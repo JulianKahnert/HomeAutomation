@@ -12,7 +12,7 @@ let package = Package(
         // 🗄 An ORM for SQL and NoSQL databases.
         .package(url: "https://github.com/vapor/fluent.git", from: "4.9.0"),
         // 🐬 Fluent driver for MySQL.
-        .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.4.0"),
+        .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.7.0"),
         // 🔵 Non-blocking, event-driven networking for Swift. Used for custom executors
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
         // other stuff

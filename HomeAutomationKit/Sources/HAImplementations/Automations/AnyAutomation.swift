@@ -10,7 +10,9 @@ import HAModels
 public enum AnyAutomation: Codable, Sendable {
     case createScene(CreateScene)
     case energyLowPrice(EnergyLowPrice)
+    #if canImport(WeatherKit)
     case gardenWatering(GardenWatering)
+    #endif
     case goodNight(GoodNight)
     case healthCheck(HealthCheck)
     case maintenanceAutomation(MaintenanceAutomation)
@@ -28,7 +30,9 @@ public enum AnyAutomation: Codable, Sendable {
         case .energyLowPrice(let energyLowPrice): return energyLowPrice
         case .motionAtNight(let motionAtNight): return motionAtNight
         case .turnOnForDuration(let turnOnForDuration): return turnOnForDuration
+        #if canImport(WeatherKit)
         case .gardenWatering(let gardenWatering): return gardenWatering
+        #endif
         case .goodNight(let goodNight): return goodNight
         case .healthCheck(let healthCheck): return healthCheck
         case .maintenanceAutomation(let maintenanceAutomation): return maintenanceAutomation
@@ -41,10 +45,9 @@ public enum AnyAutomation: Codable, Sendable {
     }
 
     public var automationTypes: [Automatable.Type] {
-        [
+        var tmp: [Automatable.Type] = [
             CreateScene.self,
             EnergyLowPrice.self,
-            GardenWatering.self,
             GoodNight.self,
             HealthCheck.self,
             MaintenanceAutomation.self,
@@ -56,6 +59,11 @@ public enum AnyAutomation: Codable, Sendable {
             UpdateScenes.self,
             WindowOpen.self
         ]
+        
+        #if canImport(WeatherKit)
+        tmp.append(GardenWatering.self)
+        #endif
+        return tmp
     }
 
     public static func create(from automation: any Automatable) -> AnyAutomation {
@@ -63,8 +71,6 @@ public enum AnyAutomation: Codable, Sendable {
             return .createScene(createScene)
         } else if let energyLowPrice = automation as? EnergyLowPrice {
             return .energyLowPrice(energyLowPrice)
-        } else if let gardenWatering = automation as? GardenWatering {
-            return .gardenWatering(gardenWatering)
         } else if let goodNight = automation as? GoodNight {
             return .goodNight(goodNight)
         } else if let healthCheck = automation as? HealthCheck {
@@ -86,6 +92,11 @@ public enum AnyAutomation: Codable, Sendable {
         } else if let windowOpen = automation as? WindowOpen {
             return .windowOpen(windowOpen)
         } else {
+            #if canImport(WeatherKit)
+            if let gardenWatering = automation as? GardenWatering {
+                return .gardenWatering(gardenWatering)
+            }
+            #endif
              fatalError(#function + ": Unsupported automation type \(type(of: automation))")
         }
     }

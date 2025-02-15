@@ -59,7 +59,7 @@ public enum AnyAutomation: Codable, Sendable {
             UpdateScenes.self,
             WindowOpen.self
         ]
-        
+
         #if canImport(WeatherKit)
         tmp.append(GardenWatering.self)
         #endif

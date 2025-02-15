@@ -14,7 +14,7 @@ struct ConfigController: RouteCollection {
         let config = routes.grouped("config")
 
         config.get(use: self.index)
-        config.post(use: self.update)
+        config.on(.POST, body: .collect(maxSize: "10mb"), use: self.update)
     }
 
     @Sendable
@@ -28,9 +28,9 @@ struct ConfigController: RouteCollection {
     @Sendable
     func update(req: Request) async throws -> ConfigDTO {
         let configDTO = try req.content.decode(ConfigDTO.self)
-        
+
         #warning("TODO: add validation of all fields")
-        
+
         try await req.application.homeAutomationConfigService.set(location: configDTO.location, automations: configDTO.automations)
 
         return configDTO

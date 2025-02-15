@@ -14,7 +14,7 @@ let package = Package(
         // 🐬 Fluent driver for MySQL.
         .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.4.0"),
         // 🔵 Non-blocking, event-driven networking for Swift. Used for custom executors
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
         // other stuff
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
         .package(path: "../HomeAutomationKit")

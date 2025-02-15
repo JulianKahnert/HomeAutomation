@@ -97,7 +97,7 @@ public enum AnyAutomation: Codable, Sendable {
                 return .gardenWatering(gardenWatering)
             }
             #endif
-             fatalError(#function + ": Unsupported automation type \(type(of: automation))")
+            fatalError(#function + ": Unsupported automation type \(type(of: automation))")
         }
     }
 }

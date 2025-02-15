@@ -1,0 +1,452 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A30AAD222C5440FB006B1BB9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30AAD212C5440FB006B1BB9 /* ContentView.swift */; };
+		A3262F7E2CD967490094F1D5 /* CircadianLightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3262F7D2CD967490094F1D5 /* CircadianLightView.swift */; };
+		A326E8212C06528B00486F8E /* HomeKitAdapterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A326E8202C06528B00486F8E /* HomeKitAdapterApp.swift */; };
+		A326E8272C06528D00486F8E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A326E8262C06528D00486F8E /* Assets.xcassets */; };
+		A326E82A2C06528D00486F8E /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A326E8292C06528D00486F8E /* Preview Assets.xcassets */; };
+		A33A6A3C2D56A29D00B92E4C /* DistributedCluster in Frameworks */ = {isa = PBXBuildFile; productRef = A33A6A3B2D56A29D00B92E4C /* DistributedCluster */; };
+		A3C778432D53917E00662E31 /* LogIntervall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C778422D53917E00662E31 /* LogIntervall.swift */; };
+		A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DA39BC2D53689700AC8512 /* HomeAutomationKit */; };
+		A3F290B22C36B96A00926098 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F290B12C36B96A00926098 /* HomeAutomationKit */; };
+		A3FA3D572D53E2C500851442 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3FA3D562D53E2C100851442 /* SettingsView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A30AAD212C5440FB006B1BB9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A31BE4172C3FE3190058F71A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		A3262F7D2CD967490094F1D5 /* CircadianLightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircadianLightView.swift; sourceTree = "<group>"; };
+		A326E81D2C06528B00486F8E /* HomeKitAdapterApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomeKitAdapterApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A326E8202C06528B00486F8E /* HomeKitAdapterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeKitAdapterApp.swift; sourceTree = "<group>"; };
+		A326E8262C06528D00486F8E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A326E8292C06528D00486F8E /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		A326E84C2C06529800486F8E /* HomeKitAdapterApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HomeKitAdapterApp.entitlements; sourceTree = "<group>"; };
+		A3C54A482CED38AE00B69A68 /* HomeAutomationKit-CI.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; name = "HomeAutomationKit-CI.xctestplan"; path = "HomeAutomationKit/HomeAutomationKit-CI.xctestplan"; sourceTree = "<group>"; };
+		A3C54A492CED390400B69A68 /* HomeAutomationKit.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; name = HomeAutomationKit.xctestplan; path = HomeAutomationKit/HomeAutomationKit.xctestplan; sourceTree = "<group>"; };
+		A3C778422D53917E00662E31 /* LogIntervall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogIntervall.swift; sourceTree = "<group>"; };
+		A3FA3D562D53E2C100851442 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A326E81A2C06528B00486F8E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3F290B22C36B96A00926098 /* HomeAutomationKit in Frameworks */,
+				A33A6A3C2D56A29D00B92E4C /* DistributedCluster in Frameworks */,
+				A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A326E8142C06528B00486F8E = {
+			isa = PBXGroup;
+			children = (
+				A3C54A482CED38AE00B69A68 /* HomeAutomationKit-CI.xctestplan */,
+				A3C54A492CED390400B69A68 /* HomeAutomationKit.xctestplan */,
+				A326E81F2C06528B00486F8E /* HomeKitAdapterApp */,
+				A326E81E2C06528B00486F8E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A326E81E2C06528B00486F8E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A326E81D2C06528B00486F8E /* HomeKitAdapterApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A326E81F2C06528B00486F8E /* HomeKitAdapterApp */ = {
+			isa = PBXGroup;
+			children = (
+				A326E84C2C06529800486F8E /* HomeKitAdapterApp.entitlements */,
+				A31BE4172C3FE3190058F71A /* Info.plist */,
+				A326E8202C06528B00486F8E /* HomeKitAdapterApp.swift */,
+				A326E8262C06528D00486F8E /* Assets.xcassets */,
+				A3FA3D582D53E85500851442 /* Helper */,
+				A326E8282C06528D00486F8E /* Preview Content */,
+				A3FA3D5B2D53E90400851442 /* Views */,
+			);
+			path = HomeKitAdapterApp;
+			sourceTree = "<group>";
+		};
+		A326E8282C06528D00486F8E /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				A326E8292C06528D00486F8E /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		A3FA3D582D53E85500851442 /* Helper */ = {
+			isa = PBXGroup;
+			children = (
+				A3C778422D53917E00662E31 /* LogIntervall.swift */,
+			);
+			path = Helper;
+			sourceTree = "<group>";
+		};
+		A3FA3D5B2D53E90400851442 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A3FA3D562D53E2C100851442 /* SettingsView.swift */,
+				A30AAD212C5440FB006B1BB9 /* ContentView.swift */,
+				A3262F7D2CD967490094F1D5 /* CircadianLightView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A326E81C2C06528B00486F8E /* HomeKitAdapterApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A326E8432C06528D00486F8E /* Build configuration list for PBXNativeTarget "HomeKitAdapterApp" */;
+			buildPhases = (
+				A326E8192C06528B00486F8E /* Sources */,
+				A326E81A2C06528B00486F8E /* Frameworks */,
+				A326E81B2C06528B00486F8E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HomeKitAdapterApp;
+			packageProductDependencies = (
+				A3F290B12C36B96A00926098 /* HomeAutomationKit */,
+				A3DA39BC2D53689700AC8512 /* HomeAutomationKit */,
+				A33A6A3B2D56A29D00B92E4C /* DistributedCluster */,
+			);
+			productName = HomeAutomation;
+			productReference = A326E81D2C06528B00486F8E /* HomeKitAdapterApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A326E8152C06528B00486F8E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					A326E81C2C06528B00486F8E = {
+						CreatedOnToolsVersion = 15.4;
+					};
+				};
+			};
+			buildConfigurationList = A326E8182C06528B00486F8E /* Build configuration list for PBXProject "HomeKitAdapterApp" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A326E8142C06528B00486F8E;
+			packageReferences = (
+				A3DA39BB2D53689700AC8512 /* XCLocalSwiftPackageReference "HomeAutomationKit" */,
+				A33A6A3A2D56A29D00B92E4C /* XCRemoteSwiftPackageReference "swift-distributed-actors" */,
+			);
+			productRefGroup = A326E81E2C06528B00486F8E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A326E81C2C06528B00486F8E /* HomeKitAdapterApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A326E81B2C06528B00486F8E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A326E82A2C06528D00486F8E /* Preview Assets.xcassets in Resources */,
+				A326E8272C06528D00486F8E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A326E8192C06528B00486F8E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3FA3D572D53E2C500851442 /* SettingsView.swift in Sources */,
+				A3C778432D53917E00662E31 /* LogIntervall.swift in Sources */,
+				A3262F7E2CD967490094F1D5 /* CircadianLightView.swift in Sources */,
+				A326E8212C06528B00486F8E /* HomeKitAdapterApp.swift in Sources */,
+				A30AAD222C5440FB006B1BB9 /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A326E8412C06528D00486F8E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A326E8422C06528D00486F8E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A326E8442C06528D00486F8E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HomeKitAdapterApp/HomeKitAdapterApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"HomeKitAdapterApp/Preview Content\"";
+				DEVELOPMENT_TEAM = 87KNVHZ8C7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HomeKitAdapterApp/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHomeKitUsageDescription = "Smart home automations";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = de.juliankahnert.HomeKitAdapterApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A326E8452C06528D00486F8E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HomeKitAdapterApp/HomeKitAdapterApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"HomeKitAdapterApp/Preview Content\"";
+				DEVELOPMENT_TEAM = 87KNVHZ8C7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HomeKitAdapterApp/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHomeKitUsageDescription = "Smart home automations";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = de.juliankahnert.HomeKitAdapterApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A326E8182C06528B00486F8E /* Build configuration list for PBXProject "HomeKitAdapterApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A326E8412C06528D00486F8E /* Debug */,
+				A326E8422C06528D00486F8E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A326E8432C06528D00486F8E /* Build configuration list for PBXNativeTarget "HomeKitAdapterApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A326E8442C06528D00486F8E /* Debug */,
+				A326E8452C06528D00486F8E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A3DA39BB2D53689700AC8512 /* XCLocalSwiftPackageReference "HomeAutomationKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = HomeAutomationKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A33A6A3A2D56A29D00B92E4C /* XCRemoteSwiftPackageReference "swift-distributed-actors" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-distributed-actors";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.7.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A33A6A3B2D56A29D00B92E4C /* DistributedCluster */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A33A6A3A2D56A29D00B92E4C /* XCRemoteSwiftPackageReference "swift-distributed-actors" */;
+			productName = DistributedCluster;
+		};
+		A3DA39BC2D53689700AC8512 /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HomeAutomationKit;
+		};
+		A3F290B12C36B96A00926098 /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HomeAutomationKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A326E8152C06528B00486F8E /* Project object */;
+}

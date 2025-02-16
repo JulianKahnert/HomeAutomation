@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import HAModels
 
 public struct HealthCheck: Automatable {
@@ -27,7 +30,7 @@ public struct HealthCheck: Automatable {
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        let data = try Data(contentsOf: url)
+        let (data, _) = try await URLSession.shared.data(from: url)
         log.debug("Healthcheck response: \(String(data: data, encoding: .utf8) ?? "")")
     }
 }

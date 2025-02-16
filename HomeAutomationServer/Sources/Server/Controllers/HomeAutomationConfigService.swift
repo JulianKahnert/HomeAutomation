@@ -13,10 +13,11 @@ import Logging
 actor HomeAutomationConfigService: Log {
     static let url = URL(fileURLWithPath: "/tmp/HomeAutomation-config.json")
     private(set) var location: Location
-    private(set) var automations: [AnyAutomation] = []
+    private(set) var automations: [AnyAutomation]
 
     init(location: Location, automations: [AnyAutomation]) {
         self.location = location
+        self.automations = automations
     }
 
     func set(location: Location, automations: [AnyAutomation]) throws {

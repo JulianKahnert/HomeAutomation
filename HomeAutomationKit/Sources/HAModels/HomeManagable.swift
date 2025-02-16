@@ -17,6 +17,7 @@ public protocol HomeManagable: Sendable {
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem
     func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
+    func addEntityHistory(_ item: EntityStorageItem) async
     func findEntity(_ entity: EntityId) async throws
 
     func perform(_ action: HomeManagableAction) async

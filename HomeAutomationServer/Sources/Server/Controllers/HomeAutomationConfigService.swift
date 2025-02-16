@@ -8,8 +8,9 @@
 import Foundation
 import HAImplementations
 import HAModels
+import Logging
 
-actor HomeAutomationConfigService {
+actor HomeAutomationConfigService: Log {
     static let url = URL(fileURLWithPath: "/tmp/HomeAutomation-config.json")
     private(set) var location: Location
     private(set) var automations: [AnyAutomation] = []
@@ -31,9 +32,15 @@ actor HomeAutomationConfigService {
         try data.write(to: Self.url)
     }
 
-    static func load() async throws -> Self {
-        let data = try Data(contentsOf: url)
-        let config = try JSONDecoder().decode(ConfigDTO.self, from: data)
-        return Self(location: config.location, automations: config.automations)
+    static func loadOrDefault() -> Self {
+        do {
+            let data = try Data(contentsOf: url)
+            let config = try JSONDecoder().decode(ConfigDTO.self, from: data)
+            return Self(location: config.location, automations: config.automations)
+        } catch {
+            log.error("Failed to parse config file - falling back to defaults: \(error)")
+            log.info("Falling back to default config: \(Location(latitude: 53.14194, longitude: 8.21292)) - automations: []")
+            return .init(location: Location(latitude: 53.14194, longitude: 8.21292), automations: [])
+        }
     }
 }

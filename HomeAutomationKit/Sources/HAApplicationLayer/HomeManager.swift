@@ -103,17 +103,17 @@ public final class HomeManager: HomeManagable {
     public func addEntityHistory(_ item: EntityStorageItem) async {
         log.debug("Adding entity item to storage \(item.entityId)")
         await entityCache.insert(item, forKey: item.entityId)
-        
+
         // persist item in the background, e.g. don't block automation execution
         Task.detached(priority: .background) {
             do {
                 if var currentItem = try await self.storageRepo.getCurrent(item.entityId) {
-                    
+
                     // found current item, save it when a change has happend
                     // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
                     currentItem.timestamp = item.timestamp
                     guard item != currentItem else { return }
-                    
+
                     try await self.storageRepo.add(item)
                 } else {
                     // no current item found add it to the store directly

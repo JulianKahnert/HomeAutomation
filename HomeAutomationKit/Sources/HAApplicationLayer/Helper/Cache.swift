@@ -11,20 +11,15 @@ actor Cache<Key: Hashable, Value> {
     private struct Entry {
         let value: Value
         let expirationDate: Date
-
-        init(value: Value, expirationDate: Date) {
-            self.value = value
-            self.expirationDate = expirationDate
-        }
     }
-    
+
     private var wrapped: [Key: Entry]
     private let entryLifetime: Duration
-    
+
     init(entryLifetime: Duration) {
         self.wrapped = [:]
         self.entryLifetime = entryLifetime
-        
+
     }
 
     func insert(_ value: Value, forKey key: Key) {

@@ -9,10 +9,14 @@ import Logging
 
 public protocol Log {
     var log: Logger { get }
+    static var log: Logger { get }
 }
 public extension Log {
-    var log: Logger {
+    static var log: Logger {
         Logger(label: String(describing: Self.self))
+    }
+    var log: Logger {
+        Self.log
     }
 }
 

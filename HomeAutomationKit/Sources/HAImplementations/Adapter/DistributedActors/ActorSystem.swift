@@ -38,7 +38,7 @@ public final class ActorSystem: Sendable {
         Task {
             for await event in self.actorSystem.cluster.events {
                 log.info("received event: \(event)")
-                }
+            }
         }
     }
 

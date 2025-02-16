@@ -35,19 +35,7 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - home automation setup
 
-    do {
-        app.homeAutomationConfigService = try await HomeAutomationConfigService.load()
-    } catch {
-        fatalError("Could not find config file from \(HomeAutomationConfigService.url)")
-//        app.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 53.14194, longitude: 8.21292), automations: [])
-//        try await app.homeAutomationConfigService.save()
-    }
-
-    let getAutomations: () async -> [any Automatable] = {
-        return await app.homeAutomationConfigService.automations
-            .map(\.automation)
-    }
-
+    app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
     let homeManager = await HomeManager(
         getAdapter: {
             return await actorSystem.resolve(.homeKitCommandReceiver)
@@ -55,24 +43,31 @@ public func configure(_ app: Application) async throws {
         storageRepo: app.entityStorageDbRepository,
         location: app.homeAutomationConfigService.location)
     app.homeManager = homeManager
+    let automationService = try AutomationService(using: homeManager,
+                                                  getAutomations: {
+        await app.homeAutomationConfigService.automations
+            .map(\.automation)
+    })
 
-    let automationManager = try AutomationService(
-        using: homeManager, getAutomations: getAutomations)
+    // MARK: - register jobs
+
+    let location = await app.homeAutomationConfigService.location
+    let jobs: [any Job] = [
+        ClockJob(location: location,
+                 homeEventsContinuation: app.homeEventsContinuation),
+        HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
+                               automationService: automationService,
+                               homeManager: app.homeManager)
+    ]
 
     Task.detached {
-        for await event in app.homeEventsStream {
-            app.logger.debug("trigger automation with \(event.description)")
-
-            // add item to history
-            switch event {
-            case .change(let item):
-                await homeManager.addEntityHistory(item)
-            case .time, .sunset, .sunrise:
-                break
+        await withTaskGroup(of: Void.self) { group in
+            for job in jobs {
+                group.addTask {
+                    await job.run()
+                }
             }
-
-            // perform automation
-            await automationManager.trigger(with: event)
+            await group.waitForAll()
         }
     }
 

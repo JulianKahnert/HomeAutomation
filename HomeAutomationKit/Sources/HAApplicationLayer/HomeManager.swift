@@ -15,6 +15,7 @@ public final class HomeManager: HomeManagable {
     private let getAdapter: () async -> any EntityAdapterable
     private let location: Location
     private var storageRepo: StorageRepository
+    private let entityCache = Cache<EntityId, EntityStorageItem>(entryLifetime: .hours(2))
     private var failedActions: [EntityId: HomeManagableAction] = [:]
 
     public init(getAdapter: @escaping () async -> any EntityAdapterable, storageRepo: StorageRepository, location: Location) {
@@ -47,6 +48,9 @@ public final class HomeManager: HomeManagable {
     }
 
     public func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
+        if let item = await entityCache.value(forKey: entityId) {
+            return item
+        }
         return try await storageRepo.getCurrent(entityId).get(with: log)
     }
 
@@ -58,8 +62,12 @@ public final class HomeManager: HomeManagable {
         return try await getAdapter().getAllEntitiesLive()
     }
 
-    public func findEntity(_ entity: EntityId) async throws {
-        return try await getAdapter().findEntity(entity)
+    public func findEntity(_ entityId: EntityId) async throws {
+        guard await entityCache.value(forKey: entityId) == nil else {
+            // found item in cache
+            return
+        }
+        return try await getAdapter().findEntity(entityId)
     }
 
     public func perform(_ action: HomeManagableAction) async {
@@ -93,23 +101,28 @@ public final class HomeManager: HomeManagable {
     }
 
     public func addEntityHistory(_ item: EntityStorageItem) async {
-        do {
-            log.debug("Adding entity item to storage \(item.entityId)")
-            if var currentItem = try await storageRepo.getCurrent(item.entityId) {
-
-                // found current item, save it when a change has happend
-                // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
-                currentItem.timestamp = item.timestamp
-                guard item != currentItem else { return }
-
-                try await storageRepo.add(item)
-            } else {
-                // no current item found add it to the store directly
-                try await storageRepo.add(item)
+        log.debug("Adding entity item to storage \(item.entityId)")
+        await entityCache.insert(item, forKey: item.entityId)
+        
+        // persist item in the background, e.g. don't block automation execution
+        Task.detached(priority: .background) {
+            do {
+                if var currentItem = try await self.storageRepo.getCurrent(item.entityId) {
+                    
+                    // found current item, save it when a change has happend
+                    // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
+                    currentItem.timestamp = item.timestamp
+                    guard item != currentItem else { return }
+                    
+                    try await self.storageRepo.add(item)
+                } else {
+                    // no current item found add it to the store directly
+                    try await self.storageRepo.add(item)
+                }
+            } catch {
+                self.log.critical("Failed to persist entity item \(error)")
+                assertionFailure()
             }
-        } catch {
-            log.critical("Failed to persist entity item \(error)")
-            assertionFailure()
         }
     }
 

@@ -27,11 +27,7 @@ public struct HealthCheck: Automatable {
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        #if DEBUG
-        log.critical("Skipping health check")
-        #else
         let data = try Data(contentsOf: url)
         log.debug("Healthcheck response: \(String(data: data, encoding: .utf8) ?? "")")
-        #endif
     }
 }

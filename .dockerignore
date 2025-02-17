@@ -1,0 +1,6 @@
+.build/
+.swiftpm/
+.github/
+docs
+HomeAutomation*
+renovate.json

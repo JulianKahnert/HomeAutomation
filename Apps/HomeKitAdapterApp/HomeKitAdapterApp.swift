@@ -5,14 +5,12 @@
 //  Created by Julian Kahnert on 28.05.24.
 //
 
-import DistributedCluster
 import HAImplementations
 import HAModels
 import Logging
 import SwiftUI
 
 let log = Logger(label: "HomeKitAdapterApp")
-// @MainActor var actorSystem: ActorSystem!
 
 @main
 struct HomeKitAdapterApp: App {

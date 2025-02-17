@@ -12,8 +12,9 @@
 		A326E8212C06528B00486F8E /* HomeKitAdapterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A326E8202C06528B00486F8E /* HomeKitAdapterApp.swift */; };
 		A326E8272C06528D00486F8E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A326E8262C06528D00486F8E /* Assets.xcassets */; };
 		A326E82A2C06528D00486F8E /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A326E8292C06528D00486F8E /* Preview Assets.xcassets */; };
-		A33A6A3C2D56A29D00B92E4C /* DistributedCluster in Frameworks */ = {isa = PBXBuildFile; productRef = A33A6A3B2D56A29D00B92E4C /* DistributedCluster */; };
 		A3C778432D53917E00662E31 /* LogIntervall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C778422D53917E00662E31 /* LogIntervall.swift */; };
+		A3CA7DAB2D63BC7D0019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */; };
+		A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */; };
 		A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DA39BC2D53689700AC8512 /* HomeAutomationKit */; };
 		A3F290B22C36B96A00926098 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F290B12C36B96A00926098 /* HomeAutomationKit */; };
 		A3FA3D572D53E2C500851442 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3FA3D562D53E2C100851442 /* SettingsView.swift */; };
@@ -28,8 +29,6 @@
 		A326E8262C06528D00486F8E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A326E8292C06528D00486F8E /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		A326E84C2C06529800486F8E /* HomeKitAdapterApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HomeKitAdapterApp.entitlements; sourceTree = "<group>"; };
-		A3C54A482CED38AE00B69A68 /* HomeAutomationKit-CI.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; name = "HomeAutomationKit-CI.xctestplan"; path = "HomeAutomationKit/HomeAutomationKit-CI.xctestplan"; sourceTree = "<group>"; };
-		A3C54A492CED390400B69A68 /* HomeAutomationKit.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; name = HomeAutomationKit.xctestplan; path = HomeAutomationKit/HomeAutomationKit.xctestplan; sourceTree = "<group>"; };
 		A3C778422D53917E00662E31 /* LogIntervall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogIntervall.swift; sourceTree = "<group>"; };
 		A3FA3D562D53E2C100851442 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -40,8 +39,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A3F290B22C36B96A00926098 /* HomeAutomationKit in Frameworks */,
-				A33A6A3C2D56A29D00B92E4C /* DistributedCluster in Frameworks */,
 				A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */,
+				A3CA7DAB2D63BC7D0019691F /* HomeAutomationKit in Frameworks */,
+				A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -51,8 +51,6 @@
 		A326E8142C06528B00486F8E = {
 			isa = PBXGroup;
 			children = (
-				A3C54A482CED38AE00B69A68 /* HomeAutomationKit-CI.xctestplan */,
-				A3C54A492CED390400B69A68 /* HomeAutomationKit.xctestplan */,
 				A326E81F2C06528B00486F8E /* HomeKitAdapterApp */,
 				A326E81E2C06528B00486F8E /* Products */,
 			);
@@ -125,7 +123,8 @@
 			packageProductDependencies = (
 				A3F290B12C36B96A00926098 /* HomeAutomationKit */,
 				A3DA39BC2D53689700AC8512 /* HomeAutomationKit */,
-				A33A6A3B2D56A29D00B92E4C /* DistributedCluster */,
+				A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */,
+				A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */,
 			);
 			productName = HomeAutomation;
 			productReference = A326E81D2C06528B00486F8E /* HomeKitAdapterApp.app */;
@@ -156,8 +155,7 @@
 			);
 			mainGroup = A326E8142C06528B00486F8E;
 			packageReferences = (
-				A3DA39BB2D53689700AC8512 /* XCLocalSwiftPackageReference "HomeAutomationKit" */,
-				A33A6A3A2D56A29D00B92E4C /* XCRemoteSwiftPackageReference "swift-distributed-actors" */,
+				A3CA7DAC2D63BDD90019691F /* XCLocalSwiftPackageReference "../../HomeAutomation" */,
 			);
 			productRefGroup = A326E81E2C06528B00486F8E /* Products */;
 			projectDirPath = "";
@@ -415,28 +413,20 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		A3DA39BB2D53689700AC8512 /* XCLocalSwiftPackageReference "HomeAutomationKit" */ = {
+		A3CA7DAC2D63BDD90019691F /* XCLocalSwiftPackageReference "../../HomeAutomation" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = HomeAutomationKit;
+			relativePath = ../../HomeAutomation;
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		A33A6A3A2D56A29D00B92E4C /* XCRemoteSwiftPackageReference "swift-distributed-actors" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-distributed-actors";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.7.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
-		A33A6A3B2D56A29D00B92E4C /* DistributedCluster */ = {
+		A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A33A6A3A2D56A29D00B92E4C /* XCRemoteSwiftPackageReference "swift-distributed-actors" */;
-			productName = DistributedCluster;
+			productName = HomeAutomationKit;
+		};
+		A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HomeAutomationKit;
 		};
 		A3DA39BC2D53689700AC8512 /* HomeAutomationKit */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -16,6 +16,7 @@
 		A3CA7DAB2D63BC7D0019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */; };
 		A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */; };
 		A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DA39BC2D53689700AC8512 /* HomeAutomationKit */; };
+		A3EC945D2D63E8870009361C /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3EC945C2D63E8870009361C /* HomeAutomationKit */; };
 		A3F290B22C36B96A00926098 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F290B12C36B96A00926098 /* HomeAutomationKit */; };
 		A3FA3D572D53E2C500851442 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3FA3D562D53E2C100851442 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
@@ -42,6 +43,7 @@
 				A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */,
 				A3CA7DAB2D63BC7D0019691F /* HomeAutomationKit in Frameworks */,
 				A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */,
+				A3EC945D2D63E8870009361C /* HomeAutomationKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +127,7 @@
 				A3DA39BC2D53689700AC8512 /* HomeAutomationKit */,
 				A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */,
 				A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */,
+				A3EC945C2D63E8870009361C /* HomeAutomationKit */,
 			);
 			productName = HomeAutomation;
 			productReference = A326E81D2C06528B00486F8E /* HomeKitAdapterApp.app */;
@@ -155,7 +158,7 @@
 			);
 			mainGroup = A326E8142C06528B00486F8E;
 			packageReferences = (
-				A3CA7DAC2D63BDD90019691F /* XCLocalSwiftPackageReference "../../HomeAutomation" */,
+				A3EC945E2D63E8C40009361C /* XCRemoteSwiftPackageReference "HomeAutomation" */,
 			);
 			productRefGroup = A326E81E2C06528B00486F8E /* Products */;
 			projectDirPath = "";
@@ -412,12 +415,16 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		A3CA7DAC2D63BDD90019691F /* XCLocalSwiftPackageReference "../../HomeAutomation" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../HomeAutomation;
+/* Begin XCRemoteSwiftPackageReference section */
+		A3EC945E2D63E8C40009361C /* XCRemoteSwiftPackageReference "HomeAutomation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/JulianKahnert/HomeAutomation";
+			requirement = {
+				branch = develop;
+				kind = branch;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */ = {
@@ -429,6 +436,10 @@
 			productName = HomeAutomationKit;
 		};
 		A3DA39BC2D53689700AC8512 /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HomeAutomationKit;
+		};
+		A3EC945C2D63E8870009361C /* HomeAutomationKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = HomeAutomationKit;
 		};

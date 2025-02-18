@@ -32,6 +32,7 @@ public final class ActorSystem: Sendable {
         // setup cluster
         var settings = ClusterSystemSettings(name: nodeId.id, host: host, port: port)
         settings.discovery = ServiceDiscoverySettings(static: nodes)
+        settings.logging.logLevel = .warning
         actorSystem = await ClusterSystem(nodeId.id, settings: settings)
 
         // start logging

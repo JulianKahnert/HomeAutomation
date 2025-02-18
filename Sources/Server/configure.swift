@@ -38,7 +38,7 @@ public func configure(_ app: Application) async throws {
     app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
     let homeManager = await HomeManager(
         getAdapter: {
-            return await actorSystem.resolve(.homeKitCommandReceiver)
+            await actorSystem.resolve(.homeKitCommandReceiver)
         },
         storageRepo: app.entityStorageDbRepository,
         location: app.homeAutomationConfigService.location)

@@ -12,13 +12,13 @@ import Logging
 @HomeManagerActor
 public final class HomeManager: HomeManagable {
     private let log = Logger(label: "HomeManager")
-    private let getAdapter: () async -> any EntityAdapterable
+    private let getAdapter: () async -> (any EntityAdapterable)?
     private let location: Location
     private var storageRepo: StorageRepository
     private let entityCache = Cache<EntityId, EntityStorageItem>(entryLifetime: .hours(2))
     private var failedActions: [EntityId: HomeManagableAction] = [:]
 
-    public init(getAdapter: @escaping () async -> any EntityAdapterable, storageRepo: StorageRepository, location: Location) {
+    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, location: Location) {
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
         self.location = location
@@ -57,7 +57,7 @@ public final class HomeManager: HomeManagable {
     }
 
     public func getAllEntitiesLive() async throws -> [EntityStorageItem] {
-        return try await getAdapter().getAllEntitiesLive()
+        return try await getAdapter().get(with: log).getAllEntitiesLive()
     }
 
     public func findEntity(_ entityId: EntityId) async throws {
@@ -65,7 +65,7 @@ public final class HomeManager: HomeManagable {
             // found item in cache
             return
         }
-        return try await getAdapter().findEntity(entityId)
+        return try await getAdapter().get(with: log).findEntity(entityId)
     }
 
     public func perform(_ action: HomeManagableAction) async {
@@ -75,7 +75,7 @@ public final class HomeManager: HomeManagable {
 
     private func perform(_ action: HomeManagableAction, addToFaliedActions: Bool) async {
         do {
-            try await getAdapter().perform(action)
+            try await getAdapter().get(with: log).perform(action)
         } catch {
             let entityId = action.entityId
 
@@ -92,7 +92,7 @@ public final class HomeManager: HomeManagable {
 
     public func trigger(scene sceneName: String) async {
         do {
-            try await getAdapter().trigger(scene: sceneName)
+            try await getAdapter().get(with: log).trigger(scene: sceneName)
         } catch {
             log.critical("Failed to trigger scene [\(sceneName)]\n\(error)")
         }

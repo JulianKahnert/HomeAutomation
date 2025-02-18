@@ -52,6 +52,9 @@ struct HomeKitAdapterApp: App {
                     do {
                         if receiver == nil {
                             receiver = await actorSystem.resolve(.homeEventReceiver)
+                            if receiver == nil {
+                                log.error("Failed to resolve HomeEventReceiver actor")
+                            }
                         }
 
                         // this might be very slow, when no server is connected

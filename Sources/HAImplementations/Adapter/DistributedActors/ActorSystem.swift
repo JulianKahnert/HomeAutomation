@@ -54,8 +54,8 @@ public final class ActorSystem: Sendable {
         return actor
     }
 
-    public func resolve<Guest>(_ key: DistributedReception.Key<Guest>) async -> Guest where Guest: DistributedActor, Guest.ActorSystem == ClusterSystem {
-        return await actorSystem.receptionist.lookup(key).first!
+    public func resolve<Guest>(_ key: DistributedReception.Key<Guest>) async -> Guest? where Guest: DistributedActor, Guest.ActorSystem == ClusterSystem {
+        return await actorSystem.receptionist.lookup(key).first
     }
 
     public func joined(within duration: Duration) async throws {

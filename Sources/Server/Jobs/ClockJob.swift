@@ -13,7 +13,7 @@ struct ClockJob: Job {
     let homeEventsContinuation: AsyncStream<HomeEvent>.Continuation
 
     func run() async {
-        for await date in Timer.publish(every: .seconds(5)) {
+        for await date in Timer.publish(every: .minutes(1)) {
             // trigger stream event
             homeEventsContinuation.yield(.time(date: date))
 

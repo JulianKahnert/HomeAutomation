@@ -9,6 +9,7 @@ import Foundation
 import HAModels
 
 public struct PoolPump: Automatable {
+    public var isActive = true
     public let name: String
     // switches that should be ACTIVATED when the energy price is low
     public let pumpSwitch: SwitchDevice

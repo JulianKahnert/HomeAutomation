@@ -13,6 +13,7 @@ import WeatherKit
 public struct GardenWatering: Automatable {
     private static let weatherService = WeatherService.shared
 
+    public var isActive = true
     public let name: String
     public let time: Time
     public let location: Location

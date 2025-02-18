@@ -18,6 +18,7 @@ public struct UpdateScenes: Automatable {
     static let sceneNameAllOn = "Alles An"
     static let sceneNameAllOff = "Alles Aus"
 
+    public var isActive = true
     public let name: String
     public let time: Time
     public var triggerEntityIds = Set<EntityId>()

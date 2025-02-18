@@ -15,6 +15,7 @@ public struct MotionAtNight: Automatable {
     // threshold under which the automation should be triggered
     private static let thresholdInLux = 60.0
 
+    public var isActive = true
     public let name: String
     public let noMotionWait: Duration
     public let dimWait: Duration

@@ -12,6 +12,7 @@ public struct Turn: Automatable {
     public enum State: String, Sendable, Codable {
         case on, off
     }
+    public var isActive = true
     public let name: String
     public let state: State
     public let time: Time

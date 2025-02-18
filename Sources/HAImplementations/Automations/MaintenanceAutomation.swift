@@ -9,6 +9,7 @@ import Foundation
 import HAModels
 
 public struct MaintenanceAutomation: Automatable {
+    public var isActive = true
     public let name: String
     public let triggerEntityIds = Set<EntityId>()
     public let time: Time

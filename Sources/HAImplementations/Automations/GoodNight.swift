@@ -9,6 +9,7 @@ import Foundation
 import HAModels
 
 public struct GoodNight: Automatable {
+    public var isActive = true
     public let name: String
     public let time: Time
     public let motionSensors: [MotionSensorDevice]

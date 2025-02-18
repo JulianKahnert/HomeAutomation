@@ -9,6 +9,7 @@ import Foundation
 import HAModels
 
 public struct EnergyLowPrice: Automatable {
+    public var isActive = true
     public let name: String
     // the devices will only be triggered, if the price is below this threshold
     private static let thresholdInEUR = 0.18

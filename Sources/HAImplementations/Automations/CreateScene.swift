@@ -9,6 +9,7 @@ import Foundation
 import HAModels
 
 public struct CreateScene: Automatable {
+    public var isActive = true
     public let name: String
     public let time: Time
     public let sceneName: String

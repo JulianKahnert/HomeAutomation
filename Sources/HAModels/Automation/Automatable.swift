@@ -15,6 +15,9 @@ import Logging
 ///
 /// **Attention:** All new scenes must also be added to `AnyAutomation`.
 public protocol Automatable: Sendable, Codable {
+    
+    /// Activate/deactive this automation.
+    var isActive: Bool { get set }
 
     /// The unique name of the automation.
     var name: String { get }

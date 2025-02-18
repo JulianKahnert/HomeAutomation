@@ -9,6 +9,7 @@ import Foundation
 import HAModels
 
 public struct WindowOpen: Automatable {
+    public var isActive = true
     public let name: String
     public let windowContact: ContactSensorDevice
     public let notificationWait: Duration

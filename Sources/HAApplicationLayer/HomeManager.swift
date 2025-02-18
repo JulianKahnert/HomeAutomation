@@ -34,9 +34,7 @@ public final class HomeManager: HomeManagable {
 //        }
 
         Task.detached(priority: .low) {
-            while true {
-                try! await Task.sleep(for: .seconds(5))
-
+            for await _ in Timer.publish(every: .seconds(5)) {
                 let actions = await self.popAllFailedActions()
                 for action in actions {
                     self.log.debug("Performing failed action again: \(action)")

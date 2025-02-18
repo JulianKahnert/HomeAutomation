@@ -34,9 +34,7 @@ extension HomeKitAdapter {
 
             // the connection to HomeKit seems to breake after x hours (e.g. no delegates will be called anymore), we try to reset the connection to avoid interruptions
             Task.detached(priority: .low) { [weak self] in
-                while true {
-                    try! await Task.sleep(for: .hours(6))
-
+                for await _ in Timer.publish(every: .hours(6)) {
                     guard let self else { continue }
 
                     log.info("Resetting HMHomeManager to create a new HomeKit connection")

@@ -7,12 +7,14 @@
 
 import Foundation
 import HAModels
+import Logging
 
-struct ClockJob: Job {
+struct ClockJob: Job, Log {
     let location: Location
     let homeEventsContinuation: AsyncStream<HomeEvent>.Continuation
 
     func run() async {
+        log.debug("Starting ClockJob")
         for await date in Timer.publish(every: .minutes(1)) {
             // trigger stream event
             homeEventsContinuation.yield(.time(date: date))

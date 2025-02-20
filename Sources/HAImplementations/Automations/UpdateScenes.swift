@@ -7,9 +7,6 @@
 
 import Foundation
 import HAModels
-#if canImport(HomeKit)
-import HomeKit.HMCharacteristic
-#endif
 
 public struct UpdateScenes: Automatable {
     static let allScenesSkippedServiceNames = Set(["Wärmepumpe geringer Strompreis Modus"])
@@ -41,7 +38,6 @@ public struct UpdateScenes: Automatable {
         for entity in entities {
             guard !Self.sceneGoodNightSkippedServiceNames.contains(entity.entityId.name) else { continue }
 
-            #if canImport(HomeKit)
             if entity.isDeviceOn != nil {
                 await hm.perform(.addEntityToScene(entity.entityId, sceneName: Self.sceneNameGoodNight, targetValue: .off))
             } else if entity.isDoorLocked != nil {
@@ -50,10 +46,6 @@ public struct UpdateScenes: Automatable {
 //                // turn on all heaters after they might be turned of for the fire place
 //                await hm.perform(.addEntityToScene(entity.entityId, sceneName: Self.sceneNameGoodNight, targetValue: .on))
             }
-            #else
-            log.critical("Running this automation in without HomeKit is not possible")
-            assertionFailure("Running this automation in without HomeKit is not possible")
-            #endif
         }
 
         try await Task.sleep(for: .seconds(2))

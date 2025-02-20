@@ -36,8 +36,8 @@ docker container ls
 docker logs CONTAINER_ID
 
 # build & run swift ubuntu container locally
-docker run -it -v ${PWD}:/code swift:6.0-noble /bin/bash
+docker run -it --workdir /code -v ${PWD}:/code swift:6.0-noble /bin/bash
 
-cd /code
+swift build
 TZ=Europe/Berlin swift run Server serve
 ```

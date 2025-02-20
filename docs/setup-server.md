@@ -23,7 +23,7 @@ docker-compose down
 
 ```
 # only start db
-docker-compose up db 
+docker-compose up db
 
 # set log level
 LOG_LEVEL=trace docker-compose up app
@@ -37,4 +37,7 @@ docker logs CONTAINER_ID
 
 # build & run swift ubuntu container locally
 docker run -it -v ${PWD}:/code swift:6.0-noble /bin/bash
+
+cd /code
+TZ=Europe/Berlin swift run Server serve
 ```

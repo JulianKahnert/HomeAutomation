@@ -4,12 +4,21 @@ import HAImplementations
 import HAModels
 import Logging
 import Vapor
+import CoreFoundation
 
 // public distributed actor HomeKitCommandReceiver: EntityAdapterable {  // this crashes the 6.0.3 swift compiler on linux so we moved it to an extension
 extension HomeKitCommandReceiver: EntityAdapterable {}
 
 // configures your application
 public func configure(_ app: Application) async throws {
+    
+    // change time zone if it is set as the TZ environment variable
+    // ATTENTION: DO NOT USE TimeZone.current before this! I will not change after first use
+    if let timeZoneString = Environment.get("TZ") {
+        setenv("TZ", timeZoneString, 1)
+        CFTimeZoneResetSystem()
+    }
+    app.logger.info("Using timezone: \(TimeZone.current.description)")
 
     // MARK: - database setup
 

@@ -1,5 +1,5 @@
 //
-//  ActorSystem+Address.swift
+//  CustomActorSystem+Address.swift
 //
 //
 //  Created by Julian Kahnert on 06.02.25.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension ActorSystem {
+extension CustomActorSystem {
     public struct Address: Codable, Equatable, CustomStringConvertible {
         let host: String
         let port: Int
@@ -23,7 +23,7 @@ extension ActorSystem {
     }
 }
 
-extension ActorSystem.Address: RawRepresentable {
+extension CustomActorSystem.Address: RawRepresentable {
     private static let separator = "###"
     public var rawValue: String {
         "\(host)\(Self.separator)\(port)"

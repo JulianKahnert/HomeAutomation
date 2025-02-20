@@ -1,5 +1,5 @@
 //
-//  ActorSystem.swift
+//  CustomActorSystem.swift
 //  HomeAutomationServer
 //
 //  Created by Julian Kahnert on 06.02.25.
@@ -17,7 +17,7 @@ public struct NodeIdentity: Sendable {
 }
 extension ClusterSystem: Sendable {}
 
-public final class ActorSystem: Sendable {
+public final class CustomActorSystem: Sendable {
     private let log = Logger(label: "ActorSystem")
     private let actorSystem: ClusterSystem
 
@@ -43,9 +43,13 @@ public final class ActorSystem: Sendable {
         }
     }
 
-    // TODO: remove this
-    public var webSocketActorSystem: ClusterSystem {
-        actorSystem
+    public var endpointDescription: String {
+        actorSystem.cluster.endpoint.description
+    }
+
+    public func makeLocalActor<Guest>(actorId: DistributedReception.Key<Guest>, _ factory: (ClusterSystem) -> Guest) -> Guest
+        where Guest: DistributedActor, Guest.ActorSystem == ClusterSystem {
+        return factory(actorSystem)
     }
 
     @discardableResult
@@ -54,8 +58,13 @@ public final class ActorSystem: Sendable {
         return actor
     }
 
-    public func resolve<Guest>(_ key: DistributedReception.Key<Guest>) async -> Guest? where Guest: DistributedActor, Guest.ActorSystem == ClusterSystem {
+    public func lookup<Guest>(_ key: DistributedReception.Key<Guest>) async -> Guest? where Guest: DistributedActor, Guest.ActorSystem == ClusterSystem {
         return await actorSystem.receptionist.lookup(key).first
+    }
+
+    public func listing<Guest>(of key: DistributedReception.Key<Guest>) async -> DistributedReception.GuestListing<Guest>
+    where Guest: DistributedActor, Guest.ActorSystem == ClusterSystem {
+        return await actorSystem.receptionist.listing(of: key)
     }
 
     public func joined(within duration: Duration) async throws {

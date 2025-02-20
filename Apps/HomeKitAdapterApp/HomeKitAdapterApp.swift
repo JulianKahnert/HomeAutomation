@@ -28,7 +28,7 @@ struct HomeKitAdapterApp: App {
             }
             .task {
                 log.info("runloop task called")
-                let actorSystem = await ActorSystem(nodeId: .homeKitAdapter, port: 7777)
+                let actorSystem = await CustomActorSystem(nodeId: .homeKitAdapter, port: 7777)
 
                 // do not start run loop when running in preview canvas
                 guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
@@ -40,18 +40,27 @@ struct HomeKitAdapterApp: App {
                     entityStreamContinuation: entityStreamContinuation)
 
                 #warning("TODO: save this actor properly somewhere else to keep a reference to it")
-                let commandReceiver = HomeKitCommandReceiver(actorSystem: actorSystem.webSocketActorSystem, adapter: adapter)
+                let commandReceiver = actorSystem.makeLocalActor(actorId: .homeKitCommandReceiver) { system in
+                    HomeKitCommandReceiver(actorSystem: system, adapter: adapter)
+                }
                 _ = await actorSystem.checkIn(actorId: .homeKitCommandReceiver, commandReceiver)
                 try! await actorSystem.joined(within: .seconds(10))
 
                 var receiver: HomeEventReceiver?
+                Task {
+                    for await foundReceiver in await actorSystem.listing(of: .homeEventReceiver) {
+                        log.info("Get new HomeEventReceiver")
+                        receiver = foundReceiver
+                    }
+                }
+
                 for await entity in entityStream {
                     // saving the data locally for the ui
                     self.entities = self.entities.suffix(99) + [entity]
 
                     do {
                         if receiver == nil {
-                            receiver = await actorSystem.resolve(.homeEventReceiver)
+                            receiver = await actorSystem.lookup(.homeEventReceiver)
                             if receiver == nil {
                                 log.error("Failed to resolve HomeEventReceiver actor")
                             }

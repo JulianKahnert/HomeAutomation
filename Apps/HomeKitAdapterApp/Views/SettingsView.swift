@@ -10,13 +10,13 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var serverAddress: ActorSystem.Address
+    @Binding var serverAddress: CustomActorSystem.Address
 
     @State private var host = "localhost"
     @State private var port = 8888
 
-    var newServerAddress: ActorSystem.Address {
-        ActorSystem.Address(host: host, port: port)
+    var newServerAddress: CustomActorSystem.Address {
+        CustomActorSystem.Address(host: host, port: port)
     }
 
     var body: some View {

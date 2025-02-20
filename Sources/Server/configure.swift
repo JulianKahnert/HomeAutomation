@@ -37,8 +37,10 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - actor system setup
 
-    let actorSystem = await ActorSystem(nodeId: .server, port: 8888)
-    let eventReceiver = HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: actorSystem.webSocketActorSystem)
+    let actorSystem = await CustomActorSystem(nodeId: .server, port: 8888)
+    let eventReceiver = actorSystem.makeLocalActor(actorId: .homeEventReceiver) { system in
+        HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: system)
+    }
     await actorSystem.checkIn(actorId: .homeEventReceiver, eventReceiver)
     app.homeEventReceiver = eventReceiver
 
@@ -47,7 +49,7 @@ public func configure(_ app: Application) async throws {
     app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
     let homeManager = await HomeManager(
         getAdapter: {
-            await actorSystem.resolve(.homeKitCommandReceiver)
+            await actorSystem.lookup(.homeKitCommandReceiver)
         },
         storageRepo: app.entityStorageDbRepository,
         location: app.homeAutomationConfigService.location)
@@ -82,7 +84,7 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - register routes
 
-    app.logger.notice("ActorSystem server running on \(actorSystem.webSocketActorSystem.cluster.node.host):\(actorSystem.webSocketActorSystem.cluster.node.port)")
+    app.logger.notice("CustomActorSystem server running on \(actorSystem.endpointDescription)")
 
     // register routes
     try routes(app)

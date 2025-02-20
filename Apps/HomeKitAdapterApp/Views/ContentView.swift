@@ -13,7 +13,7 @@ import SwiftUI
 struct ContentView: View {
     @Binding var entities: [EntityStorageItem]
     @State private var showSettings = false
-    @AppStorage("ActorSystemServerAddress") private var serverAddress = ActorSystem.Address(host: "localhost", port: 8888)
+    @AppStorage("ActorSystemServerAddress") private var serverAddress = CustomActorSystem.Address(host: "localhost", port: 8888)
 
     var body: some View {
         List(entities.reversed(), id: \.self) { (item: EntityStorageItem) in
@@ -111,7 +111,7 @@ struct ContentView: View {
         }
     }
 
-    private func serverAddressChanged(to address: ActorSystem.Address) {
+    private func serverAddressChanged(to address: CustomActorSystem.Address) {
         Task {
             do {
                 #warning("TODO: add this again")

@@ -38,11 +38,14 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
             .query(on: database)
             .filter(\.$entityPlaceId == entityId.placeId)
             .filter(\.$entityServiceName == entityId.name)
-            .filter(\.$entityCharacteristicsName == entityId.characteristicsName)
             .filter(\.$entityCharacteristicType == entityId.characteristicType.rawValue)
             .sort(\.$timestamp, .descending)
             .all()
-            .lazy
+            .filter { item in
+                guard let lhs = item.entityCharacteristicsName,
+                      let rhs = entityId.characteristicsName else { return true }
+                return lhs == rhs
+            }
             .prefix(2)
 
         guard items.count == 2 else {

@@ -26,7 +26,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.3"),
         //        .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
-        .package(url: "https://github.com/apple/swift-distributed-actors", branch: "main"),
+        .package(url: "https://github.com/apple/swift-distributed-actors", branch: "main")
     ],
     targets: [
         .executableTarget(
@@ -40,14 +40,14 @@ let package = Package(
                 .product(name: "FluentMySQLDriver", package: "fluent-mysql-driver"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio")
             ]
         ),
         .target(
             name: "HAModels",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ]
         ),
         .target(
@@ -57,7 +57,7 @@ let package = Package(
                 "HAModels",
 //                "TibberSwift",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-                .product(name: "DistributedCluster", package: "swift-distributed-actors"),
+                .product(name: "DistributedCluster", package: "swift-distributed-actors")
             ]
         ),
         .target(
@@ -65,7 +65,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 "HAModels",
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ]
         ),
         .testTarget(
@@ -75,8 +75,8 @@ let package = Package(
                 "HAModels",
                 "HAImplementations",
                 "HAApplicationLayer",
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ]
-        ),
+        )
     ]
 )

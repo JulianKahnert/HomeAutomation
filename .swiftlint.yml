@@ -1,6 +1,5 @@
 excluded: # paths to ignore during linting. Takes precedence over `included`.
-  - HomeAutomationKit/.build/*
-  - HomeAutomationServer/.build/*
+  - .build/*
 
 opt_in_rules:
   - attributes

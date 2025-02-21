@@ -7,31 +7,31 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A30AAD222C5440FB006B1BB9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30AAD212C5440FB006B1BB9 /* ContentView.swift */; };
-		A3262F7E2CD967490094F1D5 /* CircadianLightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3262F7D2CD967490094F1D5 /* CircadianLightView.swift */; };
-		A326E8212C06528B00486F8E /* HomeKitAdapterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A326E8202C06528B00486F8E /* HomeKitAdapterApp.swift */; };
-		A326E8272C06528D00486F8E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A326E8262C06528D00486F8E /* Assets.xcassets */; };
-		A326E82A2C06528D00486F8E /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A326E8292C06528D00486F8E /* Preview Assets.xcassets */; };
-		A3C778432D53917E00662E31 /* LogIntervall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C778422D53917E00662E31 /* LogIntervall.swift */; };
+		A3BC6BAC2D6916E3001BE1D5 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */; };
+		A3BC6BAD2D6916E3001BE1D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */; };
+		A3BC6BAE2D6916E3001BE1D5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA82D6916E3001BE1D5 /* ContentView.swift */; };
+		A3BC6BAF2D6916E3001BE1D5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA92D6916E3001BE1D5 /* SettingsView.swift */; };
+		A3BC6BB02D6916E3001BE1D5 /* CircadianLightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */; };
+		A3BC6BB12D6916E3001BE1D5 /* HomeKitAdapterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA32D6916E3001BE1D5 /* HomeKitAdapterApp.swift */; };
+		A3BC6BB22D6916E3001BE1D5 /* LogIntervall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6B912D6916E3001BE1D5 /* LogIntervall.swift */; };
 		A3CA7DAB2D63BC7D0019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */; };
 		A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */; };
 		A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DA39BC2D53689700AC8512 /* HomeAutomationKit */; };
 		A3EC945D2D63E8870009361C /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3EC945C2D63E8870009361C /* HomeAutomationKit */; };
 		A3F290B22C36B96A00926098 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F290B12C36B96A00926098 /* HomeAutomationKit */; };
-		A3FA3D572D53E2C500851442 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3FA3D562D53E2C100851442 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A30AAD212C5440FB006B1BB9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		A31BE4172C3FE3190058F71A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		A3262F7D2CD967490094F1D5 /* CircadianLightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircadianLightView.swift; sourceTree = "<group>"; };
 		A326E81D2C06528B00486F8E /* HomeKitAdapterApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomeKitAdapterApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A326E8202C06528B00486F8E /* HomeKitAdapterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeKitAdapterApp.swift; sourceTree = "<group>"; };
-		A326E8262C06528D00486F8E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A326E8292C06528D00486F8E /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		A326E84C2C06529800486F8E /* HomeKitAdapterApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HomeKitAdapterApp.entitlements; sourceTree = "<group>"; };
-		A3C778422D53917E00662E31 /* LogIntervall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogIntervall.swift; sourceTree = "<group>"; };
-		A3FA3D562D53E2C100851442 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A3BC6B912D6916E3001BE1D5 /* LogIntervall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogIntervall.swift; sourceTree = "<group>"; };
+		A3BC6BA22D6916E3001BE1D5 /* HomeKitAdapterApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HomeKitAdapterApp.entitlements; sourceTree = "<group>"; };
+		A3BC6BA32D6916E3001BE1D5 /* HomeKitAdapterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeKitAdapterApp.swift; sourceTree = "<group>"; };
+		A3BC6BA42D6916E3001BE1D5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircadianLightView.swift; sourceTree = "<group>"; };
+		A3BC6BA82D6916E3001BE1D5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A3BC6BA92D6916E3001BE1D5 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,7 +53,14 @@
 		A326E8142C06528B00486F8E = {
 			isa = PBXGroup;
 			children = (
-				A326E81F2C06528B00486F8E /* HomeKitAdapterApp */,
+				A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */,
+				A3BC6B922D6916E3001BE1D5 /* Helper */,
+				A3BC6BA12D6916E3001BE1D5 /* HomeAutomationKit */,
+				A3BC6BA22D6916E3001BE1D5 /* HomeKitAdapterApp.entitlements */,
+				A3BC6BA32D6916E3001BE1D5 /* HomeKitAdapterApp.swift */,
+				A3BC6BA42D6916E3001BE1D5 /* Info.plist */,
+				A3BC6BA62D6916E3001BE1D5 /* Preview Content */,
+				A3BC6BAA2D6916E3001BE1D5 /* Views */,
 				A326E81E2C06528B00486F8E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -66,42 +73,147 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A326E81F2C06528B00486F8E /* HomeKitAdapterApp */ = {
+		A3BC6B922D6916E3001BE1D5 /* Helper */ = {
 			isa = PBXGroup;
 			children = (
-				A326E84C2C06529800486F8E /* HomeKitAdapterApp.entitlements */,
-				A31BE4172C3FE3190058F71A /* Info.plist */,
-				A326E8202C06528B00486F8E /* HomeKitAdapterApp.swift */,
-				A326E8262C06528D00486F8E /* Assets.xcassets */,
-				A3FA3D582D53E85500851442 /* Helper */,
-				A326E8282C06528D00486F8E /* Preview Content */,
-				A3FA3D5B2D53E90400851442 /* Views */,
-			);
-			path = HomeKitAdapterApp;
-			sourceTree = "<group>";
-		};
-		A326E8282C06528D00486F8E /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				A326E8292C06528D00486F8E /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
-			sourceTree = "<group>";
-		};
-		A3FA3D582D53E85500851442 /* Helper */ = {
-			isa = PBXGroup;
-			children = (
-				A3C778422D53917E00662E31 /* LogIntervall.swift */,
+				A3BC6B912D6916E3001BE1D5 /* LogIntervall.swift */,
 			);
 			path = Helper;
 			sourceTree = "<group>";
 		};
-		A3FA3D5B2D53E90400851442 /* Views */ = {
+		A3BC6B932D6916E3001BE1D5 /* HAApplicationLayer */ = {
 			isa = PBXGroup;
 			children = (
-				A3FA3D562D53E2C100851442 /* SettingsView.swift */,
-				A30AAD212C5440FB006B1BB9 /* ContentView.swift */,
-				A3262F7D2CD967490094F1D5 /* CircadianLightView.swift */,
+			);
+			path = HAApplicationLayer;
+			sourceTree = "<group>";
+		};
+		A3BC6B942D6916E3001BE1D5 /* HAConfig */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = HAConfig;
+			sourceTree = "<group>";
+		};
+		A3BC6B952D6916E3001BE1D5 /* Adapter */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Adapter;
+			sourceTree = "<group>";
+		};
+		A3BC6B962D6916E3001BE1D5 /* Automations */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Automations;
+			sourceTree = "<group>";
+		};
+		A3BC6B972D6916E3001BE1D5 /* Entities */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Entities;
+			sourceTree = "<group>";
+		};
+		A3BC6B982D6916E3001BE1D5 /* HAImplementations */ = {
+			isa = PBXGroup;
+			children = (
+				A3BC6B952D6916E3001BE1D5 /* Adapter */,
+				A3BC6B962D6916E3001BE1D5 /* Automations */,
+				A3BC6B972D6916E3001BE1D5 /* Entities */,
+			);
+			path = HAImplementations;
+			sourceTree = "<group>";
+		};
+		A3BC6B992D6916E3001BE1D5 /* Entities */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Entities;
+			sourceTree = "<group>";
+		};
+		A3BC6B9A2D6916E3001BE1D5 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		A3BC6B9B2D6916E3001BE1D5 /* Helper */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Helper;
+			sourceTree = "<group>";
+		};
+		A3BC6B9C2D6916E3001BE1D5 /* HAModels */ = {
+			isa = PBXGroup;
+			children = (
+				A3BC6B992D6916E3001BE1D5 /* Entities */,
+				A3BC6B9A2D6916E3001BE1D5 /* Extensions */,
+				A3BC6B9B2D6916E3001BE1D5 /* Helper */,
+			);
+			path = HAModels;
+			sourceTree = "<group>";
+		};
+		A3BC6B9D2D6916E3001BE1D5 /* HomeAutomationKit */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = HomeAutomationKit;
+			sourceTree = "<group>";
+		};
+		A3BC6B9E2D6916E3001BE1D5 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A3BC6B932D6916E3001BE1D5 /* HAApplicationLayer */,
+				A3BC6B942D6916E3001BE1D5 /* HAConfig */,
+				A3BC6B982D6916E3001BE1D5 /* HAImplementations */,
+				A3BC6B9C2D6916E3001BE1D5 /* HAModels */,
+				A3BC6B9D2D6916E3001BE1D5 /* HomeAutomationKit */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A3BC6B9F2D6916E3001BE1D5 /* HomeAutomationKitTests */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = HomeAutomationKitTests;
+			sourceTree = "<group>";
+		};
+		A3BC6BA02D6916E3001BE1D5 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				A3BC6B9F2D6916E3001BE1D5 /* HomeAutomationKitTests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		A3BC6BA12D6916E3001BE1D5 /* HomeAutomationKit */ = {
+			isa = PBXGroup;
+			children = (
+				A3BC6B9E2D6916E3001BE1D5 /* Sources */,
+				A3BC6BA02D6916E3001BE1D5 /* Tests */,
+			);
+			path = HomeAutomationKit;
+			sourceTree = "<group>";
+		};
+		A3BC6BA62D6916E3001BE1D5 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		A3BC6BAA2D6916E3001BE1D5 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */,
+				A3BC6BA82D6916E3001BE1D5 /* ContentView.swift */,
+				A3BC6BA92D6916E3001BE1D5 /* SettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -174,8 +286,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A326E82A2C06528D00486F8E /* Preview Assets.xcassets in Resources */,
-				A326E8272C06528D00486F8E /* Assets.xcassets in Resources */,
+				A3BC6BAC2D6916E3001BE1D5 /* Preview Assets.xcassets in Resources */,
+				A3BC6BAD2D6916E3001BE1D5 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -186,11 +298,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A3FA3D572D53E2C500851442 /* SettingsView.swift in Sources */,
-				A3C778432D53917E00662E31 /* LogIntervall.swift in Sources */,
-				A3262F7E2CD967490094F1D5 /* CircadianLightView.swift in Sources */,
-				A326E8212C06528B00486F8E /* HomeKitAdapterApp.swift in Sources */,
-				A30AAD222C5440FB006B1BB9 /* ContentView.swift in Sources */,
+				A3BC6BAE2D6916E3001BE1D5 /* ContentView.swift in Sources */,
+				A3BC6BAF2D6916E3001BE1D5 /* SettingsView.swift in Sources */,
+				A3BC6BB02D6916E3001BE1D5 /* CircadianLightView.swift in Sources */,
+				A3BC6BB12D6916E3001BE1D5 /* HomeKitAdapterApp.swift in Sources */,
+				A3BC6BB22D6916E3001BE1D5 /* LogIntervall.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -321,14 +433,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = HomeKitAdapterApp/HomeKitAdapterApp.entitlements;
+				CODE_SIGN_ENTITLEMENTS = HomeKitAdapterApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"HomeKitAdapterApp/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
 				DEVELOPMENT_TEAM = 87KNVHZ8C7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = HomeKitAdapterApp/Info.plist;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHomeKitUsageDescription = "Smart home automations";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -359,14 +471,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = HomeKitAdapterApp/HomeKitAdapterApp.entitlements;
+				CODE_SIGN_ENTITLEMENTS = HomeKitAdapterApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"HomeKitAdapterApp/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
 				DEVELOPMENT_TEAM = 87KNVHZ8C7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = HomeKitAdapterApp/Info.plist;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHomeKitUsageDescription = "Smart home automations";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

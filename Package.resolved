@@ -1,5 +1,5 @@
 {
-  "originHash" : "35f333767114a845750e8a510d1354db288eb33b7c7c539bafa3eb225ea57da4",
+  "originHash" : "a87f9daed9b088043b11ae27b31631f9d3655786cfd526c3dfd735d26177af5c",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -322,7 +322,7 @@
       "location" : "https://github.com/juliankahnert/TibberSwift.git",
       "state" : {
         "branch" : "main",
-        "revision" : "396095edc0a003ccb4e7ea012473169b2cffcd96"
+        "revision" : "d3c4ac0663a4ed5225ea726e88513fb2c1bf7a39"
       }
     },
     {

@@ -112,15 +112,15 @@ struct ContentView: View {
     }
 
     private func serverAddressChanged(to address: CustomActorSystem.Address) {
-        Task {
-            do {
-                #warning("TODO: add this again")
-                log.info("Connecting to server at \(address)")
-//                try await actorSystem.connectClient(to: address)
-            } catch {
-                fatalError("Failed to start server connection \(error)")
-            }
-        }
+        #warning("TODO: add this again")
+//        Task {
+//            do {
+//                log.info("Connecting to server at \(address)")
+//                try await actorSystem.join(host: address.host, port: address.port)
+//            } catch {
+//                fatalError("Failed to start server connection \(error)")
+//            }
+//        }
     }
 
 }

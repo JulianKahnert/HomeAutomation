@@ -19,15 +19,3 @@ public extension Log {
         Self.log
     }
 }
-
-#warning("TODO: remove this")
-public protocol Entity: Sendable {
-    var query: EntityId.Query { get }
-    func validate(with: HomeManagable) async throws
-}
-
-public extension Entity {
-    var log: Logger {
-        Logger(label: String(describing: Self.self))
-    }
-}

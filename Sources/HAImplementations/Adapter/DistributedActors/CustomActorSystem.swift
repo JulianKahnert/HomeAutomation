@@ -21,9 +21,7 @@ public final class CustomActorSystem: Sendable {
     private let log = Logger(label: "ActorSystem")
     private let actorSystem: ClusterSystem
 
-    public init(nodeId: NodeIdentity, port: Int) async {
-        // TODO: make this adjustable
-        let host = "0.0.0.0"
+    public init(nodeId: NodeIdentity, host: String = "0.0.0.0", port: Int) async {
         let nodes = Set<Cluster.Endpoint>([
             .init(host: "0.0.0.0", port: 7777),
             .init(host: "0.0.0.0", port: 8888)

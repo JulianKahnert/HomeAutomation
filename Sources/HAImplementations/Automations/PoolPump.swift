@@ -30,20 +30,18 @@ public struct PoolPump: Automatable {
 
     public func execute(using hm: HomeManagable) async throws {
         log.debug("Get price infos")
-        let tibber = TibberService()
+        guard let tibber = TibberService() else { return }
 
-        var shouldTurnOnSwitches = false
-        if await tibber?.getPriceIfCurrentlyLowestPriceHour() != nil {
-            shouldTurnOnSwitches = true
-        } else if await tibber?.getPriceIfCurrentlySecondLowestPriceHour() != nil {
-            shouldTurnOnSwitches = true
-        }
+        let isCurrentlyLowestPrice = await tibber.getPriceIfCurrentlyLowestPriceHour() != nil
+        let isCurrentlySecondLowestPrice = await tibber.getPriceIfCurrentlySecondLowestPriceHour() != nil
+        guard isCurrentlyLowestPrice || isCurrentlySecondLowestPrice else { return }
 
-        #warning("TODO: fix problem - manually turned on pool will be turned off every hour")
-        if shouldTurnOnSwitches {
-            await pumpSwitch.turnOn(with: hm)
-        } else {
-            await pumpSwitch.turnOff(with: hm)
-        }
+        // turn on pool pump for 58 minutes
+        await pumpSwitch.turnOn(with: hm)
+
+        try await Task.sleep(for: .minutes(58))
+
+        // turn it off afterwards
+        await pumpSwitch.turnOff(with: hm)
     }
 }

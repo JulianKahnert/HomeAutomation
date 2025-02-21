@@ -11,6 +11,7 @@ import Logging
 import SwiftUI
 
 let log = Logger(label: "HomeKitAdapterApp")
+@MainActor var commandReceiver: HomeKitCommandReceiver!
 
 @main
 struct HomeKitAdapterApp: App {
@@ -39,8 +40,7 @@ struct HomeKitAdapterApp: App {
                     entityStream: entityStream,
                     entityStreamContinuation: entityStreamContinuation)
 
-                #warning("TODO: save this actor properly somewhere else to keep a reference to it")
-                let commandReceiver = actorSystem.makeLocalActor(actorId: .homeKitCommandReceiver) { system in
+                commandReceiver = actorSystem.makeLocalActor(actorId: .homeKitCommandReceiver) { system in
                     HomeKitCommandReceiver(actorSystem: system, adapter: adapter)
                 }
                 _ = await actorSystem.checkIn(actorId: .homeKitCommandReceiver, commandReceiver)

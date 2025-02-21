@@ -7,6 +7,7 @@
 
 import Fluent
 import HAImplementations
+import HAModels
 import Vapor
 
 struct ConfigController: RouteCollection {
@@ -29,7 +30,18 @@ struct ConfigController: RouteCollection {
     func update(req: Request) async throws -> ConfigDTO {
         let configDTO = try req.content.decode(ConfigDTO.self)
 
-        #warning("TODO: add validation of all fields")
+        // validate if all automations are correct, e.g. contain existing entities
+        let configEntityIds = configDTO.automations
+            .map(\.automation)
+            .flatMap { $0.getEntityIds() }
+            .reduce(into: Set<EntityId>()) { partialResult, entityId in
+                partialResult.insert(entityId)
+            }
+        let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
+
+        guard configEntityIds.isSubset(of: foundEntityIds.map(\.entityId)) else {
+            throw NSError()
+        }
 
         try await req.application.homeAutomationConfigService.set(location: configDTO.location, automations: configDTO.automations)
 

@@ -41,7 +41,7 @@ struct ConfigController: RouteCollection {
 
         let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
         guard missingEntityIds.isEmpty else {
-            throw Abort(.badRequest, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
+            throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
         }
 
         try await req.application.homeAutomationConfigService.set(location: configDTO.location, automations: configDTO.automations)

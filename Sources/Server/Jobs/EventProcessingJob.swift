@@ -17,7 +17,7 @@ struct HomeEventProcessingJob: Job, Log {
     func run() async {
         // This is where you would send the email
         for await event in homeEventsStream {
-            log.info("trigger automation with \(event.description)")
+            log.debug("trigger automation with \(event.description)")
 
             // add item to history
             switch event {

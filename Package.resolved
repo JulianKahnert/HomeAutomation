@@ -1,5 +1,5 @@
 {
-  "originHash" : "c7c20d911db227925392b0670cb15c10712a1e036036be6c2fcdc8ac534295fd",
+  "originHash" : "35f333767114a845750e8a510d1354db288eb33b7c7c539bafa3eb225ea57da4",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -314,6 +314,15 @@
       "state" : {
         "revision" : "c8a44d836fe7913603e246acab7c528c2e780168",
         "version" : "1.4.0"
+      }
+    },
+    {
+      "identity" : "tibberswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/juliankahnert/TibberSwift.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "396095edc0a003ccb4e7ea012473169b2cffcd96"
       }
     },
     {

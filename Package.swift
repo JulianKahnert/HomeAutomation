@@ -3,7 +3,6 @@
 
 import PackageDescription
 
-#warning("TODO: add tibber again")
 let package = Package(
     name: "HomeAutomationKit",
     platforms: [.macOS(.v15), .iOS(.v18), .macCatalyst(.v18)],
@@ -25,7 +24,7 @@ let package = Package(
         // other stuff
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.3"),
-        //        .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
+        .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", branch: "main")
     ],
     targets: [
@@ -55,7 +54,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 "HAModels",
-//                "TibberSwift",
+                "TibberSwift",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "DistributedCluster", package: "swift-distributed-actors")
             ]

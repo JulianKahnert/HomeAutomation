@@ -9,21 +9,6 @@ Main goals:
 * ability to create of complex automations (see `HAImplemenations`)
 * cooperation with HomeKit: You can/should still use the Home.app/HomePods etc. for manually setting entities
 
-
-## Next Steps
-
-* [x] build a workspace
-* [x] continue with this README.md
-* [x] check if parts of `HomeAutomationKit` should be moved to `HomeAutomationServer`
-* [x] App: set dynamically host/port
-* [x] App: test if it keeps running, e.g. disable sleep
-* [x] swiftlint add sorting imports
-* [x] Abstract websocketsactor system so it will only be a dependency in HomeAutomationKit
-* [ ] Server: check for item deduplication
-* [ ] dyanmically load config on server
-* [ ] use env vars instead of keychain helper for configuring tibber
-* [ ] fix TODOs in code
-
 ## Architecture
 
 ```mermaid

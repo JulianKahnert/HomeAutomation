@@ -34,22 +34,21 @@ public struct EnergyLowPrice: Automatable {
 
     public func execute(using hm: HomeManagable) async throws {
         log.debug("Get price infos")
-#warning("TODO: add again")
-//        let tibber = TibberService.shared
+        let tibber = TibberService()
 
         var shouldTurnOnSwitches = false
-//        if let lowestPrice = await tibber.getPriceIfCurrentlyLowestPriceHour() {
-//            log.info("Found lowest price: \(lowestPrice)")
-//            shouldTurnOnSwitches = lowestPrice <= Self.thresholdInEUR
-//        } else if let secondLowestPrice = await tibber.getPriceIfCurrentlySecondLowestPriceHour() {
-//            log.info("Found second lowest price: \(secondLowestPrice)")
-//            shouldTurnOnSwitches = secondLowestPrice <= Self.thresholdInEUR
-//        }
+        if let lowestPrice = await tibber?.getPriceIfCurrentlyLowestPriceHour() {
+            log.info("Found lowest price: \(lowestPrice)")
+            shouldTurnOnSwitches = lowestPrice <= Self.thresholdInEUR
+        } else if let secondLowestPrice = await tibber?.getPriceIfCurrentlySecondLowestPriceHour() {
+            log.info("Found second lowest price: \(secondLowestPrice)")
+            shouldTurnOnSwitches = secondLowestPrice <= Self.thresholdInEUR
+        }
 
         for enerySwitch in switches {
             if shouldTurnOnSwitches {
                 await enerySwitch.turnOn(with: hm)
-//                await tibber.sendNotification(title: "Low energy price", message: "\(Date().formatted())")
+                await tibber?.sendNotification(title: "Low energy price", message: "\(Date().formatted())")
             } else {
                 await enerySwitch.turnOff(with: hm)
             }

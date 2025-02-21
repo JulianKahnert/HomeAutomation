@@ -39,8 +39,9 @@ struct ConfigController: RouteCollection {
             }
         let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
 
-        guard configEntityIds.isSubset(of: foundEntityIds.map(\.entityId)) else {
-            throw NSError()
+        let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
+        guard missingEntityIds.isEmpty else {
+            throw Abort(.badRequest, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
         }
 
         try await req.application.homeAutomationConfigService.set(location: configDTO.location, automations: configDTO.automations)

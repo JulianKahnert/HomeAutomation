@@ -23,7 +23,7 @@ public actor AutomationService {
         let automations = await getAutomations()
 
         await withTaskGroup(of: Void.self) { group in
-            for automation in automations {
+            for automation in automations where automation.isActive {
                 group.addTask {
                     do {
                         guard try await automation.shouldTrigger(with: event, using: self.homeManager) else {

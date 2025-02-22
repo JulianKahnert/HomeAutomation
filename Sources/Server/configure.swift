@@ -57,7 +57,6 @@ public func configure(_ app: Application) async throws {
     let automationService = try AutomationService(using: homeManager,
                                                   getAutomations: {
         await app.homeAutomationConfigService.automations
-            .map(\.automation)
     })
 
     // MARK: - register jobs

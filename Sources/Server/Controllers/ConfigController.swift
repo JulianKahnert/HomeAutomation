@@ -16,12 +16,19 @@ struct ConfigController: RouteCollection {
 
         config.get(use: self.index)
         config.on(.POST, body: .collect(maxSize: "10mb"), use: self.update)
+
+        let automations = config.grouped("automations")
+        automations.get(use: self.automationsIndex)
+        automations.group(":name") { automation in
+            automation.post("activate", use: self.automationsActivate)
+            automation.post("deactivate", use: self.automationsDeactivate)
+        }
     }
 
     @Sendable
     func index(req: Request) async throws -> ConfigDTO {
         let location = await req.application.homeAutomationConfigService.location
-        let automations = await req.application.homeAutomationConfigService.automations
+        let automations = await req.application.homeAutomationConfigService.automations.map(AnyAutomation.create(from:))
 
         return ConfigDTO(location: location, automations: automations)
     }
@@ -44,8 +51,50 @@ struct ConfigController: RouteCollection {
             throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
         }
 
-        try await req.application.homeAutomationConfigService.set(location: configDTO.location, automations: configDTO.automations)
+        let previousAutomations = await req.application.homeAutomationConfigService.automations
+        let automations = configDTO.automations
+            .map(\.automation)
+            .map { automation in
+                var automation = automation
+                guard let foundAutomation = previousAutomations.first(where: { $0.name == automation.name }) else { return automation }
+                automation.isActive = foundAutomation.isActive
+                return automation
+            }
+
+        try await req.application.homeAutomationConfigService.set(location: configDTO.location, automations: automations)
 
         return configDTO
+    }
+
+    // MARK: - /config/automations
+
+    @Sendable
+    func automationsIndex(req: Request) async throws -> [AutomationDTO] {
+        await req.application.homeAutomationConfigService.automations
+            .map { tmp in
+                AutomationDTO(name: tmp.name, isActive: tmp.isActive, isRunning: false)
+            }
+    }
+
+    @Sendable
+    func automationsActivate(req: Request) async throws -> HTTPStatus {
+        guard let name = req.parameters.get("name"),
+              !name.isEmpty else {
+            throw Abort(.notFound, reason: "Automation name not provided")
+        }
+
+        await req.application.homeAutomationConfigService.setAutomationActive(with: name, to: true)
+        return .ok
+    }
+
+    @Sendable
+    func automationsDeactivate(req: Request) async throws -> HTTPStatus {
+        guard let name = req.parameters.get("name"),
+              !name.isEmpty else {
+            throw Abort(.notFound, reason: "Automation name not provided")
+        }
+
+        await req.application.homeAutomationConfigService.setAutomationActive(with: name, to: false)
+        return .ok
     }
 }

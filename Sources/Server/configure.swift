@@ -83,8 +83,8 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - register routes
 
-    app.logger.notice("CustomActorSystem server running on \(actorSystem.endpointDescription)")
-
     // register routes
     try routes(app)
+
+    app.logger.notice("CustomActorSystem server running on \(actorSystem.endpointDescription)")
 }

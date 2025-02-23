@@ -1,0 +1,66 @@
+openapi: '3.1.0'
+info:
+  title: HomeAutomationServer API
+  version: 0.0.4
+
+servers:
+  - url: http://localhost:8080
+    description: Local deployment of the server
+
+paths:
+  /config/automations:
+    get:
+      operationId: getAutomations
+      responses:
+        '200':
+          description: A success response with all available automations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    $ref: '#/components/schemas/Automation'
+
+  /config/automations/{name}/activate:
+    post:
+        operationId: activateAutomation
+        parameters:
+            - name: name
+              in: path
+              description: Name of the automation
+              required: true
+              schema:
+                type: string
+        responses:
+            '200':
+                description: The automation was activated.
+
+  /config/automations/{name}/deactivate:
+    post:
+        operationId: deactivateAutomation
+        parameters:
+            - name: name
+              in: path
+              description: Name of the automation
+              required: true
+              schema:
+                type: string
+        responses:
+            '200':
+                description: The automation was deactivated.
+
+components:
+  schemas:
+    Automation:
+      type: object
+      properties:
+        name:
+          type: string
+        isActive:
+          type: boolean
+#        isRunning:
+#          type: boolean
+      required:
+          - name
+          - isActive
+#          - isRunning

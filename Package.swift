@@ -19,11 +19,12 @@ let package = Package(
         .package(url: "https://github.com/vapor/fluent.git", from: "4.12.0"),
         // 🐬 Fluent driver for MySQL.
         .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.7.0"),
-        // 🔵 Non-blocking, event-driven networking for Swift. Used for custom executors
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
+        // open api generator
+        .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.6.0"),
+        .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.7.0"),
         // other stuff
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
-        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.3"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", branch: "main")
     ],
@@ -38,15 +39,17 @@ let package = Package(
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentMySQLDriver", package: "fluent-mysql-driver"),
                 .product(name: "Vapor", package: "vapor"),
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio")
+                .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
+                .product(name: "Dependencies", package: "swift-dependencies")
+            ],
+            plugins: [
+                .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
             ]
         ),
         .target(
             name: "HAModels",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
+                .product(name: "Logging", package: "swift-log")
             ]
         ),
         .target(
@@ -55,7 +58,6 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 "HAModels",
                 "TibberSwift",
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "DistributedCluster", package: "swift-distributed-actors")
             ]
         ),
@@ -63,8 +65,7 @@ let package = Package(
             name: "HAApplicationLayer",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
-                "HAModels",
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
+                "HAModels"
             ]
         ),
         .testTarget(
@@ -73,8 +74,7 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 "HAModels",
                 "HAImplementations",
-                "HAApplicationLayer",
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
+                "HAApplicationLayer"
             ]
         )
     ]

@@ -132,6 +132,7 @@ extension HomeKitAdapter {
 
 extension HomeKitAdapter.HomeKitHomeManager: HMHomeManagerDelegate {
     func homeManagerDidUpdateHomes(_ manager: HMHomeManager) {
+        log.info("homeManager.homeManagerDidUpdateHomes")
         update(homes: manager.homes)
     }
     func homeManager(_ manager: HMHomeManager, didUpdate status: HMHomeManagerAuthorizationStatus) {

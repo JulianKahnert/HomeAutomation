@@ -1,5 +1,5 @@
 {
-  "originHash" : "dad2b7e1680e80ba3ca941afaad7179b58ce3d4e5fcbc0f1ab5211029380a830",
+  "originHash" : "51264156fe997554ae37cb71eba5d53a5d0744ef2b46db2152383fe1561af000",
   "pins" : [
     {
       "identity" : "homeautomation",
@@ -7,7 +7,7 @@
       "location" : "https://github.com/JulianKahnert/HomeAutomation",
       "state" : {
         "branch" : "develop",
-        "revision" : "8241b91bf5e883cd87e6e20f769239ea2388dcbc"
+        "revision" : "b7b48779506162a74be294e6b37e1c00b2caa8cf"
       }
     },
     {
@@ -101,6 +101,15 @@
       }
     },
     {
+      "identity" : "swift-log-oslog",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/chrisaljoudi/swift-log-oslog.git",
+      "state" : {
+        "revision" : "176d41d46429e79c806333025b226e0c50a0c602",
+        "version" : "0.2.2"
+      }
+    },
+    {
       "identity" : "swift-metrics",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-metrics.git",
@@ -159,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-protobuf",
       "state" : {
-        "revision" : "ebc7251dd5b37f627c93698e4374084d98409633",
-        "version" : "1.28.2"
+        "revision" : "d72aed98f8253ec1aa9ea1141e28150f408cf17f",
+        "version" : "1.29.0"
       }
     },
     {
@@ -179,6 +188,15 @@
       "state" : {
         "revision" : "a34201439c74b53f0fd71ef11741af7e7caf01e1",
         "version" : "1.4.2"
+      }
+    },
+    {
+      "identity" : "tibberswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/juliankahnert/TibberSwift.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "d3c4ac0663a4ed5225ea726e88513fb2c1bf7a39"
       }
     }
   ],

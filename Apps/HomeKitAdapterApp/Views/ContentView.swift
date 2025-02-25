@@ -11,6 +11,7 @@ import Logging
 import SwiftUI
 
 struct ContentView: View {
+    @Binding var shouldCrashIfActorSystemInitFails: Bool
     @Binding var entities: [EntityStorageItem]
     @State private var showSettings = false
     @AppStorage("ActorSystemServerAddress") private var serverAddress = CustomActorSystem.Address(host: "localhost", port: 8888)
@@ -39,6 +40,11 @@ struct ContentView: View {
         .navigationTitle(serverAddress.description)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem {
+                Toggle(isOn: $shouldCrashIfActorSystemInitFails, label: {
+                    Text("Should wait for ActorSystem?")
+                })
+            }
             ToolbarItem {
                 Button("Preferences", systemImage: "gear") {
                     showSettings.toggle()
@@ -126,5 +132,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView(entities: .constant([]))
+    ContentView(shouldCrashIfActorSystemInitFails: .constant(true), entities: .constant([]))
 }

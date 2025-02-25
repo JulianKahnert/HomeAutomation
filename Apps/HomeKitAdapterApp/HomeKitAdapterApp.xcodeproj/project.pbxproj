@@ -7,13 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A302FDFC2D6E4EFE003FAB98 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A302FDFB2D6E4EFE003FAB98 /* HomeAutomationKit */; };
+		A302FDFF2D6E56EA003FAB98 /* LoggingOSLog in Frameworks */ = {isa = PBXBuildFile; productRef = A302FDFE2D6E56EA003FAB98 /* LoggingOSLog */; };
+		A302FE042D6E6252003FAB98 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = A302FE032D6E6250003FAB98 /* Logging.swift */; };
+		A302FE072D6E73DB003FAB98 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A302FE062D6E73DB003FAB98 /* HomeAutomationKit */; };
 		A3BC6BAC2D6916E3001BE1D5 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */; };
 		A3BC6BAD2D6916E3001BE1D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */; };
 		A3BC6BAE2D6916E3001BE1D5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA82D6916E3001BE1D5 /* ContentView.swift */; };
 		A3BC6BAF2D6916E3001BE1D5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA92D6916E3001BE1D5 /* SettingsView.swift */; };
 		A3BC6BB02D6916E3001BE1D5 /* CircadianLightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */; };
 		A3BC6BB12D6916E3001BE1D5 /* HomeKitAdapterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA32D6916E3001BE1D5 /* HomeKitAdapterApp.swift */; };
-		A3BC6BB22D6916E3001BE1D5 /* LogIntervall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6B912D6916E3001BE1D5 /* LogIntervall.swift */; };
 		A3CA7DAB2D63BC7D0019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */; };
 		A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */; };
 		A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DA39BC2D53689700AC8512 /* HomeAutomationKit */; };
@@ -22,9 +25,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A302FE032D6E6250003FAB98 /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 		A326E81D2C06528B00486F8E /* HomeKitAdapterApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomeKitAdapterApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A3BC6B912D6916E3001BE1D5 /* LogIntervall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogIntervall.swift; sourceTree = "<group>"; };
 		A3BC6BA22D6916E3001BE1D5 /* HomeKitAdapterApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HomeKitAdapterApp.entitlements; sourceTree = "<group>"; };
 		A3BC6BA32D6916E3001BE1D5 /* HomeKitAdapterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeKitAdapterApp.swift; sourceTree = "<group>"; };
 		A3BC6BA42D6916E3001BE1D5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -42,8 +45,11 @@
 				A3F290B22C36B96A00926098 /* HomeAutomationKit in Frameworks */,
 				A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */,
 				A3CA7DAB2D63BC7D0019691F /* HomeAutomationKit in Frameworks */,
+				A302FE072D6E73DB003FAB98 /* HomeAutomationKit in Frameworks */,
 				A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */,
 				A3EC945D2D63E8870009361C /* HomeAutomationKit in Frameworks */,
+				A302FDFF2D6E56EA003FAB98 /* LoggingOSLog in Frameworks */,
+				A302FDFC2D6E4EFE003FAB98 /* HomeAutomationKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,7 +61,6 @@
 			children = (
 				A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */,
 				A3BC6B922D6916E3001BE1D5 /* Helper */,
-				A3BC6BA12D6916E3001BE1D5 /* HomeAutomationKit */,
 				A3BC6BA22D6916E3001BE1D5 /* HomeKitAdapterApp.entitlements */,
 				A3BC6BA32D6916E3001BE1D5 /* HomeKitAdapterApp.swift */,
 				A3BC6BA42D6916E3001BE1D5 /* Info.plist */,
@@ -76,128 +81,9 @@
 		A3BC6B922D6916E3001BE1D5 /* Helper */ = {
 			isa = PBXGroup;
 			children = (
-				A3BC6B912D6916E3001BE1D5 /* LogIntervall.swift */,
+				A302FE032D6E6250003FAB98 /* Logging.swift */,
 			);
 			path = Helper;
-			sourceTree = "<group>";
-		};
-		A3BC6B932D6916E3001BE1D5 /* HAApplicationLayer */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = HAApplicationLayer;
-			sourceTree = "<group>";
-		};
-		A3BC6B942D6916E3001BE1D5 /* HAConfig */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = HAConfig;
-			sourceTree = "<group>";
-		};
-		A3BC6B952D6916E3001BE1D5 /* Adapter */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Adapter;
-			sourceTree = "<group>";
-		};
-		A3BC6B962D6916E3001BE1D5 /* Automations */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Automations;
-			sourceTree = "<group>";
-		};
-		A3BC6B972D6916E3001BE1D5 /* Entities */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Entities;
-			sourceTree = "<group>";
-		};
-		A3BC6B982D6916E3001BE1D5 /* HAImplementations */ = {
-			isa = PBXGroup;
-			children = (
-				A3BC6B952D6916E3001BE1D5 /* Adapter */,
-				A3BC6B962D6916E3001BE1D5 /* Automations */,
-				A3BC6B972D6916E3001BE1D5 /* Entities */,
-			);
-			path = HAImplementations;
-			sourceTree = "<group>";
-		};
-		A3BC6B992D6916E3001BE1D5 /* Entities */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Entities;
-			sourceTree = "<group>";
-		};
-		A3BC6B9A2D6916E3001BE1D5 /* Extensions */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Extensions;
-			sourceTree = "<group>";
-		};
-		A3BC6B9B2D6916E3001BE1D5 /* Helper */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Helper;
-			sourceTree = "<group>";
-		};
-		A3BC6B9C2D6916E3001BE1D5 /* HAModels */ = {
-			isa = PBXGroup;
-			children = (
-				A3BC6B992D6916E3001BE1D5 /* Entities */,
-				A3BC6B9A2D6916E3001BE1D5 /* Extensions */,
-				A3BC6B9B2D6916E3001BE1D5 /* Helper */,
-			);
-			path = HAModels;
-			sourceTree = "<group>";
-		};
-		A3BC6B9D2D6916E3001BE1D5 /* HomeAutomationKit */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = HomeAutomationKit;
-			sourceTree = "<group>";
-		};
-		A3BC6B9E2D6916E3001BE1D5 /* Sources */ = {
-			isa = PBXGroup;
-			children = (
-				A3BC6B932D6916E3001BE1D5 /* HAApplicationLayer */,
-				A3BC6B942D6916E3001BE1D5 /* HAConfig */,
-				A3BC6B982D6916E3001BE1D5 /* HAImplementations */,
-				A3BC6B9C2D6916E3001BE1D5 /* HAModels */,
-				A3BC6B9D2D6916E3001BE1D5 /* HomeAutomationKit */,
-			);
-			path = Sources;
-			sourceTree = "<group>";
-		};
-		A3BC6B9F2D6916E3001BE1D5 /* HomeAutomationKitTests */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = HomeAutomationKitTests;
-			sourceTree = "<group>";
-		};
-		A3BC6BA02D6916E3001BE1D5 /* Tests */ = {
-			isa = PBXGroup;
-			children = (
-				A3BC6B9F2D6916E3001BE1D5 /* HomeAutomationKitTests */,
-			);
-			path = Tests;
-			sourceTree = "<group>";
-		};
-		A3BC6BA12D6916E3001BE1D5 /* HomeAutomationKit */ = {
-			isa = PBXGroup;
-			children = (
-				A3BC6B9E2D6916E3001BE1D5 /* Sources */,
-				A3BC6BA02D6916E3001BE1D5 /* Tests */,
-			);
-			path = HomeAutomationKit;
 			sourceTree = "<group>";
 		};
 		A3BC6BA62D6916E3001BE1D5 /* Preview Content */ = {
@@ -240,6 +126,9 @@
 				A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */,
 				A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */,
 				A3EC945C2D63E8870009361C /* HomeAutomationKit */,
+				A302FDFB2D6E4EFE003FAB98 /* HomeAutomationKit */,
+				A302FDFE2D6E56EA003FAB98 /* LoggingOSLog */,
+				A302FE062D6E73DB003FAB98 /* HomeAutomationKit */,
 			);
 			productName = HomeAutomation;
 			productReference = A326E81D2C06528B00486F8E /* HomeKitAdapterApp.app */;
@@ -270,7 +159,8 @@
 			);
 			mainGroup = A326E8142C06528B00486F8E;
 			packageReferences = (
-				A3EC945E2D63E8C40009361C /* XCRemoteSwiftPackageReference "HomeAutomation" */,
+				A302FDFD2D6E56EA003FAB98 /* XCRemoteSwiftPackageReference "swift-log-oslog" */,
+				A302FE052D6E73DB003FAB98 /* XCRemoteSwiftPackageReference "HomeAutomation" */,
 			);
 			productRefGroup = A326E81E2C06528B00486F8E /* Products */;
 			projectDirPath = "";
@@ -299,10 +189,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				A3BC6BAE2D6916E3001BE1D5 /* ContentView.swift in Sources */,
+				A302FE042D6E6252003FAB98 /* Logging.swift in Sources */,
 				A3BC6BAF2D6916E3001BE1D5 /* SettingsView.swift in Sources */,
 				A3BC6BB02D6916E3001BE1D5 /* CircadianLightView.swift in Sources */,
 				A3BC6BB12D6916E3001BE1D5 /* HomeKitAdapterApp.swift in Sources */,
-				A3BC6BB22D6916E3001BE1D5 /* LogIntervall.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -528,7 +418,15 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		A3EC945E2D63E8C40009361C /* XCRemoteSwiftPackageReference "HomeAutomation" */ = {
+		A302FDFD2D6E56EA003FAB98 /* XCRemoteSwiftPackageReference "swift-log-oslog" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/chrisaljoudi/swift-log-oslog.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.2.2;
+			};
+		};
+		A302FE052D6E73DB003FAB98 /* XCRemoteSwiftPackageReference "HomeAutomation" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/JulianKahnert/HomeAutomation";
 			requirement = {
@@ -539,6 +437,20 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A302FDFB2D6E4EFE003FAB98 /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HomeAutomationKit;
+		};
+		A302FDFE2D6E56EA003FAB98 /* LoggingOSLog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A302FDFD2D6E56EA003FAB98 /* XCRemoteSwiftPackageReference "swift-log-oslog" */;
+			productName = LoggingOSLog;
+		};
+		A302FE062D6E73DB003FAB98 /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A302FE052D6E73DB003FAB98 /* XCRemoteSwiftPackageReference "HomeAutomation" */;
+			productName = HomeAutomationKit;
+		};
 		A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = HomeAutomationKit;

@@ -59,7 +59,7 @@ struct HomeKitAdapterApp: App {
                 _ = await actorSystem.checkIn(actorId: .homeKitCommandReceiver, commandReceiver)
                 
                 if shouldCrashIfActorSystemInitFails {
-                    try! await actorSystem.joined(within: .seconds(10))
+                    try! await actorSystem.waitForThisNode(is: .up, within: .seconds(10))
                 }
                 
                 var receiver: HomeEventReceiver?

@@ -15,7 +15,7 @@ func routes(_ app: Application) throws {
         return ConfigDTO(location: location, automations: automations)
     }
 
-    app.post("config") { req in
+    app.on(.POST, "config", body: .collect(maxSize: "10mb")) { req in
         let configDTO = try req.content.decode(ConfigDTO.self)
 
         // validate if all automations are correct, e.g. contain existing entities

@@ -43,10 +43,6 @@ public extension Automatable {
     var log: Logger {
         Logger(label: String(describing: Self.self))
     }
-    var identifier: String {
-        // we use a description of all properties (e.g. sensor UUIDs) as the identifier of the automation
-        return String(describing: self)
-    }
 
     func getEntityIds() -> [EntityId] {
         findAllEntityIds(in: self, maxDepth: 20)

@@ -14,9 +14,12 @@ struct ConfigController: APIProtocol {
     // MARK: - /config/automations
 
     func getAutomations(_ input: Operations.GetAutomations.Input) async throws -> Operations.GetAutomations.Output {
+        let automationNames = await request.application.automationService.getActiveAutomationNames()
         let automations = await request.application.homeAutomationConfigService.automations
             .map { tmp in
-                Components.Schemas.Automation(name: tmp.name, isActive: tmp.isActive)
+                Components.Schemas.Automation(name: tmp.name,
+                                              isActive: tmp.isActive,
+                                              isRunning: automationNames.contains(tmp.name))
             }
         return .ok(.init(body: .json(automations)))
     }

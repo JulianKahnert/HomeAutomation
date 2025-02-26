@@ -30,7 +30,7 @@ public actor AutomationService {
                             return
                         }
 
-                        self.log.info("Running automation \(automation.identifier)")
+                        self.log.info("Running automation \(automation.name)")
                         let task = Task {
                             do {
                                 try await automation.execute(using: self.homeManager)
@@ -40,13 +40,17 @@ public actor AutomationService {
                                 self.log.critical("Automation failed with error - \(error)")
                             }
                         }
-                        await self.set(task: task, with: automation.identifier)
+                        await self.set(task: task, with: automation.name)
                     } catch {
                         self.log.critical("Automation (e.g. shouldTrigger failed with error - \(error)")
                     }
                 }
             }
         }
+    }
+
+    public func getActiveAutomationNames() async -> Set<String> {
+        Set(runningTasks.keys)
     }
 
     private func set(task: Task<Void, Never>, with id: String) {

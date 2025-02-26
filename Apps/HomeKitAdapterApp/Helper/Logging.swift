@@ -6,8 +6,8 @@
 //
 // Source: git@github.com:crspybits/swift-log-file.git
 
-import Logging
 import Foundation
+import Logging
 
 extension FileLogHandler {
     // Adapted from https://nshipster.com/textoutputstream/
@@ -15,7 +15,7 @@ extension FileLogHandler {
         private let url: URL
         private var nextRotationDate: Date
         private var fileHandle: FileHandle
-        
+
         public init(basePath url: URL) {
             self.url = url
             self.fileHandle = Self.getNewFileHandle(basePath: url)
@@ -23,7 +23,7 @@ extension FileLogHandler {
                                                               matching: DateComponents(hour: 0, minute: 0, second: 0),
                                                               matchingPolicy: .nextTime)!
         }
-        
+
         public mutating func write(_ string: String) {
             if Date() > nextRotationDate {
                 self.fileHandle = Self.getNewFileHandle(basePath: url)
@@ -31,12 +31,12 @@ extension FileLogHandler {
                                                                   matching: DateComponents(hour: 0, minute: 0, second: 0),
                                                                   matchingPolicy: .nextTime)!
             }
-            
+
             if let data = string.data(using: .utf8) {
                 fileHandle.write(data)
             }
         }
-        
+
         private static func getNewFileHandle(basePath: URL) -> FileHandle {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
@@ -44,26 +44,26 @@ extension FileLogHandler {
             let date = Date()
             // format date to "path/to/2024-10-29.txt"
             let url = basePath.appendingPathComponent(formatter.string(from: date)).appendingPathExtension("txt")
-            
+
             if !FileManager.default.fileExists(atPath: url.path) {
                 guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: nil) else {
                     fatalError()
                 }
             }
-            
+
             let fileHandle = try! FileHandle(forWritingTo: url)
             fileHandle.seekToEndOfFile()
             return fileHandle
         }
     }
 }
-        
+
 /// `FileLogHandler` is a simple implementation of `LogHandler` for directing
 /// `Logger` output to a local file. Appends log output to this file, even across constructor calls.
 public struct FileLogHandler: LogHandler {
     private let stream: FileHandlerOutputStream
     private var label: String
-    
+
     public var logLevel: Logger.Level = .info
 
     private var prettyMetadata: String?
@@ -94,7 +94,7 @@ public struct FileLogHandler: LogHandler {
                     file: String,
                     function: String,
                     line: UInt) {
-        
+
         let prettyMetadata = metadata?.isEmpty ?? true
             ? self.prettyMetadata
             : self.prettify(self.metadata.merging(metadata!, uniquingKeysWith: { _, new in new }))

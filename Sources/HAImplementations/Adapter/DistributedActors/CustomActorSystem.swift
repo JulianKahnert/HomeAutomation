@@ -68,7 +68,7 @@ public final class CustomActorSystem: Sendable {
     public func joined(within duration: Duration) async throws {
         try await actorSystem.cluster.joined(within: duration)
     }
-    
+
     public func waitForThisNode(is clusterState: Cluster.MemberStatus, within duration: Duration) async throws {
         try await actorSystem.cluster.waitFor(actorSystem.cluster.node, clusterState, within: duration)
     }

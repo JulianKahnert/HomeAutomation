@@ -58,6 +58,7 @@ public func configure(_ app: Application) async throws {
                                                   getAutomations: {
         await app.homeAutomationConfigService.automations
     })
+    app.automationService = automationService
 
     // MARK: - register jobs
 

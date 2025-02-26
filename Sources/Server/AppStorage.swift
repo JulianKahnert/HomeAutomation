@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 01.02.25.
 //
 
+import HAApplicationLayer
 import HAImplementations
 import HAModels
 import Vapor
@@ -52,6 +53,19 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          }
          set {
              self.storage[HomeManagerKey.self] = newValue
+         }
+     }
+
+     private struct AutomationServiceKey: StorageKey {
+         typealias Value = AutomationService
+     }
+
+     var automationService: AutomationService {
+         get {
+             self.storage[AutomationServiceKey.self]!
+         }
+         set {
+             self.storage[AutomationServiceKey.self] = newValue
          }
      }
 

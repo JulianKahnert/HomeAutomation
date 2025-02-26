@@ -3,14 +3,13 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		A302FDFC2D6E4EFE003FAB98 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A302FDFB2D6E4EFE003FAB98 /* HomeAutomationKit */; };
 		A302FDFF2D6E56EA003FAB98 /* LoggingOSLog in Frameworks */ = {isa = PBXBuildFile; productRef = A302FDFE2D6E56EA003FAB98 /* LoggingOSLog */; };
 		A302FE042D6E6252003FAB98 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = A302FE032D6E6250003FAB98 /* Logging.swift */; };
-		A302FE072D6E73DB003FAB98 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A302FE062D6E73DB003FAB98 /* HomeAutomationKit */; };
 		A3BC6BAC2D6916E3001BE1D5 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */; };
 		A3BC6BAD2D6916E3001BE1D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */; };
 		A3BC6BAE2D6916E3001BE1D5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA82D6916E3001BE1D5 /* ContentView.swift */; };
@@ -22,6 +21,7 @@
 		A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DA39BC2D53689700AC8512 /* HomeAutomationKit */; };
 		A3EC945D2D63E8870009361C /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3EC945C2D63E8870009361C /* HomeAutomationKit */; };
 		A3F290B22C36B96A00926098 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F290B12C36B96A00926098 /* HomeAutomationKit */; };
+		A3F9BC7D2D6F99A9002298ED /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F9BC7C2D6F99A9002298ED /* HomeAutomationKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,7 +45,7 @@
 				A3F290B22C36B96A00926098 /* HomeAutomationKit in Frameworks */,
 				A3DA39BD2D53689700AC8512 /* HomeAutomationKit in Frameworks */,
 				A3CA7DAB2D63BC7D0019691F /* HomeAutomationKit in Frameworks */,
-				A302FE072D6E73DB003FAB98 /* HomeAutomationKit in Frameworks */,
+				A3F9BC7D2D6F99A9002298ED /* HomeAutomationKit in Frameworks */,
 				A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */,
 				A3EC945D2D63E8870009361C /* HomeAutomationKit in Frameworks */,
 				A302FDFF2D6E56EA003FAB98 /* LoggingOSLog in Frameworks */,
@@ -128,7 +128,7 @@
 				A3EC945C2D63E8870009361C /* HomeAutomationKit */,
 				A302FDFB2D6E4EFE003FAB98 /* HomeAutomationKit */,
 				A302FDFE2D6E56EA003FAB98 /* LoggingOSLog */,
-				A302FE062D6E73DB003FAB98 /* HomeAutomationKit */,
+				A3F9BC7C2D6F99A9002298ED /* HomeAutomationKit */,
 			);
 			productName = HomeAutomation;
 			productReference = A326E81D2C06528B00486F8E /* HomeKitAdapterApp.app */;
@@ -160,7 +160,7 @@
 			mainGroup = A326E8142C06528B00486F8E;
 			packageReferences = (
 				A302FDFD2D6E56EA003FAB98 /* XCRemoteSwiftPackageReference "swift-log-oslog" */,
-				A302FE052D6E73DB003FAB98 /* XCRemoteSwiftPackageReference "HomeAutomation" */,
+				A3F9BC7B2D6F99A9002298ED /* XCLocalSwiftPackageReference "../.." */,
 			);
 			productRefGroup = A326E81E2C06528B00486F8E /* Products */;
 			projectDirPath = "";
@@ -417,6 +417,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		A3F9BC7B2D6F99A9002298ED /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		A302FDFD2D6E56EA003FAB98 /* XCRemoteSwiftPackageReference "swift-log-oslog" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -424,14 +431,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.2.2;
-			};
-		};
-		A302FE052D6E73DB003FAB98 /* XCRemoteSwiftPackageReference "HomeAutomation" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/JulianKahnert/HomeAutomation";
-			requirement = {
-				branch = develop;
-				kind = branch;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -445,11 +444,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A302FDFD2D6E56EA003FAB98 /* XCRemoteSwiftPackageReference "swift-log-oslog" */;
 			productName = LoggingOSLog;
-		};
-		A302FE062D6E73DB003FAB98 /* HomeAutomationKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A302FE052D6E73DB003FAB98 /* XCRemoteSwiftPackageReference "HomeAutomation" */;
-			productName = HomeAutomationKit;
 		};
 		A3CA7DAA2D63BC7D0019691F /* HomeAutomationKit */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -468,6 +462,10 @@
 			productName = HomeAutomationKit;
 		};
 		A3F290B12C36B96A00926098 /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HomeAutomationKit;
+		};
+		A3F9BC7C2D6F99A9002298ED /* HomeAutomationKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = HomeAutomationKit;
 		};

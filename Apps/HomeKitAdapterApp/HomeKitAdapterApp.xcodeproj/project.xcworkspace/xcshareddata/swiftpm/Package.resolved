@@ -1,15 +1,6 @@
 {
-  "originHash" : "51264156fe997554ae37cb71eba5d53a5d0744ef2b46db2152383fe1561af000",
+  "originHash" : "3be00b529ef7a0e103e49f95afeb6bb47974f0207b69beaf38881ac1647c384e",
   "pins" : [
-    {
-      "identity" : "homeautomation",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/JulianKahnert/HomeAutomation",
-      "state" : {
-        "branch" : "develop",
-        "revision" : "b7b48779506162a74be294e6b37e1c00b2caa8cf"
-      }
-    },
     {
       "identity" : "swift-algorithms",
       "kind" : "remoteSourceControl",

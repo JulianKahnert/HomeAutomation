@@ -7,8 +7,6 @@
 
 import SwiftUI
 
-let client = AutomationClient(url: URL(string: "http://0.0.0.0:8080/")!)
-
 typealias Automation = Components.Schemas.Automation
 extension Automation: Identifiable {
     var id: String { name }
@@ -19,29 +17,50 @@ extension Bool {
 }
 
 struct ContentView: View {
+    @AppStorage("AutomationClientUrl") private var url = URL(string: "http://0.0.0.0:8080/")!
+    @State private var showSettings = false
+    @State private var client: AutomationClient!
     @State private var automations: [Automation] = []
 
     var body: some View {
-        List(automations) { automation in
-            view(for: automation)
+        List {
+            Section {
+                ForEach(automations.filter(\.isRunning)) { automation in
+                    view(for: automation)
+                }
+            }
+            Section {
+                ForEach(automations.filter(\.isRunning.inverted)) { automation in
+                    view(for: automation)
+                }
+            }
         }
-//        List {
-//            Section {
-//                ForEach(automations.filter(\.isActive)) { automation in
-//                    view(for: automation)
-//                }
-//            }
-//            Section {
-//                ForEach(automations.filter(\.isActive.inverted)) { automation in
-//                    view(for: automation)
-//                }
-//            }
-//        }
+        .navigationDestination(isPresented: $showSettings) {
+            SettingsView(serverAddress: $url)
+        }
+        .navigationTitle(url.description)
+        #if !os(macOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem {
+                Button("Preferences", systemImage: "gear") {
+                    showSettings.toggle()
+                }
+            }
+        }
         .refreshable {
             await updateAutomations()
         }
         .task {
+            client = AutomationClient(url: url)
             await updateAutomations()
+        }
+        .onChange(of: url) { _, newValue in
+            client = AutomationClient(url: url)
+            Task {
+                await updateAutomations()
+            }
         }
     }
 
@@ -69,7 +88,7 @@ struct ContentView: View {
         do {
             self.automations = try await client.getAutomations()
         } catch {
-            assertionFailure()
+            self.automations = []
         }
     }
 

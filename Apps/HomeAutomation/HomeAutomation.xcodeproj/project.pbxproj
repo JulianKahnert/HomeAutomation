@@ -11,6 +11,7 @@
 		A3B8A0952D6A8468009314DA /* HomeAutomationApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A0912D6A8468009314DA /* HomeAutomationApp.swift */; };
 		A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */; };
 		A3B8A0972D6A8468009314DA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A08E2D6A8468009314DA /* Assets.xcassets */; };
+		A3BF520B2D7240110034254A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BF520A2D7240100034254A /* SettingsView.swift */; };
 		A3E5F0CC2D6FA6520032C9A8 /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = A3E5F0CB2D6FA6520032C9A8 /* OpenAPIRuntime */; };
 		A3E5F0CF2D6FA67A0032C9A8 /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = A3E5F0CE2D6FA67A0032C9A8 /* OpenAPIURLSession */; };
 		A3E5F0D32D6FA7050032C9A8 /* openapi-generator-config.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A3E5F0D22D6FA7050032C9A8 /* openapi-generator-config.yaml */; };
@@ -26,6 +27,7 @@
 		A3B8A0912D6A8468009314DA /* HomeAutomationApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAutomationApp.swift; sourceTree = "<group>"; };
 		A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		A3BF51EF2D6FB82B0034254A /* HomeAutomation-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "HomeAutomation-Info.plist"; sourceTree = "<group>"; };
+		A3BF520A2D7240100034254A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A3E5F0D22D6FA7050032C9A8 /* openapi-generator-config.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = "openapi-generator-config.yaml"; sourceTree = "<group>"; };
 		A3E5F0D42D6FA70A0032C9A8 /* openapi.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = openapi.yaml; sourceTree = "<group>"; };
 		A3E5F0D82D6FA7A30032C9A8 /* AutomationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationClient.swift; sourceTree = "<group>"; };
@@ -65,6 +67,7 @@
 		A3ECEDA82D6A841D00E56665 = {
 			isa = PBXGroup;
 			children = (
+				A3BF520A2D7240100034254A /* SettingsView.swift */,
 				A3BF51EF2D6FB82B0034254A /* HomeAutomation-Info.plist */,
 				A3E5F0D72D6FA76F0032C9A8 /* Clients */,
 				A3E5F0D22D6FA7050032C9A8 /* openapi-generator-config.yaml */,
@@ -173,6 +176,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A3B8A0942D6A8468009314DA /* ContentView.swift in Sources */,
+				A3BF520B2D7240110034254A /* SettingsView.swift in Sources */,
 				A3E5F0DC2D6FA8AB0032C9A8 /* AutomationClient.swift in Sources */,
 				A3B8A0952D6A8468009314DA /* HomeAutomationApp.swift in Sources */,
 			);

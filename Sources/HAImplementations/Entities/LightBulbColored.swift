@@ -8,7 +8,7 @@
 import Foundation
 import HAModels
 
-public final class LightBulbColored: SwitchDevice {
+public final class LightBulbColored: SwitchDevice, @unchecked Sendable {
     public convenience init(query: EntityId.Query) {
         self.init(switchId: EntityId(query: query, characteristic: .switcher),
                   brightnessId: EntityId(query: query, characteristic: .brightness),

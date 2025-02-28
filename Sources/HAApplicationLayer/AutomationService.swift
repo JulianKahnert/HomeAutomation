@@ -39,6 +39,11 @@ public actor AutomationService {
                             } catch {
                                 self.log.critical("Automation failed with error - \(error)")
                             }
+                            
+                            // cancel the current task after completion to get correct results of getActiveAutomationNames
+                            withUnsafeCurrentTask { currentTask in
+                                currentTask?.cancel()
+                            }
                         }
                         await self.set(task: task, with: automation.name)
                     } catch {
@@ -50,7 +55,11 @@ public actor AutomationService {
     }
 
     public func getActiveAutomationNames() async -> Set<String> {
-        Set(runningTasks.keys)
+        let keys = runningTasks
+            .filter { !$0.value.isCancelled }
+            .map(\.key)
+
+        return Set(keys)
     }
 
     private func set(task: Task<Void, Never>, with id: String) {

@@ -8,7 +8,7 @@
 import Foundation
 import HAModels
 
-public final class GenericSwitch: SwitchDevice {
+public final class GenericSwitch: SwitchDevice, @unchecked Sendable {
     public convenience init(query: EntityId.Query) {
         self.init(switchId: EntityId(query: query, characteristic: .switcher),
                   brightnessId: nil,

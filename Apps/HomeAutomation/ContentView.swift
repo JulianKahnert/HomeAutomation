@@ -52,9 +52,11 @@ struct ContentView: View {
         .refreshable {
             await updateAutomations()
         }
-        .task {
+        .onAppear {
             client = AutomationClient(url: url)
-            await updateAutomations()
+            Task {
+                await updateAutomations()
+            }
         }
         .onChange(of: url) { _, newValue in
             client = AutomationClient(url: url)

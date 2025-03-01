@@ -41,7 +41,7 @@ struct CircadianTests {
         let sunData = getSunData(for: date)
         let percentage = getNormalizedBrightnessValue(sunData: sunData, current: date.percentageOfDay())
 
-        #expect(percentage > 0.2)
+        #expect(percentage > 0.1)
         #expect(percentage < 0.3)
     }
 

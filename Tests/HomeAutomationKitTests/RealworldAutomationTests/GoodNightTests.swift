@@ -1,8 +1,7 @@
 import Foundation
 @testable import HAApplicationLayer
-@testable import HAConfig
 @testable import HAImplementations
-@testable import HomeAutomationKit
+import HAModels
 import Testing
 
 @HomeManagerActor
@@ -12,14 +11,11 @@ struct GoodNightTests {
     let deviceEveMotion = EveMotion(query: .init(placeId: "room1", name: "motion1"))
     let deviceEveMotion2 = EveMotion(query: .init(placeId: "room2", name: "motion2", characteristicsName: "characteristicName2"))
     let automation: GoodNight
-    let config: Config
     init() {
-        automation = GoodNight(at: Time(hour: 0, minute: 0),
+        automation = GoodNight("good-night",
+                               at: Time(hour: 0, minute: 0),
                                motionSensors: [deviceEveMotion, deviceEveMotion2],
                                motionWait: .milliseconds(100))
-        config = Config(automations: [automation],
-                        location: .oldenburgLocation,
-                        devices: [deviceEveMotion, deviceEveMotion2])
     }
 
     @Test("Motion trigger without wait", .tags(.localOnly))
@@ -27,7 +23,7 @@ struct GoodNightTests {
         // prepare
 
         // run
-        let mockHomeAdapter = MockHomeAdapter(with: config)
+        let mockHomeAdapter = MockHomeAdapter()
         mockHomeAdapter.storageItems = [
             EntityStorageItem(entityId: deviceEveMotion.motionSensorId,
                               timestamp: Date(),
@@ -50,7 +46,9 @@ struct GoodNightTests {
         ]
 
         let mockStorageRepo = MockStorageRepository(items: mockHomeAdapter.storageItems)
-        let homeManager = HomeManager(with: mockHomeAdapter, storageRepo: mockStorageRepo, config: config)
+        let homeManager = HomeManager(getAdapter: {
+            return nil
+        }, storageRepo: mockStorageRepo, location: Location(latitude: 1, longitude: 2))
 
         // trigger motion
         let start = Date()
@@ -66,7 +64,7 @@ struct GoodNightTests {
         // prepare
 
         // run
-        let mockHomeAdapter = MockHomeAdapter(with: config)
+        let mockHomeAdapter = MockHomeAdapter()
         mockHomeAdapter.storageItems = [
             EntityStorageItem(entityId: deviceEveMotion.motionSensorId,
                               timestamp: Date(),
@@ -89,7 +87,9 @@ struct GoodNightTests {
         ]
 
         let mockStorageRepo = MockStorageRepository(items: mockHomeAdapter.storageItems)
-        let homeManager = HomeManager(with: mockHomeAdapter, storageRepo: mockStorageRepo, config: config)
+        let homeManager = HomeManager(getAdapter: {
+            return nil
+        }, storageRepo: mockStorageRepo, location: Location(latitude: 1, longitude: 2))
 
         // trigger motion
         let start = Date()

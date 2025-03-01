@@ -7,9 +7,8 @@
 
 import Foundation
 @testable import HAApplicationLayer
-@testable import HAConfig
 @testable import HAImplementations
-@testable import HomeAutomationKit
+import HAModels
 import Testing
 
 struct AutomatableTests {
@@ -18,15 +17,17 @@ struct AutomatableTests {
     let dimWait: Duration = .milliseconds(50)
     let deviceEveMotion = EveMotion(query: .init(placeId: "room1", name: "motion1"))
     let deviceEveMotion2 = EveMotion(query: .init(placeId: "room2", name: "motion2", characteristicsName: "characteristicName2"))
-    let windowContact: WindowContactSensible = WindowContactSensor(query: .init(placeId: "room1", name: "contact1"))
+    let windowContact = WindowContactSensor(query: .init(placeId: "room1", name: "contact1"))
     let automation1: GoodNight
     let automation2: WindowOpen
 
     init() {
-        automation1 = GoodNight(at: Time(hour: 0, minute: 0),
-                                 motionSensors: [deviceEveMotion, deviceEveMotion2],
-                                 motionWait: .milliseconds(100))
-        automation2 = WindowOpen(windowContact: windowContact)
+        automation1 = GoodNight("good-night",
+                                at: Time(hour: 0, minute: 0),
+                                motionSensors: [deviceEveMotion, deviceEveMotion2],
+                                motionWait: .milliseconds(100))
+        automation2 = WindowOpen("window-open",
+                                 windowContact: windowContact)
     }
 
     @Test("Test if all entityIds were found in a GoodNight automation")

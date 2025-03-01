@@ -5,10 +5,11 @@
 //  Created by Julian Kahnert on 02.07.24.
 //
 
-@testable import HomeAutomationKit
+import Distributed
 import Logging
+import HAModels
 
-final class MockHomeAdapter: EntityAdapterable, @unchecked Sendable {
+final class MockHomeAdapter: @unchecked Sendable {
 
     let entityStream: AsyncStream<EntityStorageItem>
     let entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation
@@ -17,7 +18,7 @@ final class MockHomeAdapter: EntityAdapterable, @unchecked Sendable {
     private let log = Logger(label: "MockHomeAdapter")
     private var traceMap: [String: Int] = [:]
 
-    init(with config: HAModels.Config) {
+    init() {
         let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(of: EntityStorageItem.self, bufferingPolicy: .unbounded)
         self.entityStream = entityStream
         self.entityStreamContinuation = entityStreamContinuation

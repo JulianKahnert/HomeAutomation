@@ -10,8 +10,7 @@ import Foundation
 import Logging
 
 extension FileLogHandler {
-    // Adapted from https://nshipster.com/textoutputstream/
-    public struct FileHandlerOutputStream: TextOutputStream, Sendable {
+    public actor FileHandlerOutputStream: Sendable {
         private let url: URL
         private var nextRotationDate: Date
         private var fileHandle: FileHandle
@@ -24,7 +23,7 @@ extension FileLogHandler {
                                                               matchingPolicy: .nextTime)!
         }
 
-        public mutating func write(_ string: String) {
+        public func write(_ string: String) {
             if Date() > nextRotationDate {
                 self.fileHandle = Self.getNewFileHandle(basePath: url)
                 self.nextRotationDate = Calendar.current.nextDate(after: Date(),
@@ -99,8 +98,10 @@ public struct FileLogHandler: LogHandler {
             ? self.prettyMetadata
             : self.prettify(self.metadata.merging(metadata!, uniquingKeysWith: { _, new in new }))
 
-        var stream = self.stream
-        stream.write("\(self.timestamp()) \(level) \(self.label) :\(prettyMetadata.map { " \($0)" } ?? "") \(message)\n")
+        let message = "\(self.timestamp()) \(level) \(self.label) :\(prettyMetadata.map { " \($0)" } ?? "") \(message)\n"
+        Task {
+            await stream.write(message)
+        }
     }
 
     private func prettify(_ metadata: Logger.Metadata) -> String? {

@@ -43,7 +43,7 @@ struct ConfigController: APIProtocol {
         await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: false)
         return .ok
     }
-    
+
     func stopAutomation(_ input: Operations.StopAutomation.Input) async throws -> Operations.StopAutomation.Output {
         guard let name = request.parameters.get("name"),
               !name.isEmpty else {

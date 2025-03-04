@@ -66,7 +66,7 @@ struct ContentView: View {
                 await updateAutomations()
             }
         }
-        .onChange(of: url) { _, newValue in
+        .onChange(of: url) { _, _ in
             client = AutomationClient(url: url)
             Task {
                 await updateAutomations()

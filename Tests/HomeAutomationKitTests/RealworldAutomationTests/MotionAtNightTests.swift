@@ -1,13 +1,13 @@
 #warning("TODO: add tests")
-//import Foundation
-//import HAApplicationLayer
-//import HAImplementations
-//import HAModels
-//import Server
-//import Testing
+// import Foundation
+// import HAApplicationLayer
+// import HAImplementations
+// import HAModels
+// import Server
+// import Testing
 //
-//@HomeManagerActor
-//struct MotionAtNightTests {
+// @HomeManagerActor
+// struct MotionAtNightTests {
 //    let noMotionWait: Duration = .milliseconds(200)
 //    let dimWait: Duration = .milliseconds(50)
 //    let deviceEveMotion = EveMotion(query: .init(placeId: "room1", name: "motion1"))
@@ -556,4 +556,4 @@
 ////        // assert
 ////        #expect(mockHomeAdapter.getSortedTraceMap() == ["setUsedEntityIds.count:3: 1"])
 ////    }
-//}
+// }

@@ -6,8 +6,8 @@
 //
 
 import Distributed
-import Logging
 import HAModels
+import Logging
 
 final class MockHomeAdapter: @unchecked Sendable {
 

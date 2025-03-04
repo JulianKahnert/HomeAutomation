@@ -10,7 +10,7 @@ import Foundation
 import Logging
 
 extension FileLogHandler {
-    public actor FileHandlerOutputStream: Sendable {
+    public actor FileHandlerOutputStream {
         private let url: URL
         private var nextRotationDate: Date
         private var fileHandle: FileHandle

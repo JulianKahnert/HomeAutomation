@@ -31,7 +31,7 @@ struct AutomationView: View {
                     }
                 }))
             }
-            
+
             Section {
                 Button("Stop Automation") {
                     Task {

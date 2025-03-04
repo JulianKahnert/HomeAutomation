@@ -39,7 +39,7 @@ public actor AutomationService {
                             } catch {
                                 self.log.critical("Automation failed with error - \(error)")
                             }
-                            
+
                             // cancel the current task after completion to get correct results of getActiveAutomationNames
                             withUnsafeCurrentTask { currentTask in
                                 currentTask?.cancel()
@@ -62,7 +62,7 @@ public actor AutomationService {
         log.debug("Found currently active automations \(keys)")
         return Set(keys)
     }
-    
+
     public func stopAutomation(with name: String) async {
         log.debug("Cancel automation \(name)")
         runningTasks[name]?.cancel()

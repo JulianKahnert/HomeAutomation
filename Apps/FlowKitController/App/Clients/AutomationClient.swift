@@ -32,7 +32,7 @@ struct AutomationClient {
         let response = try await client.deactivateAutomation(path: .init(name: name))
         _ = try response.ok
     }
-    
+
     func stop(automation name: String) async throws {
         let response = try await client.stopAutomation(path: .init(name: name))
         _ = try response.ok

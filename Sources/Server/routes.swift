@@ -28,7 +28,7 @@ func routes(_ app: Application) throws {
                     partialResult.insert(entityId)
                 }
             let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
-            
+
             let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
             guard missingEntityIds.isEmpty else {
                 throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")

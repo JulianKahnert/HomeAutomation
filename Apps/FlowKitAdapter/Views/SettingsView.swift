@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  HomeKitAdapterApp
+//  FlowKit Adapter
 //
 //  Created by Julian Kahnert on 05.02.25.
 //

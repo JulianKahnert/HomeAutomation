@@ -1,5 +1,5 @@
 //
-//  HomeKitAdapterApp.swift
+//  FlowKit Adapter.swift
 //  HomeAutomation
 //
 //  Created by Julian Kahnert on 28.05.24.
@@ -11,11 +11,11 @@ import Logging
 import LoggingOSLog
 import SwiftUI
 
-let log = Logger(label: "HomeKitAdapterApp")
+let log = Logger(label: "FlowKit Adapter")
 @MainActor var commandReceiver: HomeKitCommandReceiver!
 
 @main
-struct HomeKitAdapterApp: App {
+struct FlowKitAdapter: App {
     @AppStorage("ShouldCrashIfActorSystemInitFails") private var shouldCrashIfActorSystemInitFails = false
     @State private var logTask: Task<Void, Never>?
     @State private var entities: [EntityStorageItem] = []

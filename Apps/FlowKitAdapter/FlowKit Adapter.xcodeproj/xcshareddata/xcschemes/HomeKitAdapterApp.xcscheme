@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A326E81C2C06528B00486F8E"
-               BuildableName = "HomeKitAdapterApp.app"
-               BlueprintName = "HomeKitAdapterApp"
-               ReferencedContainer = "container:HomeKitAdapterApp.xcodeproj">
+               BuildableName = "FlowKit Adapter.app"
+               BlueprintName = "FlowKit Adapter"
+               ReferencedContainer = "container:FlowKit Adapter.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A326E81C2C06528B00486F8E"
-            BuildableName = "HomeKitAdapterApp.app"
-            BlueprintName = "HomeKitAdapterApp"
-            ReferencedContainer = "container:HomeKitAdapterApp.xcodeproj">
+            BuildableName = "FlowKit Adapter.app"
+            BlueprintName = "FlowKit Adapter"
+            ReferencedContainer = "container:FlowKit Adapter.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A326E81C2C06528B00486F8E"
-            BuildableName = "HomeKitAdapterApp.app"
-            BlueprintName = "HomeKitAdapterApp"
-            ReferencedContainer = "container:HomeKitAdapterApp.xcodeproj">
+            BuildableName = "FlowKit Adapter.app"
+            BlueprintName = "FlowKit Adapter"
+            ReferencedContainer = "container:FlowKit Adapter.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

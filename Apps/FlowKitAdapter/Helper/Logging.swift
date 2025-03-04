@@ -1,6 +1,6 @@
 //
 //  Logging.swift
-//  HomeKitAdapterApp
+//  FlowKit Adapter
 //
 //  Created by Julian Kahnert on 25.02.25.
 //

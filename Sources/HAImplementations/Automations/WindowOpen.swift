@@ -49,6 +49,7 @@ public struct WindowOpen: Automatable {
 
         log.debug("Start sending notification")
         await TibberService()?.sendNotification(title: "🪟 offen", message: name)
+        await hm.sendNotification(title: "🪟 offen", message: name)
         log.debug("End sending notification")
     }
 }

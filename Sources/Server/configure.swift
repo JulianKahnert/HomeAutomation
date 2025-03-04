@@ -1,3 +1,4 @@
+import APNS
 import CoreFoundation
 import FluentMySQLDriver
 import HAApplicationLayer
@@ -5,6 +6,9 @@ import HAImplementations
 import HAModels
 import Logging
 import Vapor
+import VaporAPNS
+
+#warning("TODO: remove TibberSwift from HomeAutomationKit or also use NotificationSender there")
 
 // public distributed actor HomeKitCommandReceiver: EntityAdapterable {  // this crashes the 6.0.3 swift compiler on linux so we moved it to an extension
 extension HomeKitCommandReceiver: EntityAdapterable {}
@@ -20,6 +24,13 @@ public func configure(_ app: Application) async throws {
     }
     app.logger.info("Using timezone: \(TimeZone.current.description)")
 
+    // MARK: - env parsing
+
+    let notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.homeautomation"
+    let notificationPrivateKey = String.fromBase64(Environment.get("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")!)!
+    let notificationKeyIdentifier = Environment.get("PUSH_NOTIFICATION_KEY_IDENTIFIER")!
+    let notificationTeamIdentifier = Environment.get("PUSH_NOTIFICATION_TEAM_IDENTIFIER")!
+
     // MARK: - database setup
 
     var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
@@ -34,6 +45,27 @@ public func configure(_ app: Application) async throws {
     ), as: .mysql)
 
     app.migrations.add(CreateEntityStorageDbItem())
+    app.migrations.add(PushDeviceDbItem())
+
+    // MARK: - configure APNS
+
+    // Configure APNS using JWT authentication.
+    let apnsConfig = APNSClientConfiguration(
+        authenticationMethod: .jwt(
+            privateKey: try .loadFrom(string: notificationPrivateKey),
+            keyIdentifier: notificationKeyIdentifier,
+            teamIdentifier: notificationTeamIdentifier
+        ),
+        environment: .development
+    )
+
+    app.apns.containers.use(
+        apnsConfig,
+        eventLoopGroupProvider: .shared(app.eventLoopGroup),
+        responseDecoder: JSONDecoder(),
+        requestEncoder: JSONEncoder(),
+        as: .default
+    )
 
     // MARK: - actor system setup
 
@@ -47,11 +79,16 @@ public func configure(_ app: Application) async throws {
     // MARK: - home automation setup
 
     app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
+    let notificationSender = PushNotifcationService(database: app.db,
+                                                    apnsClient: app.apns.client,
+                                                    notificationTopic: notificationTopic,
+                                                    logger: app.logger)
     let homeManager = await HomeManager(
         getAdapter: {
             await actorSystem.lookup(.homeKitCommandReceiver)
         },
         storageRepo: app.entityStorageDbRepository,
+        notificationSender: notificationSender,
         location: app.homeAutomationConfigService.location)
     app.homeManager = homeManager
     let automationService = try AutomationService(using: homeManager,

@@ -14,13 +14,15 @@ public final class HomeManager: HomeManagable {
     private let log = Logger(label: "HomeManager")
     private let getAdapter: () async -> (any EntityAdapterable)?
     private let location: Location
-    private var storageRepo: StorageRepository
+    private let storageRepo: StorageRepository
+    private let notificationSender: NotificationSender
     private let entityCache = Cache<EntityId, EntityStorageItem>(entryLifetime: .hours(2))
     private var failedActions: [EntityId: HomeManagableAction] = [:]
 
-    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, location: Location) {
+    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, notificationSender: NotificationSender, location: Location) {
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
+        self.notificationSender = notificationSender
         self.location = location
 
 //        Task {
@@ -132,6 +134,16 @@ public final class HomeManager: HomeManagable {
 
     public func getLocation() -> Location {
         return location
+    }
+
+    public func sendNotification(title: String, message: String) async {
+        do {
+            log.debug("Sending notification \(title): \(message)")
+            try await notificationSender.sendNotification(title: title, message: message)
+        } catch {
+            log.critical("Failed to send notification: \(error)")
+            assertionFailure()
+        }
     }
 
     private func popAllFailedActions() -> [HomeManagableAction] {

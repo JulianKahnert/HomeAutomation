@@ -63,6 +63,20 @@ paths:
         "200":
           description: The currently running automation was stopped or the automation is not running.
 
+  /pushdevices:
+    post:
+      operationId: registerPushDevice
+      requestBody:
+        description: New device to register for push notifications.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushDevice"
+      responses:
+        "200":
+          description: The device was registered for push notifications.
+
 components:
   schemas:
     Automation:
@@ -78,3 +92,11 @@ components:
         - name
         - isActive
         - isRunning
+
+    PushDevice:
+      type: object
+      properties:
+        deviceToken:
+          type: string
+      required:
+        - deviceToken

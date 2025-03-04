@@ -24,6 +24,7 @@ public protocol HomeManagable: Sendable {
     func trigger(scene sceneName: String) async
     func maintenance() async throws
     func getLocation() async -> Location
+    func sendNotification(title: String, message: String) async
 }
 
 public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable {

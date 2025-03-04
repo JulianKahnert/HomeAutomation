@@ -6,6 +6,7 @@
 //
 
 import Dependencies
+import Fluent
 import Vapor
 
 struct ConfigController: APIProtocol {
@@ -51,6 +52,23 @@ struct ConfigController: APIProtocol {
         }
 
         await request.application.automationService.stopAutomation(with: name)
+        return .ok
+    }
+
+    // MARK: - /pushdevices
+
+    func registerPushDevice(_ input: Operations.RegisterPushDevice.Input) async throws -> Operations.RegisterPushDevice.Output {
+       guard case let .json(content) = input.body else {
+            throw Abort(.badRequest, reason: "Invalid JSON body")
+        }
+        let numberOfPushDevices = try await PushDevice
+            .query(on: request.db)
+            .filter(\.$deviceToken == content.deviceToken)
+            .count()
+        if numberOfPushDevices == 0 {
+            let newPushDevice = PushDevice(id: nil, deviceToken: content.deviceToken)
+            try await newPushDevice.save(on: request.db)
+        }
         return .ok
     }
 }

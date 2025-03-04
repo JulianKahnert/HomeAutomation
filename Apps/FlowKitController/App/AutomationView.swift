@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AutomationView: View {
-    let client: AutomationClient!
+    let client: FlowKitClient!
     let automation: Automation
 
     var body: some View {

@@ -17,9 +17,9 @@ extension Bool {
 }
 
 struct ContentView: View {
-    @AppStorage("AutomationClientUrl") private var url = URL(string: "http://0.0.0.0:8080/")!
+    @AppStorage(FlowKitClient.userDefaultsKey) private var url = URL(string: "http://0.0.0.0:8080/")!
     @State private var showSettings = false
-    @State private var client: AutomationClient!
+    @State private var client: FlowKitClient!
     @State private var automations: [Automation] = []
 
     var body: some View {
@@ -61,13 +61,14 @@ struct ContentView: View {
             await updateAutomations()
         }
         .onAppear {
-            client = AutomationClient(url: url)
+            client = FlowKitClient(url: url)
             Task {
                 await updateAutomations()
             }
+            requestRemoteNotificationsIfNeeded()
         }
         .onChange(of: url) { _, _ in
-            client = AutomationClient(url: url)
+            client = FlowKitClient(url: url)
             Task {
                 await updateAutomations()
             }
@@ -89,6 +90,16 @@ struct ContentView: View {
             self.automations = try await client.getAutomations()
         } catch {
             self.automations = []
+        }
+    }
+
+    private func requestRemoteNotificationsIfNeeded() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+            if granted {
+                DispatchQueue.main.async {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+            }
         }
     }
 }

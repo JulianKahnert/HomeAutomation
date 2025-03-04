@@ -1,5 +1,5 @@
 //
-//  AutomationClient.swift
+//  FlowKitClient.swift
 //  HomeAutomation
 //
 //  Created by Julian Kahnert on 26.02.25.
@@ -8,7 +8,9 @@
 import Foundation
 import OpenAPIURLSession
 
-struct AutomationClient {
+struct FlowKitClient {
+    static let userDefaultsKey = "AutomationClientUrl"
+
     private let client: Client
 
     init(url: URL) {
@@ -35,6 +37,11 @@ struct AutomationClient {
 
     func stop(automation name: String) async throws {
         let response = try await client.stopAutomation(path: .init(name: name))
+        _ = try response.ok
+    }
+
+    func register(pushDeviceToken: String) async throws {
+        let response = try await client.registerPushDevice(.init(body: .json(.init(deviceToken: pushDeviceToken))))
         _ = try response.ok
     }
 }

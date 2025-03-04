@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A3714AF12D7780A5006E340F /* AutomationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3714AF02D7780A5006E340F /* AutomationView.swift */; };
 		A3B8A0942D6A8468009314DA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A08F2D6A8468009314DA /* ContentView.swift */; };
 		A3B8A0952D6A8468009314DA /* FlowKitController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A0912D6A8468009314DA /* FlowKitController.swift */; };
 		A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */; };
@@ -21,6 +22,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A3714AF02D7780A5006E340F /* AutomationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationView.swift; sourceTree = "<group>"; };
 		A3B8A08E2D6A8468009314DA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A3B8A08F2D6A8468009314DA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A3B8A0902D6A8468009314DA /* FlowKitController.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlowKitController.entitlements; sourceTree = "<group>"; };
@@ -48,6 +50,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A3714AEF2D778077006E340F /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A3BF520A2D7240100034254A /* SettingsView.swift */,
+				A3E5F0D72D6FA76F0032C9A8 /* Clients */,
+				A3B8A08F2D6A8468009314DA /* ContentView.swift */,
+				A3714AF02D7780A5006E340F /* AutomationView.swift */,
+				A3B8A0912D6A8468009314DA /* FlowKitController.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
 		A3B8A0932D6A8468009314DA /* Preview Content */ = {
 			isa = PBXGroup;
 			children = (
@@ -67,15 +81,12 @@
 		A3ECEDA82D6A841D00E56665 = {
 			isa = PBXGroup;
 			children = (
-				A3BF520A2D7240100034254A /* SettingsView.swift */,
 				A3BF51EF2D6FB82B0034254A /* FlowKit Controller-Info.plist */,
-				A3E5F0D72D6FA76F0032C9A8 /* Clients */,
 				A3E5F0D22D6FA7050032C9A8 /* openapi-generator-config.yaml */,
 				A3E5F0D42D6FA70A0032C9A8 /* openapi.yaml */,
 				A3B8A08E2D6A8468009314DA /* Assets.xcassets */,
-				A3B8A08F2D6A8468009314DA /* ContentView.swift */,
 				A3B8A0902D6A8468009314DA /* FlowKitController.entitlements */,
-				A3B8A0912D6A8468009314DA /* FlowKitController.swift */,
+				A3714AEF2D778077006E340F /* App */,
 				A3B8A0932D6A8468009314DA /* Preview Content */,
 				A3ECEDB22D6A841D00E56665 /* Products */,
 			);
@@ -179,6 +190,7 @@
 				A3BF520B2D7240110034254A /* SettingsView.swift in Sources */,
 				A3E5F0DC2D6FA8AB0032C9A8 /* AutomationClient.swift in Sources */,
 				A3B8A0952D6A8468009314DA /* FlowKitController.swift in Sources */,
+				A3714AF12D7780A5006E340F /* AutomationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

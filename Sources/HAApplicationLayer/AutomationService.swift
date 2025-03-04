@@ -59,7 +59,13 @@ public actor AutomationService {
             .filter { !$0.value.isCancelled }
             .map(\.key)
 
+        log.debug("Found currently active automations \(keys)")
         return Set(keys)
+    }
+    
+    public func stopAutomation(with name: String) async {
+        log.debug("Cancel automation \(name)")
+        runningTasks[name]?.cancel()
     }
 
     private func set(task: Task<Void, Never>, with id: String) {

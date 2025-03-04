@@ -49,6 +49,20 @@ paths:
         "200":
           description: The automation was deactivated.
 
+  /config/automations/{name}/stop:
+    post:
+      operationId: stopAutomation
+      parameters:
+        - name: name
+          in: path
+          description: Name of the automation
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The currently running automation was stopped or the automation is not running.
+
 components:
   schemas:
     Automation:

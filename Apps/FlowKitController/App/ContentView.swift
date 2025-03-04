@@ -26,12 +26,20 @@ struct ContentView: View {
         List {
             Section {
                 ForEach(automations.filter(\.isRunning)) { automation in
-                    view(for: automation)
+                    NavigationLink(destination: {
+                        AutomationView(client: client, automation: automation)
+                    }, label: {
+                        view(for: automation)
+                    })
                 }
             }
             Section {
                 ForEach(automations.filter(\.isRunning.inverted)) { automation in
-                    view(for: automation)
+                    NavigationLink(destination: {
+                        AutomationView(client: client, automation: automation)
+                    }, label: {
+                        view(for: automation)
+                    })
                 }
             }
         }
@@ -68,21 +76,11 @@ struct ContentView: View {
 
     @ViewBuilder
     func view(for automation: Automation) -> some View {
-        VStack(alignment: .leading) {
+        HStack {
             Text(automation.name)
-            HStack {
-                Image(systemName: "circle.fill")
-                    .foregroundStyle(automation.isRunning ? Color.green : Color.gray.opacity(0.3))
-                Spacer()
-                Toggle("", isOn: Binding<Bool>(get: {
-                    automation.isActive
-                }, set: { value in
-                    guard value != automation.isActive else { return }
-                    Task {
-                        await toggleActive(value, automationName: automation.name)
-                    }
-                }))
-            }
+            Spacer()
+            Image(systemName: "circle.fill")
+                .foregroundStyle(automation.isRunning ? Color.green : Color.gray.opacity(0.3))
         }
     }
 
@@ -91,19 +89,6 @@ struct ContentView: View {
             self.automations = try await client.getAutomations()
         } catch {
             self.automations = []
-        }
-    }
-
-    func toggleActive(_ value: Bool, automationName: String) async {
-        do {
-            if value {
-                try await client.activate(automation: automationName)
-            } else {
-                try await client.deactivate(automation: automationName)
-            }
-            self.automations = try await client.getAutomations()
-        } catch {
-            assertionFailure()
         }
     }
 }

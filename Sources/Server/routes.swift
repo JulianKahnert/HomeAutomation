@@ -17,19 +17,22 @@ func routes(_ app: Application) throws {
 
     app.on(.POST, "config", body: .collect(maxSize: "10mb")) { req in
         let configDTO = try req.content.decode(ConfigDTO.self)
+        let skipValidation = req.query["skipValidation"] == "true"
 
-        // validate if all automations are correct, e.g. contain existing entities
-        let configEntityIds = configDTO.automations
-            .map(\.automation)
-            .flatMap { $0.getEntityIds() }
-            .reduce(into: Set<EntityId>()) { partialResult, entityId in
-                partialResult.insert(entityId)
+        if !skipValidation {
+            // validate if all automations are correct, e.g. contain existing entities
+            let configEntityIds = configDTO.automations
+                .map(\.automation)
+                .flatMap { $0.getEntityIds() }
+                .reduce(into: Set<EntityId>()) { partialResult, entityId in
+                    partialResult.insert(entityId)
+                }
+            let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
+            
+            let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
+            guard missingEntityIds.isEmpty else {
+                throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
             }
-        let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
-
-        let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
-        guard missingEntityIds.isEmpty else {
-            throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
         }
 
         let previousAutomations = await req.application.homeAutomationConfigService.automations

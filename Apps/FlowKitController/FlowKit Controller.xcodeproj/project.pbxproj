@@ -14,6 +14,7 @@
 		A3B8A0952D6A8468009314DA /* FlowKitControllerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */; };
 		A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */; };
 		A3B8A0972D6A8468009314DA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A08E2D6A8468009314DA /* Assets.xcassets */; };
+		A3BA51482D78D0EC002DD924 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = A3BA51472D78D0EC002DD924 /* Logging */; };
 		A3BF520B2D7240110034254A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BF520A2D7240100034254A /* SettingsView.swift */; };
 		A3E5F0CC2D6FA6520032C9A8 /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = A3E5F0CB2D6FA6520032C9A8 /* OpenAPIRuntime */; };
 		A3E5F0CF2D6FA67A0032C9A8 /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = A3E5F0CE2D6FA67A0032C9A8 /* OpenAPIURLSession */; };
@@ -45,6 +46,7 @@
 			files = (
 				A3E5F0CC2D6FA6520032C9A8 /* OpenAPIRuntime in Frameworks */,
 				A3E5F0CF2D6FA67A0032C9A8 /* OpenAPIURLSession in Frameworks */,
+				A3BA51482D78D0EC002DD924 /* Logging in Frameworks */,
 				A3F9BC802D6FA547002298ED /* HomeAutomationKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -124,6 +126,7 @@
 				A3F9BC7F2D6FA547002298ED /* HomeAutomationKit */,
 				A3E5F0CB2D6FA6520032C9A8 /* OpenAPIRuntime */,
 				A3E5F0CE2D6FA67A0032C9A8 /* OpenAPIURLSession */,
+				A3BA51472D78D0EC002DD924 /* Logging */,
 			);
 			productName = HomeAutomation;
 			productReference = A3ECEDB12D6A841D00E56665 /* FlowKit Controller.app */;
@@ -159,6 +162,7 @@
 				A3E5F0C92D6FA6020032C9A8 /* XCRemoteSwiftPackageReference "swift-openapi-generator" */,
 				A3E5F0CA2D6FA6520032C9A8 /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */,
 				A3E5F0CD2D6FA67A0032C9A8 /* XCRemoteSwiftPackageReference "swift-openapi-urlsession" */,
+				A3BA51462D78D0EC002DD924 /* XCRemoteSwiftPackageReference "swift-log" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A3ECEDB22D6A841D00E56665 /* Products */;
@@ -438,6 +442,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A3BA51462D78D0EC002DD924 /* XCRemoteSwiftPackageReference "swift-log" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-log";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.2;
+			};
+		};
 		A3E5F0C92D6FA6020032C9A8 /* XCRemoteSwiftPackageReference "swift-openapi-generator" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/swift-openapi-generator";
@@ -465,6 +477,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A3BA51472D78D0EC002DD924 /* Logging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A3BA51462D78D0EC002DD924 /* XCRemoteSwiftPackageReference "swift-log" */;
+			productName = Logging;
+		};
 		A3E5F0CB2D6FA6520032C9A8 /* OpenAPIRuntime */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A3E5F0CA2D6FA6520032C9A8 /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */;

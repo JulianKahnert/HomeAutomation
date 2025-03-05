@@ -12,3 +12,9 @@ HomeAutomationKit/.swiftpm/xcode/xcuserdata
 HomeAutomationKit/.build
 xcuserdata
 .env
+Client.d
+Client.swiftdeps
+Server.d
+Server.swiftdeps
+Types.d
+Types.swiftdeps

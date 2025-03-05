@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 typealias Automation = Components.Schemas.Automation
 extension Automation: Identifiable {
@@ -97,7 +98,11 @@ struct ContentView: View {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
             if granted {
                 DispatchQueue.main.async {
+                    #if canImport(UIKit)
                     UIApplication.shared.registerForRemoteNotifications()
+                    #else
+                    NSApplication.shared.registerForRemoteNotifications()
+                    #endif
                 }
             }
         }

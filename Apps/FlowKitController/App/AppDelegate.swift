@@ -7,7 +7,11 @@
 
 import Foundation
 import Logging
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 @MainActor
 class AppDelegate: NSObject {
@@ -16,17 +20,8 @@ class AppDelegate: NSObject {
     override init() {
         super.init()
     }
-}
 
-extension AppDelegate: UIApplicationDelegate {
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-    ) -> Bool {
-        return true
-    }
-
-    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    private func register(deviceToken: Data) {
         let tokenString = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
         logger.info("Did register for remote notifications \(tokenString)")
 
@@ -45,8 +40,26 @@ extension AppDelegate: UIApplicationDelegate {
             }
         }
     }
+}
+
+#if canImport(UIKit)
+extension AppDelegate: UIApplicationDelegate {
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        register(deviceToken: deviceToken)
+    }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
         logger.critical("Failed to register for remote notifications: \(error)")
     }
 }
+#else
+extension AppDelegate: NSApplicationDelegate {
+    func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        register(deviceToken: deviceToken)
+    }
+
+    func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
+        logger.critical("Failed to register for remote notifications: \(error)")
+    }
+}
+#endif

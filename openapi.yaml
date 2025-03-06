@@ -76,6 +76,8 @@ paths:
       responses:
         "200":
           description: The device was registered for push notifications.
+        "500":
+          description: Some internal server error.
 
 components:
   schemas:
@@ -96,7 +98,19 @@ components:
     PushDevice:
       type: object
       properties:
-        deviceToken:
+        deviceName:
           type: string
+          description: The name of the device that created this token.
+        tokenString:
+          type: string
+        tokenType:
+          type: string
+          enum: [pushNotification, liveActivityStart, liveActivityUpdate]
+          description: The type of the push notification.
+        activityType:
+          type: string
+          description: Type of the activity (e.g. WindowOpenAttributes) - only available for tokens of type "liveActivityUpdate".
       required:
-        - deviceToken
+        - deviceName
+        - tokenString
+        - tokenType

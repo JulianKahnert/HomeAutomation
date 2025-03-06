@@ -45,7 +45,7 @@ public func configure(_ app: Application) async throws {
     ), as: .mysql)
 
     app.migrations.add(CreateEntityStorageDbItem())
-    app.migrations.add(PushDeviceDbItem())
+    app.migrations.add(DeviceTokenItem())
 
     // MARK: - configure APNS
 

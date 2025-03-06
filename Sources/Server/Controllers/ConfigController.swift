@@ -61,14 +61,57 @@ struct ConfigController: APIProtocol {
        guard case let .json(content) = input.body else {
             throw Abort(.badRequest, reason: "Invalid JSON body")
         }
-        let numberOfPushDevices = try await PushDevice
-            .query(on: request.db)
-            .filter(\.$deviceToken == content.deviceToken)
-            .count()
-        if numberOfPushDevices == 0 {
-            let newPushDevice = PushDevice(id: nil, deviceToken: content.deviceToken)
-            try await newPushDevice.save(on: request.db)
+        
+        switch content.tokenType {
+        case .pushNotification, .liveActivityStart:
+            let numberOfPushDevices = try await DeviceToken
+                .query(on: request.db)
+                .filter(\.$deviceName == content.deviceName)
+                .filter(\.$tokenString == content.tokenString)
+                .filter(\.$tokenType == content.tokenType.rawValue)
+                .count()
+            if numberOfPushDevices == 0 {
+                let newPushDevice = DeviceToken(id: nil,
+                                                deviceName: content.deviceName,
+                                                tokenString: content.tokenString,
+                                                tokenType: content.tokenType.rawValue,
+                                                activityType: content.activityType) // for pushNotification & liveActivityStart - this should always be nil
+                try await newPushDevice.save(on: request.db)
+            }
+            return .ok
+        
+        case .liveActivityUpdate:
+            guard let activityType = content.activityType else {
+                request.logger.critical("Token of type liveActivityUpdate must contain activityType")
+                return .internalServerError
+            }
+            
+            // delete other tokens with that activity type
+            try await DeviceToken
+                .query(on: request.db)
+                .filter(\.$deviceName == content.deviceName)
+                .filter(\.$tokenString != content.tokenString)
+                .filter(\.$tokenType == content.tokenType.rawValue)
+                .filter(\.$activityType == activityType)
+                .delete()
+            
+            // insert the new token, if needed
+            let numberOfPushDevices = try await DeviceToken
+                .query(on: request.db)
+                .filter(\.$deviceName == content.deviceName)
+                .filter(\.$tokenString == content.tokenString)
+                .filter(\.$tokenType == content.tokenType.rawValue)
+                .filter(\.$activityType == activityType)
+                .count()
+            if numberOfPushDevices == 0 {
+                let newPushDevice = DeviceToken(id: nil,
+                                                deviceName: content.deviceName,
+                                                tokenString: content.tokenString,
+                                                tokenType: content.tokenType.rawValue,
+                                                activityType: content.activityType) // this should always be nil
+                try await newPushDevice.save(on: request.db)
+            }
+            return .ok
         }
-        return .ok
     }
 }

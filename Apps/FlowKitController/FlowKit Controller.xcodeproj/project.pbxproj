@@ -15,6 +15,10 @@
 		A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */; };
 		A3B8A0972D6A8468009314DA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A08E2D6A8468009314DA /* Assets.xcassets */; };
 		A3BA51482D78D0EC002DD924 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = A3BA51472D78D0EC002DD924 /* Logging */; };
+		A3BA515C2D798A69002DD924 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515B2D798A69002DD924 /* WidgetKit.framework */; };
+		A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515D2D798A69002DD924 /* SwiftUI.framework */; };
+		A3BA516C2D798A6A002DD924 /* FlowKit Controller WidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A3BA51F32D79B6B4002DD924 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BA51F22D79B6B4002DD924 /* AppState.swift */; };
 		A3BF520B2D7240110034254A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BF520A2D7240100034254A /* SettingsView.swift */; };
 		A3E5F0CC2D6FA6520032C9A8 /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = A3E5F0CB2D6FA6520032C9A8 /* OpenAPIRuntime */; };
 		A3E5F0CF2D6FA67A0032C9A8 /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = A3E5F0CE2D6FA67A0032C9A8 /* OpenAPIURLSession */; };
@@ -22,6 +26,30 @@
 		A3E5F0D52D6FA70A0032C9A8 /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A3E5F0D42D6FA70A0032C9A8 /* openapi.yaml */; };
 		A3F9BC802D6FA547002298ED /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F9BC7F2D6FA547002298ED /* HomeAutomationKit */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A3BA516A2D798A6A002DD924 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A3ECEDA92D6A841D00E56665 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A3BA51582D798A69002DD924;
+			remoteInfo = "FlowKit Controller WidgetExtensionExtension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A3BA51712D798A6A002DD924 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A3BA516C2D798A6A002DD924 /* FlowKit Controller WidgetExtensionExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A3714AF02D7780A5006E340F /* AutomationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationView.swift; sourceTree = "<group>"; };
@@ -32,6 +60,10 @@
 		A3B8A0902D6A8468009314DA /* FlowKitController.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlowKitController.entitlements; sourceTree = "<group>"; };
 		A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowKitControllerApp.swift; sourceTree = "<group>"; };
 		A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "FlowKit Controller WidgetExtensionExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A3BA515B2D798A69002DD924 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		A3BA515D2D798A69002DD924 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		A3BA51F22D79B6B4002DD924 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		A3BF51EF2D6FB82B0034254A /* FlowKit Controller-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "FlowKit Controller-Info.plist"; sourceTree = "<group>"; };
 		A3BF520A2D7240100034254A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A3E5F0D22D6FA7050032C9A8 /* openapi-generator-config.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = "openapi-generator-config.yaml"; sourceTree = "<group>"; };
@@ -39,7 +71,53 @@
 		A3ECEDB12D6A841D00E56665 /* FlowKit Controller.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "FlowKit Controller.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A3BA516D2D798A6A002DD924 /* Exceptions for "FlowKit Controller WidgetExtension" folder in "FlowKit Controller WidgetExtensionExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A3BA51582D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension */;
+		};
+		A3BA519D2D799F49002DD924 /* Exceptions for "Shared" folder in "FlowKit Controller WidgetExtensionExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				WindowOpenAttributes.swift,
+				WindowOpenLiveActivityView.swift,
+			);
+			target = A3BA51582D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A3BA515F2D798A69002DD924 /* FlowKit Controller WidgetExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A3BA516D2D798A6A002DD924 /* Exceptions for "FlowKit Controller WidgetExtension" folder in "FlowKit Controller WidgetExtensionExtension" target */,
+			);
+			path = "FlowKit Controller WidgetExtension";
+			sourceTree = "<group>";
+		};
+		A3BA519B2D799F42002DD924 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A3BA519D2D799F49002DD924 /* Exceptions for "Shared" folder in "FlowKit Controller WidgetExtensionExtension" target */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
+		A3BA51562D798A69002DD924 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */,
+				A3BA515C2D798A69002DD924 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A3ECEDAE2D6A841D00E56665 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -57,11 +135,13 @@
 		A3714AEF2D778077006E340F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				A3BA51F22D79B6B4002DD924 /* AppState.swift */,
 				A3BF520A2D7240100034254A /* SettingsView.swift */,
 				A3B8A08F2D6A8468009314DA /* ContentView.swift */,
 				A3714AF02D7780A5006E340F /* AutomationView.swift */,
 				A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */,
 				A3714B412D779ED9006E340F /* AppDelegate.swift */,
+				A3E5F0D72D6FA76F0032C9A8 /* Features */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -72,6 +152,15 @@
 				A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		A3BA515A2D798A69002DD924 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A3BA515B2D798A69002DD924 /* WidgetKit.framework */,
+				A3BA515D2D798A69002DD924 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		A3E5F0D72D6FA76F0032C9A8 /* Features */ = {
@@ -85,14 +174,16 @@
 		A3ECEDA82D6A841D00E56665 = {
 			isa = PBXGroup;
 			children = (
+				A3BA519B2D799F42002DD924 /* Shared */,
 				A3BF51EF2D6FB82B0034254A /* FlowKit Controller-Info.plist */,
 				A3E5F0D22D6FA7050032C9A8 /* openapi-generator-config.yaml */,
 				A3E5F0D42D6FA70A0032C9A8 /* openapi.yaml */,
 				A3B8A08E2D6A8468009314DA /* Assets.xcassets */,
 				A3B8A0902D6A8468009314DA /* FlowKitController.entitlements */,
-				A3E5F0D72D6FA76F0032C9A8 /* Features */,
 				A3714AEF2D778077006E340F /* App */,
 				A3B8A0932D6A8468009314DA /* Preview Content */,
+				A3BA515F2D798A69002DD924 /* FlowKit Controller WidgetExtension */,
+				A3BA515A2D798A69002DD924 /* Frameworks */,
 				A3ECEDB22D6A841D00E56665 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -101,6 +192,7 @@
 			isa = PBXGroup;
 			children = (
 				A3ECEDB12D6A841D00E56665 /* FlowKit Controller.app */,
+				A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,6 +200,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A3BA51582D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A3BA516E2D798A6A002DD924 /* Build configuration list for PBXNativeTarget "FlowKit Controller WidgetExtensionExtension" */;
+			buildPhases = (
+				A3BA51552D798A69002DD924 /* Sources */,
+				A3BA51562D798A69002DD924 /* Frameworks */,
+				A3BA51572D798A69002DD924 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A3BA515F2D798A69002DD924 /* FlowKit Controller WidgetExtension */,
+			);
+			name = "FlowKit Controller WidgetExtensionExtension";
+			packageProductDependencies = (
+			);
+			productName = "FlowKit Controller WidgetExtensionExtension";
+			productReference = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		A3ECEDB02D6A841D00E56665 /* FlowKit Controller */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A3ECEDC02D6A841E00E56665 /* Build configuration list for PBXNativeTarget "FlowKit Controller" */;
@@ -115,11 +229,16 @@
 				A3ECEDAD2D6A841D00E56665 /* Sources */,
 				A3ECEDAE2D6A841D00E56665 /* Frameworks */,
 				A3ECEDAF2D6A841D00E56665 /* Resources */,
+				A3BA51712D798A6A002DD924 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				A3E5F0D12D6FA6E10032C9A8 /* PBXTargetDependency */,
+				A3BA516B2D798A6A002DD924 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A3BA519B2D799F42002DD924 /* Shared */,
 			);
 			name = "FlowKit Controller";
 			packageProductDependencies = (
@@ -142,6 +261,9 @@
 				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
+					A3BA51582D798A69002DD924 = {
+						CreatedOnToolsVersion = 16.2;
+					};
 					A3ECEDB02D6A841D00E56665 = {
 						CreatedOnToolsVersion = 16.2;
 						LastSwiftMigration = 1620;
@@ -170,11 +292,19 @@
 			projectRoot = "";
 			targets = (
 				A3ECEDB02D6A841D00E56665 /* FlowKit Controller */,
+				A3BA51582D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A3BA51572D798A69002DD924 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A3ECEDAF2D6A841D00E56665 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -189,6 +319,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A3BA51552D798A69002DD924 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A3ECEDAD2D6A841D00E56665 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -197,6 +334,7 @@
 				A3B8A0942D6A8468009314DA /* ContentView.swift in Sources */,
 				A3BF520B2D7240110034254A /* SettingsView.swift in Sources */,
 				A3B8A0952D6A8468009314DA /* FlowKitControllerApp.swift in Sources */,
+				A3BA51F32D79B6B4002DD924 /* AppState.swift in Sources */,
 				A3714AF12D7780A5006E340F /* AutomationView.swift in Sources */,
 				A3714B4D2D77A231006E340F /* FlowKitClient.swift in Sources */,
 			);
@@ -205,6 +343,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		A3BA516B2D798A6A002DD924 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A3BA51582D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension */;
+			targetProxy = A3BA516A2D798A6A002DD924 /* PBXContainerItemProxy */;
+		};
 		A3E5F0D12D6FA6E10032C9A8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			productRef = A3E5F0D02D6FA6E10032C9A8 /* OpenAPIGenerator */;
@@ -212,6 +355,72 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		A3BA516F2D798A6A002DD924 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = "FlowKit Controller WidgetExtension/FlowKit_Controller_WidgetExtension.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 87KNVHZ8C7;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "FlowKit Controller WidgetExtension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "FlowKit Controller WidgetExtension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "de.juliankahnert.HomeAutomation.FlowKit-Controller-WidgetExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A3BA51702D798A6A002DD924 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = "FlowKit Controller WidgetExtension/FlowKit_Controller_WidgetExtension.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 87KNVHZ8C7;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "FlowKit Controller WidgetExtension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "FlowKit Controller WidgetExtension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "de.juliankahnert.HomeAutomation.FlowKit-Controller-WidgetExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		A3ECEDBE2D6A841E00E56665 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -342,6 +551,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "FlowKit Controller-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHomeKitUsageDescription = "Access HomeKit";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -385,6 +597,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "FlowKit Controller-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHomeKitUsageDescription = "Access HomeKit";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -414,6 +629,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A3BA516E2D798A6A002DD924 /* Build configuration list for PBXNativeTarget "FlowKit Controller WidgetExtensionExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A3BA516F2D798A6A002DD924 /* Debug */,
+				A3BA51702D798A6A002DD924 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A3ECEDAC2D6A841D00E56665 /* Build configuration list for PBXProject "FlowKit Controller" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

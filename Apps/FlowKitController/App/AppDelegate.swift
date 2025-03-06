@@ -12,40 +12,48 @@ import UIKit
 #else
 import AppKit
 #endif
+import ActivityKit
 
 @MainActor
 class AppDelegate: NSObject {
     private let logger = Logger(label: "AppDelegate")
+    
+    private(set) var appState = AppState()
 
     override init() {
         super.init()
-    }
-
-    private func register(deviceToken: Data) {
-        let tokenString = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
-        logger.info("Did register for remote notifications \(tokenString)")
-
-        Task {
-            do {
-                guard let url = UserDefaults.standard.url(forKey: FlowKitClient.userDefaultsKey) else {
-                    logger.critical("Failed to get client URL")
-                    assertionFailure()
-                    return
-                }
-                let client = FlowKitClient(url: url)
-                try await client.register(pushDeviceToken: tokenString)
-            } catch {
-                logger.critical("Failed to register push device \(error)")
-                assertionFailure()
-            }
-        }
     }
 }
 
 #if canImport(UIKit)
 extension AppDelegate: UIApplicationDelegate {
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any]) async -> UIBackgroundFetchResult {
+        
+        logger.info("didReceiveRemoteNotification")
+        
+//        for activity in Activity<WindowOpenAttributes>.activities {
+        let activity = await Activity<WindowOpenAttributes>.activityUpdates.makeAsyncIterator().next()
+        logger.info("didReceiveRemoteNotification activity \(activity?.id)")
+            guard let activity,
+                  let token = activity.pushToken else {
+                logger.error("FAILED to get pushToken")
+                return .failed
+            }
+            await appState.send(pushToken: token, ofType: .liveActivityUpdate)
+//        }
+        
+        logger.info("didReceiveRemoteNotification complete")
+        return .newData
+    }
+    
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        register(deviceToken: deviceToken)
+        Task {
+//            let tmp = WindowOpenAttributes.ContentState.WindowState(name: "window1", opened: Date(), maxOpenDuration: 60)
+//            let data = try! JSONEncoder().encode(tmp)
+//            print(String(data: data, encoding: .utf8))
+//            
+            await appState.send(pushToken: deviceToken, ofType: .pushNotification)
+        }
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
@@ -55,7 +63,9 @@ extension AppDelegate: UIApplicationDelegate {
 #else
 extension AppDelegate: NSApplicationDelegate {
     func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        register(deviceToken: deviceToken)
+        Task {
+            await appState.send(pushToken: deviceToken, ofType: .pushNotification)
+        }
     }
 
     func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {

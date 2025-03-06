@@ -19,6 +19,7 @@ struct FlowKitControllerApp: App {
         WindowGroup {
             NavigationStack {
                 ContentView()
+                    .environment(appDelegate.appState)
             }
         }
     }

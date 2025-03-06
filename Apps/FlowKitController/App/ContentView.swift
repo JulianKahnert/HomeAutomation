@@ -8,6 +8,8 @@
 import SwiftUI
 import UserNotifications
 
+import ActivityKit
+
 typealias Automation = Components.Schemas.Automation
 extension Automation: Identifiable {
     var id: String { name }
@@ -19,6 +21,8 @@ extension Bool {
 
 struct ContentView: View {
     @AppStorage(FlowKitClient.userDefaultsKey) private var url = URL(string: "http://0.0.0.0:8080/")!
+    @Environment(AppState.self) var appState
+
     @State private var showSettings = false
     @State private var client: FlowKitClient!
     @State private var automations: [Automation] = []
@@ -55,6 +59,11 @@ struct ContentView: View {
             ToolbarItem {
                 Button("Preferences", systemImage: "gear") {
                     showSettings.toggle()
+                }
+            }
+            ToolbarItem {
+                Button("Push Notification", systemImage: "app.badge") {
+                    appState.startLiveActivity()
                 }
             }
         }

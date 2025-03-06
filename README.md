@@ -13,18 +13,18 @@ Main goals:
 
 ```mermaid
 ---
-title: HomeAutomation Architecture
+title: FlowKit Architecture
 ---
 
 flowchart TB
     subgraph iOS/catalyst
-        subgraph HomeKitAdapterApp
+        subgraph FlowKitAdapterApp
             subgraph ActorSystem Part 1
                 HomeKitCommandReceiver[HomeKit Command Reveiver]
                 HomeEventReceiverRef[HomeEvent Reveiver Ref]
             end
             HomeKit[fa:fa-home HomeKit]
-            HomeKitAdapter
+            FlowKitAdapter
         end
     end
 
@@ -46,12 +46,12 @@ flowchart TB
 
     HomeAutomationService -->|run commands, e.g. turnOn light| HomeKitCommandReceiverRef
     HomeKitCommandReceiverRef -->|WebSocket| HomeKitCommandReceiver
-    HomeKitCommandReceiver -->HomeKitAdapter
+    HomeKitCommandReceiver -->FlowKitAdapter
 
-    HomeKitAdapter -->|HomeEvent, e.g. light turned on| HomeEventReceiverRef
+    FlowKitAdapter -->|HomeEvent, e.g. light turned on| HomeEventReceiverRef
     HomeEventReceiverRef -->|WebSocket| HomeEventReceiver
     HomeEventReceiver --> HomeAutomationService
-    HomeKitAdapter <--> HomeKit
+    FlowKitAdapter <--> HomeKit
     HomeAutomationService <--> StorageAdapter
 
     StorageAdapter <--> MySQLDB
@@ -59,18 +59,18 @@ flowchart TB
 
 ## Project Structure & Glossary
 
-* `HomeAutomationServer`: [Vapor](https://vapor.codes) server that contains the business logic e.g. receives `HomeEvent`s, triggers automations, servers the config and persists Entities.
+* `FlowKit Server`: [Vapor](https://vapor.codes) server that contains the business logic e.g. receives `HomeEvent`s, triggers automations, servers the config and persists Entities.
 * `HomeAutomationKit`: Package the contains the entities etc. that are shared between the server and other parts of the system.
-* `HomeKitAdapterApp`: A macOS catalyst/iOS app that must run in foreground (because of HomeKit privacy implications). It sends `HomeEvent`s to the server and receives commands (e.g. `HomeManagableAction`) that will be forwarded to HomeKit.
+* `FlowKit Adapter`: A macOS catalyst/iOS app that must run in foreground (because of HomeKit privacy implications). It sends `HomeEvent`s to the server and receives commands (e.g. `HomeManagableAction`) that will be forwarded to HomeKit.
 
 
 Besides the main project structure there are a few more elements in the project that are defined here:
 
 * Entity: characteristic of a device in HomeKit, e.g. the light sensor of a Eve Motion device.
 * HomeEvent: event that might trigger an automation, e.g. `.sunrise` or the change of an entity.
-* HomeManagableAction: action that will can be processed by the `HomeKitAdapterApp`.
+* HomeManagableAction: action that will can be processed by the `FlowKit Adapter` app.
 
 ## Further Information
 
 * [Server Setup](./docs/setup-server.md)
-* [HomeKitAdapterApp Setup](./docs/setup-homekitadapterapp.md)
+* [FlowKit Adapter Setup](./docs/setup-FlowKitAdapter.md)

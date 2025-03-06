@@ -1,6 +1,6 @@
-# Setup HomeKitAdapterApp
+# Setup FlowKit Adapter
 
-The `HomeKitAdapterApp` must run in foreground to be able to subscribe to HomeKit events.
+The `FlowKit Adapter` app must run in foreground to be able to subscribe to HomeKit events.
 To ensure that the app will always run, you could use a Mac or an iPhone/iPad.
 
 ## Setup on Mac
@@ -22,7 +22,7 @@ The following setup will install a `launchctl` daemon that ensure, that the app 
      <key>ProgramArguments</key>
       <array>
          <string>open</string>
-         <string>/Applications/HomeAutomation.app</string>
+         <string>/Applications/FlowKit Adapter.app</string>
       </array>
 </dict>
 </plist>

@@ -40,8 +40,9 @@ struct FlowKitClient {
         _ = try response.ok
     }
 
-    func register(pushDeviceToken: String) async throws {
-        let response = try await client.registerPushDevice(.init(body: .json(.init(deviceToken: pushDeviceToken))))
+    func register(deviceName: String, tokenString: String, tokenType: Components.Schemas.PushDevice.TokenTypePayload, activityType: String?) async throws {
+        let body: Components.Schemas.PushDevice = .init(deviceName: deviceName, tokenString: tokenString, tokenType: tokenType, activityType: activityType)
+        let response = try await client.registerPushDevice(.init(body: .json(body)))
         _ = try response.ok
     }
 }

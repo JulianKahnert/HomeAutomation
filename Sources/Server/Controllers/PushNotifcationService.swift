@@ -73,6 +73,13 @@ actor PushNotifcationService: NotificationSender {
     private func startOrUpdateOpenWindowActivities(with windowStates: [WindowOpenState]) async {
         assert(!windowStates.isEmpty, "Use 'endAllOpenWindowActivities' when no window is opened")
         
+        let states = windowStates.map { windowState in
+            WindowOpenContentState.WindowState(name: windowState.name,
+                                               opened: windowState.opened,
+                                               maxOpenDuration: windowState.maxOpenDuration)
+        }
+        let contentState = WindowOpenContentState(windowStates: states)
+        
         do {
             let deviceTokens = try await DeviceToken
                 .query(on: database)
@@ -83,11 +90,26 @@ actor PushNotifcationService: NotificationSender {
             for tokens in deviceMap.values {
                 assert(tokens.count <= 2, "Found device with more than 2 tokens")
                 if let updateToken = tokens.first(where: { $0.tokenType == "liveActivityUpdate" }) {
-                    // TODO: send update
+                    logger.info("Update LiveActivity (on: \(updateToken.deviceName)): \(contentState)")
+                    let notification = APNSLiveActivityNotification<WindowOpenContentState>(expiration: .immediately,
+                                                                                            priority: .immediately,
+                                                                                            appID: notificationTopic,
+                                                                                            contentState: contentState,
+                                                                                            event: .update,
+                                                                                            timestamp: Int(Date().timeIntervalSince1970))
                     
-                } else if let startToken = tokens.first(where: { $0.tokenType == "liveActivityStart" }) {
-                    // TODO: send start
+                    try await sendLiveActivity(notification, to: deviceTokens)
 
+                } else if let startToken = tokens.first(where: { $0.tokenType == "liveActivityStart" }) {
+                    logger.info("Starting LiveActivity (on: \(startToken.deviceName)): \(contentState)")
+                    let notification = APNSLiveActivityNotification<WindowOpenContentState>(expiration: .immediately,
+                                                                                            priority: .immediately,
+                                                                                            appID: notificationTopic,
+                                                                                            contentState: contentState,
+                                                                                            event: .start,
+                                                                                            timestamp: Int(Date().timeIntervalSince1970))
+                    
+                    try await sendLiveActivity(notification, to: deviceTokens)
                 } else {
                     assertionFailure("Should find at least one start token")
                 }

@@ -8,6 +8,7 @@
 import ActivityKit
 import SwiftUI
 import Logging
+import LoggingOSLog
 
 @MainActor
 @Observable
@@ -15,6 +16,15 @@ final class AppState {
     private let logger = Logger(label: "AppState")
     
     init() {
+        LoggingSystem.bootstrap { label in
+            let handlers: [LogHandler] = [
+                LoggingOSLog(label: label)
+            ]
+            var mpxHandler = MultiplexLogHandler(handlers)
+            mpxHandler.logLevel = .debug
+            return MultiplexLogHandler(handlers)
+        }
+        
         Task {
             await observeLiveActivityStartTokens()
         }

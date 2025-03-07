@@ -8,6 +8,7 @@
 #if canImport(ActivityKit)
 import ActivityKit
 import Foundation
+import HAModels
 
 struct WindowOpenAttributes: ActivityAttributes {
     typealias ContentState = WindowOpenContentState

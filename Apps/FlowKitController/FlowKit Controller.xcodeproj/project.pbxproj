@@ -20,6 +20,9 @@
 		A3BA516C2D798A6A002DD924 /* FlowKit Controller WidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A3BA51F32D79B6B4002DD924 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BA51F22D79B6B4002DD924 /* AppState.swift */; };
 		A3BF520B2D7240110034254A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BF520A2D7240100034254A /* SettingsView.swift */; };
+		A3E34F212D7B1DDC002B0C63 /* LoggingOSLog in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F202D7B1DDC002B0C63 /* LoggingOSLog */; };
+		A3E34F262D7B1E87002B0C63 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */; };
+		A3E34F282D7B1E9D002B0C63 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F272D7B1E9D002B0C63 /* HomeAutomationKit */; };
 		A3E5F0CC2D6FA6520032C9A8 /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = A3E5F0CB2D6FA6520032C9A8 /* OpenAPIRuntime */; };
 		A3E5F0CF2D6FA67A0032C9A8 /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = A3E5F0CE2D6FA67A0032C9A8 /* OpenAPIURLSession */; };
 		A3E5F0D32D6FA7050032C9A8 /* openapi-generator-config.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A3E5F0D22D6FA7050032C9A8 /* openapi-generator-config.yaml */; };
@@ -115,6 +118,7 @@
 			files = (
 				A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */,
 				A3BA515C2D798A69002DD924 /* WidgetKit.framework in Frameworks */,
+				A3E34F282D7B1E9D002B0C63 /* HomeAutomationKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -123,9 +127,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				A3E5F0CC2D6FA6520032C9A8 /* OpenAPIRuntime in Frameworks */,
+				A3E34F212D7B1DDC002B0C63 /* LoggingOSLog in Frameworks */,
 				A3E5F0CF2D6FA67A0032C9A8 /* OpenAPIURLSession in Frameworks */,
 				A3BA51482D78D0EC002DD924 /* Logging in Frameworks */,
 				A3F9BC802D6FA547002298ED /* HomeAutomationKit in Frameworks */,
+				A3E34F262D7B1E87002B0C63 /* HomeAutomationKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -217,6 +223,7 @@
 			);
 			name = "FlowKit Controller WidgetExtensionExtension";
 			packageProductDependencies = (
+				A3E34F272D7B1E9D002B0C63 /* HomeAutomationKit */,
 			);
 			productName = "FlowKit Controller WidgetExtensionExtension";
 			productReference = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */;
@@ -246,6 +253,8 @@
 				A3E5F0CB2D6FA6520032C9A8 /* OpenAPIRuntime */,
 				A3E5F0CE2D6FA67A0032C9A8 /* OpenAPIURLSession */,
 				A3BA51472D78D0EC002DD924 /* Logging */,
+				A3E34F202D7B1DDC002B0C63 /* LoggingOSLog */,
+				A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */,
 			);
 			productName = HomeAutomation;
 			productReference = A3ECEDB12D6A841D00E56665 /* FlowKit Controller.app */;
@@ -280,11 +289,12 @@
 			mainGroup = A3ECEDA82D6A841D00E56665;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A3F9BC7E2D6FA547002298ED /* XCLocalSwiftPackageReference "../.." */,
 				A3E5F0C92D6FA6020032C9A8 /* XCRemoteSwiftPackageReference "swift-openapi-generator" */,
 				A3E5F0CA2D6FA6520032C9A8 /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */,
 				A3E5F0CD2D6FA67A0032C9A8 /* XCRemoteSwiftPackageReference "swift-openapi-urlsession" */,
 				A3BA51462D78D0EC002DD924 /* XCRemoteSwiftPackageReference "swift-log" */,
+				A3E34F1F2D7B1DDC002B0C63 /* XCRemoteSwiftPackageReference "swift-log-oslog" */,
+				A3E34F242D7B1E87002B0C63 /* XCLocalSwiftPackageReference "../.." */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A3ECEDB22D6A841D00E56665 /* Products */;
@@ -659,7 +669,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		A3F9BC7E2D6FA547002298ED /* XCLocalSwiftPackageReference "../.." */ = {
+		A3E34F242D7B1E87002B0C63 /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../..;
 		};
@@ -672,6 +682,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 1.6.2;
+			};
+		};
+		A3E34F1F2D7B1DDC002B0C63 /* XCRemoteSwiftPackageReference "swift-log-oslog" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/chrisaljoudi/swift-log-oslog";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.2.2;
 			};
 		};
 		A3E5F0C92D6FA6020032C9A8 /* XCRemoteSwiftPackageReference "swift-openapi-generator" */ = {
@@ -705,6 +723,20 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A3BA51462D78D0EC002DD924 /* XCRemoteSwiftPackageReference "swift-log" */;
 			productName = Logging;
+		};
+		A3E34F202D7B1DDC002B0C63 /* LoggingOSLog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A3E34F1F2D7B1DDC002B0C63 /* XCRemoteSwiftPackageReference "swift-log-oslog" */;
+			productName = LoggingOSLog;
+		};
+		A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HomeAutomationKit;
+		};
+		A3E34F272D7B1E9D002B0C63 /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A3E34F242D7B1E87002B0C63 /* XCLocalSwiftPackageReference "../.." */;
+			productName = HomeAutomationKit;
 		};
 		A3E5F0CB2D6FA6520032C9A8 /* OpenAPIRuntime */ = {
 			isa = XCSwiftPackageProductDependency;

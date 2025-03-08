@@ -24,7 +24,7 @@ let package = Package(
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.7.0"),
         // other stuff
-        .package(url: "https://github.com/vapor/apns.git", from: "4.0.0"),
+        .package(url: "https://github.com/vapor/apns.git", from: "4.2.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", branch: "main")

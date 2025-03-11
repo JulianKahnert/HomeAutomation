@@ -322,6 +322,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "FlowKit Adapter";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHomeKitUsageDescription = "Smart home automations";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -360,6 +361,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "FlowKit Adapter";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHomeKitUsageDescription = "Smart home automations";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

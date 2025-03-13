@@ -146,6 +146,10 @@ public final class HomeManager: HomeManagable {
         }
     }
 
+    public func setWindowOpenState(entityId: EntityId, to newState: WindowOpenState?) async {
+        await notificationSender.setWindowOpenState(entityId: entityId, to: newState)
+    }
+
     private func popAllFailedActions() -> [HomeManagableAction] {
         let actions = Array(failedActions.values)
         failedActions.removeAll()

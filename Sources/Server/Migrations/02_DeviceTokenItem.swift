@@ -12,7 +12,7 @@ struct DeviceTokenItem: AsyncMigration {
         try await database.schema(DeviceToken.schema)
             .id()
             .field("deviceName", .string, .required)
-            .field("tokenString", .string, .required)
+            .field("tokenString", .custom("VARCHAR(500)"), .required)
             .field("tokenType", .string, .required)
             .field("activityType", .string)
             .field("createdAt", .datetime)

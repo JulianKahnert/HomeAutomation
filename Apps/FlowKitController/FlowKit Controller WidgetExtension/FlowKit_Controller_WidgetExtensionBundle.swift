@@ -5,8 +5,8 @@
 //  Created by Julian Kahnert on 06.03.25.
 //
 
-import WidgetKit
 import SwiftUI
+import WidgetKit
 
 @main
 struct FlowKit_Controller_WidgetExtensionBundle: WidgetBundle {

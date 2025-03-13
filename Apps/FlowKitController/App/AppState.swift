@@ -6,15 +6,15 @@
 //
 
 import ActivityKit
-import SwiftUI
 import Logging
 import LoggingOSLog
+import SwiftUI
 
 @MainActor
 @Observable
 final class AppState {
     private let logger = Logger(label: "AppState")
-    
+
     init() {
         LoggingSystem.bootstrap { label in
             let handlers: [LogHandler] = [
@@ -24,11 +24,11 @@ final class AppState {
             mpxHandler.logLevel = .debug
             return MultiplexLogHandler(handlers)
         }
-        
+
         Task {
             await observeLiveActivityStartTokens()
         }
-        
+
         Task {
             let activity = await Activity<WindowOpenAttributes>.activityUpdates.makeAsyncIterator().next()
             guard let activity else {
@@ -40,7 +40,7 @@ final class AppState {
 //
 //                await send(pushToken: token, ofType: .liveActivityUpdate)
         }
-        
+
         Task {
             for activity in Activity<WindowOpenAttributes>.activities {
                 logger.info("Found running activity \(activity)")
@@ -49,7 +49,7 @@ final class AppState {
         }
     }
 //    @Published var activityViewState: WindowOpenAttributes.ContentState?
-    
+
     // this should be done by the server later
     func startLiveActivity() {
         if ActivityAuthorizationInfo().areActivitiesEnabled {
@@ -59,13 +59,13 @@ final class AppState {
                     .init(name: "window1", opened: date, maxOpenDuration: 60.0 * 3),
                     .init(name: "window2", opened: date.addingTimeInterval(-1 * 60), maxOpenDuration: 60.0 * 3)
                 ])
-                
+
                 let activity = try Activity<WindowOpenAttributes>.request(
                     attributes: WindowOpenAttributes(),
                     content: .init(state: initialState, staleDate: nil),
                     pushType: .token
                 )
-                
+
 //                self.activityViewState = activity.content.state
             } catch {
                 let errorMessage = """
@@ -73,20 +73,18 @@ final class AppState {
                     ------------------------
                     \(String(describing: error))
                     """
-                
+
                 assertionFailure(errorMessage)
             }
         }
     }
-    
+
     func observeLiveActivityStartTokens() async {
         for await pushToken in Activity<WindowOpenAttributes>.pushToStartTokenUpdates {
             await self.send(pushToken: pushToken, ofType: .liveActivityStart)
-            Date().timeIntervalSinceReferenceDate
-            
         }
     }
-    
+
     func observeActivity(activity: Activity<WindowOpenAttributes>) {
         Task {
             await withTaskGroup(of: Void.self) { group in
@@ -95,10 +93,10 @@ final class AppState {
 ////                        self.activityViewState = contentState.state
 //                    }
 //                }
-                
+
                 group.addTask { @MainActor in
                     for await pushToken in activity.pushTokenUpdates {
-                        await self.send(pushToken: pushToken, ofType: .liveActivityUpdate)
+                        await self.send(pushToken: pushToken, ofType: .liveActivityUpdate(activityName: String(describing: activity.self)))
                     }
                 }
             }
@@ -107,8 +105,8 @@ final class AppState {
 
     func send(pushToken: Data, ofType type: PushTokenType) async {
         let pushTokenString = pushToken.hexadecimalString
-        logger.debug("New push token (\(type.rawValue)): \(pushTokenString)")
-        
+        logger.debug("New push token (\(type)): \(pushTokenString)")
+
         #if canImport(UIKit)
         let deviceName = UIDevice.current.name
         #else
@@ -116,19 +114,35 @@ final class AppState {
         #endif
 
 //        let frequentUpdateEnabled = ActivityAuthorizationInfo().frequentPushesEnabled
-        
-        logger.info("Sending (\(type.rawValue)) of [\(deviceName)]: \(pushTokenString)")
+
+        logger.info("Sending (\(type)) of \(deviceName)")
 
         do {
             guard let url = UserDefaults.standard.url(forKey: FlowKitClient.userDefaultsKey) else {
                 logger.critical("Failed to get client URL")
-//                assertionFailure()
+                assertionFailure()
                 return
             }
+
+            typealias PushTokenTypeDto = Components.Schemas.PushDevice.TokenTypePayload
+            let tokenTypeDto: PushTokenTypeDto
+            var activityNameDto: String?
+            switch type {
+            case .pushNotification:
+                tokenTypeDto = .pushNotification
+            case .liveActivityStart:
+                tokenTypeDto = .liveActivityStart
+            case .liveActivityUpdate(let activityName):
+                tokenTypeDto = .liveActivityUpdate
+                activityNameDto = activityName
+            }
+
             let client = FlowKitClient(url: url)
-            
-            // TODO: implement sending push token
-//            try await client.register(pushDeviceToken: tokenString)
+
+            try await client.register(deviceName: deviceName,
+                                      tokenString: pushTokenString,
+                                      tokenType: tokenTypeDto,
+                                      activityType: activityNameDto)
         } catch {
             logger.critical("""
             Failed to send push token to server
@@ -139,10 +153,10 @@ final class AppState {
     }
 }
 
-enum PushTokenType: String {
+enum PushTokenType {
     case pushNotification
     case liveActivityStart
-    case liveActivityUpdate
+    case liveActivityUpdate(activityName: String)
 }
 
 private extension Data {

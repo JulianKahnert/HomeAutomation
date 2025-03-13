@@ -16,13 +16,13 @@ final class DeviceToken: Model, Content, @unchecked Sendable {
 
     @Field(key: "tokenString")
     var tokenString: String
-    
+
     @Field(key: "deviceName")
     var deviceName: String
-    
+
     @Field(key: "tokenType")
     var tokenType: String
-    
+
     @Field(key: "activityType")
     var activityType: String?
 
@@ -33,9 +33,8 @@ final class DeviceToken: Model, Content, @unchecked Sendable {
     var updatedAt: Date?
 
     init() { }
-    
-    init(id: UUID? = nil, deviceName: String, tokenString: String, tokenType: String, activityType: String?) {
-        self.id = id
+
+    init(deviceName: String, tokenString: String, tokenType: String, activityType: String?) {
         self.deviceName = deviceName
         self.tokenString = tokenString
         self.tokenType = tokenType

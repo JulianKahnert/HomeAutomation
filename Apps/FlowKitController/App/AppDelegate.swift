@@ -17,7 +17,7 @@ import ActivityKit
 @MainActor
 class AppDelegate: NSObject {
     private let logger = Logger(label: "AppDelegate")
-    
+
     private(set) var appState = AppState()
 
     override init() {
@@ -27,10 +27,10 @@ class AppDelegate: NSObject {
 
 #if canImport(UIKit)
 extension AppDelegate: UIApplicationDelegate {
-    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any]) async -> UIBackgroundFetchResult {
-        
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+
         logger.info("didReceiveRemoteNotification")
-        
+
 //        for activity in Activity<WindowOpenAttributes>.activities {
         let activity = await Activity<WindowOpenAttributes>.activityUpdates.makeAsyncIterator().next()
         logger.info("didReceiveRemoteNotification activity \(activity?.id)")
@@ -39,13 +39,13 @@ extension AppDelegate: UIApplicationDelegate {
                 logger.error("FAILED to get pushToken")
                 return .failed
             }
-            await appState.send(pushToken: token, ofType: .liveActivityUpdate)
+        await appState.send(pushToken: token, ofType: .liveActivityUpdate(activityName: String(describing: activity.self)))
 //        }
-        
+
         logger.info("didReceiveRemoteNotification complete")
         return .newData
     }
-    
+
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Task {
 //            let tmp = WindowOpenAttributes.ContentState.WindowState(name: "window1", opened: Date(), maxOpenDuration: 60)

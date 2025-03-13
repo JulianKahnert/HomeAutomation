@@ -11,24 +11,17 @@ import SwiftUI
 
 struct WindowOpenLiveActivityView: View {
     let contentState: WindowOpenAttributes.ContentState
-    
-    public var body: some View {
-        VStack(alignment: .leading) {
-            ForEach(contentState.windowStates, id: \.self) { windowState in
-                let value = getNormalizedValue(for: windowState)
-                ProgressView(windowState.name, value: value)
-                    .progressViewStyle(.linear)
-                    .foregroundStyle(Color.black)
-                    .tint(value <= 1 ? Color.accentColor : Color.red)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(contentState.windowStates, id: \.hashValue) { windowState in
+                ProgressView(timerInterval: windowState.opened...windowState.end, countsDown: false) {
+                    Text(windowState.name)
+                }
+                    .tint(Date() <= windowState.end ? Color.accentColor : Color.red)
             }
         }
         .padding()
-    }
-    
-    private func getNormalizedValue(for windowState: WindowOpenAttributes.ContentState.WindowState) -> Double {
-        
-        // time in percent the
-        return Date().timeIntervalSince(windowState.opened) / windowState.maxOpenDuration
     }
 }
 

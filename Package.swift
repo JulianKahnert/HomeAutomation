@@ -28,7 +28,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", branch: "main"),
-        .package(url: "https://github.com/juliankahnert/APNSwift", branch: "version5"),
+        .package(url: "https://github.com/juliankahnert/APNSwift", branch: "version5")
     ],
     targets: [
         .executableTarget(
@@ -44,7 +44,8 @@ let package = Package(
                 .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "VaporAPNS", package: "apns"),
-                .product(name: "APNSCore", package: "APNSwift")
+                .product(name: "APNSCore", package: "APNSwift"),
+                .product(name: "APNSURLSession", package: "APNSwift")
             ],
             plugins: [
                 .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")

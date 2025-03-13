@@ -10,18 +10,26 @@ import Foundation
 public struct WindowOpenContentState: Codable, Hashable, Sendable {
     public struct WindowState: Codable, Hashable, Sendable {
         public let name: String
-        public let opened: Date
-        public let maxOpenDuration: TimeInterval
-        
+        public let openedIsoTimeStamp: String
+        public let maxOpenDuration: Double
+
+        public var opened: Date {
+            return ISO8601DateFormatter().date(from: openedIsoTimeStamp)!
+        }
+
+        public var end: Date {
+            opened.addingTimeInterval(maxOpenDuration)
+        }
+
         public init(name: String, opened: Date, maxOpenDuration: TimeInterval) {
             self.name = name
-            self.opened = opened
+            self.openedIsoTimeStamp = opened.ISO8601Format()
             self.maxOpenDuration = maxOpenDuration
         }
     }
-    
+
     public let windowStates: [WindowState]
-    
+
     public init(windowStates: [WindowState]) {
         self.windowStates = windowStates
     }

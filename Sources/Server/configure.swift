@@ -1,4 +1,6 @@
 import APNS
+import APNSCore
+import APNSURLSession
 import CoreFoundation
 import FluentMySQLDriver
 import HAApplicationLayer
@@ -26,7 +28,7 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - env parsing
 
-    let notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.homeautomation"
+    let notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.HomeAutomation"
     let notificationPrivateKey = String.fromBase64(Environment.get("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")!)!
     let notificationKeyIdentifier = Environment.get("PUSH_NOTIFICATION_KEY_IDENTIFIER")!
     let notificationTeamIdentifier = Environment.get("PUSH_NOTIFICATION_TEAM_IDENTIFIER")!
@@ -35,14 +37,16 @@ public func configure(_ app: Application) async throws {
 
     var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
     tlsConfiguration.certificateVerification = .none
-    app.databases.use(DatabaseConfigurationFactory.mysql(
-        hostname: Environment.get("DATABASE_HOST") ?? "localhost",
-        port: Environment.get("DATABASE_PORT").flatMap(Int.init(_:)) ?? MySQLConfiguration.ianaPortNumber,
-        username: Environment.get("DATABASE_USERNAME") ?? "vapor_username",
-        password: Environment.get("DATABASE_PASSWORD") ?? "vapor_password",
-        database: Environment.get("DATABASE_NAME") ?? "vapor_database",
-        tlsConfiguration: tlsConfiguration
-    ), as: .mysql)
+    app.databases.use(
+        DatabaseConfigurationFactory.mysql(
+            hostname: Environment.get("DATABASE_HOST") ?? "localhost",
+            port: Environment.get("DATABASE_PORT").flatMap(Int.init(_:))
+                ?? MySQLConfiguration.ianaPortNumber,
+            username: Environment.get("DATABASE_USERNAME") ?? "vapor_username",
+            password: Environment.get("DATABASE_PASSWORD") ?? "vapor_password",
+            database: Environment.get("DATABASE_NAME") ?? "vapor_database",
+            tlsConfiguration: tlsConfiguration
+        ), as: .mysql)
 
     app.migrations.add(CreateEntityStorageDbItem())
     app.migrations.add(DeviceTokenItem())
@@ -56,7 +60,8 @@ public func configure(_ app: Application) async throws {
             keyIdentifier: notificationKeyIdentifier,
             teamIdentifier: notificationTeamIdentifier
         ),
-        environment: .development
+        environment: .production
+//        environment: .development
     )
 
     app.apns.containers.use(
@@ -83,13 +88,13 @@ public func configure(_ app: Application) async throws {
                                                     apnsClient: app.apns.client,
                                                     notificationTopic: notificationTopic,
                                                     logger: app.logger)
-    let homeManager = await HomeManager(
-        getAdapter: {
-            await actorSystem.lookup(.homeKitCommandReceiver)
-        },
-        storageRepo: app.entityStorageDbRepository,
-        notificationSender: notificationSender,
-        location: app.homeAutomationConfigService.location)
+
+    let homeManager = await HomeManager(getAdapter: {
+        await actorSystem.lookup(.homeKitCommandReceiver)
+    },
+                                        storageRepo: app.entityStorageDbRepository,
+                                        notificationSender: notificationSender,
+                                        location: app.homeAutomationConfigService.location)
     app.homeManager = homeManager
     let automationService = try AutomationService(using: homeManager,
                                                   getAutomations: {

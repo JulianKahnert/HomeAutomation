@@ -15,8 +15,8 @@ struct WindowOpenPushConfiguration: Widget {
             // banner on the Home Screen of devices that don't support the
             // Dynamic Island.
             WindowOpenLiveActivityView(contentState: context.state)
-                .activityBackgroundTint(Color.gray.opacity(0.6))
-        } dynamicIsland: { context in
+//                .activityBackgroundTint(Color.gray.opacity(0.8))
+        } dynamicIsland: { _ in
             // Create the presentations that appear in the Dynamic Island.
             DynamicIsland {
                 // Create the expanded presentation.
@@ -26,14 +26,15 @@ struct WindowOpenPushConfiguration: Widget {
 //                    isStale: context.isStale
 //                )
                 DynamicIslandExpandedRegion(.bottom) {
-                    
+
                     Text("Dynamic Island")
                 }
             } compactLeading: {
                 // Create the compact leading presentation.
 //                Avatar(hero: context.attributes.hero, includeBackground: true)
 //                    .accessibilityLabel("The avatar of \(context.attributes.hero.name).")
-                Text("L\(context.state.windowStates.count)")
+//                Text("L\(context.state.windowStates.count)")
+                Text("L")
             } compactTrailing: {
                 // Create the compact trailing presentation.
 //                ProgressView(value: context.state.currentHealthLevel, total: 1) {
@@ -43,7 +44,8 @@ struct WindowOpenPushConfiguration: Widget {
 //                }
 //                .progressViewStyle(.circular)
 //                .tint(context.state.currentHealthLevel <= 0.2 ? Color.red : Color.green)
-                Text("T\(context.state.windowStates.count)")
+//                Text("T\(context.state.windowStates.count)")
+                Text("T")
             } minimal: {
                 // Create the minimal presentation.
 //                ProgressView(value: context.state.currentHealthLevel, total: 1) {
@@ -52,16 +54,17 @@ struct WindowOpenPushConfiguration: Widget {
 //                }
 //                .progressViewStyle(.circular)
 //                .tint(context.state.currentHealthLevel <= 0.2 ? Color.red : Color.green)
-                Text("M\(context.state.windowStates.count)")
+//                Text("M\(context.state.windowStates.count)")
+                Text("M")
             }
-            
+
         }
     }
 }
 
-//#Preview(as: WidgetFamily.systemSmall) {
+// #Preview(as: WidgetFamily.systemSmall) {
 //    WindowOpenPushConfiguration()
-//} timeline: {
+// } timeline: {
 //    WindowOpenAttributes.ContentState(windowStates: [
 //        .init(name: "window1", opened: Date(), maxOpenDuration: 60)
 //    ])
@@ -70,4 +73,4 @@ struct WindowOpenPushConfiguration: Widget {
 ////    CaffeineLogEntry.log2
 ////    CaffeineLogEntry.log3
 ////    CaffeineLogEntry.log4
-//}
+// }

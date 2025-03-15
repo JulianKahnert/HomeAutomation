@@ -60,8 +60,7 @@ public func configure(_ app: Application) async throws {
             keyIdentifier: notificationKeyIdentifier,
             teamIdentifier: notificationTeamIdentifier
         ),
-        environment: .production
-//        environment: .development
+        environment: app.environment.isRelease ? .production : .development
     )
 
     app.apns.containers.use(
@@ -86,8 +85,7 @@ public func configure(_ app: Application) async throws {
     app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
     let notificationSender = PushNotifcationService(database: app.db,
                                                     apnsClient: app.apns.client,
-                                                    notificationTopic: notificationTopic,
-                                                    logger: app.logger)
+                                                    notificationTopic: notificationTopic)
 
     let homeManager = await HomeManager(getAdapter: {
         await actorSystem.lookup(.homeKitCommandReceiver)

@@ -1,5 +1,5 @@
 //
-//  WindowOpenAttributes.swift
+//  WindowAttributes.swift
 //  FlowKit Controller
 //
 //  Created by Julian Kahnert on 06.03.25.
@@ -10,7 +10,7 @@ import ActivityKit
 import Foundation
 import HAModels
 
-struct WindowOpenAttributes: ActivityAttributes {
-    typealias ContentState = WindowOpenContentState
+struct WindowAttributes: ActivityAttributes {
+    typealias ContentState = WindowContentState
 }
 #endif

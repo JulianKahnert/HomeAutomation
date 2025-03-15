@@ -10,6 +10,7 @@
 		A3714AF12D7780A5006E340F /* AutomationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3714AF02D7780A5006E340F /* AutomationView.swift */; };
 		A3714B422D779EDD006E340F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3714B412D779ED9006E340F /* AppDelegate.swift */; };
 		A3714B4D2D77A231006E340F /* FlowKitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3714B4C2D77A231006E340F /* FlowKitClient.swift */; };
+		A39C992F2D84BBDF00DBB536 /* DropShadow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A39C992E2D84BB7F00DBB536 /* DropShadow.swift */; };
 		A3B8A0942D6A8468009314DA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A08F2D6A8468009314DA /* ContentView.swift */; };
 		A3B8A0952D6A8468009314DA /* FlowKitControllerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */; };
 		A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */; };
@@ -58,6 +59,7 @@
 		A3714AF02D7780A5006E340F /* AutomationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationView.swift; sourceTree = "<group>"; };
 		A3714B412D779ED9006E340F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A3714B4C2D77A231006E340F /* FlowKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowKitClient.swift; sourceTree = "<group>"; };
+		A39C992E2D84BB7F00DBB536 /* DropShadow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropShadow.swift; sourceTree = "<group>"; };
 		A3B8A08E2D6A8468009314DA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A3B8A08F2D6A8468009314DA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A3B8A0902D6A8468009314DA /* FlowKitController.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlowKitController.entitlements; sourceTree = "<group>"; };
@@ -85,7 +87,7 @@
 		A3BA519D2D799F49002DD924 /* Exceptions for "Shared" folder in "FlowKit Controller WidgetExtensionExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				WindowOpenAttributes.swift,
+				WindowAttributes.swift,
 				WindowOpenLiveActivityView.swift,
 			);
 			target = A3BA51582D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension */;
@@ -144,6 +146,7 @@
 				A3BA51F22D79B6B4002DD924 /* AppState.swift */,
 				A3BF520A2D7240100034254A /* SettingsView.swift */,
 				A3B8A08F2D6A8468009314DA /* ContentView.swift */,
+				A39C992E2D84BB7F00DBB536 /* DropShadow.swift */,
 				A3714AF02D7780A5006E340F /* AutomationView.swift */,
 				A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */,
 				A3714B412D779ED9006E340F /* AppDelegate.swift */,
@@ -344,6 +347,7 @@
 				A3B8A0942D6A8468009314DA /* ContentView.swift in Sources */,
 				A3BF520B2D7240110034254A /* SettingsView.swift in Sources */,
 				A3B8A0952D6A8468009314DA /* FlowKitControllerApp.swift in Sources */,
+				A39C992F2D84BBDF00DBB536 /* DropShadow.swift in Sources */,
 				A3BA51F32D79B6B4002DD924 /* AppState.swift in Sources */,
 				A3714AF12D7780A5006E340F /* AutomationView.swift in Sources */,
 				A3714B4D2D77A231006E340F /* FlowKitClient.swift in Sources */,

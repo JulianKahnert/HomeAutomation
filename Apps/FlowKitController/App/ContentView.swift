@@ -5,10 +5,10 @@
 //  Created by Julian Kahnert on 22.02.25.
 //
 
+import ActivityKit
+import HAModels
 import SwiftUI
 import UserNotifications
-
-import ActivityKit
 
 typealias Automation = Components.Schemas.Automation
 extension Automation: Identifiable {
@@ -48,6 +48,17 @@ struct ContentView: View {
                 }
             }
         }
+        .overlay(alignment: .bottom) {
+            Group {
+                if let activityViewState = appState.activityViewState {
+                    WindowOpenLiveActivityView(contentState: activityViewState)
+                } else {
+                    EmptyView()
+                }
+            }
+            .modifier(DropShadow())
+            .opacity(appState.activityViewState == nil ? 0 : 1)
+        }
         .navigationDestination(isPresented: $showSettings) {
             SettingsView(serverAddress: $url)
         }
@@ -68,19 +79,19 @@ struct ContentView: View {
             }
         }
         .refreshable {
-            await updateAutomations()
+            await updateData()
         }
         .onAppear {
             client = FlowKitClient(url: url)
             Task {
-                await updateAutomations()
+                await updateData()
             }
             requestRemoteNotificationsIfNeeded()
         }
         .onChange(of: url) { _, _ in
             client = FlowKitClient(url: url)
             Task {
-                await updateAutomations()
+                await updateData()
             }
         }
     }
@@ -95,7 +106,8 @@ struct ContentView: View {
         }
     }
 
-    func updateAutomations() async {
+    func updateData() async {
+        await appState.fetchWindowState()
         do {
             self.automations = try await client.getAutomations()
         } catch {

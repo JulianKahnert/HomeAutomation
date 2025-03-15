@@ -7,7 +7,15 @@
 
 import Foundation
 
-public struct WindowOpenContentState: Codable, Hashable, Sendable {
+public struct WindowContentState: Codable, Hashable, Sendable {
+    public let windowStates: [WindowState]
+
+    public init(windowStates: [WindowState]) {
+        self.windowStates = windowStates
+    }
+}
+
+extension WindowContentState: Identifiable {
     public struct WindowState: Codable, Hashable, Sendable {
         public let name: String
         public let openedIsoTimeStamp: String
@@ -28,9 +36,7 @@ public struct WindowOpenContentState: Codable, Hashable, Sendable {
         }
     }
 
-    public let windowStates: [WindowState]
-
-    public init(windowStates: [WindowState]) {
-        self.windowStates = windowStates
+    public var id: Int {
+        hashValue
     }
 }

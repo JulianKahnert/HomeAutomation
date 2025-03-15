@@ -12,6 +12,8 @@ import Logging
 @HomeManagerActor
 public final class HomeManager: HomeManagable {
     private let log = Logger(label: "HomeManager")
+    private let windowManager: WindowManager
+
     private let getAdapter: () async -> (any EntityAdapterable)?
     private let location: Location
     private let storageRepo: StorageRepository
@@ -20,6 +22,7 @@ public final class HomeManager: HomeManagable {
     private var failedActions: [EntityId: HomeManagableAction] = [:]
 
     public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, notificationSender: NotificationSender, location: Location) {
+        self.windowManager = WindowManager(notificationSender: notificationSender)
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
         self.notificationSender = notificationSender
@@ -147,7 +150,11 @@ public final class HomeManager: HomeManagable {
     }
 
     public func setWindowOpenState(entityId: EntityId, to newState: WindowOpenState?) async {
-        await notificationSender.setWindowOpenState(entityId: entityId, to: newState)
+        await windowManager.setWindowOpenState(entityId: entityId, to: newState)
+    }
+
+    public func getWindowStates() async -> [WindowOpenState] {
+        await windowManager.getWindowStates()
     }
 
     private func popAllFailedActions() -> [HomeManagableAction] {

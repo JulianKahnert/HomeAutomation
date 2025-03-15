@@ -31,27 +31,34 @@ extension AppDelegate: UIApplicationDelegate {
 
         logger.info("didReceiveRemoteNotification")
 
-//        for activity in Activity<WindowOpenAttributes>.activities {
-        let activity = await Activity<WindowOpenAttributes>.activityUpdates.makeAsyncIterator().next()
-        logger.info("didReceiveRemoteNotification activity \(activity?.id)")
+        let fetchTask = Task {
+            let activity = await Activity<WindowAttributes>.activityUpdates.makeAsyncIterator().next()
+            logger.info("didReceiveRemoteNotification activity \(activity?.id ?? "")")
             guard let activity,
                   let token = activity.pushToken else {
                 logger.error("FAILED to get pushToken")
-                return .failed
+                return UIBackgroundFetchResult.failed
             }
-        await appState.send(pushToken: token, ofType: .liveActivityUpdate(activityName: String(describing: activity.self)))
-//        }
+            await appState.send(pushToken: token, ofType: .liveActivityUpdate(activityName: String(describing: activity.self)))
+            return UIBackgroundFetchResult.newData
+        }
+
+        let timeoutTask = Task {
+            try await Task.sleep(for: .seconds(5))
+            fetchTask.cancel()
+            logger.error("didReceiveRemoteNotification timeout while getting pushToken")
+            assertionFailure()
+        }
+
+        let result = await fetchTask.value
+        timeoutTask.cancel()
 
         logger.info("didReceiveRemoteNotification complete")
-        return .newData
+        return result
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Task {
-//            let tmp = WindowOpenAttributes.ContentState.WindowState(name: "window1", opened: Date(), maxOpenDuration: 60)
-//            let data = try! JSONEncoder().encode(tmp)
-//            print(String(data: data, encoding: .utf8))
-//            
             await appState.send(pushToken: deviceToken, ofType: .pushNotification)
         }
     }

@@ -1,7 +1,9 @@
 openapi: "3.1.0"
+
 info:
   title: HomeAutomationServer API
   version: 0.0.4
+  description: This is the API documentation for the HomeAutomationServer API. It provides endpoints to manage automations, push devices, and window states, etc.
 
 servers:
   - url: http://localhost:8080
@@ -10,6 +12,8 @@ servers:
 paths:
   /config/automations:
     get:
+      summary: Get all automations
+      description: Retrieve a list of all available automations.
       operationId: getAutomations
       responses:
         "200":
@@ -23,6 +27,8 @@ paths:
 
   /config/automations/{name}/activate:
     post:
+      summary: Activate an automation
+      description: Activate a specific automation by name.
       operationId: activateAutomation
       parameters:
         - name: name
@@ -37,6 +43,8 @@ paths:
 
   /config/automations/{name}/deactivate:
     post:
+      summary: Deactivate an automation
+      description: Deactivate a specific automation by name.
       operationId: deactivateAutomation
       parameters:
         - name: name
@@ -51,6 +59,8 @@ paths:
 
   /config/automations/{name}/stop:
     post:
+      summary: Stop a running automation
+      description: Stop a currently running automation by name.
       operationId: stopAutomation
       parameters:
         - name: name
@@ -65,6 +75,8 @@ paths:
 
   /pushdevices:
     post:
+      summary: Register a push device
+      description: Register a new device for push notifications.
       operationId: registerPushDevice
       requestBody:
         description: New device to register for push notifications.
@@ -76,8 +88,29 @@ paths:
       responses:
         "200":
           description: The device was registered for push notifications.
+
         "500":
           description: Some internal server error.
+
+  /windowstates:
+    get:
+      summary: Get window states
+      description: Retrieve the current states of all windows.
+      operationId: getWindowStates
+      responses:
+        "200":
+          description: A success response with all window states.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  windowStates:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WindowState"
+                required:
+                  - windowStates
 
 components:
   schemas:
@@ -86,10 +119,13 @@ components:
       properties:
         name:
           type: string
+          description: The name of the automation.
         isActive:
           type: boolean
+          description: Indicates if the automation is active.
         isRunning:
           type: boolean
+          description: Indicates if the automation is currently running.
       required:
         - name
         - isActive
@@ -103,14 +139,32 @@ components:
           description: The name of the device that created this token.
         tokenString:
           type: string
+          description: The token string for push notifications.
         tokenType:
           type: string
           enum: [pushNotification, liveActivityStart, liveActivityUpdate]
           description: The type of the push notification.
         activityType:
           type: string
-          description: Type of the activity (e.g. WindowOpenAttributes) - only available for tokens of type "liveActivityUpdate".
+          description: Type of the activity (e.g., WindowAttributes) - only available for tokens of type "liveActivityUpdate".
       required:
         - deviceName
         - tokenString
         - tokenType
+
+    WindowState:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the window.
+        openedIsoTimeStamp:
+          type: string
+          description: The ISO timestamp when the window was opened.
+        maxOpenDuration:
+          type: number
+          description: The maximum duration the window can remain open.
+      required:
+        - name
+        - openedIsoTimeStamp
+        - maxOpenDuration

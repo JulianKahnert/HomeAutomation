@@ -53,6 +53,6 @@ func routes(_ app: Application) throws {
     let requestInjectionMiddleware = OpenAPIRequestInjectionMiddleware()
     let transport = VaporTransport(routesBuilder: app.grouped(requestInjectionMiddleware))
 
-    let handler = ConfigController()
+    let handler = OpenAPIController()
     try handler.registerHandlers(on: transport)
 }

@@ -6,11 +6,10 @@
 //
 
 #if canImport(ActivityKit)
-
 import SwiftUI
 
 struct WindowOpenLiveActivityView: View {
-    let contentState: WindowOpenAttributes.ContentState
+    let contentState: WindowAttributes.ContentState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

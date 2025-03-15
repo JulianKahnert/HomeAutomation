@@ -9,5 +9,6 @@ import Foundation
 
 public protocol NotificationSender: Sendable {
     func sendNotification(title: String, message: String) async throws
-    func setWindowOpenState(entityId: EntityId, to newState: WindowOpenState?) async
+    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState) async
+    func endAllLiveActivities(ofActivityType activityType: String) async
 }

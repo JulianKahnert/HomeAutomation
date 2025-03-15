@@ -1,5 +1,5 @@
 //
-//  ConfigController.swift
+//  OpenAPIController.swift
 //  HomeAutomationServer
 //
 //  Created by Julian Kahnert on 14.02.25.
@@ -9,7 +9,7 @@ import Dependencies
 import Fluent
 import Vapor
 
-struct ConfigController: APIProtocol {
+struct OpenAPIController: APIProtocol {
     @Dependency(\.request) var request
 
     // MARK: - /config/automations
@@ -115,4 +115,17 @@ struct ConfigController: APIProtocol {
             return .ok
         }
     }
+
+    // MARK: - /windowopenstates
+    func getWindowStates(_ input: Operations.GetWindowStates.Input) async throws -> Operations.GetWindowStates.Output {
+        let states: [Components.Schemas.WindowState] = await request.application.homeManager.getWindowStates()
+            .map { state in
+                Components.Schemas.WindowState(name: state.name,
+                                               openedIsoTimeStamp: state.opened.ISO8601Format(),
+                                               maxOpenDuration: state.maxOpenDuration)
+            }
+
+        return .ok(.init(body: .json(.init(windowStates: states))))
+    }
+
 }

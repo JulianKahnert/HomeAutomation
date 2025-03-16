@@ -118,8 +118,14 @@ actor PushNotifcationService: NotificationSender {
                         assertionFailure("Should find at least one start token")
                     }
                 } catch {
+                    if let apnsError = error as? APNSError,
+                        let id = apnsError.apnsUniqueID {
+                        Self.logger.critical(
+                            "[startOrUpdateLiveActivity] Error sending push notification apnsUniqueID: \(id.uuidString)"
+                        )
+                    }
                     Self.logger.critical(
-                        "Failed to send live activity push notification to \(usedToken?.deviceName ?? ""): \(error.localizedDescription)"
+                        "[startOrUpdateLiveActivity] Failed to send live activity push notification to \(usedToken?.deviceName ?? "") [\(usedToken?.tokenType ?? "")]: \(error.localizedDescription)"
                     )
                     try? await DeviceToken.query(on: database)
                         .filter(\.$tokenString == usedToken?.tokenString ?? "")
@@ -158,8 +164,14 @@ actor PushNotifcationService: NotificationSender {
                         notification, deviceToken: deviceToken.tokenString)
                     Self.logger.debug("Received send live activity response: \(response)")
                 } catch {
+                    if let apnsError = error as? APNSError,
+                        let id = apnsError.apnsUniqueID {
+                        Self.logger.critical(
+                            "[endAllLiveActivities] Error sending push notification apnsUniqueID: \(id.uuidString)"
+                        )
+                    }
                     Self.logger.critical(
-                        "Failed to send live activity push notification to \(deviceToken.deviceName) [\(deviceToken.tokenType)]: \(error.localizedDescription)"
+                        "[endAllLiveActivities] Failed to send live activity push notification to \(deviceToken.deviceName) [\(deviceToken.tokenType)]: \(error.localizedDescription)"
                     )
                     try? await DeviceToken.query(on: database)
                         .filter(\.$tokenString == deviceToken.tokenString)

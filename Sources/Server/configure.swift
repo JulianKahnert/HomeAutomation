@@ -25,6 +25,7 @@ public func configure(_ app: Application) async throws {
         CFTimeZoneResetSystem()
     }
     app.logger.info("Using timezone: \(TimeZone.current.description)")
+    app.logger.info("Using environment: \(app.environment.name) (isRelease: \(app.environment.isRelease))")
 
     // MARK: - env parsing
 
@@ -54,13 +55,15 @@ public func configure(_ app: Application) async throws {
     // MARK: - configure APNS
 
     // Configure APNS using JWT authentication.
+    let apnsEnvironment: APNSEnvironment = app.environment == .production ? .production : .development
+    app.logger.info("Using apns url \(apnsEnvironment.absoluteURL)")
     let apnsConfig = APNSClientConfiguration(
         authenticationMethod: .jwt(
             privateKey: try .loadFrom(string: notificationPrivateKey),
             keyIdentifier: notificationKeyIdentifier,
             teamIdentifier: notificationTeamIdentifier
         ),
-        environment: app.environment.isRelease ? .production : .development
+        environment: apnsEnvironment
     )
 
     app.apns.containers.use(

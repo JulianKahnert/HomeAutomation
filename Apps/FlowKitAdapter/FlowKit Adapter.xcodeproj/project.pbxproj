@@ -15,7 +15,7 @@
 		A3BC6BAE2D6916E3001BE1D5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA82D6916E3001BE1D5 /* ContentView.swift */; };
 		A3BC6BAF2D6916E3001BE1D5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA92D6916E3001BE1D5 /* SettingsView.swift */; };
 		A3BC6BB02D6916E3001BE1D5 /* CircadianLightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */; };
-		A3BC6BB12D6916E3001BE1D5 /* FlowKitAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapter.swift */; };
+		A3BC6BB12D6916E3001BE1D5 /* FlowKitAdapterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapterApp.swift */; };
 		A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */; };
 		A3EC945D2D63E8870009361C /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3EC945C2D63E8870009361C /* HomeAutomationKit */; };
 		A3F9BC7D2D6F99A9002298ED /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F9BC7C2D6F99A9002298ED /* HomeAutomationKit */; };
@@ -26,7 +26,7 @@
 		A326E81D2C06528B00486F8E /* FlowKit Adapter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "FlowKit Adapter.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A3BC6BA22D6916E3001BE1D5 /* FlowKitAdapter.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlowKitAdapter.entitlements; sourceTree = "<group>"; };
-		A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowKitAdapter.swift; sourceTree = "<group>"; };
+		A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowKitAdapterApp.swift; sourceTree = "<group>"; };
 		A3BC6BA42D6916E3001BE1D5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircadianLightView.swift; sourceTree = "<group>"; };
@@ -56,7 +56,7 @@
 				A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */,
 				A3BC6B922D6916E3001BE1D5 /* Helper */,
 				A3BC6BA22D6916E3001BE1D5 /* FlowKitAdapter.entitlements */,
-				A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapter.swift */,
+				A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapterApp.swift */,
 				A3BC6BA42D6916E3001BE1D5 /* Info.plist */,
 				A3BC6BA62D6916E3001BE1D5 /* Preview Content */,
 				A3BC6BAA2D6916E3001BE1D5 /* Views */,
@@ -183,7 +183,7 @@
 				A302FE042D6E6252003FAB98 /* Logging.swift in Sources */,
 				A3BC6BAF2D6916E3001BE1D5 /* SettingsView.swift in Sources */,
 				A3BC6BB02D6916E3001BE1D5 /* CircadianLightView.swift in Sources */,
-				A3BC6BB12D6916E3001BE1D5 /* FlowKitAdapter.swift in Sources */,
+				A3BC6BB12D6916E3001BE1D5 /* FlowKitAdapterApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -31,18 +31,6 @@ final class AppState {
         return FlowKitClient(url: url)
     }
 
-    init() {
-        LoggingSystem.bootstrap { label in
-            let handlers: [LogHandler] = [
-                LoggingOSLog(label: label)
-            ]
-            var mpxHandler = MultiplexLogHandler(handlers)
-            mpxHandler.logLevel = .debug
-            return MultiplexLogHandler(handlers)
-        }
-
-    }
-
     #if canImport(ActivityKit)
     func initLiveActivity() async {
         Task {
@@ -108,7 +96,6 @@ final class AppState {
             self.activityViewState = states.isEmpty ? nil : .init(windowStates: states)
         } catch {
             logger.critical("Failed to fetch window states: \(error)")
-            assertionFailure()
         }
     }
 

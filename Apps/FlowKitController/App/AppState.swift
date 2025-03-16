@@ -5,7 +5,9 @@
 //  Created by Julian Kahnert on 06.03.25.
 //
 
+#if canImport(ActivityKit)
 import ActivityKit
+#endif
 import HAModels
 import Logging
 import LoggingOSLog
@@ -39,6 +41,10 @@ final class AppState {
             return MultiplexLogHandler(handlers)
         }
 
+    }
+
+    #if canImport(ActivityKit)
+    func initLiveActivity() async {
         Task {
             await observeLiveActivityStartTokens()
         }
@@ -130,15 +136,16 @@ final class AppState {
             }
         }
     }
+    #endif
 
     func send(pushToken: Data, ofType type: PushTokenType) async {
         let pushTokenString = pushToken.hexadecimalString
         logger.debug("New push token (\(type)): \(pushTokenString)")
 
-        #if canImport(UIKit)
+#if canImport(UIKit)
         let deviceName = UIDevice.current.name
-        #else
-        let deviceName = Host.current.localizedName(for: .current, locale: .current)
+#else
+        let deviceName = Host().localizedName ?? "macOS"
         #endif
 
 //        let frequentUpdateEnabled = ActivityAuthorizationInfo().frequentPushesEnabled

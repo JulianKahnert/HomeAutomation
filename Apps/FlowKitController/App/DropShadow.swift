@@ -22,7 +22,7 @@ struct DropShadow: ViewModifier {
         content
             .padding()
             .background(RoundedRectangle(cornerRadius: 10)
-                .fill(Color(UIColor.systemBackground))
+                .fill(Color.systemBackground)
             )
             .compositingGroup()
             .shadow(color: Color.gray.opacity(0.7),

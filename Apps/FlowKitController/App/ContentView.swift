@@ -5,7 +5,6 @@
 //  Created by Julian Kahnert on 22.02.25.
 //
 
-import ActivityKit
 import HAModels
 import SwiftUI
 import UserNotifications
@@ -48,6 +47,7 @@ struct ContentView: View {
                 }
             }
         }
+        #if canImport(ActivityKit)
         .overlay(alignment: .bottom) {
             Group {
                 if let activityViewState = appState.activityViewState {
@@ -59,6 +59,7 @@ struct ContentView: View {
             .modifier(DropShadow())
             .opacity(appState.activityViewState == nil ? 0 : 1)
         }
+        #endif
         .navigationDestination(isPresented: $showSettings) {
             SettingsView(serverAddress: $url)
         }
@@ -72,11 +73,13 @@ struct ContentView: View {
                     showSettings.toggle()
                 }
             }
+            #if canImport(ActivityKit)
             ToolbarItem {
                 Button("Push Notification", systemImage: "app.badge") {
                     appState.startLiveActivity()
                 }
             }
+            #endif
         }
         .refreshable {
             await updateData()
@@ -107,7 +110,9 @@ struct ContentView: View {
     }
 
     func updateData() async {
+        #if canImport(ActivityKit)
         await appState.fetchWindowState()
+        #endif
         do {
             self.automations = try await client.getAutomations()
         } catch {

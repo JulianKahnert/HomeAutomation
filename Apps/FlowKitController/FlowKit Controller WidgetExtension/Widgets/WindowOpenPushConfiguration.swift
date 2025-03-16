@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 06.03.25.
 //
 
+#if os(iOS)
 import SwiftUI
 import WidgetKit
 
@@ -31,3 +32,4 @@ struct WindowOpenPushConfiguration: Widget {
         }
     }
 }
+#endif

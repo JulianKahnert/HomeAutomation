@@ -7,12 +7,12 @@
 
 import Foundation
 import Logging
-#if canImport(UIKit)
+#if os(iOS)
+import ActivityKit
 import UIKit
 #else
 import AppKit
 #endif
-import ActivityKit
 
 @MainActor
 class AppDelegate: NSObject {

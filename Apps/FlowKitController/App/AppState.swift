@@ -30,9 +30,15 @@ final class AppState {
 
         return FlowKitClient(url: url)
     }
+    
+    init() {
+        #if canImport(ActivityKit)
+        initLiveActivity()
+        #endif
+    }
 
     #if canImport(ActivityKit)
-    func initLiveActivity() async {
+    func initLiveActivity() {
         Task {
             await observeLiveActivityStartTokens()
         }

@@ -11,11 +11,18 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var serverAddress: URL
 
-    @State private var host = "localhost"
-    @State private var port = 8080
+    @State private var host: String
+    @State private var port: Int
 
     private var newServerAddress: URL {
         URL(string: "http://\(host):\(port)/")!
+    }
+
+    init(serverAddress: Binding<URL>) {
+        self._serverAddress = serverAddress
+
+        self.host = serverAddress.wrappedValue.host() ?? "localhost"
+        self.port = serverAddress.wrappedValue.port ?? 8080
     }
 
     var body: some View {

@@ -6,6 +6,7 @@
 //
 
 import HAModels
+import Logging
 import SwiftUI
 import UserNotifications
 
@@ -19,6 +20,8 @@ extension Bool {
 }
 
 struct ContentView: View {
+    private static let logger = Logger(label: "ContentView")
+
     @AppStorage(FlowKitClient.userDefaultsKey) private var url = URL(string: "http://0.0.0.0:8080/")!
     @Environment(AppState.self) var appState
 
@@ -110,6 +113,7 @@ struct ContentView: View {
     }
 
     func updateData() async {
+        Self.logger.info("Update data ...")
         #if canImport(ActivityKit)
         await appState.fetchWindowState()
         #endif

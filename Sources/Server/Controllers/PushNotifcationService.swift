@@ -58,13 +58,31 @@ actor PushNotifcationService: NotificationSender {
         Self.logger.debug("Start or update live activity")
 
         do {
-            let deviceTokens =
-                try await DeviceToken
+            let allDeviceTokens =
+            try await DeviceToken
                 .query(on: database)
                 .filter(\.$tokenType != "pushNotification")
                 .all()
 
-            Self.logger.debug("Found tokens \(deviceTokens.count)")
+            Self.logger.debug("Found tokens \(allDeviceTokens.count)")
+
+            var deviceTokens: [DeviceToken] = []
+            for token in allDeviceTokens {
+                if token.tokenType == "liveActivityUpdate",
+                    let date = token.updatedAt ?? token.createdAt,
+                   date < Date().addingTimeInterval(-1 * Duration.hours(4).timeInterval),
+                    let tokenId = token.id {
+
+                    // delete liveActivityUpdate tokens that are older than 4 hours
+                    try await DeviceToken
+                        .query(on: database)
+                        .filter(\.$id != tokenId)
+                        .delete()
+
+                } else {
+                    deviceTokens.append(token)
+                }
+            }
 
             let deviceMap = Dictionary(grouping: deviceTokens, by: { $0.deviceName })
             for tokens in deviceMap.values {
@@ -157,12 +175,22 @@ actor PushNotifcationService: NotificationSender {
                 event: .end,
                 timestamp: Int(Date().timeIntervalSince1970),
                 dismissalDate: .immediately)
+            Self.logger.info("Sending live activity notification \(notification)")
 
             for deviceToken in deviceTokens {
                 do {
                     let response = try await apnsClient.sendLiveActivityNotification(
                         notification, deviceToken: deviceToken.tokenString)
                     Self.logger.debug("Received send live activity response: \(response)")
+
+                    // delete token when ending the live activity
+                    do {
+                        try await DeviceToken.query(on: database)
+                            .filter(\.$tokenString == deviceToken.tokenString)
+                            .delete()
+                    } catch {
+                        Self.logger.critical("Failed to delete device token: \(error.localizedDescription)")
+                    }
                 } catch {
                     if let apnsError = error as? APNSError,
                         let id = apnsError.apnsUniqueID {

@@ -30,32 +30,37 @@ final class AppState {
 
         return FlowKitClient(url: url)
     }
-    
+
     init() {
-        #if canImport(ActivityKit)
-        initLiveActivity()
-        #endif
+#if canImport(ActivityKit)
+        Task {
+            await initLiveActivity()
+        }
+#endif
     }
 
-    #if canImport(ActivityKit)
-    func initLiveActivity() {
-        Task {
-            await observeLiveActivityStartTokens()
-        }
+#if canImport(ActivityKit)
+    func initLiveActivity() async {
+        await withTaskGroup(of: Void.self) { group in
 
-        Task {
-            let activity = await Activity<WindowAttributes>.activityUpdates.makeAsyncIterator().next()
-            guard let activity else {
-                logger.error("FAILED to get pushToken")
-                return
+            group.addTask(priority: .background) {
+                await self.observeLiveActivityStartTokens()
             }
-            observeActivity(activity: activity)
-        }
 
-        Task {
+            group.addTask {
+                let activity = await Activity<WindowAttributes>.activityUpdates.makeAsyncIterator().next()
+                guard let activity else {
+                    self.logger.error("FAILED to get pushToken")
+                    return
+                }
+                await self.observeActivity(activity: activity)
+            }
+
             for activity in Activity<WindowAttributes>.activities {
-                logger.info("Found running activity \(activity)")
-                observeActivity(activity: activity)
+                self.logger.info("Found running activity \(activity)")
+                group.addTask {
+                    await self.observeActivity(activity: activity)
+                }
             }
         }
     }
@@ -111,25 +116,23 @@ final class AppState {
         }
     }
 
-    func observeActivity(activity: Activity<WindowAttributes>) {
+    func observeActivity(activity: Activity<WindowAttributes>) async {
         logger.info("observeActivity activity \(activity.id)")
-        Task {
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask { @MainActor in
-                    for await contentState in activity.contentUpdates {
-                        self.activityViewState = contentState.state.windowStates.isEmpty ? nil : contentState.state
-                    }
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { @MainActor in
+                for await contentState in activity.contentUpdates {
+                    self.activityViewState = contentState.state.windowStates.isEmpty ? nil : contentState.state
                 }
+            }
 
-                group.addTask { @MainActor in
-                    for await pushToken in activity.pushTokenUpdates {
-                        await self.send(pushToken: pushToken, ofType: .liveActivityUpdate(activityName: String(describing: activity.self)))
-                    }
+            group.addTask { @MainActor in
+                for await pushToken in activity.pushTokenUpdates {
+                    await self.send(pushToken: pushToken, ofType: .liveActivityUpdate(activityName: String(describing: activity.self)))
                 }
             }
         }
     }
-    #endif
+#endif
 
     func send(pushToken: Data, ofType type: PushTokenType) async {
         let pushTokenString = pushToken.hexadecimalString
@@ -139,9 +142,9 @@ final class AppState {
         let deviceName = UIDevice.current.name
 #else
         let deviceName = Host().localizedName ?? "macOS"
-        #endif
+#endif
 
-//        let frequentUpdateEnabled = ActivityAuthorizationInfo().frequentPushesEnabled
+        //        let frequentUpdateEnabled = ActivityAuthorizationInfo().frequentPushesEnabled
         logger.info("Sending (\(type)) of \(deviceName)")
 
         do {

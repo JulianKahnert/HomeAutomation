@@ -58,31 +58,32 @@ struct OpenAPIController: APIProtocol {
     // MARK: - /pushdevices
 
     func registerPushDevice(_ input: Operations.RegisterPushDevice.Input) async throws -> Operations.RegisterPushDevice.Output {
-       guard case let .json(content) = input.body else {
+       guard case let .json(token) = input.body else {
             throw Abort(.badRequest, reason: "Invalid JSON body")
         }
+        request.logger.info("Adding/updating push device token: \(token.tokenType.rawValue)")
 
-        switch content.tokenType {
+        switch token.tokenType {
         case .pushNotification, .liveActivityStart:
-            assert(content.activityType == nil, "For pushNotification and liveActivityStart, activityType should be nil")
+            assert(token.activityType == nil, "For pushNotification and liveActivityStart, activityType should be nil")
 
             // first delete all previous token
             try await DeviceToken
                 .query(on: request.db)
-                .filter(\.$deviceName == content.deviceName)
-                .filter(\.$tokenType == content.tokenType.rawValue)
+                .filter(\.$deviceName == token.deviceName)
+                .filter(\.$tokenType == token.tokenType.rawValue)
                 .delete()
 
             // add the new token
-            let newPushDevice = DeviceToken(deviceName: content.deviceName,
-                                            tokenString: content.tokenString,
-                                            tokenType: content.tokenType.rawValue,
-                                            activityType: content.activityType) // for pushNotification & liveActivityStart - this should always be nil
+            let newPushDevice = DeviceToken(deviceName: token.deviceName,
+                                            tokenString: token.tokenString,
+                                            tokenType: token.tokenType.rawValue,
+                                            activityType: token.activityType) // for pushNotification & liveActivityStart - this should always be nil
             try await newPushDevice.save(on: request.db)
             return .ok
 
         case .liveActivityUpdate:
-            guard let activityType = content.activityType else {
+            guard let activityType = token.activityType else {
                 request.logger.critical("Token of type liveActivityUpdate must contain activityType")
                 return .internalServerError
             }
@@ -90,24 +91,24 @@ struct OpenAPIController: APIProtocol {
             // delete other tokens with that activity type
             try await DeviceToken
                 .query(on: request.db)
-                .filter(\.$deviceName == content.deviceName)
-                .filter(\.$tokenString != content.tokenString)
-                .filter(\.$tokenType == content.tokenType.rawValue)
+                .filter(\.$deviceName == token.deviceName)
+                .filter(\.$tokenString != token.tokenString)
+                .filter(\.$tokenType == token.tokenType.rawValue)
                 .filter(\.$activityType == activityType)
                 .delete()
 
             // insert the new token, if needed
             let numberOfPushDevices = try await DeviceToken
                 .query(on: request.db)
-                .filter(\.$deviceName == content.deviceName)
-                .filter(\.$tokenString == content.tokenString)
-                .filter(\.$tokenType == content.tokenType.rawValue)
+                .filter(\.$deviceName == token.deviceName)
+                .filter(\.$tokenString == token.tokenString)
+                .filter(\.$tokenType == token.tokenType.rawValue)
                 .filter(\.$activityType == activityType)
                 .count()
             if numberOfPushDevices == 0 {
-                let newPushDevice = DeviceToken(deviceName: content.deviceName,
-                                                tokenString: content.tokenString,
-                                                tokenType: content.tokenType.rawValue,
+                let newPushDevice = DeviceToken(deviceName: token.deviceName,
+                                                tokenString: token.tokenString,
+                                                tokenType: token.tokenType.rawValue,
                                                 activityType: activityType)
 
                 try await newPushDevice.save(on: request.db)

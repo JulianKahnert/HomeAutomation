@@ -16,7 +16,7 @@ public struct GoodNight: Automatable {
         []
     }
 
-    public init(_ name: String, at time: Time, motionSensors: [MotionSensorDevice]) {
+    public init(_ name: String, at time: Time) {
         self.name = name
         self.time = time
     }

@@ -1,9 +1,9 @@
 # Setup Server
 
-## Prerequisits
+## Prerequisites
 
-If using the "EnergyLowPrice" automation, you need change the tibber api key with the URL "https://api.tibber.com/v1-beta/gql".
-It will be set automatically when the automations runs the first time.
+If using the "EnergyLowPrice" automation, you need to change the Tibber API key with the URL "https://api.tibber.com/v1-beta/gql".
+It will be set automatically when the automation runs for the first time.
 
 
 ## Setup
@@ -29,15 +29,16 @@ docker-compose up db
 LOG_LEVEL=trace docker-compose up app
 
 # run migration
-docker compose run migrate
+docker-compose run migrate
 
 # show logs
-docker container ls
-docker logs CONTAINER_ID
+docker ps
+docker logs <CONTAINER_ID>
 
-# build & run swift ubuntu container locally
+# Build & run Swift Ubuntu container locally
 docker run -it --workdir /code -v ${PWD}:/code swift:6.0-noble /bin/bash
 
 swift build
+TZ=Europe/Berlin swift run Server serve
 TZ=Europe/Berlin swift run Server serve
 ```

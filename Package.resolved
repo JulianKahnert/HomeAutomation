@@ -1,5 +1,5 @@
 {
-  "originHash" : "444d58dd15ca3fb0e316374b0aa0c2ddfab89830d82da52e07f35ee96eaf2b54",
+  "originHash" : "ea79c92a0afc1b5f7f65f6cf7ef77623293bd63faec868d2a7e91be775bd7608",
   "pins" : [
     {
       "identity" : "apns",
@@ -13,10 +13,10 @@
     {
       "identity" : "apnswift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/juliankahnert/APNSwift",
+      "location" : "https://github.com/swift-server-community/APNSwift",
       "state" : {
-        "branch" : "version5",
-        "revision" : "659d0d6095bccbd86b9e666cabbab00a80abf5e9"
+        "revision" : "36fec7e6ca5e99c6049771601770a5488021e19a",
+        "version" : "5.1.0"
       }
     },
     {
@@ -69,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/fluent-kit.git",
       "state" : {
-        "revision" : "dd5a92d3b5e9e7fb72fd2325eda5bcea36cc4ea1",
-        "version" : "1.50.2"
+        "revision" : "8baacd7e8f7ebf68886c496b43bbe6cdcc5b57e0",
+        "version" : "1.52.2"
       }
     },
     {
@@ -78,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/fluent-mysql-driver.git",
       "state" : {
-        "revision" : "c1422fde19433fa9ded948f83a226291e9ac33a9",
-        "version" : "4.7.0"
+        "revision" : "52b7d863b884cbecfe61dd4eae2e7277992f0a35",
+        "version" : "4.7.1"
       }
     },
     {
@@ -240,8 +240,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/swift-dependencies.git",
       "state" : {
-        "revision" : "ec2862d1364536fc22ec56a3094e7a034bbc7da8",
-        "version" : "1.8.1"
+        "revision" : "4c90d6b2b9bf0911af87b103bb40f41771891596",
+        "version" : "1.9.2"
       }
     },
     {
@@ -249,8 +249,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-distributed-actors",
       "state" : {
-        "branch" : "main",
-        "revision" : "fc2f2ab5693db25ca9b0fd0c0dc9959fa7045fd0"
+        "branch" : "0041f6a",
+        "revision" : "0041f6a0a27b649216ffd85ab325091cdf32b841"
       }
     },
     {
@@ -287,6 +287,15 @@
       "state" : {
         "revision" : "3d8596ed08bd13520157f0355e35caed215ffbfa",
         "version" : "1.6.3"
+      }
+    },
+    {
+      "identity" : "swift-log-oslog",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/chrisaljoudi/swift-log-oslog.git",
+      "state" : {
+        "revision" : "176d41d46429e79c806333025b226e0c50a0c602",
+        "version" : "0.2.2"
       }
     },
     {
@@ -357,8 +366,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-generator",
       "state" : {
-        "revision" : "755c0ec69bd667aa4e8ba50c8b710585d302879e",
-        "version" : "1.7.1"
+        "revision" : "ea291f05436363665ee67c453f4a72a895f18e75",
+        "version" : "1.9.0"
       }
     },
     {
@@ -366,8 +375,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-runtime",
       "state" : {
-        "revision" : "23146bc8710ac5e57abb693113f02dc274cf39b6",
-        "version" : "1.8.0"
+        "revision" : "8f33cc5dfe81169fb167da73584b9c72c3e8bc23",
+        "version" : "1.8.2"
+      }
+    },
+    {
+      "identity" : "swift-openapi-urlsession",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-openapi-urlsession",
+      "state" : {
+        "revision" : "6fac6f7c428d5feea2639b5f5c8b06ddfb79434b",
+        "version" : "1.1.0"
       }
     },
     {
@@ -438,8 +456,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "f6459d6417d4968f91979224dd8fd38fa99b042c",
-        "version" : "4.114.0"
+        "revision" : "4014016aad591a120f244f9b9e8a57252b7e62b4",
+        "version" : "4.115.0"
       }
     },
     {

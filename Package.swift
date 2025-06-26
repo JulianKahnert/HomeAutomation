@@ -14,21 +14,22 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", from: "4.114.0"),
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.115.0"),
         // 🗄 An ORM for SQL and NoSQL databases.
         .package(url: "https://github.com/vapor/fluent.git", from: "4.12.0"),
         // 🐬 Fluent driver for MySQL.
-        .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.7.0"),
+        .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.7.1"),
         // open api generator
-        .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.7.1"),
+        .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.9.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.8.1"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.9.2"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", from: "4.2.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.3"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
-        .package(url: "https://github.com/apple/swift-distributed-actors", branch: "main"),
-        .package(url: "https://github.com/juliankahnert/APNSwift", branch: "version5")
+        .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
+//        .package(url: "https://github.com/swift-server-community/APNSwift", branch: "main")
+        .package(url: "https://github.com/swift-server-community/APNSwift", from: "5.0.0")
     ],
     targets: [
         .executableTarget(

@@ -29,7 +29,7 @@ let package = Package(
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
 //        .package(url: "https://github.com/swift-server-community/APNSwift", branch: "main")
-        .package(url: "https://github.com/swift-server-community/APNSwift", from: "5.0.0")
+        .package(url: "https://github.com/swift-server-community/APNSwift", from: "5.1.0")
     ],
     targets: [
         .executableTarget(

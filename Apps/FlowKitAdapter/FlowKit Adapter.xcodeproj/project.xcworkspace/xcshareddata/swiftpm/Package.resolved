@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-distributed-actors",
       "state" : {
-        "branch" : "main",
-        "revision" : "fc2f2ab5693db25ca9b0fd0c0dc9959fa7045fd0"
+        "branch" : "0041f6a",
+        "revision" : "0041f6a0a27b649216ffd85ab325091cdf32b841"
       }
     },
     {

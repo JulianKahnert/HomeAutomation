@@ -66,7 +66,7 @@ public func configure(_ app: Application) async throws {
         environment: apnsEnvironment
     )
 
-    app.apns.containers.use(
+    await app.apns.containers.use(
         apnsConfig,
         eventLoopGroupProvider: .shared(app.eventLoopGroup),
         responseDecoder: JSONDecoder(),
@@ -86,9 +86,9 @@ public func configure(_ app: Application) async throws {
     // MARK: - home automation setup
 
     app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
-    let notificationSender = PushNotifcationService(database: app.db,
-                                                    apnsClient: app.apns.client,
-                                                    notificationTopic: notificationTopic)
+    let notificationSender = await PushNotifcationService(database: app.db,
+                                                          apnsClient: app.apns.client,
+                                                          notificationTopic: notificationTopic)
 
     let homeManager = await HomeManager(getAdapter: {
         await actorSystem.lookup(.homeKitCommandReceiver)

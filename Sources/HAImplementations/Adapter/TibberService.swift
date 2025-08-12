@@ -5,15 +5,15 @@
 //  Created by Julian Kahnert on 09.09.24.
 //
 
- import Foundation
- import HAModels
- import Logging
- import TibberSwift
+import Foundation
+import HAModels
+import Logging
+import TibberSwift
 
 public actor TibberService: Log {
     public struct TodayPrice: Sendable {
-        public let startsAt: Date
-        public let total: Double
+        public let time: ClosedRange<Date>
+        public let price: Double
     }
 
     private static let tibberApi = "https://api.tibber.com/v1-beta/gql"
@@ -29,54 +29,54 @@ public actor TibberService: Log {
         self.tibber = TibberSwift(apiKey: apiKey)
     }
 
-    public func getPricesToday() async -> [TodayPrice]? {
+    public func getPricesToday() async throws -> [TodayPrice] {
         let date = Date()
 
         if let priceCache,
-           Calendar.current.isDate(priceCache.0, inSameDayAs: date) {
+            Calendar.current.isDate(priceCache.0, inSameDayAs: date) {
             return priceCache.1
         }
 
-        do {
-            let response = try await tibber.priceInfoToday()
-            guard let home = response.homes.first else { return nil }
-            let prices = home.currentSubscription.priceInfo.today
-                .map { price in
-                    TodayPrice(startsAt: price.startsAt, total: price.total)
-                }
-            priceCache = (date, prices)
-            return prices
-        } catch {
-            log.critical("Failed to get today prices \(error.localizedDescription)")
-            return nil
+        let response = try await tibber.priceInfoToday()
+        guard let home = response.homes.first else {
+            log.critical("Failed to get home")
+            return []
         }
+
+        let sortedPrices = home.currentSubscription.priceInfo.today.sorted { $0.startsAt < $1.startsAt }
+        let prices = sortedPrices.enumerated().map { index, price in
+            let start = price.startsAt
+            let end: Date
+            if index + 1 < sortedPrices.count {
+                end = sortedPrices[index + 1].startsAt
+            } else {
+                end = Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: start)!
+
+            }
+            return TodayPrice(time: start...end, price: price.total)
+        }
+
+        priceCache = (date, prices)
+        return prices
     }
 
-    public func getPriceIfCurrentlyLowestPriceHour() async -> Double? {
-        let priceInfos = await getPricesToday()
-        guard let priceInfos,
-            priceInfos.count >= 2 else { return nil }
+    public func getCheapestPricesToday(for duration: Duration) async throws -> [TodayPrice] {
+        let prices = try await getPricesToday()
+        guard !prices.isEmpty else { return [] }
 
-        let sortedPriceInfos = Array(priceInfos.sorted(by: { $0.total < $1.total }))
-        let lowestPriceInfo = sortedPriceInfos[0]
+        let sortedPrices = prices.sorted { $0.price < $1.price }
 
-        let hour = Calendar.current.component(.hour, from: Date())
-        let isLowestPriceHour = hour == Calendar.current.component(.hour, from: lowestPriceInfo.startsAt)
-        return isLowestPriceHour ? lowestPriceInfo.total : nil
-    }
+        var cheapPrices: [TodayPrice] = []
+        var totalDuration: TimeInterval = 0
+        for price in sortedPrices {
+            cheapPrices.append(price)
+            totalDuration += price.time.upperBound.timeIntervalSince(price.time.lowerBound)
+            if totalDuration >= duration.timeInterval {
+                break
+            }
+        }
 
-    public func getPriceIfCurrentlySecondLowestPriceHour() async -> Double? {
-        let priceInfos = await getPricesToday()
-        guard let priceInfos,
-            priceInfos.count >= 2 else { return nil }
-
-        let sortedPriceInfos = Array(priceInfos.sorted(by: { $0.total < $1.total }))
-        let secondLowestPriceInfo = sortedPriceInfos[1]
-
-        let hour = Calendar.current.component(.hour, from: Date())
-        let isSecondLowestPriceHour = hour == Calendar.current.component(.hour, from: secondLowestPriceInfo.startsAt)
-
-        return isSecondLowestPriceHour ? secondLowestPriceInfo.total : nil
+        return cheapPrices
     }
 
     public func sendNotification(title: String, message: String) async {
@@ -87,8 +87,8 @@ public actor TibberService: Log {
             log.critical("Failed to send notification \(error.localizedDescription)")
         }
     }
- }
+}
 
- extension PriceInfoToday: @unchecked @retroactive Sendable { }
- extension PushNotificationResult: @unchecked @retroactive Sendable { }
- extension TibberSwift: @unchecked @retroactive Sendable { }
+extension PriceInfoToday: @unchecked @retroactive Sendable {}
+extension PushNotificationResult: @unchecked @retroactive Sendable {}
+extension TibberSwift: @unchecked @retroactive Sendable {}

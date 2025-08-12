@@ -17,7 +17,6 @@ public enum AnyAutomation: Codable, Sendable {
     case healthCheck(HealthCheck)
     case maintenanceAutomation(MaintenanceAutomation)
     case motionAtNight(MotionAtNight)
-    case poolPump(PoolPump)
     case restartSystem(RestartSystem)
     case turn(Turn)
     case turnOnForDuration(TurnOnForDuration)
@@ -36,7 +35,6 @@ public enum AnyAutomation: Codable, Sendable {
         case .goodNight(let goodNight): return goodNight
         case .healthCheck(let healthCheck): return healthCheck
         case .maintenanceAutomation(let maintenanceAutomation): return maintenanceAutomation
-        case .poolPump(let poolPump): return poolPump
         case .restartSystem(let restartSystem): return restartSystem
         case .turn(let turn): return turn
         case .updateScenes(let updateScenes): return updateScenes
@@ -52,7 +50,6 @@ public enum AnyAutomation: Codable, Sendable {
             HealthCheck.self,
             MaintenanceAutomation.self,
             MotionAtNight.self,
-            PoolPump.self,
             RestartSystem.self,
             Turn.self,
             TurnOnForDuration.self,
@@ -79,8 +76,6 @@ public enum AnyAutomation: Codable, Sendable {
             return .maintenanceAutomation(maintenanceAutomation)
         } else if let motionAtNight = automation as? MotionAtNight {
             return .motionAtNight(motionAtNight)
-        } else if let poolPump = automation as? PoolPump {
-            return .poolPump(poolPump)
         } else if let restartSystem = automation as? RestartSystem {
             return .restartSystem(restartSystem)
         } else if let turn = automation as? Turn {

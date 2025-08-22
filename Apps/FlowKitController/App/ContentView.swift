@@ -26,6 +26,7 @@ struct ContentView: View {
     @Environment(AppState.self) var appState
 
     @State private var showSettings = false
+    @State private var showLiveActivityData = false
     @State private var client: FlowKitClient!
     @State private var automations: [Automation] = []
 
@@ -51,16 +52,14 @@ struct ContentView: View {
             }
         }
         #if canImport(ActivityKit)
-        .overlay(alignment: .bottom) {
+        .popover(isPresented: $showLiveActivityData) {
             Group {
                 if let activityViewState = appState.activityViewState {
                     WindowOpenLiveActivityView(contentState: activityViewState)
                 } else {
-                    EmptyView()
+                    ContentUnavailableView("No live activity data", systemImage: "chart.bar.horizontal.page")
                 }
             }
-            .modifier(DropShadow())
-            .opacity(appState.activityViewState == nil ? 0 : 1)
         }
         #endif
         .navigationDestination(isPresented: $showSettings) {
@@ -79,7 +78,8 @@ struct ContentView: View {
             #if canImport(ActivityKit)
             ToolbarItem {
                 Button("Push Notification", systemImage: "app.badge") {
-                    appState.startLiveActivity()
+//                    appState.startLiveActivity()
+                    showLiveActivityData.toggle()
                 }
             }
             #endif
@@ -106,9 +106,10 @@ struct ContentView: View {
     func view(for automation: Automation) -> some View {
         HStack {
             Text(automation.name)
+                .foregroundStyle(automation.isRunning ? Color.green : Color.primary)
             Spacer()
-            Image(systemName: "circle.fill")
-                .foregroundStyle(automation.isRunning ? Color.green : Color.gray.opacity(0.3))
+            Image(systemName: "x.circle")
+                .foregroundStyle(automation.isActive ? Color.clear : Color.red)
         }
     }
 

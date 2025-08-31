@@ -54,6 +54,7 @@ extension HomeKitAdapter {
             let actionSet = try manager.homes.flatMap(\.actionSets).first(where: { $0.name == sceneName }).get(with: log)
             let home = try actionSet.home.get(with: log)
 
+            log.info("Executing action set: \(actionSet.name) [\(home.description)]")
             try await home.executeActionSet(actionSet)
         }
 

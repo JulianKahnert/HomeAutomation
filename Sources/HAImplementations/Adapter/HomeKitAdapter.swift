@@ -162,6 +162,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
     }
 
     public func trigger(scene sceneName: String) async throws {
+        log.info("triggering scene: \(sceneName)")
         try await homeKitHomeManager.trigger(scene: sceneName)
     }
 

@@ -93,10 +93,12 @@ public struct MotionAtNight: Automatable {
             for light in lights {
                 await light.setColorTemperature(to: colorTemperatureValue, with: hm)
             }
+            await Task.yield()
 
             for light in lights {
                 await light.setBrightness(to: brightnessValue, with: hm)
             }
+            await Task.yield()
 
             for light in lights {
                 await light.turnOn(with: hm)

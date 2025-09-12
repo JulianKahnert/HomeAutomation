@@ -10,7 +10,7 @@ import HAModels
 
 public struct UpdateScenes: Automatable {
     static let allScenesSkippedServiceNames = Set(["Wärmepumpe geringer Strompreis Modus", "Pool"])
-    static let sceneGoodNightSkippedServiceNames = Set(["Fußball"])
+    static let sceneGoodNightSkippedServiceNames = Set(["Schreibtisch Lampe"])
     static let sceneNameGoodNight = "Gute Nacht"
     static let sceneNameAllOn = "Alles An"
     static let sceneNameAllOff = "Alles Aus"

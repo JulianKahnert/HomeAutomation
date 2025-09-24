@@ -8,6 +8,7 @@
 import Foundation
 import HAModels
 
+@available(*, deprecated, message: "Use UpdateScenes instead")
 public struct UpdateScenes: Automatable {
     static let allScenesSkippedServiceNames = Set(["Wärmepumpe geringer Strompreis Modus", "Pool"])
     static let sceneGoodNightSkippedServiceNames = Set(["Schreibtisch Lampe"])

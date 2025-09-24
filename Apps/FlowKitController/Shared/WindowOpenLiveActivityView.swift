@@ -5,7 +5,7 @@
 //  Created by Julian Kahnert on 06.03.25.
 //
 
-#if canImport(ActivityKit)
+#if os(iOS)
 import SwiftUI
 
 struct WindowOpenLiveActivityView: View {

@@ -32,14 +32,14 @@ final class AppState {
     }
 
     init() {
-#if canImport(ActivityKit)
+#if os(iOS)
         Task {
             await initLiveActivity()
         }
 #endif
     }
 
-#if canImport(ActivityKit)
+#if os(iOS)
     func initLiveActivity() async {
         await withTaskGroup(of: Void.self) { group in
 

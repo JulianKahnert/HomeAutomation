@@ -51,7 +51,7 @@ struct ContentView: View {
                 }
             }
         }
-        #if canImport(ActivityKit)
+        #if os(iOS)
         .popover(isPresented: $showLiveActivityData) {
             Group {
                 if let activityViewState = appState.activityViewState {
@@ -75,7 +75,7 @@ struct ContentView: View {
                     showSettings.toggle()
                 }
             }
-            #if canImport(ActivityKit)
+            #if os(iOS)
             ToolbarItem {
                 Button("Push Notification", systemImage: "app.badge") {
 //                    appState.startLiveActivity()
@@ -115,7 +115,7 @@ struct ContentView: View {
 
     func updateData() async {
         Self.logger.info("Update data ...")
-        #if canImport(ActivityKit)
+        #if os(iOS)
         await appState.fetchWindowState()
         #endif
         do {

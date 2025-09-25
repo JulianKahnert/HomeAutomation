@@ -22,6 +22,8 @@ public enum AnyAutomation: Codable, Sendable {
     case turnOnForDuration(TurnOnForDuration)
     case updateScenes(UpdateScenes)
     case windowOpen(WindowOpen)
+    case upsertScene(UpsertScene)
+    case triggerScene(TriggerScene)
 
     public var automation: any Automatable {
         switch self {
@@ -39,6 +41,8 @@ public enum AnyAutomation: Codable, Sendable {
         case .turn(let turn): return turn
         case .updateScenes(let updateScenes): return updateScenes
         case .windowOpen(let windowOpen): return windowOpen
+        case .upsertScene(let upsertScene): return upsertScene
+        case .triggerScene(let triggerScene): return triggerScene
         }
     }
 
@@ -54,7 +58,9 @@ public enum AnyAutomation: Codable, Sendable {
             Turn.self,
             TurnOnForDuration.self,
             UpdateScenes.self,
-            WindowOpen.self
+            WindowOpen.self,
+            UpsertScene.self,
+            TriggerScene.self
         ]
 
         #if canImport(WeatherKit)
@@ -86,6 +92,10 @@ public enum AnyAutomation: Codable, Sendable {
             return .updateScenes(updateScenes)
         } else if let windowOpen = automation as? WindowOpen {
             return .windowOpen(windowOpen)
+        } else if let upsertScene = automation as? UpsertScene {
+            return .upsertScene(upsertScene)
+        } else if let triggerScene = automation as? TriggerScene {
+            return .triggerScene(triggerScene)
         } else {
             #if canImport(WeatherKit)
             if let gardenWatering = automation as? GardenWatering {

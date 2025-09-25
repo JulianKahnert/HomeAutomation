@@ -12,6 +12,9 @@ import VaporAPNS
 
 #warning("TODO: remove TibberSwift from HomeAutomationKit or also use NotificationSender there")
 
+// public distributed actor HomeKitCommandReceiver: EntityAdapterable {  // this crashes the 6.0.3 swift compiler on linux so we moved it to an extension
+extension HomeKitCommandReceiver: EntityAdapterable {}
+
 // configures your application
 public func configure(_ app: Application) async throws {
 

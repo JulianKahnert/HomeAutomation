@@ -13,14 +13,12 @@ public enum AnyAutomation: Codable, Sendable {
     #if canImport(WeatherKit)
     case gardenWatering(GardenWatering)
     #endif
-    case goodNight(GoodNight)
     case healthCheck(HealthCheck)
     case maintenanceAutomation(MaintenanceAutomation)
     case motionAtNight(MotionAtNight)
     case restartSystem(RestartSystem)
     case turn(Turn)
     case turnOnForDuration(TurnOnForDuration)
-    case updateScenes(UpdateScenes)
     case windowOpen(WindowOpen)
     case upsertScene(UpsertScene)
     case triggerScene(TriggerScene)
@@ -34,12 +32,10 @@ public enum AnyAutomation: Codable, Sendable {
         #if canImport(WeatherKit)
         case .gardenWatering(let gardenWatering): return gardenWatering
         #endif
-        case .goodNight(let goodNight): return goodNight
         case .healthCheck(let healthCheck): return healthCheck
         case .maintenanceAutomation(let maintenanceAutomation): return maintenanceAutomation
         case .restartSystem(let restartSystem): return restartSystem
         case .turn(let turn): return turn
-        case .updateScenes(let updateScenes): return updateScenes
         case .windowOpen(let windowOpen): return windowOpen
         case .upsertScene(let upsertScene): return upsertScene
         case .triggerScene(let triggerScene): return triggerScene
@@ -50,14 +46,12 @@ public enum AnyAutomation: Codable, Sendable {
         var tmp: [Automatable.Type] = [
             CreateScene.self,
             EnergyLowPrice.self,
-            GoodNight.self,
             HealthCheck.self,
             MaintenanceAutomation.self,
             MotionAtNight.self,
             RestartSystem.self,
             Turn.self,
             TurnOnForDuration.self,
-            UpdateScenes.self,
             WindowOpen.self,
             UpsertScene.self,
             TriggerScene.self
@@ -74,8 +68,6 @@ public enum AnyAutomation: Codable, Sendable {
             return .createScene(createScene)
         } else if let energyLowPrice = automation as? EnergyLowPrice {
             return .energyLowPrice(energyLowPrice)
-        } else if let goodNight = automation as? GoodNight {
-            return .goodNight(goodNight)
         } else if let healthCheck = automation as? HealthCheck {
             return .healthCheck(healthCheck)
         } else if let maintenanceAutomation = automation as? MaintenanceAutomation {
@@ -88,8 +80,6 @@ public enum AnyAutomation: Codable, Sendable {
             return .turn(turn)
         } else if let turnOnForDuration = automation as? TurnOnForDuration {
             return .turnOnForDuration(turnOnForDuration)
-        } else if let updateScenes = automation as? UpdateScenes {
-            return .updateScenes(updateScenes)
         } else if let windowOpen = automation as? WindowOpen {
             return .windowOpen(windowOpen)
         } else if let upsertScene = automation as? UpsertScene {

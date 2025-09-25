@@ -18,7 +18,7 @@ let package = Package(
         // 🗄 An ORM for SQL and NoSQL databases.
         .package(url: "https://github.com/vapor/fluent.git", from: "4.12.0"),
         // 🐬 Fluent driver for MySQL.
-        .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.7.1"),
+        .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.8.0"),
         // open api generator
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.2"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),

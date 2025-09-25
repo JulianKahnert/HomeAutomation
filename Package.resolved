@@ -1,5 +1,5 @@
 {
-  "originHash" : "e3c4c554ac52d5deacf132b0db8d26eaa056cfcfddab296b345a3f297b9acd0b",
+  "originHash" : "030bcb9c95d4d3f5acd915110629a7121ff8230711de72026aad51eab3a4776a",
   "pins" : [
     {
       "identity" : "apns",
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/fluent.git",
       "state" : {
-        "revision" : "223b27d04ab2b51c25503c9922eecbcdf6c12f89",
-        "version" : "4.12.0"
+        "revision" : "2fe9e36daf4bdb5edcf193e0d0806ba2074d2864",
+        "version" : "4.13.0"
       }
     },
     {
@@ -249,8 +249,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/swift-dependencies",
       "state" : {
-        "revision" : "a501eebe552fd23691c560adf474fca2169ad8aa",
-        "version" : "1.9.4"
+        "revision" : "a10f9feeb214bc72b5337b6ef6d5a029360db4cc",
+        "version" : "1.10.0"
       }
     },
     {
@@ -366,8 +366,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-generator",
       "state" : {
-        "revision" : "bb9a13596af11db9bb83389295d91cd335810fe8",
-        "version" : "1.10.2"
+        "revision" : "d74223cc5595a8165181c4d9579243c932e5cd07",
+        "version" : "1.10.3"
       }
     },
     {
@@ -456,8 +456,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "3636f443474769147828a5863e81a31f6f30e92c",
-        "version" : "4.115.1"
+        "revision" : "773ea6a63595ae4f6bc46a366d78769d4cb8b08c",
+        "version" : "4.117.0"
       }
     },
     {

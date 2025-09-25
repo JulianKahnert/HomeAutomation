@@ -38,20 +38,15 @@ public struct WindowOpen: Automatable {
         // stop this automation and do not notify anyone, if the window is closed
         guard isWindowOpen else {
             log.debug("Skipping 'WindowOpen' automation, window is closed")
-            await hm.setWindowOpenState(entityId: windowContact.contactSensorId, to: nil)
             return
         }
 
-        let name = "\(windowContact.contactSensorId.name) (\(windowContact.contactSensorId.placeId))"
         let opened = Date()
         let end = opened.addingTimeInterval(notificationWait.timeInterval)
-        let openState = WindowOpenState(name: name, opened: opened, maxOpenDuration: notificationWait.timeInterval)
 
         log.debug("Start sleeping for \(notificationWait.description) before sending notification")
         var shouldWait = true
         while shouldWait {
-            await hm.setWindowOpenState(entityId: windowContact.contactSensorId, to: openState)
-
             let waitSeconds = min(60, end.timeIntervalSinceNow)
             try await Task.sleep(for: .seconds(waitSeconds))
 

@@ -17,7 +17,7 @@ public struct UpsertScene: Automatable {
     public let name: String
     public let time: Time
     public var triggerEntityIds = Set<EntityId>()
-    
+
     public let sceneName: String
     public let mode: Mode
     public let skippedServiceNames: Set<String>
@@ -51,7 +51,7 @@ public struct UpsertScene: Automatable {
 //                    await hm.perform(.addEntityToScene(entity.entityId, sceneName: Self.sceneNameGoodNight, targetValue: .on))
                 }
             }
-            
+
         case .allOn:
             for entity in entities {
                 if entity.isDeviceOn != nil {

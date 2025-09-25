@@ -8,7 +8,6 @@
 import Foundation
 import Logging
 
-extension Timer: @retroactive @unchecked Sendable {}
 extension Timer: Log {}
 public extension Timer {
     static func publish(every duration: Duration) -> any AsyncSequence<Date, Never> {

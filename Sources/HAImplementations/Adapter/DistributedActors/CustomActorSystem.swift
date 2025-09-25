@@ -15,7 +15,6 @@ typealias DefaultDistributedActorSystem = ClusterSystem
 public struct NodeIdentity: Sendable {
     let id: String
 }
-extension ClusterSystem: Sendable {}
 
 public final class CustomActorSystem: Sendable {
     private let log = Logger(label: "ActorSystem")

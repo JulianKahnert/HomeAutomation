@@ -22,8 +22,7 @@ public extension DistributedReception.Key {
 /// Receiver of HomeKit commands
 ///
 /// This should be instantiated on the HomeKitAdapter.
-// public distributed actor HomeKitCommandReceiver: EntityAdapterable {  // this crashes the 6.0.3 swift compiler on linux so we moved it to an extension
-public distributed actor HomeKitCommandReceiver {
+public distributed actor HomeKitCommandReceiver: EntityAdapterable {
     public typealias ActorSystem = ClusterSystem
     private let adapter: any HomeKitAdapterable
 

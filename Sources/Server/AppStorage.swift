@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 01.02.25.
 //
 
+import Adapter
 import HAApplicationLayer
 import HAImplementations
 import HAModels

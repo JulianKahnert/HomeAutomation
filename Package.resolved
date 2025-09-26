@@ -1,5 +1,5 @@
 {
-  "originHash" : "030bcb9c95d4d3f5acd915110629a7121ff8230711de72026aad51eab3a4776a",
+  "originHash" : "12c0221bf7398a00271df3bb9009854da73aeabac6ca0f50e1b0935ea6caa1bb",
   "pins" : [
     {
       "identity" : "apns",
@@ -299,6 +299,15 @@
       }
     },
     {
+      "identity" : "swift-log-oslog",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/chrisaljoudi/swift-log-oslog.git",
+      "state" : {
+        "revision" : "176d41d46429e79c806333025b226e0c50a0c602",
+        "version" : "0.2.2"
+      }
+    },
+    {
       "identity" : "swift-metrics",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-metrics.git",
@@ -377,6 +386,15 @@
       "state" : {
         "revision" : "8f33cc5dfe81169fb167da73584b9c72c3e8bc23",
         "version" : "1.8.2"
+      }
+    },
+    {
+      "identity" : "swift-openapi-urlsession",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-openapi-urlsession",
+      "state" : {
+        "revision" : "6fac6f7c428d5feea2639b5f5c8b06ddfb79434b",
+        "version" : "1.1.0"
       }
     },
     {

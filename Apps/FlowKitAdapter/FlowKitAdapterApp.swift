@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 28.05.24.
 //
 
+import Adapter
 import HAImplementations
 import HAModels
 import Logging

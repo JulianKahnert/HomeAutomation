@@ -1,3 +1,4 @@
+import Adapter
 import APNS
 import APNSCore
 import APNSURLSession

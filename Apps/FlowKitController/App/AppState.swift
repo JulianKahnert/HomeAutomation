@@ -105,6 +105,22 @@ final class AppState {
         do {
             let states = try await flowKitClient.getWindowStates()
             self.activityViewState = states.isEmpty ? nil : .init(windowStates: states)
+
+            var activities = Activity<WindowAttributes>.activities
+            let lastActivity = activities.popLast()
+
+            // remove duplicate activities
+            for activity in activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+
+            // update lastActivity
+            if let activityViewState {
+                await lastActivity?.update(.init(state: activityViewState, staleDate: nil))
+            } else {
+                await lastActivity?.end(nil, dismissalPolicy: .immediate)
+            }
+
         } catch {
             logger.critical("Failed to fetch window states: \(error)")
         }

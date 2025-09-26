@@ -10,7 +10,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "HomeAutomationKit",
-            targets: ["HAModels", "HAImplementations", "HAApplicationLayer"]
+            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer"]
         )
     ],
     dependencies: [
@@ -35,6 +35,7 @@ let package = Package(
         .executableTarget(
             name: "Server",
             dependencies: [
+                "Adapter",
                 "HAModels",
                 "HAApplicationLayer",
                 "HAImplementations",
@@ -53,6 +54,14 @@ let package = Package(
             ]
         ),
         .target(
+            name: "Adapter",
+            dependencies: [
+                .product(name: "Logging", package: "swift-log"),
+                "HAModels",
+                .product(name: "DistributedCluster", package: "swift-distributed-actors")
+            ]
+        ),
+        .target(
             name: "HAModels",
             dependencies: [
                 .product(name: "Logging", package: "swift-log")
@@ -63,8 +72,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 "HAModels",
-                "TibberSwift",
-                .product(name: "DistributedCluster", package: "swift-distributed-actors")
+                "TibberSwift"
             ]
         ),
         .target(

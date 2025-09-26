@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 05.02.25.
 //
 
+import Adapter
 import HAImplementations
 import SwiftUI
 

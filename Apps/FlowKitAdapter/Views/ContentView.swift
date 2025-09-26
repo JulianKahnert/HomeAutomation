@@ -5,7 +5,7 @@
 //  Created by Julian Kahnert on 26.07.24.
 //
 
-import HAImplementations
+import Adapter
 import HAModels
 import Logging
 import SwiftUI

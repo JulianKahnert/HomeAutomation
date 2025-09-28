@@ -24,6 +24,7 @@ struct ContentView: View {
 
     @AppStorage(FlowKitClient.userDefaultsKey) private var url = URL(string: "http://0.0.0.0:8080/")!
     @Environment(AppState.self) var appState
+    @Environment(\.scenePhase) var scenePhase
 
     @State private var showSettings = false
     @State private var showLiveActivityData = false
@@ -81,6 +82,7 @@ struct ContentView: View {
 //                    appState.startLiveActivity()
                     showLiveActivityData.toggle()
                 }
+                .badge(appState.activityViewState?.windowStates.count ?? 0)
             }
             #endif
         }
@@ -93,6 +95,12 @@ struct ContentView: View {
                 await updateData()
             }
             requestRemoteNotificationsIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, new in
+            guard new == .active else { return }
+            Task {
+                await updateData()
+            }
         }
         .onChange(of: url) { _, _ in
             client = FlowKitClient(url: url)

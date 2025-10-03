@@ -115,8 +115,14 @@ final class AppState {
             }
 
             // update lastActivity
-            if let activityViewState {
-                await lastActivity?.update(.init(state: activityViewState, staleDate: nil))
+            if let activityViewState,
+                let lastActivity {
+                await lastActivity.update(.init(state: activityViewState, staleDate: nil))
+                
+                if let newestPushToken = await lastActivity.pushTokenUpdates.makeAsyncIterator().next() {
+                    await send(pushToken: newestPushToken, ofType: .liveActivityUpdate(activityName: String(describing: lastActivity.self)))
+                }
+
             } else {
                 await lastActivity?.end(nil, dismissalPolicy: .immediate)
             }

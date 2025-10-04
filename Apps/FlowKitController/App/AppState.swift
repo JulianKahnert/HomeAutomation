@@ -125,7 +125,7 @@ final class AppState {
                 } else {
                     activity = try Activity<WindowAttributes>.request(
                         attributes: WindowAttributes(),
-                        content: activityViewState,
+                        content: .init(state: activityViewState, staleDate: nil),
                         pushType: .token
                     )
                 }

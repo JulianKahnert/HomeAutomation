@@ -23,6 +23,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.3"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.18.0"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", from: "5.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.4"),

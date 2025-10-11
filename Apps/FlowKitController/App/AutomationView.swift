@@ -9,9 +9,23 @@ import SwiftUI
 
 struct AutomationView: View {
     let client: FlowKitClient!
-    let automation: Automation
+    @Bindable var automationStore: AutomationStore
+    let automationId: String
+    let onDataUpdate: () async -> Void
+
+    private var automation: Automation? {
+        automationStore.automation(withId: automationId)
+    }
 
     var body: some View {
+        guard let automation else {
+            return AnyView(ContentUnavailableView("Automation not found", systemImage: "exclamationmark.triangle"))
+        }
+        return AnyView(content(for: automation))
+    }
+
+    @ViewBuilder
+    private func content(for automation: Automation) -> some View {
         Form {
             Section {
                 HStack {
@@ -50,6 +64,9 @@ struct AutomationView: View {
             } else {
                 try await client.deactivate(automation: automationName)
             }
+
+            // Reload all automations to get the updated state from the server
+            await onDataUpdate()
         } catch {
             assertionFailure()
         }

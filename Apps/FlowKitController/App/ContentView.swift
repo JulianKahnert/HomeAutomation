@@ -29,23 +29,33 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showLiveActivityData = false
     @State private var client: FlowKitClient!
-    @State private var automations: [Automation] = []
+    @State private var automationStore = AutomationStore()
 
     var body: some View {
         List {
             Section {
-                ForEach(automations.filter(\.isRunning)) { automation in
+                ForEach(automationStore.automations.filter(\.isRunning)) { automation in
                     NavigationLink(destination: {
-                        AutomationView(client: client, automation: automation)
+                        AutomationView(
+                            client: client,
+                            automationStore: automationStore,
+                            automationId: automation.id,
+                            onDataUpdate: { await updateData() }
+                        )
                     }, label: {
                         view(for: automation)
                     })
                 }
             }
             Section {
-                ForEach(automations.filter(\.isRunning.inverted)) { automation in
+                ForEach(automationStore.automations.filter(\.isRunning.inverted)) { automation in
                     NavigationLink(destination: {
-                        AutomationView(client: client, automation: automation)
+                        AutomationView(
+                            client: client,
+                            automationStore: automationStore,
+                            automationId: automation.id,
+                            onDataUpdate: { await updateData() }
+                        )
                     }, label: {
                         view(for: automation)
                     })
@@ -127,9 +137,10 @@ struct ContentView: View {
         await appState.fetchWindowState()
         #endif
         do {
-            self.automations = try await client.getAutomations()
+            let fetchedAutomations = try await client.getAutomations()
+            automationStore.updateAll(fetchedAutomations)
         } catch {
-            self.automations = []
+            automationStore.updateAll([])
         }
     }
 

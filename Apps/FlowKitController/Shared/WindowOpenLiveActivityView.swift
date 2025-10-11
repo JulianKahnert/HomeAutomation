@@ -23,7 +23,7 @@ struct WindowOpenLiveActivityView: View {
                         Text(windowState.name)
                             .font(.body)
                             .lineLimit(1)
-                            .truncationMode(.tail)
+                            .truncationMode(.head)
                             .frame(width: geometry.size.width * 2 / 3 - 6, alignment: .leading)
                     }
                 }

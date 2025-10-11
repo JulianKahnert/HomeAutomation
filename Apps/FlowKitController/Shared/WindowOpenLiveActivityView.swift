@@ -14,10 +14,13 @@ struct WindowOpenLiveActivityView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ForEach(contentState.windowStates, id: \.hashValue) { windowState in
-                ProgressView(timerInterval: windowState.opened...windowState.end, countsDown: false) {
+                HStack(spacing: 12) {
+                    ProgressView(timerInterval: windowState.opened...windowState.end, countsDown: false)
+                        .tint(Date() <= windowState.end ? Color.accentColor : Color.red)
+
                     Text(windowState.name)
+                        .font(.body)
                 }
-                    .tint(Date() <= windowState.end ? Color.accentColor : Color.red)
             }
         }
         .padding()

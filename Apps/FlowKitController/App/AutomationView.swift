@@ -9,7 +9,8 @@ import SwiftUI
 
 struct AutomationView: View {
     let client: FlowKitClient!
-    let automation: Automation
+    @State var automation: Automation
+    @State var isLoading = false
 
     var body: some View {
         Form {
@@ -26,10 +27,15 @@ struct AutomationView: View {
                     automation.isActive
                 }, set: { value in
                     guard value != automation.isActive else { return }
-                    Task {
+                    Task.detached {
                         await toggleActive(value, automationName: automation.name)
                     }
                 }))
+                .disabled(isLoading)
+                .overlay {
+                    ProgressView()
+                        .opacity(isLoading ? 1 : 0)
+                }
             }
 
             Section {
@@ -43,15 +49,28 @@ struct AutomationView: View {
         .navigationTitle(automation.name)
     }
 
+    @concurrent
     func toggleActive(_ value: Bool, automationName: String) async {
+        await MainActor.run {
+            isLoading = true
+        }
         do {
             if value {
                 try await client.activate(automation: automationName)
             } else {
                 try await client.deactivate(automation: automationName)
             }
+            
+            await MainActor.run {
+                automation.isActive = value
+            }
         } catch {
             assertionFailure()
+        }
+        
+        try! await Task.sleep(for: .seconds(1))
+        await MainActor.run {
+            isLoading = false
         }
     }
 }

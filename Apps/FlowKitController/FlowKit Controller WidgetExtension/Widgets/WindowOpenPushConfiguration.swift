@@ -27,7 +27,7 @@ struct WindowOpenPushConfiguration: Widget {
                 Label("\(context.state.windowStates.count)", systemImage: "window.vertical.open")
                     .foregroundStyle(shouldClose ? Color.red : Color.primary)
             } compactTrailing: {
-                Text("")
+                EmptyView()
             } minimal: {
                 let shouldClose = context.state.windowStates.contains { Date() > $0.end }
                 Label("\(context.state.windowStates.count)", systemImage: "window.vertical.open")

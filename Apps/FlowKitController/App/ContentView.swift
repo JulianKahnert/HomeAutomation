@@ -5,7 +5,6 @@
 //  Created by Julian Kahnert on 22.02.25.
 //
 
-import Dependencies
 import HAModels
 import Logging
 import SwiftUI
@@ -30,7 +29,8 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showLiveActivityData = false
     @State private var client: FlowKitClient!
-    @Dependency(\.automationStore) var automationStore
+
+    @StateObject private var automationStore = AutomationStore.liveValue
 
     var body: some View {
         List {
@@ -39,7 +39,7 @@ struct ContentView: View {
                     NavigationLink(destination: {
                         AutomationView(
                             client: client,
-                            automationId: automation.id,
+                            automation: automation,
                             onDataUpdate: { await updateData() }
                         )
                     }, label: {
@@ -52,7 +52,7 @@ struct ContentView: View {
                     NavigationLink(destination: {
                         AutomationView(
                             client: client,
-                            automationId: automation.id,
+                            automation: automation,
                             onDataUpdate: { await updateData() }
                         )
                     }, label: {

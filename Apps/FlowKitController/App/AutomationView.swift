@@ -5,29 +5,14 @@
 //  Created by Julian Kahnert on 22.02.25.
 //
 
-import Dependencies
 import SwiftUI
 
 struct AutomationView: View {
     let client: FlowKitClient!
-    let automationId: String
+    let automation: Automation
     let onDataUpdate: () async -> Void
 
-    @Dependency(\.automationStore) var automationStore
-
-    private var automation: Automation? {
-        automationStore.automation(withId: automationId)
-    }
-
     var body: some View {
-        guard let automation else {
-            return AnyView(ContentUnavailableView("Automation not found", systemImage: "exclamationmark.triangle"))
-        }
-        return AnyView(content(for: automation))
-    }
-
-    @ViewBuilder
-    private func content(for automation: Automation) -> some View {
         Form {
             Section {
                 HStack {

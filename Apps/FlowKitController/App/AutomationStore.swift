@@ -1,17 +1,9 @@
-//
-//  AutomationStore.swift
-//  FlowKit Controller
-//
-//  Created by Claude Code on 11.10.25.
-//
-
+import Combine
 import Dependencies
 import Foundation
-import Observation
 
-@Observable
-final class AutomationStore {
-    var automations: [Automation] = []
+final class AutomationStore: ObservableObject {
+    @Published var automations: [Automation] = []
 
     func update(automation: Automation) {
         if let index = automations.firstIndex(where: { $0.id == automation.id }) {
@@ -27,8 +19,6 @@ final class AutomationStore {
         automations.first(where: { $0.id == id })
     }
 }
-
-// MARK: - Dependency
 
 extension AutomationStore: DependencyKey {
     static let liveValue = AutomationStore()

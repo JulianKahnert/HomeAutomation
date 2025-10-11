@@ -14,13 +14,20 @@ struct WindowOpenLiveActivityView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ForEach(contentState.windowStates, id: \.hashValue) { windowState in
-                HStack(spacing: 12) {
-                    ProgressView(timerInterval: windowState.opened...windowState.end, countsDown: false)
-                        .tint(Date() <= windowState.end ? Color.accentColor : Color.red)
+                GeometryReader { geometry in
+                    HStack(spacing: 12) {
+                        ProgressView(timerInterval: windowState.opened...windowState.end, countsDown: false)
+                            .tint(Date() <= windowState.end ? Color.accentColor : Color.red)
+                            .frame(width: geometry.size.width / 3 - 6)
 
-                    Text(windowState.name)
-                        .font(.body)
+                        Text(windowState.name)
+                            .font(.body)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(width: geometry.size.width * 2 / 3 - 6, alignment: .leading)
+                    }
                 }
+                .frame(height: 20)
             }
         }
         .padding()

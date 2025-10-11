@@ -5,13 +5,15 @@
 //  Created by Julian Kahnert on 22.02.25.
 //
 
+import Dependencies
 import SwiftUI
 
 struct AutomationView: View {
     let client: FlowKitClient!
-    @Bindable var automationStore: AutomationStore
     let automationId: String
     let onDataUpdate: () async -> Void
+
+    @Dependency(\.automationStore) var automationStore
 
     private var automation: Automation? {
         automationStore.automation(withId: automationId)

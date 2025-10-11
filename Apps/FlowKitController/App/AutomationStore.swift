@@ -5,6 +5,7 @@
 //  Created by Claude Code on 11.10.25.
 //
 
+import Dependencies
 import Foundation
 import Observation
 
@@ -24,5 +25,18 @@ final class AutomationStore {
 
     func automation(withId id: String) -> Automation? {
         automations.first(where: { $0.id == id })
+    }
+}
+
+// MARK: - Dependency
+
+extension AutomationStore: DependencyKey {
+    static let liveValue = AutomationStore()
+}
+
+extension DependencyValues {
+    var automationStore: AutomationStore {
+        get { self[AutomationStore.self] }
+        set { self[AutomationStore.self] = newValue }
     }
 }

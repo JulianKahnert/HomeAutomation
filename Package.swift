@@ -10,7 +10,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "HomeAutomationKit",
-            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer"]
+            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared"]
         )
     ],
     dependencies: [
@@ -39,6 +39,7 @@ let package = Package(
                 "HAModels",
                 "HAApplicationLayer",
                 "HAImplementations",
+                "Shared",
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentMySQLDriver", package: "fluent-mysql-driver"),
@@ -54,17 +55,23 @@ let package = Package(
             ]
         ),
         .target(
+            name: "Shared",
+            dependencies: []
+        ),
+        .target(
             name: "Adapter",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 "HAModels",
+                "Shared",
                 .product(name: "DistributedCluster", package: "swift-distributed-actors")
             ]
         ),
         .target(
             name: "HAModels",
             dependencies: [
-                .product(name: "Logging", package: "swift-log")
+                .product(name: "Logging", package: "swift-log"),
+                "Shared"
             ]
         ),
         .target(
@@ -79,7 +86,14 @@ let package = Package(
             name: "HAApplicationLayer",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
-                "HAModels"
+                "HAModels",
+                "Shared"
+            ]
+        ),
+        .testTarget(
+            name: "SharedTests",
+            dependencies: [
+                "Shared"
             ]
         ),
         .testTarget(

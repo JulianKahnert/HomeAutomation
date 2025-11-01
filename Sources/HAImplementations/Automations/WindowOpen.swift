@@ -7,6 +7,7 @@
 
 import Foundation
 import HAModels
+import Shared
 
 public struct WindowOpen: Automatable {
     public var isActive = true

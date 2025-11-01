@@ -9,24 +9,25 @@ import Foundation
 
 /// Generic cache with time-based expiration
 /// Based on: https://www.swiftbysundell.com/articles/caching-in-swift/
-final class Cache<Key: Hashable, Value> {
+public actor Cache<Key: Hashable & Sendable, Value: Sendable> {
     private let wrapped = NSCache<WrappedKey, Entry>()
-    private let dateProvider: () -> Date
+    private let dateProvider: @Sendable () -> Date
     private let entryLifetime: TimeInterval
 
-    init(dateProvider: @escaping () -> Date = Date.init,
-         entryLifetime: TimeInterval = 60) {
+    /// Convenience initializer that accepts Duration
+    public init(dateProvider: @escaping @Sendable () -> Date = Date.init,
+         entryLifetime: Duration) {
         self.dateProvider = dateProvider
-        self.entryLifetime = entryLifetime
+        self.entryLifetime = entryLifetime.timeInterval
     }
 
-    func insert(_ value: Value, forKey key: Key) {
+    public func insert(_ value: Value, forKey key: Key) {
         let date = dateProvider().addingTimeInterval(entryLifetime)
         let entry = Entry(key: key, value: value, expirationDate: date)
         wrapped.setObject(entry, forKey: WrappedKey(key))
     }
 
-    func value(forKey key: Key) -> Value? {
+    public func value(forKey key: Key) -> Value? {
         guard let entry = wrapped.object(forKey: WrappedKey(key)) else {
             return nil
         }
@@ -40,11 +41,11 @@ final class Cache<Key: Hashable, Value> {
         return entry.value
     }
 
-    func removeValue(forKey key: Key) {
+    public func removeValue(forKey key: Key) {
         wrapped.removeObject(forKey: WrappedKey(key))
     }
 
-    subscript(key: Key) -> Value? {
+    public subscript(key: Key) -> Value? {
         get { return value(forKey: key) }
         set {
             guard let value = newValue else {

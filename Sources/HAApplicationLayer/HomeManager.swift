@@ -8,6 +8,7 @@
 import Foundation
 import HAModels
 import Logging
+import Shared
 
 @HomeManagerActor
 public final class HomeManager: HomeManagable {

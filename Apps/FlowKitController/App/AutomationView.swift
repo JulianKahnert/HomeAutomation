@@ -60,14 +60,14 @@ struct AutomationView: View {
             } else {
                 try await client.deactivate(automation: automationName)
             }
-            
+
             await MainActor.run {
                 automation.isActive = value
             }
         } catch {
             assertionFailure()
         }
-        
+
         try! await Task.sleep(for: .seconds(1))
         await MainActor.run {
             isLoading = false

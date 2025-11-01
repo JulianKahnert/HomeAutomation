@@ -22,6 +22,7 @@ import Foundation
 import HAModels
 import HomeKit
 import Logging
+import Shared
 
 public final class HomeKitAdapter: HomeKitAdapterable {
     private let log = Logger(label: "HomeKitAdapter")
@@ -30,7 +31,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
 
     public init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
         self.homeKitHomeManager = HomeKitHomeManager(entityStream: entityStream, entityStreamContinuation: entityStreamContinuation)
-        self.commandCache = Cache(entryLifetime: 60) // 1 minute deduplication window
+        self.commandCache = Cache(entryLifetime: .minutes(1)) // 1 minute deduplication window
     }
 
     public  func getAllEntitiesLive() async -> [EntityStorageItem] {
@@ -63,13 +64,13 @@ public final class HomeKitAdapter: HomeKitAdapterable {
 
     public func perform(_ action: HomeManagableAction) async throws {
         // Check if this is a duplicate command within the deduplication window
-        if let _ = commandCache.value(forKey: action) {
+        if let _ = await commandCache.value(forKey: action) {
             log.info("Skipping duplicate command: [\(action)]")
             return
         }
 
         // Mark command as executed
-        commandCache.insert(Date(), forKey: action)
+        await commandCache.insert(Date(), forKey: action)
 
         let characteristics = await getCharacteristics()
         let filteredCharacteristics = characteristics.filter({ $0.entityId == action.entityId })

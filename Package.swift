@@ -86,6 +86,7 @@ let package = Package(
             name: "HomeAutomationKitTests",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
+                "Adapter",
                 "HAModels",
                 "HAImplementations",
                 "HAApplicationLayer"

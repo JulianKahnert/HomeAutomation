@@ -16,11 +16,9 @@ final class Cache<Key: Hashable, Value> {
     private let keyTracker = KeyTracker()
 
     init(dateProvider: @escaping () -> Date = Date.init,
-         entryLifetime: TimeInterval = 60,
-         maximumEntryCount: Int = 50) {
+         entryLifetime: TimeInterval = 60) {
         self.dateProvider = dateProvider
         self.entryLifetime = entryLifetime
-        wrapped.countLimit = maximumEntryCount
         wrapped.delegate = keyTracker
     }
 

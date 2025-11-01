@@ -12,18 +12,23 @@ import Foundation
 public actor Cache<Key: Hashable & Sendable, Value: Sendable> {
     private let wrapped = NSCache<WrappedKey, Entry>()
     private let dateProvider: @Sendable () -> Date
-    private let entryLifetime: TimeInterval
+    private let entryLifetime: TimeInterval?
 
     /// Convenience initializer that accepts Duration
     public init(dateProvider: @escaping @Sendable () -> Date = Date.init,
-         entryLifetime: Duration) {
+         entryLifetime: Duration? = nil) {
         self.dateProvider = dateProvider
-        self.entryLifetime = entryLifetime.timeInterval
+        self.entryLifetime = entryLifetime?.timeInterval
     }
 
     public func insert(_ value: Value, forKey key: Key) {
-        let date = dateProvider().addingTimeInterval(entryLifetime)
-        let entry = Entry(key: key, value: value, expirationDate: date)
+        let entry: Entry
+        if let entryLifetime = entryLifetime {
+            let date = dateProvider().addingTimeInterval(entryLifetime)
+            entry = Entry(key: key, value: value, expirationDate: date)
+        } else {
+            entry = Entry(key: key, value: value, expirationDate: nil)
+        }
         wrapped.setObject(entry, forKey: WrappedKey(key))
     }
 
@@ -31,14 +36,18 @@ public actor Cache<Key: Hashable & Sendable, Value: Sendable> {
         guard let entry = wrapped.object(forKey: WrappedKey(key)) else {
             return nil
         }
-
-        guard dateProvider() < entry.expirationDate else {
-            // Discard values that have expired
-            removeValue(forKey: key)
-            return nil
+        
+        if let expirationDate = entry.expirationDate {
+            if dateProvider() < expirationDate {
+                return entry.value
+            } else {
+                // Discard values that have expired
+                removeValue(forKey: key)
+                return nil
+            }
+        } else {
+            return entry.value
         }
-
-        return entry.value
     }
 
     public func removeValue(forKey key: Key) {
@@ -84,9 +93,9 @@ private extension Cache {
     final class Entry {
         let key: Key
         let value: Value
-        let expirationDate: Date
+        let expirationDate: Date?
 
-        init(key: Key, value: Value, expirationDate: Date) {
+        init(key: Key, value: Value, expirationDate: Date?) {
             self.key = key
             self.value = value
             self.expirationDate = expirationDate

@@ -70,7 +70,7 @@ struct CacheTests {
 
         let cache = Cache<String, String>(
             dateProvider: dateProvider,
-            entryLifetime: 60 // 60 seconds
+            entryLifetime: .seconds(60)
         )
 
         await cache.insert("fresh", forKey: "data")
@@ -127,7 +127,7 @@ struct CacheTests {
 
         let cache = Cache<String, String>(
             dateProvider: dateProvider,
-            entryLifetime: 120 // 2 minutes
+            entryLifetime: .minutes(2)
         )
 
         await cache.insert("data", forKey: "key")

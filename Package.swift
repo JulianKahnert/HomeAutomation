@@ -56,12 +56,13 @@ let package = Package(
         ),
         .target(
             name: "Shared",
-            dependencies: []
+            dependencies: [
+                .product(name: "Logging", package: "swift-log"),
+            ]
         ),
         .target(
             name: "Adapter",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"),
                 "HAModels",
                 "Shared",
                 .product(name: "DistributedCluster", package: "swift-distributed-actors")
@@ -70,7 +71,6 @@ let package = Package(
         .target(
             name: "HAModels",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"),
                 "Shared"
             ]
         ),
@@ -85,7 +85,6 @@ let package = Package(
         .target(
             name: "HAApplicationLayer",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"),
                 "HAModels",
                 "Shared"
             ]

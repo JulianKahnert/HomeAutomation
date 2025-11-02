@@ -4,16 +4,7 @@ on:
   pull_request:
 
 jobs:
-  SwiftLint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: GitHub Action for SwiftLint (Only files changed in the PR)
-        uses: stanfordbdhg/action-swiftlint@v4
-        env:
-          DIFF_BASE: ${{ github.base_ref }}
-
-  Build:
+  PR-Checks:
     runs-on: macos-15
     permissions:
       contents: write
@@ -29,6 +20,12 @@ jobs:
         uses: JulianKahnert/setup-swift@patch-1
         with:
           swift-version: "6.2"
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint
 
       - name: Build
         run: swift build

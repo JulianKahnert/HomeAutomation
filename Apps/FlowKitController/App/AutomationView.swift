@@ -64,7 +64,7 @@ struct AutomationView: View {
             } else {
                 try await client.deactivate(automation: automationName)
             }
-            
+
             await MainActor.run {
                 automation.isActive = value
             }

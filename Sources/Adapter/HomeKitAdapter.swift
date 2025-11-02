@@ -101,7 +101,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         if let cachedAction = await commandCache.value(forKey: cacheKey) {
             // Compare the cached action with the current action
             // If they are the same (including values), skip execution
-            if areActionsEqual(cachedAction, action) {
+            if cachedAction == action {
                 log.info("Skipping duplicate command: [\(action)]")
                 return
             }
@@ -226,45 +226,6 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             .flatMap(\.characteristics)
             .filter(\.isReadable)
             .sorted()
-    }
-
-    /// Compare two actions for equality including their values
-    private func areActionsEqual(_ lhs: HomeManagableAction, _ rhs: HomeManagableAction) -> Bool {
-        switch (lhs, rhs) {
-        case (.turnOn(let id1), .turnOn(let id2)):
-            return id1 == id2
-        case (.turnOff(let id1), .turnOff(let id2)):
-            return id1 == id2
-        case (.setBrightness(let id1, let val1), .setBrightness(let id2, let val2)):
-            return id1 == id2 && val1 == val2
-        case (.setColorTemperature(let id1, let val1), .setColorTemperature(let id2, let val2)):
-            return id1 == id2 && val1 == val2
-        case (.setRGB(let id1, let rgb1), .setRGB(let id2, let rgb2)):
-            return id1 == id2 && rgb1.red == rgb2.red && rgb1.green == rgb2.green && rgb1.blue == rgb2.blue
-        case (.lockDoor(let id1), .lockDoor(let id2)):
-            return id1 == id2
-        case (.addEntityToScene(let id1, let scene1, let action1), .addEntityToScene(let id2, let scene2, let action2)):
-            return id1 == id2 && scene1 == scene2 && areSceneActionsEqual(action1, action2)
-        case (.setHeating(let id1, let active1), .setHeating(let id2, let active2)):
-            return id1 == id2 && active1 == active2
-        case (.setValve(let id1, let active1), .setValve(let id2, let active2)):
-            return id1 == id2 && active1 == active2
-        default:
-            return false
-        }
-    }
-
-    private func areSceneActionsEqual(_ lhs: HomeManagableAction.SceneEntityAction, _ rhs: HomeManagableAction.SceneEntityAction) -> Bool {
-        switch (lhs, rhs) {
-        case (.lockDoor, .lockDoor):
-            return true
-        case (.on, .on):
-            return true
-        case (.off, .off):
-            return true
-        default:
-            return false
-        }
     }
 }
 

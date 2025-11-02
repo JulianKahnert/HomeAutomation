@@ -89,4 +89,27 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equ
             return entityId
         }
     }
+
+    public var actionName: String {
+        switch self {
+        case .turnOn:
+            return "turnOn"
+        case .turnOff:
+            return "turnOff"
+        case .setBrightness:
+            return "setBrightness"
+        case .setColorTemperature:
+            return "setColorTemperature"
+        case .setRGB:
+            return "setRGB"
+        case .lockDoor:
+            return "lockDoor"
+        case .addEntityToScene:
+            return "addEntityToScene"
+        case .setHeating:
+            return "setHeating"
+        case .setValve:
+            return "setValve"
+        }
+    }
 }

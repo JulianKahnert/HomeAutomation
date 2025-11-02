@@ -24,43 +24,10 @@ import HomeKit
 import Logging
 import Shared
 
-/// Cache key for deduplicating HomeKit commands
-/// Only uses entity ID and action type (NOT the value) to allow
-/// different values to update the same cache entry
-struct CommandCacheKey: Hashable, Sendable {
-    let entityId: EntityId
-    let actionType: String
-
-    init(from action: HomeManagableAction) {
-        self.entityId = action.entityId
-
-        switch action {
-        case .turnOn:
-            self.actionType = "turnOn"
-        case .turnOff:
-            self.actionType = "turnOff"
-        case .setBrightness:
-            self.actionType = "setBrightness"
-        case .setColorTemperature:
-            self.actionType = "setColorTemperature"
-        case .setRGB:
-            self.actionType = "setRGB"
-        case .lockDoor:
-            self.actionType = "lockDoor"
-        case .addEntityToScene:
-            self.actionType = "addEntityToScene"
-        case .setHeating:
-            self.actionType = "setHeating"
-        case .setValve:
-            self.actionType = "setValve"
-        }
-    }
-}
-
 public final class HomeKitAdapter: HomeKitAdapterable {
     private let log = Logger(label: "HomeKitAdapter")
     private let homeKitHomeManager: HomeKitHomeManager
-    private let commandCache: Cache<CommandCacheKey, HomeManagableAction>
+    private let commandCache: Cache<String, HomeManagableAction>
 
     public init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
         self.homeKitHomeManager = HomeKitHomeManager(entityStream: entityStream, entityStreamContinuation: entityStreamContinuation)
@@ -97,7 +64,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
 
     public func perform(_ action: HomeManagableAction) async throws {
         // Check if this is a duplicate command within the deduplication window
-        let cacheKey = CommandCacheKey(from: action)
+        let cacheKey = "\(action.entityId)-\(action.actionName)"
         if let cachedAction = await commandCache.value(forKey: cacheKey) {
             // Compare the cached action with the current action
             // If they are the same (including values), skip execution

@@ -5,6 +5,8 @@
 //  Created by Julian Kahnert on 28.07.24.
 //
 
+// swiftlint:disable identifier_name
+
 import Foundation
 
 public struct RGB: Sendable, Codable {

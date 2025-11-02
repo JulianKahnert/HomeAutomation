@@ -144,4 +144,64 @@ struct CacheTests {
         holder.currentDate = holder.currentDate.addingTimeInterval(2)
         #expect(await cache.value(forKey: "key") == nil)
     }
+
+    @Test("Values never expire when entryLifetime is not set")
+    func noExpiry() async {
+        final class DateHolder: @unchecked Sendable {
+            var currentDate = Date()
+        }
+        let holder = DateHolder()
+        let dateProvider: @Sendable () -> Date = { holder.currentDate }
+
+        // Create cache without entryLifetime
+        let cache = Cache<String, String>(
+            dateProvider: dateProvider,
+            entryLifetime: nil
+        )
+
+        await cache.insert("persistent", forKey: "data")
+
+        // Should exist immediately
+        #expect(await cache.value(forKey: "data") == "persistent")
+
+        // Should still exist after 1 hour
+        holder.currentDate = holder.currentDate.addingTimeInterval(3600)
+        #expect(await cache.value(forKey: "data") == "persistent")
+
+        // Should still exist after 1 day
+        holder.currentDate = holder.currentDate.addingTimeInterval(86400)
+        #expect(await cache.value(forKey: "data") == "persistent")
+
+        // Should still exist after 1 year
+        holder.currentDate = holder.currentDate.addingTimeInterval(365 * 86400)
+        #expect(await cache.value(forKey: "data") == "persistent")
+    }
+
+    @Test("Values expire when entryLifetime is set")
+    func withExpiry() async {
+        final class DateHolder: @unchecked Sendable {
+            var currentDate = Date()
+        }
+        let holder = DateHolder()
+        let dateProvider: @Sendable () -> Date = { holder.currentDate }
+
+        // Create cache with 5 minute lifetime
+        let cache = Cache<String, String>(
+            dateProvider: dateProvider,
+            entryLifetime: .minutes(5)
+        )
+
+        await cache.insert("temporary", forKey: "data")
+
+        // Should exist immediately
+        #expect(await cache.value(forKey: "data") == "temporary")
+
+        // Should still exist after 4 minutes
+        holder.currentDate = holder.currentDate.addingTimeInterval(240)
+        #expect(await cache.value(forKey: "data") == "temporary")
+
+        // Should be expired after 5 minutes 1 second
+        holder.currentDate = holder.currentDate.addingTimeInterval(61)
+        #expect(await cache.value(forKey: "data") == nil)
+    }
 }

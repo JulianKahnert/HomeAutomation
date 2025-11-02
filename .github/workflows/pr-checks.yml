@@ -1,0 +1,28 @@
+name: Run PR Checks
+
+on:
+  pull_request:
+
+jobs:
+  PR-Checks:
+    runs-on: macos-15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Swift
+        uses: JulianKahnert/setup-swift@patch-1
+        with:
+          swift-version: "6.2"
+
+      - name: Build
+        run: swift build
+
+      - name: Run Tests
+        run: swift test

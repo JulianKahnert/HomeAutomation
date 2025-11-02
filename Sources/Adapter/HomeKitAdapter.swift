@@ -24,10 +24,43 @@ import HomeKit
 import Logging
 import Shared
 
+/// Cache key for deduplicating HomeKit commands
+/// Only uses entity ID and action type (NOT the value) to allow
+/// different values to update the same cache entry
+struct CommandCacheKey: Hashable, Sendable {
+    let entityId: EntityId
+    let actionType: String
+
+    init(from action: HomeManagableAction) {
+        self.entityId = action.entityId
+
+        switch action {
+        case .turnOn:
+            self.actionType = "turnOn"
+        case .turnOff:
+            self.actionType = "turnOff"
+        case .setBrightness:
+            self.actionType = "setBrightness"
+        case .setColorTemperature:
+            self.actionType = "setColorTemperature"
+        case .setRGB:
+            self.actionType = "setRGB"
+        case .lockDoor:
+            self.actionType = "lockDoor"
+        case .addEntityToScene:
+            self.actionType = "addEntityToScene"
+        case .setHeating:
+            self.actionType = "setHeating"
+        case .setValve:
+            self.actionType = "setValve"
+        }
+    }
+}
+
 public final class HomeKitAdapter: HomeKitAdapterable {
     private let log = Logger(label: "HomeKitAdapter")
     private let homeKitHomeManager: HomeKitHomeManager
-    private let commandCache: Cache<HomeManagableAction, Date>
+    private let commandCache: Cache<CommandCacheKey, HomeManagableAction>
 
     public init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
         self.homeKitHomeManager = HomeKitHomeManager(entityStream: entityStream, entityStreamContinuation: entityStreamContinuation)
@@ -64,13 +97,20 @@ public final class HomeKitAdapter: HomeKitAdapterable {
 
     public func perform(_ action: HomeManagableAction) async throws {
         // Check if this is a duplicate command within the deduplication window
-        if let _ = await commandCache.value(forKey: action) {
-            log.info("Skipping duplicate command: [\(action)]")
-            return
+        let cacheKey = CommandCacheKey(from: action)
+        if let cachedAction = await commandCache.value(forKey: cacheKey) {
+            // Compare the cached action with the current action
+            // If they are the same (including values), skip execution
+            if areActionsEqual(cachedAction, action) {
+                log.info("Skipping duplicate command: [\(action)]")
+                return
+            }
+            // Different value - update cache and execute
+            log.debug("Same action type but different value, executing: [\(action)]")
         }
 
         // Mark command as executed
-        await commandCache.insert(Date(), forKey: action)
+        await commandCache.insert(action, forKey: cacheKey)
 
         let characteristics = await getCharacteristics()
         let filteredCharacteristics = characteristics.filter({ $0.entityId == action.entityId })
@@ -186,6 +226,45 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             .flatMap(\.characteristics)
             .filter(\.isReadable)
             .sorted()
+    }
+
+    /// Compare two actions for equality including their values
+    private func areActionsEqual(_ lhs: HomeManagableAction, _ rhs: HomeManagableAction) -> Bool {
+        switch (lhs, rhs) {
+        case (.turnOn(let id1), .turnOn(let id2)):
+            return id1 == id2
+        case (.turnOff(let id1), .turnOff(let id2)):
+            return id1 == id2
+        case (.setBrightness(let id1, let val1), .setBrightness(let id2, let val2)):
+            return id1 == id2 && val1 == val2
+        case (.setColorTemperature(let id1, let val1), .setColorTemperature(let id2, let val2)):
+            return id1 == id2 && val1 == val2
+        case (.setRGB(let id1, let rgb1), .setRGB(let id2, let rgb2)):
+            return id1 == id2 && rgb1.red == rgb2.red && rgb1.green == rgb2.green && rgb1.blue == rgb2.blue
+        case (.lockDoor(let id1), .lockDoor(let id2)):
+            return id1 == id2
+        case (.addEntityToScene(let id1, let scene1, let action1), .addEntityToScene(let id2, let scene2, let action2)):
+            return id1 == id2 && scene1 == scene2 && areSceneActionsEqual(action1, action2)
+        case (.setHeating(let id1, let active1), .setHeating(let id2, let active2)):
+            return id1 == id2 && active1 == active2
+        case (.setValve(let id1, let active1), .setValve(let id2, let active2)):
+            return id1 == id2 && active1 == active2
+        default:
+            return false
+        }
+    }
+
+    private func areSceneActionsEqual(_ lhs: HomeManagableAction.SceneEntityAction, _ rhs: HomeManagableAction.SceneEntityAction) -> Bool {
+        switch (lhs, rhs) {
+        case (.lockDoor, .lockDoor):
+            return true
+        case (.on, .on):
+            return true
+        case (.off, .off):
+            return true
+        default:
+            return false
+        }
     }
 }
 

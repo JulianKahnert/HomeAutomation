@@ -28,8 +28,8 @@ public protocol HomeManagable: Sendable {
     func getWindowStates() async -> [WindowOpenState]
 }
 
-public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Hashable, Equatable {
-    public enum SceneEntityAction: Sendable, Codable, Hashable, Equatable {
+public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable {
+    public enum SceneEntityAction: Sendable, Codable {
         case lockDoor
         case on
         case off

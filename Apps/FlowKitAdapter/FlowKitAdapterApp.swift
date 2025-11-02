@@ -53,7 +53,7 @@ struct FlowKitAdapter: App {
                 // do not start run loop when running in preview canvas
                 guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
 
-                try! await Task.sleep(for: .seconds(1))
+                try? await Task.sleep(for: .seconds(1))
                 let actorSystem = await CustomActorSystem(nodeId: .homeKitAdapter, port: 7777)
 
                 let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(
@@ -68,7 +68,11 @@ struct FlowKitAdapter: App {
                 _ = await actorSystem.checkIn(actorId: .homeKitCommandReceiver, commandReceiver)
 
                 if shouldCrashIfActorSystemInitFails {
-                    try! await actorSystem.waitForThisNode(is: .up, within: .seconds(10))
+                    do {
+                        try await actorSystem.waitForThisNode(is: .up, within: .seconds(10))
+                    } catch {
+                        fatalError("Actor system initialization failed: \(error)")
+                    }
                 }
 
                 var receiver: HomeEventReceiver?

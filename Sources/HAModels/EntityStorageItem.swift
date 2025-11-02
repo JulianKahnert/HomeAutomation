@@ -30,7 +30,11 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     public var description: String {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        return String(data: try! encoder.encode(self), encoding: .utf8)!
+        guard let data = try? encoder.encode(self),
+              let string = String(data: data, encoding: .utf8) else {
+            return "EntityStorageItem(entityId: \(entityId))"
+        }
+        return string
     }
 
     public init(entityId: EntityId) {

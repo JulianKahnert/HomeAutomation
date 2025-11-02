@@ -41,7 +41,11 @@ struct AutomationView: View {
             Section {
                 Button("Stop Automation") {
                     Task {
-                        try! await client.stop(automation: automation.name)
+                        do {
+                            try await client.stop(automation: automation.name)
+                        } catch {
+                            print("Failed to stop automation: \(error)")
+                        }
                     }
                 }
             }
@@ -67,7 +71,8 @@ struct AutomationView: View {
         } catch {
             assertionFailure()
         }
-        
+
+        // swiftlint:disable:next force_try
         try! await Task.sleep(for: .seconds(1))
         await MainActor.run {
             isLoading = false

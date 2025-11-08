@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Shared
 
 open class MotionSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
 

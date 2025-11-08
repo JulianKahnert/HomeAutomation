@@ -11,6 +11,7 @@ public protocol Log {
     var log: Logger { get }
     static var log: Logger { get }
 }
+
 public extension Log {
     static var log: Logger {
         Logger(label: String(describing: Self.self))

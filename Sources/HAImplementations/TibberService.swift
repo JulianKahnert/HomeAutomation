@@ -8,6 +8,7 @@
 import Foundation
 import HAModels
 import Logging
+import Shared
 import TibberSwift
 
 public actor TibberService: Log {

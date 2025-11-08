@@ -12,6 +12,9 @@ public extension Duration {
         return Double(components.seconds)
     }
 
+    static func milliseconds(_ milliseconds: Int64) -> Duration {
+        return .seconds(Double(milliseconds) / 1000.0)
+    }
     static func minutes<T>(_ minutes: T) -> Duration where T: BinaryInteger {
         return .seconds(minutes * 60)
     }

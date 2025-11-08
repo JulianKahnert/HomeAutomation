@@ -9,6 +9,7 @@ import Foundation
 import HAImplementations
 import HAModels
 import Logging
+import Shared
 
 actor HomeAutomationConfigService: Log {
     static let url = URL(fileURLWithPath: "/tmp/HomeAutomation-config.json")

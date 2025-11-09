@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Shared
 
 open class ContactSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
     public let contactSensorId: EntityId

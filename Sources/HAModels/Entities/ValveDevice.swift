@@ -5,6 +5,8 @@
 //  Created by Julian Kahnert on 13.02.25.
 //
 
+import Shared
+
 open class ValveDevice: Codable, @unchecked Sendable, Validatable, Log {
     public let valveId: EntityId
 

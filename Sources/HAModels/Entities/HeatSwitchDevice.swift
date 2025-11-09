@@ -5,6 +5,8 @@
 //  Created by Julian Kahnert on 13.02.25.
 //
 
+import Shared
+
 open class HeatSwitchDevice: Codable, @unchecked Sendable, Validatable, Log {
     public let heatSwitchId: EntityId
 

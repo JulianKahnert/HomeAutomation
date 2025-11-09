@@ -8,6 +8,7 @@
 import Foundation
 import HAModels
 import Logging
+import Shared
 
 struct ClockJob: Job, Log {
     let location: Location

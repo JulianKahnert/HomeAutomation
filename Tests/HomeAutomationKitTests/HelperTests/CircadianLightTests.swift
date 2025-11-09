@@ -36,6 +36,9 @@ struct CircadianTests {
 
     @Test("Test case for when the date is during the night (between sunset and sunrise)", .tags(.localOnly))
     func testCircadianPercentage_Nighttime() {
+        setenv("TZ", "Europe/Berlin", 1)
+        CFTimeZoneResetSystem()
+
         let date = self.date(year: 2023, month: 7, day: 25, hour: 2, minute: 0) // During night
 
         let sunData = getSunData(for: date)

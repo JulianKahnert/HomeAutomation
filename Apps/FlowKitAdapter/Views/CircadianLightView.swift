@@ -50,7 +50,6 @@ public struct CircadianLightView: View {
     }
 }
 
-// swiftlint:disable:next force_try
 #Preview("Date View", traits: .fixedLayout(width: 500, height: 1200)) {
     // swiftlint:disable force_try
     CircadianLightView(date: try! Date("2025-01-01T12:00:00+02:00", strategy: .iso8601))

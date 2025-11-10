@@ -46,13 +46,17 @@ extension FileLogHandler {
 
             if !FileManager.default.fileExists(atPath: url.path) {
                 guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: nil) else {
-                    fatalError()
+                    fatalError("Failed to create log file at \(url.path)")
                 }
             }
 
-            let fileHandle = try! FileHandle(forWritingTo: url)
-            fileHandle.seekToEndOfFile()
-            return fileHandle
+            do {
+                let fileHandle = try FileHandle(forWritingTo: url)
+                fileHandle.seekToEndOfFile()
+                return fileHandle
+            } catch {
+                fatalError("Failed to open log file at \(url.path): \(error)")
+            }
         }
     }
 }

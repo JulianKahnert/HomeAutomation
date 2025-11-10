@@ -21,6 +21,12 @@ jobs:
         with:
           swift-version: "6.2"
 
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint
+
       - name: Build
         run: swift build
 

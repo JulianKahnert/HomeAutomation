@@ -31,7 +31,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
 
     public init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
         self.homeKitHomeManager = HomeKitHomeManager(entityStream: entityStream, entityStreamContinuation: entityStreamContinuation)
-        self.commandCache = Cache(entryLifetime: .minutes(5)) // 5 minute deduplication window
+        self.commandCache = Cache(entryLifetime: .minutes(2)) // 2 minute deduplication window
     }
 
     public  func getAllEntitiesLive() async -> [EntityStorageItem] {

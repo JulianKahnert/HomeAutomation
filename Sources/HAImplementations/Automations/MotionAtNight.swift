@@ -89,19 +89,20 @@ public struct MotionAtNight: Automatable {
         if !isWindowOpen {
 
             log.debug("Adjusting lights")
-            // we set the color temperature, brightness and power state values seperatly so the correct temperature/brightness is already set when the turn on
+            // We reduce the number of invocations/calls to the device to avoid flickering of it.
+            // Note: setting color temperature will also turn on the device
             for light in lights {
-                await light.setColorTemperature(to: colorTemperatureValue, with: hm)
+                if light.colorTemperatureId != nil {
+                    await light.setColorTemperature(to: colorTemperatureValue, with: hm)
+                } else {
+                    await light.turnOn(with: hm)
+                }
             }
-            await Task.yield()
+
+            try? await Task.sleep(for: .milliseconds(300))
 
             for light in lights {
                 await light.setBrightness(to: brightnessValue, with: hm)
-            }
-            await Task.yield()
-
-            for light in lights {
-                await light.turnOn(with: hm)
             }
 
             // wait for x seconds or until this task wil be suspended

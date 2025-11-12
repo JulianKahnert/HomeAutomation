@@ -12,6 +12,9 @@ public extension Duration {
         return Double(components.seconds)
     }
 
+    static func milliseconds(_ milliseconds: Int64) -> Duration {
+        return .seconds(Double(milliseconds) / 1000.0)
+    }
     static func minutes<T>(_ minutes: T) -> Duration where T: BinaryInteger {
         return .seconds(minutes * 60)
     }
@@ -23,5 +26,11 @@ public extension Duration {
     }
     static func hours(_ hours: Double) -> Duration {
         return .minutes(hours * 60.0)
+    }
+    static func days<T>(_ days: T) -> Duration where T: BinaryInteger {
+        return .hours(days * 24)
+    }
+    static func days(_ days: Double) -> Duration {
+        return .hours(days * 24.0)
     }
 }

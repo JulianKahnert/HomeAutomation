@@ -51,11 +51,13 @@ public struct CircadianLightView: View {
 }
 
 #Preview("Date View", traits: .fixedLayout(width: 500, height: 1200)) {
+    // swiftlint:disable force_try
     CircadianLightView(date: try! Date("2025-01-01T12:00:00+02:00", strategy: .iso8601))
     CircadianLightView(date: try! Date("2025-03-01T12:00:00+02:00", strategy: .iso8601))
     CircadianLightView(date: try! Date("2025-06-01T12:00:00+02:00", strategy: .iso8601))
     CircadianLightView(date: try! Date("2025-09-01T12:00:00+02:00", strategy: .iso8601))
     CircadianLightView(date: try! Date("2025-12-01T12:00:00+02:00", strategy: .iso8601))
+    // swiftlint:enable force_try
 }
 
 #Preview("Symmetric View", traits: .fixedLayout(width: 500, height: 300)) {

@@ -1,6 +1,6 @@
 import Adapter
 import APNS
-import APNSCore
+@preconcurrency import APNSCore
 import APNSURLSession
 import CoreFoundation
 import FluentMySQLDriver
@@ -30,10 +30,25 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - env parsing
 
-    let notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.HomeAutomation"
-    let notificationPrivateKey = String.fromBase64(Environment.get("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")!)!
-    let notificationKeyIdentifier = Environment.get("PUSH_NOTIFICATION_KEY_IDENTIFIER")!
-    let notificationTeamIdentifier = Environment.get("PUSH_NOTIFICATION_TEAM_IDENTIFIER")!
+    #if DEBUG
+    // Mock APNS Client for DEBUG builds
+    final class MockAPNSClient: APNSClientProtocol, Sendable {
+        private let logger: Logger
+
+        init(logger: Logger) {
+            self.logger = logger
+        }
+
+        func send(_ request: APNSRequest<some APNSMessage>) async throws -> APNSResponse {
+            logger.debug("📱 [MOCK APNS] Would send notification to device token")
+            return APNSResponse(apnsID: UUID(), apnsUniqueID: nil)
+        }
+
+        func shutdown() async throws {
+            logger.debug("🔕 [MOCK APNS] Shutdown called")
+        }
+    }
+    #endif
 
     // MARK: - database setup
 
@@ -55,9 +70,59 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - configure APNS
 
-    // Configure APNS using JWT authentication.
+    #if DEBUG
+    // Check if real APNS is requested in DEBUG builds
+    let useRealAPNS = Environment.get("ENABLE_APNS_DEBUG") == "true"
+
+    let apnsClient: any APNSClientProtocol & Sendable
+    let notificationTopic: String
+
+    if useRealAPNS {
+        app.logger.info("✅ Real APNS enabled in DEBUG via ENABLE_APNS_DEBUG=true")
+
+        // Real APNS configuration (same as release)
+        notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.HomeAutomation"
+        let notificationPrivateKey = String.fromBase64(Environment.get("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")!)!
+        let notificationKeyIdentifier = Environment.get("PUSH_NOTIFICATION_KEY_IDENTIFIER")!
+        let notificationTeamIdentifier = Environment.get("PUSH_NOTIFICATION_TEAM_IDENTIFIER")!
+
+        let apnsEnvironment: APNSEnvironment = app.environment == .production ? .production : .development
+        app.logger.info("Using apns url \(apnsEnvironment.absoluteURL)")
+
+        let apnsConfig = APNSClientConfiguration(
+            authenticationMethod: .jwt(
+                privateKey: try .loadFrom(string: notificationPrivateKey),
+                keyIdentifier: notificationKeyIdentifier,
+                teamIdentifier: notificationTeamIdentifier
+            ),
+            environment: apnsEnvironment
+        )
+
+        await app.apns.containers.use(
+            apnsConfig,
+            eventLoopGroupProvider: .shared(app.eventLoopGroup),
+            responseDecoder: JSONDecoder(),
+            requestEncoder: JSONEncoder(),
+            as: .default
+        )
+
+        apnsClient = await app.apns.client
+    } else {
+        app.logger.info("🔕 APNS disabled in DEBUG - using mock client (set ENABLE_APNS_DEBUG=true to enable)")
+        apnsClient = MockAPNSClient(logger: app.logger)
+        notificationTopic = "mock.topic"
+    }
+
+    #else
+    // RELEASE: Always use real APNS
+    let notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.HomeAutomation"
+    let notificationPrivateKey = String.fromBase64(Environment.get("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")!)!
+    let notificationKeyIdentifier = Environment.get("PUSH_NOTIFICATION_KEY_IDENTIFIER")!
+    let notificationTeamIdentifier = Environment.get("PUSH_NOTIFICATION_TEAM_IDENTIFIER")!
+
     let apnsEnvironment: APNSEnvironment = app.environment == .production ? .production : .development
     app.logger.info("Using apns url \(apnsEnvironment.absoluteURL)")
+
     let apnsConfig = APNSClientConfiguration(
         authenticationMethod: .jwt(
             privateKey: try .loadFrom(string: notificationPrivateKey),
@@ -75,6 +140,9 @@ public func configure(_ app: Application) async throws {
         as: .default
     )
 
+    let apnsClient = await app.apns.client
+    #endif
+
     // MARK: - actor system setup
 
     let actorSystem = await CustomActorSystem(nodeId: .server, port: 8888)
@@ -88,7 +156,7 @@ public func configure(_ app: Application) async throws {
 
     app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
     let notificationSender = await PushNotifcationService(database: app.db,
-                                                          apnsClient: app.apns.client,
+                                                          apnsClient: apnsClient,
                                                           notificationTopic: notificationTopic)
 
     let homeManager = await HomeManager(getAdapter: {
@@ -112,7 +180,8 @@ public func configure(_ app: Application) async throws {
                  homeEventsContinuation: app.homeEventsContinuation),
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
-                               homeManager: app.homeManager)
+                               homeManager: app.homeManager),
+        DatabaseCleanupJob(homeManager: app.homeManager)
     ]
 
     Task.detached {

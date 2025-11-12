@@ -8,6 +8,7 @@
 import HAApplicationLayer
 import HAModels
 import Logging
+import Shared
 
 struct HomeEventProcessingJob: Job, Log {
     let homeEventsStream: AsyncStream<HomeEvent>

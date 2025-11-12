@@ -5,12 +5,20 @@
 //  Created by Julian Kahnert on 28.07.24.
 //
 
+// swiftlint:disable identifier_name
+
 import Foundation
 
-public struct RGB: Sendable, Codable {
-    let red: Float
-    let green: Float
-    let blue: Float
+public struct RGB: Sendable, Codable, Equatable {
+    public let red: Float
+    public let green: Float
+    public let blue: Float
+
+    public init(red: Float, green: Float, blue: Float) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
 }
 
 public func componentsForColorTemperature(normalzied value: Float) -> RGB {

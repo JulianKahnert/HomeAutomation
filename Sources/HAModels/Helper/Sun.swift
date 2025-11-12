@@ -29,6 +29,8 @@
 //
 //  For more information, please refer to <http://unlicense.org/>
 
+// swiftlint:disable identifier_name
+
 import Foundation
 
 public struct SunPosition {

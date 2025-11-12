@@ -23,13 +23,14 @@ public protocol HomeManagable: Sendable {
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async
     func maintenance() async throws
+    func deleteStorageEntries(olderThan date: Date) async throws
     func getLocation() async -> Location
     func sendNotification(title: String, message: String) async
     func getWindowStates() async -> [WindowOpenState]
 }
 
-public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable {
-    public enum SceneEntityAction: Sendable, Codable {
+public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equatable {
+    public enum SceneEntityAction: Sendable, Codable, Equatable {
         case lockDoor
         case on
         case off
@@ -87,6 +88,29 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable {
             return entityId
         case .setValve(let entityId, _):
             return entityId
+        }
+    }
+
+    public var actionName: String {
+        switch self {
+        case .turnOn:
+            return "turnOn"
+        case .turnOff:
+            return "turnOff"
+        case .setBrightness:
+            return "setBrightness"
+        case .setColorTemperature:
+            return "setColorTemperature"
+        case .setRGB:
+            return "setRGB"
+        case .lockDoor:
+            return "lockDoor"
+        case .addEntityToScene:
+            return "addEntityToScene"
+        case .setHeating:
+            return "setHeating"
+        case .setValve:
+            return "setValve"
         }
     }
 }

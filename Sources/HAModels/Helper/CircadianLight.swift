@@ -5,6 +5,8 @@
 //  Created by Julian Kahnert on 25.07.24.
 //
 
+// swiftlint:disable identifier_name
+
 import Foundation
 
 public func getNormalizedBrightnessValue(sunData: SunData? = nil, current: Double? = nil) -> Float {

@@ -115,8 +115,25 @@ final class AppState {
             }
 
             // update lastActivity
-            if let activityViewState {
-                await lastActivity?.update(.init(state: activityViewState, staleDate: nil))
+            if let activityViewState,
+               !activityViewState.windowStates.isEmpty {
+
+                let activity: Activity<WindowAttributes>
+                if let lastActivity {
+                    activity = lastActivity
+                    await activity.update(.init(state: activityViewState, staleDate: nil))
+                } else {
+                    activity = try Activity<WindowAttributes>.request(
+                        attributes: WindowAttributes(),
+                        content: .init(state: activityViewState, staleDate: nil),
+                        pushType: .token
+                    )
+                }
+
+                if let newestPushToken = await activity.pushTokenUpdates.makeAsyncIterator().next() {
+                    await send(pushToken: newestPushToken, ofType: .liveActivityUpdate(activityName: String(describing: activity.self)))
+                }
+
             } else {
                 await lastActivity?.end(nil, dismissalPolicy: .immediate)
             }

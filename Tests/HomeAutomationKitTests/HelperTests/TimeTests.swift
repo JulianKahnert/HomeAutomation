@@ -36,6 +36,9 @@ struct TimeTests {
         (dateString: "2024-07-20T21:41:06+02:00", weekdays: [Time.Weekday.friday], result: false)
     ])
     func timeEqualityWithWeekday(arguments: (dateString: String, weekdays: [Time.Weekday], result: Bool)) throws {
+        setenv("TZ", "Europe/Berlin", 1)
+        CFTimeZoneResetSystem()
+
         let date = try Date(arguments.dateString, strategy: .iso8601)
         let event = HomeEvent.time(date: date)
 

@@ -5,6 +5,8 @@
 //  Created by Julian Kahnert on 06.03.25.
 //
 
+// swiftlint:disable type_name
+
 import SwiftUI
 import WidgetKit
 

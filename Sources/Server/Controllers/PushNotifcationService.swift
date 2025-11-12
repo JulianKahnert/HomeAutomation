@@ -15,10 +15,10 @@ actor PushNotifcationService: NotificationSender {
     private static let logger = Logger(label: "PushNotifcationService")
 
     let database: any Database
-    let apnsClient: APNSGenericClient
+    let apnsClient: any APNSClientProtocol & Sendable
     let notificationTopic: String
 
-    init(database: any Database, apnsClient: APNSGenericClient, notificationTopic: String) {
+    init(database: any Database, apnsClient: any APNSClientProtocol & Sendable, notificationTopic: String) {
         self.database = database
         self.apnsClient = apnsClient
         self.notificationTopic = notificationTopic

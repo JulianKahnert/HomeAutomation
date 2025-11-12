@@ -31,7 +31,7 @@ struct DatabaseCleanupJob: Job, Log {
 
     private func performCleanup() async {
         do {
-            let cutoffDate = Date().addingTimeInterval(-1 * Double(Self.retentionDays) * 24 * 60 * 60)
+            let cutoffDate = Date().addingTimeInterval(-1 * Duration.days(Self.retentionDays).timeInterval)
             log.info("Running database cleanup - deleting entries older than \(Self.retentionDays) days (before \(cutoffDate))")
 
             try await homeManager.deleteStorageEntries(olderThan: cutoffDate)

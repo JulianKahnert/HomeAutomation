@@ -180,7 +180,8 @@ public func configure(_ app: Application) async throws {
                  homeEventsContinuation: app.homeEventsContinuation),
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
-                               homeManager: app.homeManager)
+                               homeManager: app.homeManager),
+        DatabaseCleanupJob(homeManager: app.homeManager)
     ]
 
     Task.detached {

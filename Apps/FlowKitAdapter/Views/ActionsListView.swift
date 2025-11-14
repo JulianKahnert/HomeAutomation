@@ -42,11 +42,9 @@ struct ActionsListView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            .padding(.vertical, 4)
         }
         .searchable(
             text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
             prompt: "Search actions..."
         )
         .navigationTitle("Actions (\(filteredActions.count))")

@@ -18,24 +18,28 @@ struct ContentView: View {
     var body: some View {
         TabView {
             // Tab 1: Existing entities list
-            EntitiesListView(
-                shouldCrashIfActorSystemInitFails: $shouldCrashIfActorSystemInitFails,
-                entities: $entities,
-                serverAddress: $serverAddress,
-                showSettings: $showSettings
-            )
+            NavigationStack {
+                EntitiesListView(
+                    shouldCrashIfActorSystemInitFails: $shouldCrashIfActorSystemInitFails,
+                    entities: $entities,
+                    serverAddress: $serverAddress,
+                    showSettings: $showSettings
+                )
+                .navigationDestination(isPresented: $showSettings) {
+                    SettingsView(serverAddress: $serverAddress)
+                }
+            }
             .tabItem {
                 Label("Entities", systemImage: "list.bullet")
             }
 
             // Tab 2: New actions list
-            ActionsListView()
-                .tabItem {
-                    Label("Actions", systemImage: "bolt.fill")
-                }
-        }
-        .navigationDestination(isPresented: $showSettings) {
-            SettingsView(serverAddress: $serverAddress)
+            NavigationStack {
+                ActionsListView()
+            }
+            .tabItem {
+                Label("Actions", systemImage: "bolt.fill")
+            }
         }
     }
 }

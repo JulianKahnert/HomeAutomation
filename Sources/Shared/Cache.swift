@@ -36,7 +36,7 @@ public actor Cache<Key: Hashable & Sendable, Value: Sendable> {
         guard let entry = wrapped.object(forKey: WrappedKey(key)) else {
             return nil
         }
-        
+
         if let expirationDate = entry.expirationDate {
             if dateProvider() < expirationDate {
                 return entry.value

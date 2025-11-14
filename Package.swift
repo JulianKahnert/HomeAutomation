@@ -57,7 +57,7 @@ let package = Package(
         .target(
             name: "Shared",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"),
+                .product(name: "Logging", package: "swift-log")
             ]
         ),
         .target(

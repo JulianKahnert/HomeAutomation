@@ -12,8 +12,8 @@ import SwiftUI
 struct EntitiesListView: View {
     @Binding var shouldCrashIfActorSystemInitFails: Bool
     @Binding var entities: [EntityStorageItem]
-    @State private var showSettings = false
-    @AppStorage("ActorSystemServerAddress") private var serverAddress = CustomActorSystem.Address(host: "localhost", port: 8888)
+    @Binding var serverAddress: CustomActorSystem.Address
+    @Binding var showSettings: Bool
 
     var body: some View {
         List(entities.reversed(), id: \.self) { (item: EntityStorageItem) in
@@ -32,9 +32,6 @@ struct EntitiesListView: View {
                     .font(.subheadline)
             }
             .listRowBackground((item.stateOfCharge ?? 100) <= 5 ? Color.yellow.opacity(0.2) : nil)
-        }
-        .navigationDestination(isPresented: $showSettings) {
-            SettingsView(serverAddress: $serverAddress)
         }
         .navigationTitle(serverAddress.description)
         .navigationBarTitleDisplayMode(.inline)
@@ -130,5 +127,10 @@ struct EntitiesListView: View {
 }
 
 #Preview {
-    EntitiesListView(shouldCrashIfActorSystemInitFails: .constant(true), entities: .constant([]))
+    EntitiesListView(
+        shouldCrashIfActorSystemInitFails: .constant(true),
+        entities: .constant([]),
+        serverAddress: .constant(CustomActorSystem.Address(host: "localhost", port: 8888)),
+        showSettings: .constant(false)
+    )
 }

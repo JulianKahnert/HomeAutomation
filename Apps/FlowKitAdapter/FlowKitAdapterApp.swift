@@ -44,9 +44,7 @@ struct FlowKitAdapter: App {
 
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                ContentView(shouldCrashIfActorSystemInitFails: $shouldCrashIfActorSystemInitFails, entities: $entities)
-            }
+            ContentView(shouldCrashIfActorSystemInitFails: $shouldCrashIfActorSystemInitFails, entities: $entities)
             .task {
                 Self.log.info("runloop task called")
 

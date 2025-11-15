@@ -213,14 +213,41 @@ components:
           type: string
           format: date-time
           description: The ISO timestamp when the action was logged.
-        action:
-          type: object
-          description: The HomeManagableAction that was performed (serialized as JSON).
+        entityId:
+          $ref: "#/components/schemas/EntityId"
+        actionName:
+          type: string
+          description: The name of the action that was performed.
+        detailDescription:
+          type: string
+          description: A detailed description of the action.
         hasCacheHit:
           type: boolean
           description: Indicates if the action was a cache hit.
       required:
         - id
         - timestamp
-        - action
+        - entityId
+        - actionName
+        - detailDescription
         - hasCacheHit
+
+    EntityId:
+      type: object
+      properties:
+        placeId:
+          type: string
+          description: The identifier of the place.
+        name:
+          type: string
+          description: The name of the entity.
+        characteristicsName:
+          type: string
+          description: Optional name of the characteristic (may be empty).
+        characteristicType:
+          type: string
+          description: The type of characteristic.
+      required:
+        - placeId
+        - name
+        - characteristicType

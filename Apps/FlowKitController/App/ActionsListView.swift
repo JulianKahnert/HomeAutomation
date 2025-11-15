@@ -36,15 +36,13 @@ struct ActionsListView: View {
 
                 // Detailed action description with cache indicator
                 HStack(spacing: 4) {
-                    if item.hasCacheHit {
-                        Image(systemName: "arrow.clockwise.circle.fill")
-                            .foregroundColor(.blue)
-                            .accessibilityLabel("Cached")
-                    }
+                    Image(systemName: "internaldrive")
+                        .opacity(item.hasCacheHit ? 1 : 0)
                     Text(item.detailDescription)
                         .font(.body)
-                        .foregroundColor(item.hasCacheHit ? .blue : .green)
+
                 }
+                .foregroundColor(item.hasCacheHit ? Color.yellow : nil)
 
                 // Timestamp
                 Text(item.timestamp.formatted(date: .numeric, time: .standard))
@@ -145,7 +143,7 @@ struct ActionsListView: View {
             return """
             [\(item.timestamp.formatted(date: .numeric, time: .standard))] \(item.displayName)
             Action: \(item.detailDescription)
-            Entity: \(item.action.entityId)
+            Entity: \(item.entityId)
             Status: \(status)
 
             """

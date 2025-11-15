@@ -46,29 +46,6 @@ public actor ActionLogger {
         return result
     }
 
-    public func exportAsText() -> String {
-        let header = """
-        HomeKit Action Log
-        Exported: \(Date().formatted(date: .long, time: .standard))
-        Total Actions: \(actions.count)
-        =====================================
-
-        """
-
-        let entries = actions.map { item in
-            let status = item.hasCacheHit ? "✅ Cached" : "🆕 Fresh (no cache hit)"
-            return """
-            [\(item.timestamp.formatted(date: .numeric, time: .standard))] \(item.displayName)
-            Action: \(item.detailDescription)
-            Entity: \(item.action.entityId)
-            Status: \(status)
-
-            """
-        }.joined(separator: "\n")
-
-        return header + entries
-    }
-
     public func clear() {
         actions.removeAll()
     }

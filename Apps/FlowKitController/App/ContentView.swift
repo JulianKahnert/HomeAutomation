@@ -22,73 +22,40 @@ extension Bool {
 struct ContentView: View {
     private static let logger = Logger(label: "ContentView")
 
+    enum TabType {
+        case automations
+        case actions
+        case settings
+    }
+
     @AppStorage(FlowKitClient.userDefaultsKey) private var url = URL(string: "http://0.0.0.0:8080/")!
     @Environment(AppState.self) var appState
     @Environment(\.scenePhase) var scenePhase
 
-    @State private var showSettings = false
     @State private var showLiveActivityData = false
     @State private var client: FlowKitClient!
     @State private var automations: [Automation] = []
+    @State private var selectedTab: TabType = .automations
 
     var body: some View {
-        List {
-            Section {
-                ForEach(automations.filter(\.isRunning)) { automation in
-                    NavigationLink(destination: {
-                        AutomationView(client: client, automation: automation)
-                    }, label: {
-                        view(for: automation)
-                    })
+        TabView(selection: $selectedTab) {
+            Tab("Automations", systemImage: "gearshape.2", value: TabType.automations) {
+                automationsTab
+            }
+
+            Tab("Actions", systemImage: "list.bullet", value: TabType.actions) {
+                NavigationStack {
+                    ActionsListView(client: client ?? FlowKitClient(url: url))
                 }
             }
-            Section {
-                ForEach(automations.filter(\.isRunning.inverted)) { automation in
-                    NavigationLink(destination: {
-                        AutomationView(client: client, automation: automation)
-                    }, label: {
-                        view(for: automation)
-                    })
+
+            Tab("Settings", systemImage: "gear", value: TabType.settings) {
+                NavigationStack {
+                    SettingsView(serverAddress: $url)
                 }
             }
         }
-        #if os(iOS)
-        .popover(isPresented: $showLiveActivityData) {
-            Group {
-                if let activityViewState = appState.activityViewState {
-                    WindowOpenLiveActivityView(contentState: activityViewState)
-                } else {
-                    ContentUnavailableView("No live activity data", systemImage: "chart.bar.horizontal.page")
-                }
-            }
-        }
-        #endif
-        .navigationDestination(isPresented: $showSettings) {
-            SettingsView(serverAddress: $url)
-        }
-        .navigationTitle(url.description)
-        #if !os(macOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-            ToolbarItem {
-                Button("Preferences", systemImage: "gear") {
-                    showSettings.toggle()
-                }
-            }
-            #if os(iOS)
-            ToolbarItem {
-                Button("Push Notification", systemImage: "app.badge") {
-//                    appState.startLiveActivity()
-                    showLiveActivityData.toggle()
-                }
-                .badge(appState.activityViewState?.windowStates.count ?? 0)
-            }
-            #endif
-        }
-        .refreshable {
-            await updateData()
-        }
+        .tabViewStyle(.sidebarAdaptable)
         .onAppear {
             client = FlowKitClient(url: url)
             Task {
@@ -105,6 +72,61 @@ struct ContentView: View {
         .onChange(of: url) { _, _ in
             client = FlowKitClient(url: url)
             Task {
+                await updateData()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var automationsTab: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(automations.filter(\.isRunning)) { automation in
+                        NavigationLink(destination: {
+                            AutomationView(client: client, automation: automation)
+                        }, label: {
+                            view(for: automation)
+                        })
+                    }
+                }
+                Section {
+                    ForEach(automations.filter(\.isRunning.inverted)) { automation in
+                        NavigationLink(destination: {
+                            AutomationView(client: client, automation: automation)
+                        }, label: {
+                            view(for: automation)
+                        })
+                    }
+                }
+            }
+            #if os(iOS)
+            .popover(isPresented: $showLiveActivityData) {
+                Group {
+                    if let activityViewState = appState.activityViewState {
+                        WindowOpenLiveActivityView(contentState: activityViewState)
+                    } else {
+                        ContentUnavailableView("No live activity data", systemImage: "chart.bar.horizontal.page")
+                    }
+                }
+            }
+            #endif
+            .navigationTitle(url.description)
+            #if !os(macOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                #if os(iOS)
+                ToolbarItem {
+                    Button("Push Notification", systemImage: "app.badge") {
+    //                    appState.startLiveActivity()
+                        showLiveActivityData.toggle()
+                    }
+                    .badge(appState.activityViewState?.windowStates.count ?? 0)
+                }
+                #endif
+            }
+            .refreshable {
                 await updateData()
             }
         }

@@ -57,4 +57,31 @@ struct FlowKitClient {
                                                       maxOpenDuration: state.maxOpenDuration)
             }
     }
+
+    func getActions(limit: Int? = nil) async throws -> [ActionLogItem] {
+        let response = try await client.getActions(query: .init(limit: limit))
+        return try response.ok.body.json.compactMap { item -> ActionLogItem? in
+            guard let id = UUID(uuidString: item.id),
+                  let characteristic = CharacteristicsType(rawValue: item.entityId.characteristicType) else {
+                print("Failed to parse characteristic")
+                assertionFailure("Failed to parse characteristic")
+                return nil
+            }
+            let entityId = EntityId(placeId: item.entityId.placeId,
+                                    name: item.entityId.name,
+                                    characteristicsName: item.entityId.characteristicsName,
+                                    characteristic: characteristic)
+            return ActionLogItem(id: id,
+                                 timestamp: item.timestamp,
+                                 entityId: entityId,
+                                 actionName: item.actionName,
+                                 detailDescription: item.detailDescription,
+                                 hasCacheHit: item.hasCacheHit)
+        }
+    }
+
+    func clearActions() async throws {
+        let response = try await client.clearActions()
+        _ = try response.ok
+    }
 }

@@ -7,6 +7,8 @@
 
 import Dependencies
 import Fluent
+import HAModels
+import OpenAPIRuntime
 import Vapor
 
 struct OpenAPIController: APIProtocol {
@@ -127,6 +129,36 @@ struct OpenAPIController: APIProtocol {
             }
 
         return .ok(.init(body: .json(.init(windowStates: states))))
+    }
+
+    // MARK: - /actions
+
+    func getActions(_ input: Operations.GetActions.Input) async throws -> Operations.GetActions.Output {
+        let limit = input.query.limit
+
+        let actionItems = await ActionLogger.shared.getActions(limit: limit)
+
+        // Map to OpenAPI schema types
+        let schemaItems = actionItems.compactMap { item -> Components.Schemas.ActionLogItem? in
+            let entityId = Components.Schemas.EntityId(placeId: item.entityId.placeId,
+                                                       name: item.entityId.name,
+                                                       characteristicsName: item.entityId.characteristicsName ?? "",
+                                                       characteristicType: item.entityId.characteristicType.rawValue)
+
+            return Components.Schemas.ActionLogItem(id: item.id.uuidString,
+                                                    timestamp: item.timestamp,
+                                                    entityId: entityId,
+                                                    actionName: item.actionName,
+                                                    detailDescription: item.detailDescription,
+                                                    hasCacheHit: item.hasCacheHit)
+        }
+
+        return .ok(.init(body: .json(schemaItems)))
+    }
+
+    func clearActions(_ input: Operations.ClearActions.Input) async throws -> Operations.ClearActions.Output {
+        await ActionLogger.shared.clear()
+        return .ok
     }
 
 }

@@ -112,6 +112,39 @@ paths:
                 required:
                   - windowStates
 
+  /actions:
+    get:
+      summary: Get action logs
+      description: Retrieve logged HomeKit actions.
+      operationId: getActions
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of actions to return (default 1000, max 1000)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 1000
+      responses:
+        "200":
+          description: A success response with action logs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActionLogItem"
+
+    delete:
+      summary: Clear action logs
+      description: Remove all logged actions.
+      operationId: clearActions
+      responses:
+        "200":
+          description: Action logs cleared successfully.
+
 components:
   schemas:
     Automation:
@@ -168,3 +201,53 @@ components:
         - name
         - openedIsoTimeStamp
         - maxOpenDuration
+
+    ActionLogItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the log item.
+        timestamp:
+          type: string
+          format: date-time
+          description: The ISO timestamp when the action was logged.
+        entityId:
+          $ref: "#/components/schemas/EntityId"
+        actionName:
+          type: string
+          description: The name of the action that was performed.
+        detailDescription:
+          type: string
+          description: A detailed description of the action.
+        hasCacheHit:
+          type: boolean
+          description: Indicates if the action was a cache hit.
+      required:
+        - id
+        - timestamp
+        - entityId
+        - actionName
+        - detailDescription
+        - hasCacheHit
+
+    EntityId:
+      type: object
+      properties:
+        placeId:
+          type: string
+          description: The identifier of the place.
+        name:
+          type: string
+          description: The name of the entity.
+        characteristicsName:
+          type: string
+          description: Optional name of the characteristic (may be empty).
+        characteristicType:
+          type: string
+          description: The type of characteristic.
+      required:
+        - placeId
+        - name
+        - characteristicType

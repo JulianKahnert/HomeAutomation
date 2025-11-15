@@ -15,6 +15,7 @@
 		A3B8A0952D6A8468009314DA /* FlowKitControllerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */; };
 		A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */; };
 		A3B8A0972D6A8468009314DA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A08E2D6A8468009314DA /* Assets.xcassets */; };
+		A3B9B35E2EC8A58900AE2620 /* ActionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B9B35D2EC8A58900AE2620 /* ActionsListView.swift */; };
 		A3BA51482D78D0EC002DD924 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = A3BA51472D78D0EC002DD924 /* Logging */; };
 		A3BA515C2D798A69002DD924 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515B2D798A69002DD924 /* WidgetKit.framework */; };
 		A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515D2D798A69002DD924 /* SwiftUI.framework */; };
@@ -65,6 +66,7 @@
 		A3B8A0902D6A8468009314DA /* FlowKitController.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlowKitController.entitlements; sourceTree = "<group>"; };
 		A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowKitControllerApp.swift; sourceTree = "<group>"; };
 		A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		A3B9B35D2EC8A58900AE2620 /* ActionsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionsListView.swift; sourceTree = "<group>"; };
 		A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "FlowKit Controller WidgetExtensionExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A3BA515B2D798A69002DD924 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		A3BA515D2D798A69002DD924 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -151,6 +153,7 @@
 		A3714AEF2D778077006E340F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				A3B9B35D2EC8A58900AE2620 /* ActionsListView.swift */,
 				A3714B412D779ED9006E340F /* AppDelegate.swift */,
 				A3BA51F22D79B6B4002DD924 /* AppState.swift */,
 				A3714AF02D7780A5006E340F /* AutomationView.swift */,
@@ -279,7 +282,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
-				LastUpgradeCheck = 1620;
+				LastUpgradeCheck = 2610;
 				TargetAttributes = {
 					A3BA51582D798A69002DD924 = {
 						CreatedOnToolsVersion = 16.2;
@@ -358,6 +361,7 @@
 				A39C992F2D84BBDF00DBB536 /* DropShadow.swift in Sources */,
 				A3BA51F32D79B6B4002DD924 /* AppState.swift in Sources */,
 				A3714AF12D7780A5006E340F /* AutomationView.swift in Sources */,
+				A3B9B35E2EC8A58900AE2620 /* ActionsListView.swift in Sources */,
 				A3714B4D2D77A231006E340F /* FlowKitClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -387,7 +391,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 87KNVHZ8C7;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "FlowKit Controller WidgetExtension/Info.plist";
@@ -423,7 +426,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 87KNVHZ8C7;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "FlowKit Controller WidgetExtension/Info.plist";
@@ -485,6 +487,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 87KNVHZ8C7;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -506,6 +509,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -547,6 +551,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 87KNVHZ8C7;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -561,6 +566,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -576,12 +582,15 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
-				DEVELOPMENT_TEAM = 87KNVHZ8C7;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "FlowKit Controller-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHomeKitUsageDescription = "Access HomeKit";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -624,12 +633,15 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
-				DEVELOPMENT_TEAM = 87KNVHZ8C7;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "FlowKit Controller-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHomeKitUsageDescription = "Access HomeKit";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;

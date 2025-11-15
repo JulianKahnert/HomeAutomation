@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct ActionLogItem: Identifiable, Sendable {
+public struct ActionLogItem: Identifiable, Sendable, Codable {
     public let id: UUID
     public let timestamp: Date
     public let action: HomeManagableAction

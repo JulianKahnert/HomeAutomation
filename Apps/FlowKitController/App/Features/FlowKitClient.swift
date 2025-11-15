@@ -57,4 +57,14 @@ struct FlowKitClient {
                                                       maxOpenDuration: state.maxOpenDuration)
             }
     }
+
+    func getActions(limit: Int? = nil) async throws -> [ActionLogItem] {
+        let response = try await client.getActions(query: .init(limit: limit))
+        return try response.ok.body.json
+    }
+
+    func clearActions() async throws {
+        let response = try await client.clearActions()
+        _ = try response.ok
+    }
 }

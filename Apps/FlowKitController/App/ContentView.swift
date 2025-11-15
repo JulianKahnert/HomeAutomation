@@ -26,12 +26,50 @@ struct ContentView: View {
     @Environment(AppState.self) var appState
     @Environment(\.scenePhase) var scenePhase
 
-    @State private var showSettings = false
     @State private var showLiveActivityData = false
     @State private var client: FlowKitClient!
     @State private var automations: [Automation] = []
 
     var body: some View {
+        TabView {
+            automationsTab
+                .tabItem {
+                    Label("Automations", systemImage: "gearshape.2")
+                }
+
+            ActionsListView(client: client ?? FlowKitClient(url: url))
+                .tabItem {
+                    Label("Actions", systemImage: "list.bullet")
+                }
+
+            SettingsView(serverAddress: $url)
+                .tabItem {
+                    Label("Settings", systemImage: "gear")
+                }
+        }
+        .onAppear {
+            client = FlowKitClient(url: url)
+            Task {
+                await updateData()
+            }
+            requestRemoteNotificationsIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, new in
+            guard new == .active else { return }
+            Task {
+                await updateData()
+            }
+        }
+        .onChange(of: url) { _, _ in
+            client = FlowKitClient(url: url)
+            Task {
+                await updateData()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var automationsTab: some View {
         List {
             Section {
                 ForEach(automations.filter(\.isRunning)) { automation in
@@ -63,19 +101,11 @@ struct ContentView: View {
             }
         }
         #endif
-        .navigationDestination(isPresented: $showSettings) {
-            SettingsView(serverAddress: $url)
-        }
         .navigationTitle(url.description)
         #if !os(macOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            ToolbarItem {
-                Button("Preferences", systemImage: "gear") {
-                    showSettings.toggle()
-                }
-            }
             #if os(iOS)
             ToolbarItem {
                 Button("Push Notification", systemImage: "app.badge") {
@@ -88,25 +118,6 @@ struct ContentView: View {
         }
         .refreshable {
             await updateData()
-        }
-        .onAppear {
-            client = FlowKitClient(url: url)
-            Task {
-                await updateData()
-            }
-            requestRemoteNotificationsIfNeeded()
-        }
-        .onChange(of: scenePhase) { _, new in
-            guard new == .active else { return }
-            Task {
-                await updateData()
-            }
-        }
-        .onChange(of: url) { _, _ in
-            client = FlowKitClient(url: url)
-            Task {
-                await updateData()
-            }
         }
     }
 

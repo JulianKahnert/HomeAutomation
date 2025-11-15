@@ -112,6 +112,39 @@ paths:
                 required:
                   - windowStates
 
+  /actions:
+    get:
+      summary: Get action logs
+      description: Retrieve logged HomeKit actions.
+      operationId: getActions
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of actions to return (default 1000, max 1000)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 1000
+      responses:
+        "200":
+          description: A success response with action logs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActionLogItem"
+
+    delete:
+      summary: Clear action logs
+      description: Remove all logged actions.
+      operationId: clearActions
+      responses:
+        "200":
+          description: Action logs cleared successfully.
+
 components:
   schemas:
     Automation:
@@ -168,3 +201,26 @@ components:
         - name
         - openedIsoTimeStamp
         - maxOpenDuration
+
+    ActionLogItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the log item.
+        timestamp:
+          type: string
+          format: date-time
+          description: The ISO timestamp when the action was logged.
+        action:
+          type: object
+          description: The HomeManagableAction that was performed (serialized as JSON).
+        hasCacheHit:
+          type: boolean
+          description: Indicates if the action was a cache hit.
+      required:
+        - id
+        - timestamp
+        - action
+        - hasCacheHit

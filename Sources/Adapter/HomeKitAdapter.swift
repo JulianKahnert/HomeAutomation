@@ -27,11 +27,9 @@ import Shared
 public final class HomeKitAdapter: HomeKitAdapterable {
     private let log = Logger(label: "HomeKitAdapter")
     private let homeKitHomeManager: HomeKitHomeManager
-    private let commandCache: Cache<String, HomeManagableAction>
 
     public init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
         self.homeKitHomeManager = HomeKitHomeManager(entityStream: entityStream, entityStreamContinuation: entityStreamContinuation)
-        self.commandCache = Cache(entryLifetime: .minutes(2)) // 2 minute deduplication window
     }
 
     public  func getAllEntitiesLive() async -> [EntityStorageItem] {
@@ -63,34 +61,6 @@ public final class HomeKitAdapter: HomeKitAdapterable {
     }
 
     public func perform(_ action: HomeManagableAction) async throws {
-        // Check if this is a duplicate command within the deduplication window
-        let cacheKey = "\(action.entityId)-\(action.actionName)"
-
-        // Determine if action was in cache
-        let wasCached = await commandCache.value(forKey: cacheKey) != nil
-
-        if let cachedAction = await commandCache.value(forKey: cacheKey) {
-            // Compare the cached action with the current action
-            // If they are the same (including values), skip execution
-            if cachedAction == action {
-                log.info("Skipping duplicate command: [\(action)]")
-
-                #if canImport(UIKit)
-                // Log the cached/skipped action
-                await MainActor.run {
-                    ActionLogger.shared.log(action: action, hasCacheHit: true)
-                }
-                #endif
-
-                return
-            }
-            // Different value - update cache and execute
-            log.debug("Same action type but different value, executing: [\(action)]")
-        }
-
-        // Mark command as executed
-        await commandCache.insert(action, forKey: cacheKey)
-
         let characteristics = await getCharacteristics()
         let filteredCharacteristics = characteristics.filter({ $0.entityId == action.entityId })
         guard filteredCharacteristics.count == 1,
@@ -190,13 +160,6 @@ public final class HomeKitAdapter: HomeKitAdapterable {
 
             log.warning("An error was thrown, but the value is correct\n\(error)")
         }
-
-        #if canImport(UIKit)
-        // Log successful execution
-        await MainActor.run {
-            ActionLogger.shared.log(action: action, hasCacheHit: wasCached)
-        }
-        #endif
     }
 
     public func trigger(scene sceneName: String) async throws {

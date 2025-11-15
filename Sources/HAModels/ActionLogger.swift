@@ -1,22 +1,18 @@
 //
 //  ActionLogger.swift
-//
+//  HAModels
 //
 //  Created by Julian Kahnert on 14.11.25.
 //
 
 import Foundation
-import HAModels
-import Observation
 
-@MainActor
-@Observable
-public final class ActionLogger {
+public actor ActionLogger {
     public static let shared = ActionLogger()
 
     public static let maxEntries = 1000
 
-    public private(set) var actions: [ActionLogItem] = []
+    private var actions: [ActionLogItem] = []
 
     private init() {}
 
@@ -36,6 +32,18 @@ public final class ActionLogger {
         if actions.count > Self.maxEntries {
             actions = Array(actions.prefix(Self.maxEntries))
         }
+    }
+
+    public func getActions(limit: Int? = nil) -> [ActionLogItem] {
+        var result = actions
+
+        // Apply limit if provided
+        if let limit = limit {
+            let cappedLimit = min(limit, Self.maxEntries)
+            result = Array(result.prefix(cappedLimit))
+        }
+
+        return result
     }
 
     public func exportAsText() -> String {

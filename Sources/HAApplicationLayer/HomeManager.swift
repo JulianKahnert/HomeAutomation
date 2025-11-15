@@ -77,8 +77,10 @@ public final class HomeManager: HomeManagable {
     }
 
     public func perform(_ action: HomeManagableAction) async {
+        // Round values to prevent excessive HomeKit updates
+        let roundedAction = action.rounded()
         // add errors to failed action in this first run from external source
-        await perform(action, addToFaliedActions: true)
+        await perform(roundedAction, addToFaliedActions: true)
     }
 
     private func perform(_ action: HomeManagableAction, addToFaliedActions: Bool) async {

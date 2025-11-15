@@ -18,8 +18,18 @@ extension HomeManagableAction {
             return .setColorTemperature(id, value.rounded(toPlaces: 2))
         case .setRGB(let id, let rgb):
             return .setRGB(id, rgb: rgb.rounded())
-        default:
-            return self // No rounding needed for other cases
+        case .turnOn(let id):
+            return .turnOn(id)
+        case .turnOff(let id):
+            return .turnOff(id)
+        case .lockDoor(let id):
+            return .lockDoor(id)
+        case .addEntityToScene(let id, let sceneName, let targetValue):
+            return .addEntityToScene(id, sceneName: sceneName, targetValue: targetValue)
+        case .setHeating(let id, let active):
+            return .setHeating(id, active: active)
+        case .setValve(let id, let active):
+            return .setValve(id, active: active)
         }
     }
 }

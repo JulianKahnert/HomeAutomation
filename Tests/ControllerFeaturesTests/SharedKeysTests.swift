@@ -5,9 +5,9 @@
 //  Tests for shared state keys
 //
 
-import Testing
-import Sharing
 @testable import ControllerFeatures
+import Sharing
+import Testing
 
 @Suite("Shared Keys Tests")
 struct SharedKeysTests {

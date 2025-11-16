@@ -6,8 +6,8 @@
 //
 
 import Foundation
-import Sharing
 import HAModels
+import Sharing
 
 // MARK: - AppStorage-backed (UserDefaults)
 
@@ -27,6 +27,13 @@ public extension SharedKey where Self == AppStorageKey<Bool>.Default {
 }
 
 // MARK: - In-Memory (volatile state)
+
+public extension SharedKey where Self == InMemoryKey<[Automation]> {
+    /// List of automations from the server
+    static var automations: Self {
+        inMemory("automations")
+    }
+}
 
 public extension SharedKey where Self == InMemoryKey<[ActionLogItem]> {
     /// List of action log items
@@ -55,6 +62,3 @@ public extension SharedKey where Self == InMemoryKey<WindowContentState?> {
         inMemory("windowContentState")
     }
 }
-
-// NOTE: Type-specific shared keys (like automations) will be added in Phase 2
-// when we implement the FlowKitClient dependency and integrate with OpenAPI types

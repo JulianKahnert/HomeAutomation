@@ -5,7 +5,7 @@
 //  Tests for shared state keys
 //
 
-@testable import ControllerFeatures
+@testable import Controller
 import Sharing
 import Testing
 

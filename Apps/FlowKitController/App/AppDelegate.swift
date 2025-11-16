@@ -5,6 +5,8 @@
 //  Created by Julian Kahnert on 04.03.25.
 //
 
+import ComposableArchitecture
+import Controller
 import Foundation
 import Logging
 #if os(iOS)
@@ -18,7 +20,10 @@ import AppKit
 class AppDelegate: NSObject {
     private let logger = Logger(label: "AppDelegate")
 
-    private(set) var appState = AppState()
+    // TCA Store
+    private(set) lazy var store = Store(initialState: AppFeature.State()) {
+        AppFeature()
+    }
 
     override init() {
         super.init()
@@ -39,7 +44,10 @@ extension AppDelegate: UIApplicationDelegate {
                 logger.error("FAILED to get pushToken")
                 return UIBackgroundFetchResult.failed
             }
-            await appState.send(pushToken: token, ofType: .liveActivityUpdate(activityName: String(describing: activity.self)))
+
+            // Send token to TCA store
+            await store.send(.liveActivityPushTokenReceived(token)).finish()
+
             return UIBackgroundFetchResult.newData
         }
 
@@ -58,9 +66,8 @@ extension AppDelegate: UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        Task {
-            await appState.send(pushToken: deviceToken, ofType: .pushNotification)
-        }
+        logger.info("Registered for remote notifications")
+        store.send(.deviceTokenReceived(deviceToken))
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
@@ -70,9 +77,8 @@ extension AppDelegate: UIApplicationDelegate {
 #else
 extension AppDelegate: NSApplicationDelegate {
     func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        Task {
-            await appState.send(pushToken: deviceToken, ofType: .pushNotification)
-        }
+        logger.info("Registered for remote notifications")
+        store.send(.deviceTokenReceived(deviceToken))
     }
 
     func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {

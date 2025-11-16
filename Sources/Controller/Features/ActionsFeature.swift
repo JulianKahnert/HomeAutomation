@@ -21,23 +21,37 @@ public struct ActionsFeature: Sendable {
         public var isLoading: Bool = false
         public var error: String?
         public var limit: Int = 50
+        public var searchText: String = ""
+
+        public var filteredActions: [ActionLogItem] {
+            guard !searchText.isEmpty else {
+                return actions
+            }
+
+            let searchLowercased = searchText.localizedLowercase
+            return actions.filter { item in
+                item.searchableText.contains(searchLowercased)
+            }
+        }
 
         public init(
             actions: [ActionLogItem] = [],
             isLoading: Bool = false,
             error: String? = nil,
-            limit: Int = 50
+            limit: Int = 50,
+            searchText: String = ""
         ) {
             self.actions = actions
             self.isLoading = isLoading
             self.error = error
             self.limit = limit
+            self.searchText = searchText
         }
     }
 
     // MARK: - Action
 
-    public enum Action: Sendable {
+    public enum Action: Sendable, BindableAction {
         case onAppear
         case refresh
         case actionsResponse(Result<[ActionLogItem], Error>)
@@ -45,6 +59,7 @@ public struct ActionsFeature: Sendable {
         case clearActionsResponse(Result<Void, Error>)
         case setLimit(Int)
         case dismissError
+        case binding(BindingAction<State>)
     }
 
     // MARK: - Dependencies
@@ -54,6 +69,7 @@ public struct ActionsFeature: Sendable {
     // MARK: - Body
 
     public var body: some ReducerOf<Self> {
+        BindingReducer()
         Reduce { state, action in
             switch action {
             case .onAppear:
@@ -107,6 +123,9 @@ public struct ActionsFeature: Sendable {
 
             case .dismissError:
                 state.error = nil
+                return .none
+
+            case .binding:
                 return .none
             }
         }

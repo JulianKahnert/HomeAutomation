@@ -5,7 +5,7 @@
 //  Tests for PushNotification dependency
 //
 
-@testable import ControllerFeatures
+@testable import Controller
 import Dependencies
 import Foundation
 import Testing

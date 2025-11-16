@@ -1,4 +1,4 @@
-# ControllerFeatures
+# Controller
 
 TCA-based architecture for the FlowKit Controller iOS app.
 
@@ -51,7 +51,7 @@ Custom dependencies wrap platform and network APIs:
 ### Basic Setup
 
 ```swift
-import ControllerFeatures
+import Controller
 import ComposableArchitecture
 
 let store = Store(initialState: AppFeature.State()) {

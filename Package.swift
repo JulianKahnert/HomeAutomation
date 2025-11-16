@@ -10,7 +10,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "HomeAutomationKit",
-            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "ControllerFeatures"]
+            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "Controller"]
         )
     ],
     dependencies: [
@@ -109,7 +109,7 @@ let package = Package(
             ]
         ),
         .target(
-            name: "ControllerFeatures",
+            name: "Controller",
             dependencies: [
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "Dependencies", package: "swift-dependencies"),
@@ -117,12 +117,13 @@ let package = Package(
                 "HAModels",
                 "Shared"
             ],
-            path: "Sources/ControllerFeatures"
+            path: "Sources/Controller",
+            exclude: ["README.md"]
         ),
         .testTarget(
-            name: "ControllerFeaturesTests",
-            dependencies: ["ControllerFeatures"],
-            path: "Tests/ControllerFeaturesTests"
+            name: "ControllerTests",
+            dependencies: ["Controller"],
+            path: "Tests/ControllerTests"
         )
     ]
 )

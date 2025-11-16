@@ -60,7 +60,7 @@ public struct AppFeature: Sendable {
 
     // MARK: - Action
 
-    public enum Action: Sendable {
+    public enum Action: Sendable, BindableAction {
         case onAppear
         case selectedTabChanged(Tab)
         case automations(AutomationsFeature.Action)
@@ -82,6 +82,8 @@ public struct AppFeature: Sendable {
         // Background tasks
         case refreshWindowStates
         case syncComplete
+
+        case binding(BindingAction<State>)
     }
 
     // MARK: - Dependencies
@@ -93,6 +95,8 @@ public struct AppFeature: Sendable {
     // MARK: - Body
 
     public var body: some ReducerOf<Self> {
+        BindingReducer()
+
         Scope(state: \.automations, action: \.automations) {
             AutomationsFeature()
         }
@@ -213,6 +217,9 @@ public struct AppFeature: Sendable {
                 }
 
             case .syncComplete:
+                return .none
+
+            case .binding:
                 return .none
             }
         }

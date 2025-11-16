@@ -21,6 +21,14 @@ public struct AutomationsFeature: Sendable {
         public var selectedAutomationIndex: Int?
         public var error: String?
 
+        public var runningAutomations: [Automation] {
+            automations.filter(\.isRunning)
+        }
+
+        public var inactiveAutomations: [Automation] {
+            automations.filter { !$0.isRunning }
+        }
+
         public init(
             automations: [Automation] = [],
             isLoading: Bool = false,

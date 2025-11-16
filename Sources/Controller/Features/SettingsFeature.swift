@@ -17,22 +17,30 @@ public struct SettingsFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable, Sendable {
-        public var serverURL: URL
+        public var serverURL: URL?
         public var liveActivitiesEnabled: Bool = true
         public var windowContentState: WindowContentState?
         public var isLoadingWindowStates: Bool = false
         public var error: String?
+
+        // Server URL editing state
+        public var isEditingServerURL: Bool = false
+        public var serverHost: String = "localhost"
+        public var serverPort: Int = 8080
 
         // Push notification state
         public var isPushAuthorized: Bool = false
         public var deviceToken: Data?
 
         public init(
-            serverURL: URL = URL(string: "http://localhost:8080/")!,
+            serverURL: URL? = URL(string: "http://localhost:8080/"),
             liveActivitiesEnabled: Bool = true,
             windowContentState: WindowContentState? = nil,
             isLoadingWindowStates: Bool = false,
             error: String? = nil,
+            isEditingServerURL: Bool = false,
+            serverHost: String = "localhost",
+            serverPort: Int = 8080,
             isPushAuthorized: Bool = false,
             deviceToken: Data? = nil
         ) {
@@ -41,6 +49,9 @@ public struct SettingsFeature: Sendable {
             self.windowContentState = windowContentState
             self.isLoadingWindowStates = isLoadingWindowStates
             self.error = error
+            self.isEditingServerURL = isEditingServerURL
+            self.serverHost = serverHost
+            self.serverPort = serverPort
             self.isPushAuthorized = isPushAuthorized
             self.deviceToken = deviceToken
         }
@@ -48,9 +59,12 @@ public struct SettingsFeature: Sendable {
 
     // MARK: - Action
 
-    public enum Action: Sendable {
+    public enum Action: Sendable, BindableAction {
         case onAppear
         case setServerURL(URL)
+        case editServerURL
+        case saveServerURL
+        case cancelEditServerURL
         case toggleLiveActivities(Bool)
         case refreshWindowStates
         case windowStatesResponse(Result<[WindowContentState.WindowState], Error>)
@@ -60,6 +74,7 @@ public struct SettingsFeature: Sendable {
         case checkPushAuthorizationStatus
         case pushAuthorizationStatusResponse(Bool)
         case dismissError
+        case binding(BindingAction<State>)
     }
 
     // MARK: - Dependencies
@@ -71,6 +86,7 @@ public struct SettingsFeature: Sendable {
     // MARK: - Body
 
     public var body: some ReducerOf<Self> {
+        BindingReducer()
         Reduce { state, action in
             switch action {
             case .onAppear:
@@ -81,6 +97,26 @@ public struct SettingsFeature: Sendable {
 
             case let .setServerURL(url):
                 state.serverURL = url
+                return .none
+
+            case .editServerURL:
+                state.isEditingServerURL = true
+                if let url = state.serverURL {
+                    state.serverHost = url.host() ?? "localhost"
+                    state.serverPort = url.port ?? 8080
+                }
+                return .none
+
+            case .saveServerURL:
+                state.isEditingServerURL = false
+                let urlString = "http://\(state.serverHost):\(state.serverPort)/"
+                if let url = URL(string: urlString) {
+                    state.serverURL = url
+                }
+                return .none
+
+            case .cancelEditServerURL:
+                state.isEditingServerURL = false
                 return .none
 
             case let .toggleLiveActivities(enabled):
@@ -150,6 +186,9 @@ public struct SettingsFeature: Sendable {
 
             case .dismissError:
                 state.error = nil
+                return .none
+
+            case .binding:
                 return .none
             }
         }

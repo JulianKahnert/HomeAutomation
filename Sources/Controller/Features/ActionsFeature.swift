@@ -11,19 +11,19 @@ import HAModels
 import Sharing
 
 @Reducer
-public struct ActionsFeature: Sendable {
+struct ActionsFeature: Sendable {
 
     // MARK: - State
 
     @ObservableState
-    public struct State: Equatable, Sendable {
-        public var actions: [ActionLogItem] = []
-        public var isLoading: Bool = false
-        public var error: String?
-        public var limit: Int = 50
-        public var searchText: String = ""
+    struct State: Equatable, Sendable {
+        var actions: [ActionLogItem] = []
+        var isLoading: Bool = false
+        var error: String?
+        var limit: Int = 50
+        var searchText: String = ""
 
-        public var filteredActions: [ActionLogItem] {
+        var filteredActions: [ActionLogItem] {
             guard !searchText.isEmpty else {
                 return actions
             }
@@ -33,25 +33,11 @@ public struct ActionsFeature: Sendable {
                 item.searchableText.contains(searchLowercased)
             }
         }
-
-        public init(
-            actions: [ActionLogItem] = [],
-            isLoading: Bool = false,
-            error: String? = nil,
-            limit: Int = 50,
-            searchText: String = ""
-        ) {
-            self.actions = actions
-            self.isLoading = isLoading
-            self.error = error
-            self.limit = limit
-            self.searchText = searchText
-        }
     }
 
     // MARK: - Action
 
-    public enum Action: Sendable, BindableAction {
+    enum Action: Sendable, BindableAction {
         case onAppear
         case refresh
         case actionsResponse(Result<[ActionLogItem], Error>)
@@ -68,7 +54,7 @@ public struct ActionsFeature: Sendable {
 
     // MARK: - Body
 
-    public var body: some ReducerOf<Self> {
+    var body: some ReducerOf<Self> {
         BindingReducer()
         Reduce { state, action in
             switch action {

@@ -23,6 +23,8 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.3"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.7.0"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.0.0"),
         // TCA and related
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.23.1"),
         .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.7.4"),
@@ -92,6 +94,30 @@ let package = Package(
                 "Shared"
             ]
         ),
+        .target(
+            name: "ServerClient",
+            dependencies: [
+                "HAModels",
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession")
+            ],
+            plugins: [
+                .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
+            ]
+        ),
+        .target(
+            name: "Controller",
+            dependencies: [
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+                "HAModels",
+                "Shared",
+                "ServerClient"
+            ],
+            path: "Sources/Controller",
+            exclude: ["README.md"]
+        ),
         .testTarget(
             name: "SharedTests",
             dependencies: [
@@ -107,18 +133,6 @@ let package = Package(
                 "HAImplementations",
                 "HAApplicationLayer"
             ]
-        ),
-        .target(
-            name: "Controller",
-            dependencies: [
-                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
-                .product(name: "Dependencies", package: "swift-dependencies"),
-                .product(name: "Sharing", package: "swift-sharing"),
-                "HAModels",
-                "Shared"
-            ],
-            path: "Sources/Controller",
-            exclude: ["README.md"]
         ),
         .testTarget(
             name: "ControllerTests",

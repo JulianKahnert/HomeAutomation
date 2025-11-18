@@ -10,38 +10,26 @@ import Foundation
 import HAModels
 
 @Reducer
-public struct AppFeature: Sendable {
+struct AppFeature: Sendable {
 
     // MARK: - State
 
     @ObservableState
-    public struct State: Equatable, Sendable {
-        public var selectedTab: Tab = .automations
-        public var automations = AutomationsFeature.State()
-        public var actions = ActionsFeature.State()
-        public var settings = SettingsFeature.State()
-
-        public init(
-            selectedTab: Tab = .automations,
-            automations: AutomationsFeature.State = .init(),
-            actions: ActionsFeature.State = .init(),
-            settings: SettingsFeature.State = .init()
-        ) {
-            self.selectedTab = selectedTab
-            self.automations = automations
-            self.actions = actions
-            self.settings = settings
-        }
+    struct State: Equatable, Sendable {
+        var selectedTab: Tab = .automations
+        var automations = AutomationsFeature.State()
+        var actions = ActionsFeature.State()
+        var settings = SettingsFeature.State()
     }
 
     // MARK: - Tab
 
-    public enum Tab: Sendable, Equatable, CaseIterable {
+    enum Tab: Sendable, Equatable, CaseIterable {
         case automations
         case actions
         case settings
 
-        public var title: String {
+        var title: String {
             switch self {
             case .automations: return "Automations"
             case .actions: return "Actions"
@@ -49,7 +37,7 @@ public struct AppFeature: Sendable {
             }
         }
 
-        public var systemImage: String {
+        var systemImage: String {
             switch self {
             case .automations: return "lamp.floor"
             case .actions: return "list.bullet.clipboard"
@@ -60,24 +48,17 @@ public struct AppFeature: Sendable {
 
     // MARK: - Action
 
-    public enum Action: Sendable, BindableAction {
+    enum Action: Sendable, BindableAction {
         case onAppear
         case selectedTabChanged(Tab)
         case automations(AutomationsFeature.Action)
         case actions(ActionsFeature.Action)
         case settings(SettingsFeature.Action)
 
-        // Live Activities
+        // Live Activities & Push Notifications
         case startMonitoringLiveActivities
         case stopMonitoringLiveActivities
-        case liveActivityPushTokenReceived(Data)
-        case windowStatesUpdated([WindowContentState.WindowState])
-
-        // Push Notifications
-        case startMonitoringPushNotifications
-        case stopMonitoringPushNotifications
-        case deviceTokenReceived(Data)
-        case registerDeviceToken(Data, String?)
+        case registerPushToken(PushToken)
 
         // Background tasks
         case refreshWindowStates
@@ -94,7 +75,7 @@ public struct AppFeature: Sendable {
 
     // MARK: - Body
 
-    public var body: some ReducerOf<Self> {
+    var body: some ReducerOf<Self> {
         BindingReducer()
 
         Scope(state: \.automations, action: \.automations) {
@@ -113,7 +94,6 @@ public struct AppFeature: Sendable {
             switch action {
             case .onAppear:
                 return .run { send in
-                    await send(.startMonitoringPushNotifications)
                     await send(.startMonitoringLiveActivities)
                     await send(.refreshWindowStates)
                 }
@@ -140,8 +120,18 @@ public struct AppFeature: Sendable {
 
                 return .run { send in
                     // Monitor push tokens for Live Activities
-                    for await token in await liveActivity.pushTokenUpdates() {
-                        await send(.liveActivityPushTokenReceived(token))
+                    await withTaskGroup(of: Void.self) { group in
+                        group.addTask {
+                            for await token in await liveActivity.pushToStartTokenUpdates() {
+                                await send(.registerPushToken(token))
+                            }
+                        }
+                        
+                        group.addTask {
+                            for await token in await liveActivity.pushTokenUpdates() {
+                                await send(.registerPushToken(token))
+                            }
+                        }
                     }
                 }
 
@@ -150,63 +140,12 @@ public struct AppFeature: Sendable {
                     await liveActivity.stopActivity()
                 }
 
-            case let .liveActivityPushTokenReceived(token):
-                return .run { send in
-                    await send(.registerDeviceToken(token, "live_activity"))
-                }
-
-            case let .windowStatesUpdated(windowStates):
-                state.settings.windowContentState = WindowContentState(windowStates: windowStates)
-
-                // Start or update Live Activity if enabled
-                if state.settings.liveActivitiesEnabled, !windowStates.isEmpty {
-                    return .run { _ in
-                        let hasActive = await liveActivity.hasActiveActivities()
-                        if hasActive {
-                            await liveActivity.updateActivity(windowStates)
-                        } else {
-                            try await liveActivity.startActivity(windowStates)
-                        }
-                    } catch: { _, _ in
-                        // Ignore errors for now
-                    }
-                }
-                return .none
-
             // MARK: - Push Notifications
 
-            case .startMonitoringPushNotifications:
+            case let .registerPushToken(token):
                 return .run { send in
-                    // Monitor device tokens
-                    for await token in await pushNotification.deviceTokenUpdates() {
-                        await send(.deviceTokenReceived(token))
-                    }
-                }
-
-            case .stopMonitoringPushNotifications:
-                return .run { _ in
-                    await pushNotification.unregister()
-                }
-
-            case let .deviceTokenReceived(token):
-                return .run { send in
-                    await send(.registerDeviceToken(token, nil))
-                }
-
-            case let .registerDeviceToken(token, activityType):
-                let tokenString = token.map { String(format: "%02x", $0) }.joined()
-                let deviceName = "iOS Device" // TODO: Get actual device name
-
-                return .run { send in
-                    try await flowKitClient.registerDevice(
-                        deviceName,
-                        tokenString,
-                        .apns,
-                        activityType
-                    )
+                    try await flowKitClient.registerDevice(token)
                     await send(.syncComplete)
-                } catch: { _, _ in
-                    // Ignore registration errors for now
                 }
 
             // MARK: - Background Tasks

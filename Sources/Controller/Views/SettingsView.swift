@@ -9,14 +9,10 @@ import ComposableArchitecture
 import HAModels
 import SwiftUI
 
-public struct SettingsView: View {
-    @Bindable public var store: StoreOf<SettingsFeature>
+struct SettingsView: View {
+    @Bindable var store: StoreOf<SettingsFeature>
 
-    public init(store: StoreOf<SettingsFeature>) {
-        self.store = store
-    }
-
-    public var body: some View {
+    var body: some View {
         NavigationStack {
             Form {
                 Section {
@@ -69,14 +65,14 @@ public struct SettingsView: View {
                 }
             }
 
-            Text(store.serverURL?.absoluteString ?? "Not configured")
+            Text(store.serverURL.absoluteString)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
 
         if store.isEditingServerURL {
             TextField("Host", text: $store.serverHost)
-            TextField("Port", value: $store.serverPort, format: .number)
+            TextField("Port", value: $store.serverPort, format: .number.grouping(.never))
 
             Button("Save") {
                 store.send(.saveServerURL)
@@ -93,12 +89,6 @@ public struct SettingsView: View {
     @ViewBuilder
     private var liveActivitiesSection: some View {
         Toggle("Enable Live Activities", isOn: $store.liveActivitiesEnabled)
-
-        if store.liveActivitiesEnabled {
-            Button("Refresh Window States") {
-                store.send(.refreshWindowStates)
-            }
-        }
     }
 
     @ViewBuilder
@@ -108,21 +98,12 @@ public struct SettingsView: View {
                 .foregroundColor(.secondary)
         } else {
             ForEach(windowState.windowStates, id: \.name) { window in
-                VStack(alignment: .leading, spacing: 4) {
+                ProgressView(timerInterval: window.opened...window.end, countsDown: false) {
                     Text(window.name)
-                        .font(.headline)
-
-                    Text("Opened: \(window.opened.formatted(date: .numeric, time: .standard))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    if let maxDuration = window.maxOpenDuration {
-                        Text("Max duration: \(maxDuration) seconds")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                    }
                 }
+                .tint(Date() <= window.end ? Color.accentColor : Color.red)
             }
+            .listRowSeparator(.hidden)
         }
     }
     #endif

@@ -8,14 +8,10 @@
 import ComposableArchitecture
 import SwiftUI
 
-public struct AppView: View {
-    @Bindable public var store: StoreOf<AppFeature>
+struct AppView: View {
+    @Bindable var store: StoreOf<AppFeature>
 
-    public init(store: StoreOf<AppFeature>) {
-        self.store = store
-    }
-
-    public var body: some View {
+    var body: some View {
         TabView(selection: $store.selectedTab) {
             Tab(
                 AppFeature.Tab.automations.title,

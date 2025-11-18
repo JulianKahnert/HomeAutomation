@@ -8,10 +8,14 @@
 #if os(iOS)
 import SwiftUI
 
-struct WindowOpenLiveActivityView: View {
+public struct WindowOpenLiveActivityView: View {
     let contentState: WindowAttributes.ContentState
 
-    var body: some View {
+    public init(contentState: WindowAttributes.ContentState) {
+        self.contentState = contentState
+    }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ForEach(contentState.windowStates, id: \.hashValue) { windowState in
                 GeometryReader { geometry in

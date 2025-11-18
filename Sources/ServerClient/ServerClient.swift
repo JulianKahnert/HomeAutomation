@@ -1,5 +1,5 @@
 //
-//  FlowKitClient.swift
+//  ServerClient.swift
 //  HomeAutomation
 //
 //  Created by Julian Kahnert on 26.02.25.
@@ -9,45 +9,52 @@ import Foundation
 import HAModels
 import OpenAPIURLSession
 
-struct FlowKitClient {
-    static let userDefaultsKey = "AutomationClientUrl"
-
+public struct ServerClient {
     private let client: Client
 
-    init(url: URL) {
+    public init(url: URL) {
         self.client = Client(
             serverURL: url,
             transport: URLSessionTransport()
         )
     }
 
-    func getAutomations() async throws -> [Components.Schemas.Automation] {
+    public func getAutomations() async throws -> [AutomationInfo] {
         let response = try await client.getAutomations()
         return try response.ok.body.json
+            .map { automation in
+                AutomationInfo(name: automation.name,
+                               isActive: automation.isActive,
+                               isRunning: automation.isRunning)
+            }
     }
 
-    func activate(automation name: String) async throws {
+    public func activate(automation name: String) async throws {
         let response = try await client.activateAutomation(path: .init(name: name))
         _ = try response.ok
     }
 
-    func deactivate(automation name: String) async throws {
+    public func deactivate(automation name: String) async throws {
         let response = try await client.deactivateAutomation(path: .init(name: name))
         _ = try response.ok
     }
 
-    func stop(automation name: String) async throws {
+    public func stop(automation name: String) async throws {
         let response = try await client.stopAutomation(path: .init(name: name))
         _ = try response.ok
     }
 
-    func register(deviceName: String, tokenString: String, tokenType: Components.Schemas.PushDevice.TokenTypePayload, activityType: String?) async throws {
-        let body: Components.Schemas.PushDevice = .init(deviceName: deviceName, tokenString: tokenString, tokenType: tokenType, activityType: activityType)
+    public func register(token: PushToken) async throws {
+        let tokenType = Components.Schemas.PushDevice.TokenTypePayload.create(from: token.type)
+        let body = Components.Schemas.PushDevice(deviceName: token.deviceName,
+                                                 tokenString: token.tokenString,
+                                                 tokenType: tokenType,
+                                                 activityType: token.type.activityType)
         let response = try await client.registerPushDevice(.init(body: .json(body)))
         _ = try response.ok
     }
 
-    func getWindowStates() async throws -> [WindowContentState.WindowState] {
+    public func getWindowStates() async throws -> [WindowContentState.WindowState] {
         let response = try await client.getWindowStates()
         return try response.ok.body.json.windowStates
             .map { state in
@@ -58,7 +65,7 @@ struct FlowKitClient {
             }
     }
 
-    func getActions(limit: Int? = nil) async throws -> [ActionLogItem] {
+    public func getActions(limit: Int? = nil) async throws -> [ActionLogItem] {
         let response = try await client.getActions(query: .init(limit: limit))
         return try response.ok.body.json.compactMap { item -> ActionLogItem? in
             guard let id = UUID(uuidString: item.id),
@@ -80,8 +87,21 @@ struct FlowKitClient {
         }
     }
 
-    func clearActions() async throws {
+    public func clearActions() async throws {
         let response = try await client.clearActions()
         _ = try response.ok
+    }
+}
+
+extension Components.Schemas.PushDevice.TokenTypePayload {
+    static func create(from type: PushToken.TokenType) -> Self {
+        switch type {
+        case .pushNotification:
+            return .pushNotification
+        case .liveActivityStart:
+            return .liveActivityStart
+        case .liveActivityUpdate:
+            return .liveActivityUpdate
+        }
     }
 }

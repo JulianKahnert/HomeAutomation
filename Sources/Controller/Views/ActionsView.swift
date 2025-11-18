@@ -9,14 +9,10 @@ import ComposableArchitecture
 import HAModels
 import SwiftUI
 
-public struct ActionsView: View {
-    @Bindable public var store: StoreOf<ActionsFeature>
+struct ActionsView: View {
+    @Bindable var store: StoreOf<ActionsFeature>
 
-    public init(store: StoreOf<ActionsFeature>) {
-        self.store = store
-    }
-
-    public var body: some View {
+    var body: some View {
         NavigationStack {
             List {
                 ForEach(store.filteredActions) { item in

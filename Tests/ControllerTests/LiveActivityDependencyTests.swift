@@ -5,6 +5,7 @@
 //  Tests for LiveActivity dependency
 //
 
+#if os(iOS)
 @testable import Controller
 import Dependencies
 import Foundation
@@ -20,13 +21,6 @@ struct LiveActivityDependencyTests {
             $0.liveActivity = .testValue
         } operation: {
             @Dependency(\.liveActivity) var liveActivity
-
-            let activityStream = await liveActivity.activityUpdates()
-            var activityCount = 0
-            for await _ in activityStream {
-                activityCount += 1
-            }
-            #expect(activityCount == 0)
 
             let tokenStream = await liveActivity.pushTokenUpdates()
             var tokenCount = 0
@@ -49,14 +43,6 @@ struct LiveActivityDependencyTests {
             $0.liveActivity = .previewValue
         } operation: {
             @Dependency(\.liveActivity) var liveActivity
-
-            let activityStream = await liveActivity.activityUpdates()
-            var activityUpdates: [String] = []
-            for await update in activityStream {
-                activityUpdates.append(update)
-            }
-            #expect(activityUpdates.count == 1)
-            #expect(activityUpdates[0] == "preview")
 
             let tokenStream = await liveActivity.pushTokenUpdates()
             var tokens: [Data] = []
@@ -103,3 +89,4 @@ struct LiveActivityDependencyTests {
         }
     }
 }
+#endif

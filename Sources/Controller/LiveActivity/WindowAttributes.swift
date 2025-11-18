@@ -10,7 +10,7 @@ import ActivityKit
 import Foundation
 import HAModels
 
-struct WindowAttributes: ActivityAttributes {
-    typealias ContentState = WindowContentState
+public struct WindowAttributes: ActivityAttributes {
+    public typealias ContentState = WindowContentState
 }
 #endif

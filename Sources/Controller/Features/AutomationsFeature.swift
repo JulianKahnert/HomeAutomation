@@ -7,47 +7,36 @@
 
 import ComposableArchitecture
 import Foundation
+import HAModels
 import Sharing
 
 @Reducer
-public struct AutomationsFeature: Sendable {
+struct AutomationsFeature: Sendable {
 
     // MARK: - State
 
     @ObservableState
-    public struct State: Equatable, Sendable {
-        public var automations: [Automation] = []
-        public var isLoading: Bool = false
-        public var selectedAutomationIndex: Int?
-        public var error: String?
+    struct State: Equatable, Sendable {
+        var automations: [AutomationInfo] = []
+        var isLoading: Bool = false
+        var selectedAutomationIndex: Int?
+        var error: String?
 
-        public var runningAutomations: [Automation] {
+        var runningAutomations: [AutomationInfo] {
             automations.filter(\.isRunning)
         }
 
-        public var inactiveAutomations: [Automation] {
+        var inactiveAutomations: [AutomationInfo] {
             automations.filter { !$0.isRunning }
-        }
-
-        public init(
-            automations: [Automation] = [],
-            isLoading: Bool = false,
-            selectedAutomationIndex: Int? = nil,
-            error: String? = nil
-        ) {
-            self.automations = automations
-            self.isLoading = isLoading
-            self.selectedAutomationIndex = selectedAutomationIndex
-            self.error = error
         }
     }
 
     // MARK: - Action
 
-    public enum Action: Sendable {
+    enum Action: Sendable {
         case onAppear
         case refresh
-        case automationsResponse(Result<[Automation], Error>)
+        case automationsResponse(Result<[AutomationInfo], Error>)
         case selectAutomation(Int?)
         case activateAutomation(String)
         case deactivateAutomation(String)
@@ -62,7 +51,7 @@ public struct AutomationsFeature: Sendable {
 
     // MARK: - Body
 
-    public var body: some ReducerOf<Self> {
+    var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
             case .onAppear:

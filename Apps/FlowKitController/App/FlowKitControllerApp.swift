@@ -5,7 +5,6 @@
 //  Created by Julian Kahnert on 22.02.25.
 //
 
-import ComposableArchitecture
 import Controller
 import Logging
 import LoggingOSLog
@@ -40,7 +39,7 @@ struct FlowKitControllerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AppView(store: appDelegate.store)
+            RootView()
         }
     }
 }

@@ -6,16 +6,13 @@
 //
 
 import ComposableArchitecture
+import HAModels
 import SwiftUI
 
-public struct AutomationsView: View {
-    public let store: StoreOf<AutomationsFeature>
+struct AutomationsView: View {
+    let store: StoreOf<AutomationsFeature>
 
-    public init(store: StoreOf<AutomationsFeature>) {
-        self.store = store
-    }
-
-    public var body: some View {
+    var body: some View {
         NavigationStack {
             List {
                 if !store.runningAutomations.isEmpty {
@@ -88,7 +85,7 @@ public struct AutomationsView: View {
     }
 
     @ViewBuilder
-    private func automationRow(_ automation: Automation) -> some View {
+    private func automationRow(_ automation: AutomationInfo) -> some View {
         HStack {
             Text(automation.name)
                 .foregroundStyle(automation.isRunning ? Color.green : Color.primary)
@@ -104,7 +101,7 @@ public struct AutomationsView: View {
 // MARK: - Automation Detail View
 
 private struct AutomationDetailView: View {
-    let automation: Automation
+    let automation: AutomationInfo
     let onActivate: (String) -> Void
     let onDeactivate: (String) -> Void
     let onStop: (String) -> Void

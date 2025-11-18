@@ -31,9 +31,6 @@ struct LiveActivityDependencyTests {
 
             let hasActive = await liveActivity.hasActiveActivities()
             #expect(hasActive == false)
-
-            let state = await liveActivity.currentActivityState()
-            #expect(state == nil)
         }
     }
 
@@ -45,28 +42,16 @@ struct LiveActivityDependencyTests {
             @Dependency(\.liveActivity) var liveActivity
 
             let tokenStream = await liveActivity.pushTokenUpdates()
-            var tokens: [Data] = []
+            var tokens: [PushToken] = []
             for await token in tokenStream {
                 tokens.append(token)
             }
             #expect(tokens.count == 1)
-            #expect(tokens[0] == Data([0x01, 0x02, 0x03, 0x04]))
-
-            let contentStream = await liveActivity.contentUpdates()
-            var contents: [WindowContentState] = []
-            for await content in contentStream {
-                contents.append(content)
-            }
-            #expect(contents.count == 1)
-            #expect(contents[0].windowStates.count == 1)
-            #expect(contents[0].windowStates[0].name == "Preview Window")
+            #expect(tokens[0].deviceName == "preview")
+            #expect(tokens[0].tokenString == "1234")
 
             let hasActive = await liveActivity.hasActiveActivities()
             #expect(hasActive == true)
-
-            let state = await liveActivity.currentActivityState()
-            #expect(state != nil)
-            #expect(state?.windowStates.count == 1)
         }
     }
 

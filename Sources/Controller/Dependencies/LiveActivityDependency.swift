@@ -133,4 +133,37 @@ extension DependencyValues {
         set { self[LiveActivityDependency.self] = newValue }
     }
 }
+#else
+// MARK: - Stub for non-iOS platforms
+
+import Dependencies
+import DependenciesMacros
+import Foundation
+import HAModels
+
+@DependencyClient
+struct LiveActivityDependency: Sendable {
+    var startActivity: @Sendable (_ windowStates: [WindowContentState.WindowState]) async throws -> Void
+    var updateActivity: @Sendable (_ windowStates: [WindowContentState.WindowState]) async -> Void
+    var stopActivity: @Sendable () async -> Void
+    var pushTokenUpdates: @Sendable () async -> AsyncStream<PushToken> = { .finished }
+    var pushToStartTokenUpdates: @Sendable () async -> AsyncStream<PushToken> = { .finished }
+    var hasActiveActivities: @Sendable () async -> Bool = { false }
+}
+
+extension LiveActivityDependency: TestDependencyKey {
+    static let testValue = Self()
+    static let previewValue = Self()
+}
+
+extension LiveActivityDependency: DependencyKey {
+    static let liveValue = Self()
+}
+
+extension DependencyValues {
+    var liveActivity: LiveActivityDependency {
+        get { self[LiveActivityDependency.self] }
+        set { self[LiveActivityDependency.self] = newValue }
+    }
+}
 #endif

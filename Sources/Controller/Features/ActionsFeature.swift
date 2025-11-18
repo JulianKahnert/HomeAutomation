@@ -20,7 +20,7 @@ struct ActionsFeature: Sendable {
         var actions: [ActionLogItem] = []
         var isLoading: Bool = false
         var error: String?
-        var limit: Int = 50
+        var limit: Int = 1000
         var searchText: String = ""
 
         var filteredActions: [ActionLogItem] {
@@ -43,7 +43,6 @@ struct ActionsFeature: Sendable {
         case actionsResponse(Result<[ActionLogItem], Error>)
         case clearActions
         case clearActionsResponse(Result<Void, Error>)
-        case setLimit(Int)
         case dismissError
         case binding(BindingAction<State>)
     }
@@ -100,12 +99,6 @@ struct ActionsFeature: Sendable {
             case let .clearActionsResponse(.failure(error)):
                 state.error = "Failed to clear actions: \(error.localizedDescription)"
                 return .none
-
-            case let .setLimit(limit):
-                state.limit = limit
-                return .run { send in
-                    await send(.refresh)
-                }
 
             case .dismissError:
                 state.error = nil

@@ -8,6 +8,7 @@
 @testable import Controller
 import Dependencies
 import Foundation
+import HAModels
 import Testing
 
 @Suite("FlowKitClient Dependency Tests")
@@ -75,12 +76,12 @@ struct FlowKitClientDependencyTests {
         } operation: {
             @Dependency(\.flowKitClient) var client
 
-            try await client.registerDevice(
-                "Test Device",
-                "abc123",
-                .apns,
-                "window_state"
+            let token = PushToken(
+                deviceName: "Test Device",
+                tokenString: "abc123",
+                type: .pushNotification
             )
+            try await client.registerDevice(token)
         }
     }
 }

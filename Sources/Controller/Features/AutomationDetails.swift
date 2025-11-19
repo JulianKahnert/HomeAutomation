@@ -28,7 +28,7 @@ struct AutomationDetails: Sendable {
         case updateIsLoading(Bool)
     }
 
-    @Dependency(\.flowKitClient) var flowKitClient
+    @Dependency(\.serverClient) var serverClient
 
     var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -112,4 +112,20 @@ struct AutomationDetailView: View {
         // TODO: da wo es angezeigt wird
         .navigationTitle(store.automation.name)
     }
+}
+
+#Preview {
+    AutomationDetailView(
+        store: Store(
+            initialState: AutomationDetails.State(
+                automation: Shared(value: AutomationInfo(
+                    name: "Test Automation",
+                    isActive: true,
+                    isRunning: true
+                ))
+            )
+        ) {
+            AutomationDetails()
+        }
+    )
 }

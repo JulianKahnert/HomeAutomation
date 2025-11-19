@@ -63,7 +63,6 @@ struct AppFeature: Sendable {
 
         // Background tasks
         case refreshWindowStates
-        case syncComplete
 
         case binding(BindingAction<State>)
     }
@@ -95,8 +94,9 @@ struct AppFeature: Sendable {
             switch action {
             case .onAppear:
                 return .run { send in
-                    await send(.startMonitoringLiveActivities)
-                    await send(.refreshWindowStates)
+                    async let monitoring: Void = send(.startMonitoringLiveActivities)
+                    async let refresh: Void = send(.refreshWindowStates)
+                    _ = await (monitoring, refresh)
                 }
 
             case let .selectedTabChanged(tab):
@@ -144,9 +144,8 @@ struct AppFeature: Sendable {
             // MARK: - Push Notifications
 
             case let .registerPushToken(token):
-                return .run { send in
+                return .run { _ in
                     try await serverClient.registerDevice(token)
-                    await send(.syncComplete)
                 }
 
             // MARK: - Background Tasks
@@ -155,9 +154,6 @@ struct AppFeature: Sendable {
                 return .run { send in
                     await send(.settings(.refreshWindowStates))
                 }
-
-            case .syncComplete:
-                return .none
 
             case .binding:
                 return .none

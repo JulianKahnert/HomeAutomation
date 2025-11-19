@@ -12,12 +12,6 @@ import HAModels
 import ServerClient
 import Sharing
 
-/// Push device token type
-enum PushDeviceTokenType: String, Sendable, Codable {
-    case apns
-    case fcm
-}
-
 // MARK: - ServerClient Dependency
 
 @DependencyClient

@@ -21,7 +21,7 @@ struct ActionsFeature: Sendable {
         let limit = 1000
         var actions: [ActionLogItem] = []
         var isLoading = false
-        var error: String?
+        @Presents var alert: AlertState<Action.Alert>?
         var searchText: String = ""
 
         var filteredActions: [ActionLogItem] {
@@ -34,6 +34,29 @@ struct ActionsFeature: Sendable {
                 item.searchableText.contains(searchLowercased)
             }
         }
+
+        var exportAsText: String {
+            let header = """
+            HomeKit Action Log
+            Exported: \(Date().formatted(date: .long, time: .standard))
+            Total Actions: \(actions.count)
+            =====================================
+
+            """
+
+            let entries = actions.map { item in
+                let status = item.hasCacheHit ? "✅ Cached" : "🆕 Fresh (no cache hit)"
+                return """
+                [\(item.timestamp.formatted(date: .numeric, time: .standard))] \(item.displayName)
+                Action: \(item.detailDescription)
+                Entity: \(item.entityId)
+                Status: \(status)
+
+                """
+            }.joined(separator: "\n")
+
+            return header + entries
+        }
     }
 
     // MARK: - Action
@@ -44,8 +67,12 @@ struct ActionsFeature: Sendable {
         case actionsResponse(Result<[ActionLogItem], Error>)
         case clearActions
         case clearActionsResponse(Result<Void, Error>)
-        case dismissError
+        case alert(PresentationAction<Alert>)
         case binding(BindingAction<State>)
+
+        enum Alert: Sendable {
+            case dismissError
+        }
     }
 
     // MARK: - Dependencies
@@ -65,7 +92,7 @@ struct ActionsFeature: Sendable {
 
             case .refresh:
                 state.isLoading = true
-                state.error = nil
+                state.alert = nil
                 let limit = state.limit
                 return .run { send in
                     await send(.actionsResponse(
@@ -80,11 +107,19 @@ struct ActionsFeature: Sendable {
 
             case let .actionsResponse(.failure(error)):
                 state.isLoading = false
-                state.error = "Failed to load actions: \(error.localizedDescription)"
+                state.alert = AlertState {
+                    TextState("Error")
+                } actions: {
+                    ButtonState(action: .dismissError) {
+                        TextState("OK")
+                    }
+                } message: {
+                    TextState("Failed to load actions: \(error.localizedDescription)")
+                }
                 return .none
 
             case .clearActions:
-                state.error = nil
+                state.alert = nil
                 return .run { send in
                     await send(.clearActionsResponse(
                         Result { try await serverClient.clearActions() }
@@ -98,17 +133,25 @@ struct ActionsFeature: Sendable {
                 }
 
             case let .clearActionsResponse(.failure(error)):
-                state.error = "Failed to clear actions: \(error.localizedDescription)"
+                state.alert = AlertState {
+                    TextState("Error")
+                } actions: {
+                    ButtonState(action: .dismissError) {
+                        TextState("OK")
+                    }
+                } message: {
+                    TextState("Failed to clear actions: \(error.localizedDescription)")
+                }
                 return .none
 
-            case .dismissError:
-                state.error = nil
+            case .alert:
                 return .none
 
             case .binding:
                 return .none
             }
         }
+        .ifLet(\.$alert, action: \.alert)
     }
 }
 
@@ -139,7 +182,7 @@ struct ActionsView: View {
 
                 ToolbarItem(placement: .secondaryAction) {
                     ShareLink(
-                        item: exportAsText(),
+                        item: store.exportAsText,
                         preview: SharePreview(
                             "HomeKit_Actions_\(Date().ISO8601Format()).txt",
                             image: Image(systemName: "doc.text")
@@ -174,6 +217,7 @@ struct ActionsView: View {
                     )
                 }
             }
+            .alert(store: store.scope(state: \.$alert, action: \.alert))
         }
     }
 
@@ -198,29 +242,6 @@ struct ActionsView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
-    }
-
-    private func exportAsText() -> String {
-        let header = """
-        HomeKit Action Log
-        Exported: \(Date().formatted(date: .long, time: .standard))
-        Total Actions: \(store.actions.count)
-        =====================================
-
-        """
-
-        let entries = store.actions.map { item in
-            let status = item.hasCacheHit ? "✅ Cached" : "🆕 Fresh (no cache hit)"
-            return """
-            [\(item.timestamp.formatted(date: .numeric, time: .standard))] \(item.displayName)
-            Action: \(item.detailDescription)
-            Entity: \(item.entityId)
-            Status: \(status)
-
-            """
-        }.joined(separator: "\n")
-
-        return header + entries
     }
 }
 

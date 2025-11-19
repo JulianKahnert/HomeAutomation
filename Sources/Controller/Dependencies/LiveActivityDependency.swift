@@ -127,7 +127,7 @@ extension LiveActivityDependency: DependencyKey {
 }
 #else
 extension LiveActivityDependency: DependencyKey {
-    static let liveValue = Self()
+    static let liveValue = Self.testValue
 }
 #endif
 

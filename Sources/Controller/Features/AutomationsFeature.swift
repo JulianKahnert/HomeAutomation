@@ -47,7 +47,7 @@ struct AutomationsFeature: Sendable {
 
     // MARK: - Dependencies
 
-    @Dependency(\.flowKitClient) var flowKitClient
+    @Dependency(\.serverClient) var serverClient
 
     // MARK: - Body
 
@@ -68,7 +68,7 @@ struct AutomationsFeature: Sendable {
                 state.error = nil
                 return .run { send in
                     await send(.automationsResponse(
-                        Result { try await flowKitClient.getAutomations() }
+                        Result { try await serverClient.getAutomations() }
                     ))
                 }
 

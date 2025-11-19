@@ -49,7 +49,7 @@ struct ActionsFeature: Sendable {
 
     // MARK: - Dependencies
 
-    @Dependency(\.flowKitClient) var flowKitClient
+    @Dependency(\.serverClient) var serverClient
 
     // MARK: - Body
 
@@ -68,7 +68,7 @@ struct ActionsFeature: Sendable {
                 let limit = state.limit
                 return .run { send in
                     await send(.actionsResponse(
-                        Result { try await flowKitClient.getActions(limit) }
+                        Result { try await serverClient.getActions(limit) }
                     ))
                 }
 
@@ -86,7 +86,7 @@ struct ActionsFeature: Sendable {
                 state.error = nil
                 return .run { send in
                     await send(.clearActionsResponse(
-                        Result { try await flowKitClient.clearActions() }
+                        Result { try await serverClient.clearActions() }
                     ))
                 }
 

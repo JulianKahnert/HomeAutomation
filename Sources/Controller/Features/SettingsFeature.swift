@@ -51,7 +51,7 @@ struct SettingsFeature: Sendable {
 
     // MARK: - Dependencies
 
-    @Dependency(\.flowKitClient) var flowKitClient
+    @Dependency(\.serverClient) var serverClient
     @Dependency(\.liveActivity) var liveActivity
     @Dependency(\.pushNotification) var pushNotification
 
@@ -104,7 +104,7 @@ struct SettingsFeature: Sendable {
                 state.error = nil
                 return .run { send in
                     await send(.windowStatesResponse(
-                        Result { try await flowKitClient.getWindowStates() }
+                        Result { try await serverClient.getWindowStates() }
                     ))
                 }
 

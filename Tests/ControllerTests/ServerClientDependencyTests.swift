@@ -1,8 +1,8 @@
 //
-//  FlowKitClientDependencyTests.swift
+//  ServerClientDependencyTests.swift
 //  ControllerFeaturesTests
 //
-//  Tests for FlowKitClient dependency
+//  Tests for ServerClient dependency
 //
 
 @testable import Controller
@@ -11,15 +11,15 @@ import Foundation
 import HAModels
 import Testing
 
-@Suite("FlowKitClient Dependency Tests")
-struct FlowKitClientDependencyTests {
+@Suite("ServerClient Dependency Tests")
+struct ServerClientDependencyTests {
 
     @Test("Test value returns empty arrays")
     func testTestValue() async throws {
         try await withDependencies {
-            $0.flowKitClient = .testValue
+            $0.serverClient = .testValue
         } operation: {
-            @Dependency(\.flowKitClient) var client
+            @Dependency(\.serverClient) var client
 
             let automations = try await client.getAutomations()
             #expect(automations.isEmpty)
@@ -35,9 +35,9 @@ struct FlowKitClientDependencyTests {
     @Test("Preview value returns mock data")
     func testPreviewValue() async throws {
         try await withDependencies {
-            $0.flowKitClient = .previewValue
+            $0.serverClient = .previewValue
         } operation: {
-            @Dependency(\.flowKitClient) var client
+            @Dependency(\.serverClient) var client
 
             let automations = try await client.getAutomations()
             #expect(automations.count == 3)
@@ -58,9 +58,9 @@ struct FlowKitClientDependencyTests {
     @Test("Activate/deactivate/stop operations don't throw")
     func testOperations() async throws {
         try await withDependencies {
-            $0.flowKitClient = .previewValue
+            $0.serverClient = .previewValue
         } operation: {
-            @Dependency(\.flowKitClient) var client
+            @Dependency(\.serverClient) var client
 
             try await client.activate("Morning Routine")
             try await client.deactivate("Morning Routine")
@@ -72,9 +72,9 @@ struct FlowKitClientDependencyTests {
     @Test("Register device doesn't throw")
     func testRegisterDevice() async throws {
         try await withDependencies {
-            $0.flowKitClient = .previewValue
+            $0.serverClient = .previewValue
         } operation: {
-            @Dependency(\.flowKitClient) var client
+            @Dependency(\.serverClient) var client
 
             let token = PushToken(
                 deviceName: "Test Device",

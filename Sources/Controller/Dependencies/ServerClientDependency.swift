@@ -1,8 +1,8 @@
 //
-//  FlowKitClientDependency.swift
+//  ServerClientDependency.swift
 //  ControllerFeatures
 //
-//  Dependency wrapper for FlowKit OpenAPI client
+//  Dependency wrapper for Server OpenAPI client
 //
 
 import Dependencies
@@ -18,10 +18,10 @@ enum PushDeviceTokenType: String, Sendable, Codable {
     case fcm
 }
 
-// MARK: - FlowKitClient Dependency
+// MARK: - ServerClient Dependency
 
 @DependencyClient
-struct FlowKitClientDependency: Sendable {
+struct ServerClientDependency: Sendable {
     /// Get all automations from the server
     var getAutomations: @Sendable () async throws -> [AutomationInfo]
 
@@ -49,7 +49,7 @@ struct FlowKitClientDependency: Sendable {
 
 // MARK: - Dependency Key Implementation
 
-extension FlowKitClientDependency: TestDependencyKey {
+extension ServerClientDependency: TestDependencyKey {
     static let testValue = Self(
         getAutomations: { [] },
         activate: { _ in },
@@ -98,7 +98,7 @@ extension FlowKitClientDependency: TestDependencyKey {
     )
 }
 
-extension FlowKitClientDependency: DependencyKey {
+extension ServerClientDependency: DependencyKey {
 
     static var client: ServerClient {
         @Shared(.serverURL) var serverURL
@@ -138,8 +138,8 @@ extension FlowKitClientDependency: DependencyKey {
 // MARK: - DependencyValues Extension
 
 extension DependencyValues {
-    var flowKitClient: FlowKitClientDependency {
-        get { self[FlowKitClientDependency.self] }
-        set { self[FlowKitClientDependency.self] = newValue }
+    var serverClient: ServerClientDependency {
+        get { self[ServerClientDependency.self] }
+        set { self[ServerClientDependency.self] = newValue }
     }
 }

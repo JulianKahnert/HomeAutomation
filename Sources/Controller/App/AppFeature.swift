@@ -71,7 +71,7 @@ struct AppFeature: Sendable {
 
     @Dependency(\.liveActivity) var liveActivity
     @Dependency(\.pushNotification) var pushNotification
-    @Dependency(\.flowKitClient) var flowKitClient
+    @Dependency(\.serverClient) var serverClient
 
     // MARK: - Body
 
@@ -144,7 +144,7 @@ struct AppFeature: Sendable {
 
             case let .registerPushToken(token):
                 return .run { send in
-                    try await flowKitClient.registerDevice(token)
+                    try await serverClient.registerDevice(token)
                     await send(.syncComplete)
                 }
 

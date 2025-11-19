@@ -5,14 +5,11 @@
 //  Dependency wrapper for Live Activities management
 //
 
-#if os(iOS)
-import ActivityKit
 import Dependencies
 import DependenciesMacros
 import Foundation
 import HAModels
 import Shared
-import UIKit
 
 // MARK: - LiveActivity Dependency
 
@@ -32,7 +29,7 @@ struct LiveActivityDependency: Sendable {
 
     /// Stream of push-to-start tokens
     var pushToStartTokenUpdates: @Sendable () async -> AsyncStream<PushToken> = { .finished }
-    
+
     /// Check if Live Activities are currently running
     var hasActiveActivities: @Sendable () async -> Bool = { false }
 }
@@ -65,6 +62,10 @@ extension LiveActivityDependency: TestDependencyKey {
         hasActiveActivities: { true }
     )
 }
+
+#if os(iOS)
+import ActivityKit
+import UIKit
 
 extension LiveActivityDependency: DependencyKey {
     static let liveValue: Self = {
@@ -124,6 +125,11 @@ extension LiveActivityDependency: DependencyKey {
         )
     }()
 }
+#else
+extension LiveActivityDependency: DependencyKey {
+    static let liveValue = Self()
+}
+#endif
 
 // MARK: - DependencyValues Extension
 
@@ -133,37 +139,3 @@ extension DependencyValues {
         set { self[LiveActivityDependency.self] = newValue }
     }
 }
-#else
-// MARK: - Stub for non-iOS platforms
-
-import Dependencies
-import DependenciesMacros
-import Foundation
-import HAModels
-
-@DependencyClient
-struct LiveActivityDependency: Sendable {
-    var startActivity: @Sendable (_ windowStates: [WindowContentState.WindowState]) async throws -> Void
-    var updateActivity: @Sendable (_ windowStates: [WindowContentState.WindowState]) async -> Void
-    var stopActivity: @Sendable () async -> Void
-    var pushTokenUpdates: @Sendable () async -> AsyncStream<PushToken> = { .finished }
-    var pushToStartTokenUpdates: @Sendable () async -> AsyncStream<PushToken> = { .finished }
-    var hasActiveActivities: @Sendable () async -> Bool = { false }
-}
-
-extension LiveActivityDependency: TestDependencyKey {
-    static let testValue = Self()
-    static let previewValue = Self()
-}
-
-extension LiveActivityDependency: DependencyKey {
-    static let liveValue = Self()
-}
-
-extension DependencyValues {
-    var liveActivity: LiveActivityDependency {
-        get { self[LiveActivityDependency.self] }
-        set { self[LiveActivityDependency.self] = newValue }
-    }
-}
-#endif

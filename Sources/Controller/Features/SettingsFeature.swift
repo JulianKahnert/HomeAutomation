@@ -111,7 +111,7 @@ struct SettingsFeature: Sendable {
             case let .windowStatesResponse(.success(windowStates)):
                 state.isLoadingWindowStates = false
                 state.windowContentState = WindowContentState(windowStates: windowStates)
-                
+
                 if state.liveActivitiesEnabled {
                     return .run { _ in
                         let hasActive = await liveActivity.hasActiveActivities()
@@ -128,7 +128,7 @@ struct SettingsFeature: Sendable {
             case let .windowStatesResponse(.failure(error)):
                 state.isLoadingWindowStates = false
                 state.error = "Failed to load window states: \(error.localizedDescription)"
-                
+
                 return .run { _ in
                     await liveActivity.updateActivity([])
                 }

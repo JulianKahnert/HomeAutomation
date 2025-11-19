@@ -10,30 +10,16 @@ import HAModels
 import SwiftUI
 
 struct AutomationsView: View {
-    let store: StoreOf<AutomationsFeature>
+    @Bindable var store: StoreOf<AutomationsFeature>
 
     var body: some View {
         NavigationStack {
-            List {
+            List(selection: $store.selectedAutomationIndex) {
                 if !store.runningAutomations.isEmpty {
                     Section("Running") {
-                        ForEach(store.runningAutomations, id: \.name) { automation in
-                            NavigationLink {
-                                AutomationDetailView(
-                                    automation: automation,
-                                    onActivate: { name in
-                                        store.send(.activateAutomation(name))
-                                    },
-                                    onDeactivate: { name in
-                                        store.send(.deactivateAutomation(name))
-                                    },
-                                    onStop: { name in
-                                        store.send(.stopAutomation(name))
-                                    }
-                                )
-                            } label: {
-                                automationRow(automation)
-                            }
+                        ForEach(store.runningAutomations) { automation in
+                            automationRow(automation)
+                                .tag(automation.id)
                         }
                     }
                 }
@@ -41,22 +27,8 @@ struct AutomationsView: View {
                 if !store.inactiveAutomations.isEmpty {
                     Section("Inactive") {
                         ForEach(store.inactiveAutomations, id: \.name) { automation in
-                            NavigationLink {
-                                AutomationDetailView(
-                                    automation: automation,
-                                    onActivate: { name in
-                                        store.send(.activateAutomation(name))
-                                    },
-                                    onDeactivate: { name in
-                                        store.send(.deactivateAutomation(name))
-                                    },
-                                    onStop: { name in
-                                        store.send(.stopAutomation(name))
-                                    }
-                                )
-                            } label: {
-                                automationRow(automation)
-                            }
+                            automationRow(automation)
+                                .tag(automation.id)
                         }
                     }
                 }
@@ -93,73 +65,6 @@ struct AutomationsView: View {
             if !automation.isActive {
                 Image(systemName: "x.circle")
                     .foregroundStyle(Color.red)
-            }
-        }
-    }
-}
-
-// MARK: - Automation Detail View
-
-private struct AutomationDetailView: View {
-    let automation: AutomationInfo
-    let onActivate: (String) -> Void
-    let onDeactivate: (String) -> Void
-    let onStop: (String) -> Void
-
-    @State private var isLoading = false
-
-    var body: some View {
-        Form {
-            Section {
-                HStack {
-                    Text("Is Running")
-                    Spacer()
-                    Image(systemName: "circle.fill")
-                        .foregroundStyle(automation.isRunning ? Color.green : Color.gray.opacity(0.3))
-                }
-            }
-
-            Section {
-                Toggle("Is Active", isOn: Binding(
-                    get: { automation.isActive },
-                    set: { value in
-                        toggleActive(value)
-                    }
-                ))
-                .disabled(isLoading)
-                .overlay {
-                    if isLoading {
-                        ProgressView()
-                    }
-                }
-            }
-
-            Section {
-                Button("Stop Automation") {
-                    onStop(automation.name)
-                }
-            }
-        }
-        .navigationTitle(automation.name)
-    }
-
-    private func toggleActive(_ value: Bool) {
-        Task {
-            await MainActor.run {
-                isLoading = true
-            }
-
-            if value {
-                onActivate(automation.name)
-            } else {
-                onDeactivate(automation.name)
-            }
-
-            // Wait for operation to complete
-            try? await Task.sleep(for: .seconds(1))
-
-            await MainActor.run {
-                isLoading = false
             }
         }
     }

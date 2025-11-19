@@ -25,3 +25,12 @@ extension SharedKey where Self == AppStorageKey<Bool>.Default {
         Self[.appStorage("liveActivitiesEnabled", store: .standard), default: true]
     }
 }
+
+// MARK: - In-Memory (volatile state)
+
+ extension SharedKey where Self == InMemoryKey<[AutomationInfo]> {
+    /// List of automations from the server
+    static var automations: Self {
+        inMemory("automations")
+    }
+ }

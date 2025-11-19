@@ -25,7 +25,7 @@ public final class AppDelegate: NSObject {
     }
 }
 
-#if canImport(UIKit)
+#if os(iOS)
 extension AppDelegate: UIApplicationDelegate {
     public func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
 
@@ -74,5 +74,10 @@ extension AppDelegate: UIApplicationDelegate {
     public func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
         logger.critical("Failed to register for remote notifications: \(error)")
     }
+}
+#else
+import AppKit
+
+extension AppDelegate: NSApplicationDelegate {
 }
 #endif

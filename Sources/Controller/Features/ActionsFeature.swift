@@ -17,10 +17,10 @@ struct ActionsFeature: Sendable {
 
     @ObservableState
     struct State: Equatable, Sendable {
+        let limit = 1000
         var actions: [ActionLogItem] = []
-        var isLoading: Bool = false
+        var isLoading = false
         var error: String?
-        var limit: Int = 1000
         var searchText: String = ""
 
         var filteredActions: [ActionLogItem] {

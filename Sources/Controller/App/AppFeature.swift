@@ -126,7 +126,7 @@ struct AppFeature: Sendable {
                                 await send(.registerPushToken(token))
                             }
                         }
-                        
+
                         group.addTask {
                             for await token in await liveActivity.pushTokenUpdates() {
                                 await send(.registerPushToken(token))

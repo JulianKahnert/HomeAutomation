@@ -10,8 +10,8 @@
 // This might be used as a DTO between the Server and the Controller.
 public struct AutomationInfo: Identifiable, Sendable, Codable, Equatable {
     public let name: String
-    public let isActive: Bool
-    public let isRunning: Bool
+    public var isActive: Bool
+    public var isRunning: Bool
 
     public var id: String { name }
 

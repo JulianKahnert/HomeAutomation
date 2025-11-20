@@ -118,6 +118,8 @@ struct SettingsFeature: Sendable {
                         let hasActive = await liveActivity.hasActiveActivities()
                         if hasActive {
                             await liveActivity.updateActivity(windowStates)
+                        } else if windowStates.isEmpty {
+                            await liveActivity.stopActivity()
                         } else {
                             try await liveActivity.startActivity(windowStates)
                         }

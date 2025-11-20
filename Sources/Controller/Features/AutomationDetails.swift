@@ -20,12 +20,14 @@ struct AutomationDetails: Sendable {
     struct State: Equatable, Sendable {
         @Shared var automation: AutomationInfo
         var isLoading = false
+        var error: String?
     }
 
     enum Action: Sendable {
         case stopAutomation
         case updateIsActive(Bool)
-        case updateIsLoading(Bool)
+        case isActiveOperationResponse(Result<Bool, Error>)
+        case stopOperationResponse(Result<Void, Error>)
     }
 
     @Dependency(\.serverClient) var serverClient
@@ -34,41 +36,49 @@ struct AutomationDetails: Sendable {
         Reduce { state, action in
             switch action {
             case .stopAutomation:
-                return .none
+                state.error = nil
+                state.isLoading = true
+                return .run { [name = state.automation.name] send in
+                    await send(.stopOperationResponse(
+                        Result { try await serverClient.stop(name) }
+                    ))
+                }
 
             case .updateIsActive(let isActive):
+                state.error = nil
+                state.isLoading = true
+                return .run { [name = state.automation.name] send in
+                    await send(.isActiveOperationResponse(
+                        Result {
+                            if isActive {
+                                try await serverClient.activate(name)
+                            } else {
+                                try await serverClient.deactivate(name)
+                            }
+                            return isActive
+                        }
+                    ))
+                }
+
+            case .isActiveOperationResponse(.success(let isActive)):
                 state.$automation.withLock { $0.isActive = isActive }
-                // TODO: use client here
+                state.isLoading = false
                 return .none
 
-            case .updateIsLoading(let isLoading):
-                state.isLoading = isLoading
+            case let .isActiveOperationResponse(.failure(error)):
+                state.isLoading = false
+                state.error = "Failed to load automations: \(error.localizedDescription)"
                 return .none
 
-//            case let .activateAutomation(name):
-//                state.error = nil
-//                return .run { send in
-//                    await send(.automationOperationResponse(
-//                        Result { try await flowKitClient.activate(name) }
-//                    ))
-//                }
-//
-//            case let .deactivateAutomation(name):
-//                state.error = nil
-//                return .run { send in
-//                    await send(.automationOperationResponse(
-//                        Result { try await flowKitClient.deactivate(name) }
-//                    ))
-//                }
-//
-//            case let .stopAutomation(name):
-//                state.error = nil
-//                return .run { send in
-//                    await send(.automationOperationResponse(
-//                        Result { try await flowKitClient.stop(name) }
-//                    ))
-//                }
+            case .stopOperationResponse(.success):
+                state.isLoading = false
+                state.$automation.withLock { $0.isRunning = false }
+                return .none
 
+            case let .stopOperationResponse(.failure(error)):
+                state.isLoading = false
+                state.error = "Failed to load automations: \(error.localizedDescription)"
+                return .none
             }
         }
     }
@@ -107,10 +117,13 @@ struct AutomationDetailView: View {
                 Button("Stop Automation") {
                     store.send(.stopAutomation)
                 }
+            } footer: {
+                if let error = store.error {
+                    Text(error)
+                        .foregroundStyle(Color.red)
+                }
             }
         }
-        // TODO: da wo es angezeigt wird
-        .navigationTitle(store.automation.name)
     }
 }
 

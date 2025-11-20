@@ -18,7 +18,7 @@ struct AutomationsFeature: Sendable {
 
     @ObservableState
     struct State: Equatable, Sendable {
-        @Shared(.automations) var automations: [AutomationInfo] = []
+        @Shared(.automations) var automations: IdentifiedArrayOf<AutomationInfo> = []
         var isLoading = false
         var selectedAutomationIndex: String?
         var error: String?
@@ -56,6 +56,15 @@ struct AutomationsFeature: Sendable {
         BindingReducer()
         Reduce { state, action in
             switch action {
+            case .binding(\.selectedAutomationIndex):
+                if let selectedAutomationIndex = state.selectedAutomationIndex,
+                   let automation = Shared(state.$automations[id: selectedAutomationIndex]) {
+                    state.selectedAutomation = .init(automation: automation)
+                } else {
+                    state.selectedAutomation = nil
+                }
+                return .none
+
             case .binding:
                 return .none
 
@@ -75,7 +84,7 @@ struct AutomationsFeature: Sendable {
 
             case let .automationsResponse(.success(automations)):
                 state.isLoading = false
-                state.$automations.withLock { $0 = automations }
+                state.$automations.withLock { $0 = IdentifiedArrayOf(uniqueElements: automations) }
                 return .none
 
             case let .automationsResponse(.failure(error)):
@@ -140,6 +149,11 @@ struct AutomationsView: View {
                 }
             }
             .navigationTitle("Automations")
+            .navigationDestination(item: $store.scope(state: \.selectedAutomation, action: \.selectedAutomation)) { automationStore in
+                AutomationDetailView(store: automationStore)
+                    .navigationTitle(automationStore.automation.name)
+            }
+            .sensoryFeedback(.selection, trigger: store.selectedAutomationIndex)
             .refreshable {
                 store.send(.refresh)
             }

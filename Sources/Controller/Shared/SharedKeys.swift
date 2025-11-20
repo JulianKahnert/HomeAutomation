@@ -5,6 +5,7 @@
 //  Shared state keys for TCA features
 //
 
+import ComposableArchitecture
 import Foundation
 import HAModels
 import Sharing
@@ -28,7 +29,7 @@ extension SharedKey where Self == AppStorageKey<Bool>.Default {
 
 // MARK: - In-Memory (volatile state)
 
- extension SharedKey where Self == InMemoryKey<[AutomationInfo]> {
+ extension SharedKey where Self == InMemoryKey<IdentifiedArrayOf<AutomationInfo>> {
     /// List of automations from the server
     static var automations: Self {
         inMemory("automations")

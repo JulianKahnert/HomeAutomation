@@ -115,8 +115,7 @@ let package = Package(
                 "Shared",
                 "ServerClient"
             ],
-            path: "Sources/Controller",
-            exclude: ["README.md"]
+            path: "Sources/Controller"
         ),
         .testTarget(
             name: "SharedTests",

@@ -30,7 +30,11 @@ extension SharedKey where Self == AppStorageKey<Bool>.Default {
 // MARK: - In-Memory (volatile state)
 
  extension SharedKey where Self == InMemoryKey<IdentifiedArrayOf<AutomationInfo>> {
-    /// List of automations from the server
+    /// List of automations from the server.
+    ///
+    /// Note: Using in-memory storage (Phase 1) means automation data is refreshed from the server
+    /// on each app launch. This provides always-fresh data but requires network connectivity.
+    /// Consider migrating to persistent storage in Phase 2 for offline support if needed.
     static var automations: Self {
         inMemory("automations")
     }

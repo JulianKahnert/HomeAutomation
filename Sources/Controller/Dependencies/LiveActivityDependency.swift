@@ -81,7 +81,7 @@ extension LiveActivityDependency: DependencyKey {
             },
             updateActivity: { windowStates in
                 guard let activity = Activity<WindowAttributes>.activities.last else {
-                    assertionFailure("Did not find any acticity")
+                    assertionFailure("Did not find any activity")
                     return
                 }
                 let newState = WindowContentState(windowStates: windowStates)

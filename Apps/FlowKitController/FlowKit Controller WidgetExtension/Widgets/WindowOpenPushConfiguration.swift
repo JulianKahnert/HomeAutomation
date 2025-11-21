@@ -6,6 +6,7 @@
 //
 
 #if os(iOS)
+import Controller
 import SwiftUI
 import WidgetKit
 

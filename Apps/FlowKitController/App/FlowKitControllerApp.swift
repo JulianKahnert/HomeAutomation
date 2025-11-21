@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 22.02.25.
 //
 
+import Controller
 import Logging
 import LoggingOSLog
 import SwiftUI
@@ -38,10 +39,7 @@ struct FlowKitControllerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                ContentView()
-                    .environment(appDelegate.appState)
-            }
+            RootView()
         }
     }
 }

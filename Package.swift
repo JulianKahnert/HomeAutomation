@@ -10,7 +10,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "HomeAutomationKit",
-            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared"]
+            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "Controller"]
         )
     ],
     dependencies: [
@@ -23,6 +23,11 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.3"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.7.0"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.0.0"),
+        // TCA and related
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.23.1"),
+        .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.7.4"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", from: "5.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.4"),
@@ -89,6 +94,29 @@ let package = Package(
                 "Shared"
             ]
         ),
+        .target(
+            name: "ServerClient",
+            dependencies: [
+                "HAModels",
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession")
+            ],
+            plugins: [
+                .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
+            ]
+        ),
+        .target(
+            name: "Controller",
+            dependencies: [
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+                "HAModels",
+                "Shared",
+                "ServerClient"
+            ],
+            path: "Sources/Controller"
+        ),
         .testTarget(
             name: "SharedTests",
             dependencies: [
@@ -104,6 +132,11 @@ let package = Package(
                 "HAImplementations",
                 "HAApplicationLayer"
             ]
+        ),
+        .testTarget(
+            name: "ControllerTests",
+            dependencies: ["Controller"],
+            path: "Tests/ControllerTests"
         )
     ]
 )

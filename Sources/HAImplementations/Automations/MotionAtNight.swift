@@ -90,10 +90,10 @@ public struct MotionAtNight: Automatable {
 
             log.debug("Adjusting lights")
             // We reduce the number of invocations/calls to the device to avoid flickering of it.
-            // Note: setting color temperature will also turn on the device
+            // Note: First set brightness, then color temperature
             for light in lights {
-                if light.colorTemperatureId != nil {
-                    await light.setColorTemperature(to: colorTemperatureValue, with: hm)
+                if light.brightnessId != nil {
+                    await light.setBrightness(to: brightnessValue, with: hm)
                 } else {
                     await light.turnOn(with: hm)
                 }
@@ -102,7 +102,7 @@ public struct MotionAtNight: Automatable {
             try? await Task.sleep(for: .milliseconds(300))
 
             for light in lights {
-                await light.setBrightness(to: brightnessValue, with: hm)
+                await light.setColorTemperature(to: colorTemperatureValue, with: hm)
             }
 
             // wait for x seconds or until this task wil be suspended

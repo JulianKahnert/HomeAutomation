@@ -84,7 +84,8 @@ struct AutomationsFeature: Sendable {
 
             case let .automationsResponse(.success(automations)):
                 state.isLoading = false
-                state.$automations.withLock { $0 = IdentifiedArrayOf(uniqueElements: automations) }
+                let sortedAutomations = automations.sorted { $0.name < $1.name }
+                state.$automations.withLock { $0 = IdentifiedArrayOf(uniqueElements: sortedAutomations) }
                 return .none
 
             case let .automationsResponse(.failure(error)):

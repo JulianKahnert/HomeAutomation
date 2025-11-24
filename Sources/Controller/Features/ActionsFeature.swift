@@ -169,7 +169,7 @@ struct ActionsView: View {
                 text: $store.searchText,
                 prompt: "Search actions..."
             )
-            .navigationTitle("Actions (\(store.filteredActions.count))")
+            .navigationTitle("Actions")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {

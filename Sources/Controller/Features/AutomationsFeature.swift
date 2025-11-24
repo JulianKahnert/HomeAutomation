@@ -54,7 +54,7 @@ struct AutomationsFeature: Sendable {
 
     var body: some ReducerOf<Self> {
         BindingReducer()
-        Reduce { state, action in
+        Reduce<State, Action> { state, action in
             switch action {
             case .binding(\.selectedAutomationIndex):
                 if let selectedAutomationIndex = state.selectedAutomationIndex,

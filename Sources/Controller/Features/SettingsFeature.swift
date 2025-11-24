@@ -116,10 +116,13 @@ struct SettingsFeature: Sendable {
                 if state.liveActivitiesEnabled {
                     return .run { _ in
                         let hasActive = await liveActivity.hasActiveActivities()
-                        if hasActive {
-                            await liveActivity.updateActivity(windowStates)
-                        } else if windowStates.isEmpty {
+
+                        // Check empty first to ensure we stop activities when no windows are open,
+                        // even if an activity is currently running (prevents showing empty live activities)
+                        if windowStates.isEmpty {
                             await liveActivity.stopActivity()
+                        } else if hasActive {
+                            await liveActivity.updateActivity(windowStates)
                         } else {
                             try await liveActivity.startActivity(windowStates)
                         }

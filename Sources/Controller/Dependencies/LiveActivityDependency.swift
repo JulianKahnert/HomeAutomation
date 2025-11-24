@@ -80,12 +80,19 @@ extension LiveActivityDependency: DependencyKey {
                 print("Live Activity started: \(activity.id)")
             },
             updateActivity: { windowStates in
-                guard let activity = Activity<WindowAttributes>.activities.last else {
+                var activities = Activity<WindowAttributes>.activities
+                let lastActivity = activities.popLast()
+
+                guard let lastActivity else {
                     assertionFailure("Did not find any activity")
                     return
                 }
                 let newState = WindowContentState(windowStates: windowStates)
-                await activity.update(.init(state: newState, staleDate: nil))
+                await lastActivity.update(.init(state: newState, staleDate: nil))
+
+                for activity in activities {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
             },
             stopActivity: {
                 for activity in Activity<WindowAttributes>.activities {

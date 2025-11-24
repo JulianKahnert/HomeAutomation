@@ -10,8 +10,12 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "HomeAutomationKit",
-            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "Controller"]
-        )
+            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared"]
+        ),
+        .library(
+            name: "ControllerKit",
+            targets: ["Controller"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.117.0"),

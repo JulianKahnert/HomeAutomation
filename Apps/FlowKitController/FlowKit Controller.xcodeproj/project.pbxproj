@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A34A9D0E2ED5036300D34BB3 /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A34A9D0D2ED5036300D34BB3 /* ControllerKit */; };
 		A3B8A0952D6A8468009314DA /* FlowKitControllerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */; };
 		A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */; };
 		A3B8A0972D6A8468009314DA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A08E2D6A8468009314DA /* Assets.xcassets */; };
@@ -15,9 +16,7 @@
 		A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515D2D798A69002DD924 /* SwiftUI.framework */; };
 		A3BA516C2D798A6A002DD924 /* FlowKit Controller WidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A3E34F212D7B1DDC002B0C63 /* LoggingOSLog in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F202D7B1DDC002B0C63 /* LoggingOSLog */; };
-		A3E34F262D7B1E87002B0C63 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */; };
 		A3E34F282D7B1E9D002B0C63 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F272D7B1E9D002B0C63 /* HomeAutomationKit */; };
-		A3F9BC802D6FA547002298ED /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F9BC7F2D6FA547002298ED /* HomeAutomationKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,9 +92,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A3E34F212D7B1DDC002B0C63 /* LoggingOSLog in Frameworks */,
+				A34A9D0E2ED5036300D34BB3 /* ControllerKit in Frameworks */,
 				A3BA51482D78D0EC002DD924 /* Logging in Frameworks */,
-				A3F9BC802D6FA547002298ED /* HomeAutomationKit in Frameworks */,
-				A3E34F262D7B1E87002B0C63 /* HomeAutomationKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -196,6 +194,7 @@
 				A3BA51472D78D0EC002DD924 /* Logging */,
 				A3E34F202D7B1DDC002B0C63 /* LoggingOSLog */,
 				A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */,
+				A34A9D0D2ED5036300D34BB3 /* ControllerKit */,
 			);
 			productName = HomeAutomation;
 			productReference = A3ECEDB12D6A841D00E56665 /* FlowKit Controller.app */;
@@ -641,6 +640,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A34A9D0D2ED5036300D34BB3 /* ControllerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ControllerKit;
+		};
 		A3BA51472D78D0EC002DD924 /* Logging */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A3BA51462D78D0EC002DD924 /* XCRemoteSwiftPackageReference "swift-log" */;

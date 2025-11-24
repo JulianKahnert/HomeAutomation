@@ -17,9 +17,6 @@
 		A3BC6BAF2D6916E3001BE1D5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA92D6916E3001BE1D5 /* SettingsView.swift */; };
 		A3BC6BB02D6916E3001BE1D5 /* CircadianLightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */; };
 		A3BC6BB12D6916E3001BE1D5 /* FlowKitAdapterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapterApp.swift */; };
-		A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */; };
-		A3EC945D2D63E8870009361C /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3EC945C2D63E8870009361C /* HomeAutomationKit */; };
-		A3F9BC7D2D6F99A9002298ED /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F9BC7C2D6F99A9002298ED /* HomeAutomationKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,9 +38,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A3F9BC7D2D6F99A9002298ED /* HomeAutomationKit in Frameworks */,
-				A3CA7DAE2D63BDD90019691F /* HomeAutomationKit in Frameworks */,
-				A3EC945D2D63E8870009361C /* HomeAutomationKit in Frameworks */,
 				A302FDFF2D6E56EA003FAB98 /* LoggingOSLog in Frameworks */,
 				A302FDFC2D6E4EFE003FAB98 /* HomeAutomationKit in Frameworks */,
 			);

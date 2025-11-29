@@ -21,10 +21,13 @@ public final class CustomActorSystem: Sendable {
     private let actorSystem: ClusterSystem
 
     public init(nodeId: NodeIdentity, host: String = "0.0.0.0", port: Int) async {
-        let nodes = Set<Cluster.Endpoint>([
+        let allNodes = Set<Cluster.Endpoint>([
             .init(host: "0.0.0.0", port: 7777),
             .init(host: "0.0.0.0", port: 8888)
         ])
+
+        // Remove "self" to prevent hangs in initial connection between adapter and server
+        let nodes = allNodes.filter { $0.port != port }
 
         // setup cluster
         var settings = ClusterSystemSettings(name: nodeId.id, host: host, port: port)

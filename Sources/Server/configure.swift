@@ -155,9 +155,9 @@ public func configure(_ app: Application) async throws {
     // MARK: - home automation setup
 
     app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
-    let notificationSender = await PushNotifcationService(database: app.db,
-                                                          apnsClient: apnsClient,
-                                                          notificationTopic: notificationTopic)
+    let notificationSender = PushNotifcationService(database: app.db,
+                                                    apnsClient: apnsClient,
+                                                    notificationTopic: notificationTopic)
 
     let homeManager = await HomeManager(getAdapter: {
         await actorSystem.lookup(.homeKitCommandReceiver)

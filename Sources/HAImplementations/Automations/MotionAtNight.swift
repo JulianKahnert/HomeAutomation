@@ -101,7 +101,7 @@ public struct MotionAtNight: Automatable {
 
             try? await Task.sleep(for: .milliseconds(300))
 
-            for light in lights {
+            for light in lights where light.hasColorTemperatureSupport {
                 await light.setColorTemperature(to: colorTemperatureValue, with: hm)
             }
 

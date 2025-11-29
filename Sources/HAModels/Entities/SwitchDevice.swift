@@ -5,11 +5,13 @@
 //  Created by Julian Kahnert on 12.02.25.
 //
 
+import Shared
+
 public protocol Validatable {
     func validate(with: HomeManagable) async throws
 }
 
-open class SwitchDevice: Codable, @unchecked Sendable, Validatable {
+open class SwitchDevice: Codable, @unchecked Sendable, Validatable, Log {
     public let switchId: EntityId
     public let brightnessId: EntityId?
     public let colorTemperatureId: EntityId?
@@ -20,6 +22,12 @@ open class SwitchDevice: Codable, @unchecked Sendable, Validatable {
         self.brightnessId = brightnessId
         self.colorTemperatureId = colorTemperatureId
         self.rgbId = rgbId
+    }
+
+    /// Returns true if this device supports color temperature adjustment
+    /// either through a native colorTemperature characteristic or via RGB color control
+    public var hasColorTemperatureSupport: Bool {
+        colorTemperatureId != nil || rgbId != nil
     }
 
     public func turnOn(with hm: HomeManagable) async {
@@ -39,6 +47,11 @@ open class SwitchDevice: Codable, @unchecked Sendable, Validatable {
     /// Color temperature normalized to 0...1 (warm ... white)
     public func setColorTemperature(to value: Float, with hm: any HomeManagable) async {
         assert((0...1).contains(value))
+
+        guard hasColorTemperatureSupport else {
+            log.warning("setColorTemperature called on device without support: \(switchId)")
+            return
+        }
 
         if let colorTemperatureId {
             await hm.perform(.setColorTemperature(colorTemperatureId, value))

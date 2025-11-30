@@ -35,6 +35,7 @@ let package = Package(
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", from: "5.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.4"),
+        .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", from: "0.2.1"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
 //        .package(url: "https://github.com/swift-server-community/APNSwift", branch: "main")
@@ -66,7 +67,8 @@ let package = Package(
         .target(
             name: "Shared",
             dependencies: [
-                .product(name: "Logging", package: "swift-log")
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "LoggingOSLog", package: "swift-log-oslog"),
             ]
         ),
         .target(
@@ -74,7 +76,7 @@ let package = Package(
             dependencies: [
                 "HAModels",
                 "Shared",
-                .product(name: "DistributedCluster", package: "swift-distributed-actors")
+                .product(name: "DistributedCluster", package: "swift-distributed-actors"),
             ]
         ),
         .target(
@@ -117,7 +119,7 @@ let package = Package(
                 .product(name: "Sharing", package: "swift-sharing"),
                 "HAModels",
                 "Shared",
-                "ServerClient"
+                "ServerClient",
             ],
             path: "Sources/Controller"
         ),

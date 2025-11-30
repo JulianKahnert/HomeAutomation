@@ -11,12 +11,12 @@
 		A3B8A0952D6A8468009314DA /* FlowKitControllerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */; };
 		A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */; };
 		A3B8A0972D6A8468009314DA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A08E2D6A8468009314DA /* Assets.xcassets */; };
-		A3BA51482D78D0EC002DD924 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = A3BA51472D78D0EC002DD924 /* Logging */; };
 		A3BA515C2D798A69002DD924 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515B2D798A69002DD924 /* WidgetKit.framework */; };
 		A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515D2D798A69002DD924 /* SwiftUI.framework */; };
 		A3BA516C2D798A6A002DD924 /* FlowKit Controller WidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		A3E34F212D7B1DDC002B0C63 /* LoggingOSLog in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F202D7B1DDC002B0C63 /* LoggingOSLog */; };
-		A3E34F282D7B1E9D002B0C63 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F272D7B1E9D002B0C63 /* HomeAutomationKit */; };
+		A3DEAD582EDB93FE00AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F9BC7F2D6FA547002298ED /* HomeAutomationKit */; };
+		A3DEAD592EDB93FE00AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */; };
+		A3DEAD692EDC5DA100AC511A /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEAD682EDC5DA100AC511A /* ControllerKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,8 +82,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */,
+				A3DEAD692EDC5DA100AC511A /* ControllerKit in Frameworks */,
 				A3BA515C2D798A69002DD924 /* WidgetKit.framework in Frameworks */,
-				A3E34F282D7B1E9D002B0C63 /* HomeAutomationKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,9 +91,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A3E34F212D7B1DDC002B0C63 /* LoggingOSLog in Frameworks */,
+				A3DEAD592EDB93FE00AC511A /* HomeAutomationKit in Frameworks */,
+				A3DEAD582EDB93FE00AC511A /* HomeAutomationKit in Frameworks */,
 				A34A9D0E2ED5036300D34BB3 /* ControllerKit in Frameworks */,
-				A3BA51482D78D0EC002DD924 /* Logging in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -168,7 +168,7 @@
 			);
 			name = "FlowKit Controller WidgetExtensionExtension";
 			packageProductDependencies = (
-				A3E34F272D7B1E9D002B0C63 /* HomeAutomationKit */,
+				A3DEAD682EDC5DA100AC511A /* ControllerKit */,
 			);
 			productName = "FlowKit Controller WidgetExtensionExtension";
 			productReference = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */;
@@ -191,8 +191,6 @@
 			name = "FlowKit Controller";
 			packageProductDependencies = (
 				A3F9BC7F2D6FA547002298ED /* HomeAutomationKit */,
-				A3BA51472D78D0EC002DD924 /* Logging */,
-				A3E34F202D7B1DDC002B0C63 /* LoggingOSLog */,
 				A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */,
 				A34A9D0D2ED5036300D34BB3 /* ControllerKit */,
 			);
@@ -229,9 +227,6 @@
 			mainGroup = A3ECEDA82D6A841D00E56665;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A3BA51462D78D0EC002DD924 /* XCRemoteSwiftPackageReference "swift-log" */,
-				A3E34F1F2D7B1DDC002B0C63 /* XCRemoteSwiftPackageReference "swift-log-oslog" */,
-				A3E34F242D7B1E87002B0C63 /* XCLocalSwiftPackageReference "../.." */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A3ECEDB22D6A841D00E56665 /* Products */;
@@ -613,54 +608,17 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		A3E34F242D7B1E87002B0C63 /* XCLocalSwiftPackageReference "../.." */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../..;
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		A3BA51462D78D0EC002DD924 /* XCRemoteSwiftPackageReference "swift-log" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-log";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.6.2;
-			};
-		};
-		A3E34F1F2D7B1DDC002B0C63 /* XCRemoteSwiftPackageReference "swift-log-oslog" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/chrisaljoudi/swift-log-oslog";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.2.2;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		A34A9D0D2ED5036300D34BB3 /* ControllerKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ControllerKit;
 		};
-		A3BA51472D78D0EC002DD924 /* Logging */ = {
+		A3DEAD682EDC5DA100AC511A /* ControllerKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A3BA51462D78D0EC002DD924 /* XCRemoteSwiftPackageReference "swift-log" */;
-			productName = Logging;
-		};
-		A3E34F202D7B1DDC002B0C63 /* LoggingOSLog */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A3E34F1F2D7B1DDC002B0C63 /* XCRemoteSwiftPackageReference "swift-log-oslog" */;
-			productName = LoggingOSLog;
+			productName = ControllerKit;
 		};
 		A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = HomeAutomationKit;
-		};
-		A3E34F272D7B1E9D002B0C63 /* HomeAutomationKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A3E34F242D7B1E87002B0C63 /* XCLocalSwiftPackageReference "../.." */;
 			productName = HomeAutomationKit;
 		};
 		A3F9BC7F2D6FA547002298ED /* HomeAutomationKit */ = {

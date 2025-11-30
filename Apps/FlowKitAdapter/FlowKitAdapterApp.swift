@@ -8,8 +8,7 @@
 import Adapter
 import HAImplementations
 import HAModels
-import Logging
-import LoggingOSLog
+import Shared
 import SwiftUI
 
 @MainActor var commandReceiver: HomeKitCommandReceiver!
@@ -20,24 +19,14 @@ struct FlowKitApp {
     static func main() {
 
         // we use this workaround to initialize the logging system before anything else is constructed
-        let stream = FileLogHandler.FileHandlerOutputStream(basePath: URL.documentsDirectory)
-        LoggingSystem.bootstrap { label in
-            let handlers: [LogHandler] = [
-                FileLogHandler(label: label, stream: stream),
-                LoggingOSLog(label: label)
-            ]
-            var mpxHandler = MultiplexLogHandler(handlers)
-            mpxHandler.logLevel = .debug
-            return MultiplexLogHandler(handlers)
-        }
+        initLogging(withFileLogging: true, logLevel: .debug)
 
         // start the app
         FlowKitAdapter.main()
     }
 }
 
-struct FlowKitAdapter: App {
-    static let log = Logger(label: "FlowKit Adapter")
+struct FlowKitAdapter: App, Log {
     @AppStorage("ShouldCrashIfActorSystemInitFails") private var shouldCrashIfActorSystemInitFails = false
     @State private var logTask: Task<Void, Never>?
     @State private var entities: [EntityStorageItem] = []

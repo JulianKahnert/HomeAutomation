@@ -6,6 +6,10 @@ on:
       - main
       - develop
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   swift-package:
     name: Swift Package Build & Test
@@ -41,9 +45,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode version
-        run: sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
-
       - name: Show Xcode version
         run: xcodebuild -version
 
@@ -58,14 +59,6 @@ jobs:
             -derivedDataPath .build \
             clean build \
             | xcpretty || true
-
-      - name: Upload build logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.app.name }}-build-logs
-          path: ${{ matrix.app.path }}/.build/Logs
-          retention-days: 7
 
   docker:
     name: Docker Build

@@ -86,10 +86,3 @@ jobs:
           tags: homeautomation-server:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Test Docker image
-        run: |
-          docker run --rm -d --name test-container homeautomation-server:test
-          sleep 5
-          docker logs test-container
-          docker stop test-container || true

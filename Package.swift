@@ -69,6 +69,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "LoggingOSLog", package: "swift-log-oslog", condition: .when(platforms: [.macOS, .iOS, .macCatalyst, .tvOS, .watchOS, .visionOS])),
+                .product(name: "DistributedCluster", package: "swift-distributed-actors"),
             ]
         ),
         .target(

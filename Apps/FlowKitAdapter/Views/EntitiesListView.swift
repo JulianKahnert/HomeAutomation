@@ -7,6 +7,7 @@
 
 import Adapter
 import HAModels
+import Shared
 import SwiftUI
 
 struct EntitiesListView: View {

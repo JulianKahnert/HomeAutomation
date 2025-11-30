@@ -7,6 +7,7 @@
 
 import Adapter
 import HAImplementations
+import Shared
 import SwiftUI
 
 struct SettingsView: View {

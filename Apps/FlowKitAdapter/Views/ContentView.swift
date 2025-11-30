@@ -36,11 +36,9 @@ struct ContentView: View {
             }
             .task {
                 // Update connection status periodically
-                while !Task.isCancelled {
-                    if let system = actorSystem {
-                        connectionStatus = await system.connectionStatus
-                    }
-                    try? await Task.sleep(for: .seconds(1))
+                for await _ in Timer.publish(every: .seconds(1)) {
+                    guard let actorSystem else { continue }
+                    connectionStatus = await actorSystem.connectionStatus
                 }
             }
         }
@@ -51,14 +49,9 @@ struct ConnectionStatusView: View {
     let status: ConnectionStatus
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 12, height: 12)
-            Text(statusText)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
+        Circle()
+            .fill(statusColor)
+            .frame(width: 12, height: 12)
     }
 
     private var statusColor: Color {
@@ -69,17 +62,6 @@ struct ConnectionStatusView: View {
             return .yellow
         case .error:
             return .red
-        }
-    }
-
-    private var statusText: String {
-        switch status {
-        case .up:
-            return "Connected"
-        case .joining:
-            return "Connecting..."
-        case .error:
-            return "Connection Error"
         }
     }
 }

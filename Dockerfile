@@ -17,8 +17,7 @@ WORKDIR /build
 # as long as your Package.swift/Package.resolved
 # files do not change.
 COPY ./Package.* ./
-RUN swift package resolve \
-        $([ -f ./Package.resolved ] && echo "--force-resolved-versions" || true)
+RUN swift package resolve
 
 # Copy entire repo into container
 COPY . .

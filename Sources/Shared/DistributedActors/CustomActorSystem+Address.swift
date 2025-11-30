@@ -8,9 +8,9 @@
 import Foundation
 
 extension CustomActorSystem {
-    public struct Address: Codable, Equatable, CustomStringConvertible {
-        let host: String
-        let port: Int
+    public struct Address: Codable, Equatable, CustomStringConvertible, Sendable {
+        public let host: String
+        public let port: Int
 
         public init(host: String, port: Int) {
             self.host = host

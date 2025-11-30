@@ -6,8 +6,7 @@
 //
 
 import Controller
-import Logging
-import LoggingOSLog
+import Shared
 import SwiftUI
 
 @main
@@ -16,14 +15,7 @@ struct FlowKitApp {
     static func main() {
 
         // we use this workaround to initialize the logging system before anything else is constructed
-        LoggingSystem.bootstrap { label in
-            let handlers: [LogHandler] = [
-                LoggingOSLog(label: label)
-            ]
-            var mpxHandler = MultiplexLogHandler(handlers)
-            mpxHandler.logLevel = .debug
-            return MultiplexLogHandler(handlers)
-        }
+        initLogging(withFileLogging: false, logLevel: .debug)
 
         // start the app
         FlowKitControllerApp.main()

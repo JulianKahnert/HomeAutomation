@@ -10,12 +10,12 @@ import Foundation
 import Logging
 
 extension FileLogHandler {
-    public actor FileHandlerOutputStream {
+    actor FileHandlerOutputStream {
         private let url: URL
         private var nextRotationDate: Date
         private var fileHandle: FileHandle
 
-        public init(basePath url: URL) {
+        init(basePath url: URL) {
             self.url = url
             self.fileHandle = Self.getNewFileHandle(basePath: url)
             self.nextRotationDate = Calendar.current.nextDate(after: Date(),
@@ -23,7 +23,7 @@ extension FileLogHandler {
                                                               matchingPolicy: .nextTime)!
         }
 
-        public func write(_ string: String) {
+        func write(_ string: String) {
             if Date() > nextRotationDate {
                 self.fileHandle = Self.getNewFileHandle(basePath: url)
                 self.nextRotationDate = Calendar.current.nextDate(after: Date(),
@@ -63,20 +63,20 @@ extension FileLogHandler {
 
 /// `FileLogHandler` is a simple implementation of `LogHandler` for directing
 /// `Logger` output to a local file. Appends log output to this file, even across constructor calls.
-public struct FileLogHandler: LogHandler {
+struct FileLogHandler: LogHandler {
     private let stream: FileHandlerOutputStream
     private var label: String
 
-    public var logLevel: Logger.Level = .info
+    var logLevel: Logger.Level = .info
 
     private var prettyMetadata: String?
-    public var metadata = Logger.Metadata() {
+    var metadata = Logger.Metadata() {
         didSet {
             self.prettyMetadata = self.prettify(self.metadata)
         }
     }
 
-    public subscript(metadataKey metadataKey: String) -> Logger.Metadata.Value? {
+    subscript(metadataKey metadataKey: String) -> Logger.Metadata.Value? {
         get {
             return self.metadata[metadataKey]
         }
@@ -85,12 +85,12 @@ public struct FileLogHandler: LogHandler {
         }
     }
 
-    public init(label: String, stream: FileHandlerOutputStream) {
+    init(label: String, stream: FileHandlerOutputStream) {
         self.label = label
         self.stream = stream
     }
 
-    public func log(level: Logger.Level,
+    func log(level: Logger.Level,
                     message: Logger.Message,
                     metadata: Logger.Metadata?,
                     source: String,

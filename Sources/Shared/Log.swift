@@ -36,7 +36,14 @@ public func initLogging(withFileLogging: Bool, logLevel: Logger.Level) {
         #endif
 
         if withFileLogging {
-            let stream = FileLogHandler.FileHandlerOutputStream(basePath: URL.documentsDirectory)
+            #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS) || os(visionOS)
+            let logBasePath = URL.documentsDirectory
+            #else
+            // Linux fallback: use temporary directory for logs
+            let logBasePath = FileManager.default.temporaryDirectory.appendingPathComponent("logs")
+            try? FileManager.default.createDirectory(at: logBasePath, withIntermediateDirectories: true)
+            #endif
+            let stream = FileLogHandler.FileHandlerOutputStream(basePath: logBasePath)
             handlers.append(FileLogHandler(label: label, stream: stream))
         }
 

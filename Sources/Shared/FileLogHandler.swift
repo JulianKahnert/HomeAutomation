@@ -115,7 +115,12 @@ struct FileLogHandler: LogHandler {
     private func timestamp() -> String {
         var buffer = [Int8](repeating: 0, count: 255)
         var timestamp = time(nil)
-        let localTime = localtime(&timestamp)
+        guard let localTime = localtime(&timestamp) else {
+            // Fallback to ISO8601 formatter if localtime fails
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withColonSeparatorInTimeZone]
+            return formatter.string(from: Date())
+        }
         strftime(&buffer, buffer.count, "%Y-%m-%dT%H:%M:%S%z", localTime)
         return buffer.withUnsafeBufferPointer {
             $0.withMemoryRebound(to: CChar.self) {

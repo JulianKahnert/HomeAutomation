@@ -18,15 +18,20 @@ public struct NodeIdentity: Sendable {
 
 /// Connection status of the distributed actor system
 public enum ConnectionStatus: Sendable {
-    case up          // Successfully connected
-    case joining     // Attempting to connect
-    case error       // Connection failed/lost
+    /// Successfully connected
+    case up
+    /// Attempting to connect
+    case joining
+    /// Connection failed/lost
+    case error
 }
 
 /// Discovery mode for cluster initialization
 public enum DiscoveryMode: Sendable {
-    case none                                    // Server mode: no discovery, only accept connections
-    case staticEndpoint(CustomActorSystem.Address)  // Adapter mode: connect to specific server
+    /// Server mode: no discovery, only accept connections
+    case none
+    /// Adapter mode: connect to specific server
+    case staticEndpoint(CustomActorSystem.Address)
 }
 
 /// Actor to manage connection status in a thread-safe way
@@ -44,6 +49,7 @@ public final class CustomActorSystem: Sendable {
     private let statusActor: ConnectionStatusActor
 
     /// Current connection status (observable for UI)
+    // TODO: this should be a stream
     public var connectionStatus: ConnectionStatus {
         get async {
             await statusActor.status
@@ -88,10 +94,48 @@ public final class CustomActorSystem: Sendable {
 
     /// Update connection state based on cluster events
     private func updateConnectionState(_ event: Cluster.Event) async {
-        // TODO: Monitor cluster membership to track connection status
-        // The swift-distributed-actors API for cluster events needs to be investigated
-        // to properly track when nodes join, leave, and connection status changes
-        log.info("Processing cluster event: \(event)")
+        switch event {
+        case .membershipChange(let change):
+            await handleChange(of: change.member)
+        case .reachabilityChange(let change):
+            await handleChange(of: change.member)
+        case .leadershipChange:
+            // Leader changes don't affect our connection status
+            break
+        case .snapshot(let members):
+            // Snapshot events are informational only
+            guard let member = members.first(where: { $0.node == actorSystem.cluster.node }) else { break }
+            await handleChange(of: member)
+        default:
+            log.warning("Unknown cluster event type: \(event)")
+        }
+    }
+
+    /// Handle cluster membership changes
+    private func handleChange(of member: Cluster.Member) async {
+        guard actorSystem.cluster.node == member.node else { return }
+
+        switch member.status {
+        case .joining:
+            log.info("Member joined: \(member.node)")
+            await statusActor.updateStatus(.joining)
+
+        case .up:
+            log.info("Member is up: \(member.node)")
+            // Update to 'up' status when we or another member is fully up
+            await statusActor.updateStatus(.up)
+
+        case .leaving:
+            log.info("Member leaving: \(member.node)")
+
+        case .removed:
+            log.warning("Member removed: \(member.node)")
+            // If we're tracking a specific server and it's removed, mark as error
+            await statusActor.updateStatus(.error)
+
+        default:
+            log.warning("Unknown membership change: \(member)")
+        }
     }
 
     public var endpointDescription: String {
@@ -113,13 +157,8 @@ public final class CustomActorSystem: Sendable {
         return await actorSystem.receptionist.lookup(key).first
     }
 
-    public func listing<Guest>(of key: DistributedReception.Key<Guest>) async -> DistributedReception.GuestListing<Guest>
-    where Guest: DistributedActor, Guest.ActorSystem == ClusterSystem {
+    public func listing<Guest>(of key: DistributedReception.Key<Guest>) async -> DistributedReception.GuestListing<Guest> where Guest: DistributedActor, Guest.ActorSystem == ClusterSystem {
         return await actorSystem.receptionist.listing(of: key)
-    }
-
-    public func joined(within duration: Duration) async throws {
-        try await actorSystem.cluster.joined(within: duration)
     }
 
     public func waitForThisNode(is clusterState: Cluster.MemberStatus, within duration: Duration) async throws {

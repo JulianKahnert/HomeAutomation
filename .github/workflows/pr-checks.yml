@@ -66,3 +66,30 @@ jobs:
           name: ${{ matrix.app.name }}-build-logs
           path: ${{ matrix.app.path }}/.build/Logs
           retention-days: 7
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: homeautomation-server:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker image
+        run: |
+          docker run --rm -d --name test-container homeautomation-server:test
+          sleep 5
+          docker logs test-container
+          docker stop test-container || true

@@ -1,29 +1,82 @@
-name: Run PR Checks
+name: PR Checks
 
 on:
   pull_request:
+    branches:
+      - main
+      - develop
 
 jobs:
-  PR-Checks:
-    runs-on: macos-26
-    permissions:
-      contents: write
+  swiftlint:
+    name: SwiftLint
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
+        uses: actions/checkout@v4
 
       - name: Install SwiftLint
         run: brew install swiftlint
 
       - name: Run SwiftLint
-        run: swiftlint
+        run: swiftlint --strict
 
-      - name: Build
+  swift-package:
+    name: Swift Package Build & Test
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Swift Package
         run: swift build
 
       - name: Run Tests
         run: swift test
+
+  ios-apps:
+    name: iOS Apps Build
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - name: FlowKitAdapter
+            path: Apps/FlowKitAdapter
+            project: FlowKit Adapter.xcodeproj
+            scheme: FlowKit Adapter
+          - name: FlowKitController
+            path: Apps/FlowKitController
+            project: FlowKit Controller.xcodeproj
+            scheme: FlowKit Controller
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode version
+        run: sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build ${{ matrix.app.name }}
+        working-directory: ${{ matrix.app.path }}
+        run: |
+          xcodebuild \
+            -project "${{ matrix.app.project }}" \
+            -scheme "${{ matrix.app.scheme }}" \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath .build \
+            clean build \
+            | xcpretty || true
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app.name }}-build-logs
+          path: ${{ matrix.app.path }}/.build/Logs
+          retention-days: 7

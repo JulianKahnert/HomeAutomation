@@ -7,6 +7,7 @@
 
 import Distributed
 import DistributedCluster
+import Foundation
 import Logging
 import ServiceDiscovery
 
@@ -37,9 +38,37 @@ public enum DiscoveryMode: Sendable {
 /// Actor to manage connection status in a thread-safe way
 actor ConnectionStatusActor {
     private(set) var status: ConnectionStatus = .joining
+    private var continuations: [UUID: AsyncStream<ConnectionStatus>.Continuation] = [:]
 
     func updateStatus(_ newStatus: ConnectionStatus) {
+        guard status != newStatus else { return }
         status = newStatus
+
+        // Notify all stream subscribers
+        for continuation in continuations.values {
+            continuation.yield(newStatus)
+        }
+    }
+
+    func createStream() -> AsyncStream<ConnectionStatus> {
+        AsyncStream { continuation in
+            let id = UUID()
+            continuations[id] = continuation
+
+            // Yield the current status immediately
+            continuation.yield(status)
+
+            // Clean up when the stream terminates
+            continuation.onTermination = { [weak self] _ in
+                Task {
+                    await self?.removeContinuation(id)
+                }
+            }
+        }
+    }
+
+    private func removeContinuation(_ id: UUID) {
+        continuations.removeValue(forKey: id)
     }
 }
 
@@ -48,11 +77,10 @@ public final class CustomActorSystem: Sendable {
     private let actorSystem: ClusterSystem
     private let statusActor: ConnectionStatusActor
 
-    /// Current connection status (observable for UI)
-    // TODO: this should be a stream
-    public var connectionStatus: ConnectionStatus {
+    /// Stream of connection status changes (pushes updates when status changes)
+    public var connectionStatus: AsyncStream<ConnectionStatus> {
         get async {
-            await statusActor.status
+            await statusActor.createStream()
         }
     }
 

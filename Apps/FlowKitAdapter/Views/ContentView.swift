@@ -35,10 +35,10 @@ struct ContentView: View {
                 }
             }
             .task {
-                // Update connection status periodically
-                for await _ in Timer.publish(every: .seconds(1)) {
-                    guard let actorSystem else { continue }
-                    connectionStatus = await actorSystem.connectionStatus
+                // Subscribe to connection status changes
+                guard let actorSystem else { return }
+                for await status in await actorSystem.connectionStatus {
+                    connectionStatus = status
                 }
             }
         }

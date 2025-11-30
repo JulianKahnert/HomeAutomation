@@ -7,16 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A34A9D0E2ED5036300D34BB3 /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A34A9D0D2ED5036300D34BB3 /* ControllerKit */; };
 		A3B8A0952D6A8468009314DA /* FlowKitControllerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B8A0912D6A8468009314DA /* FlowKitControllerApp.swift */; };
 		A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A0922D6A8468009314DA /* Preview Assets.xcassets */; };
 		A3B8A0972D6A8468009314DA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3B8A08E2D6A8468009314DA /* Assets.xcassets */; };
 		A3BA515C2D798A69002DD924 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515B2D798A69002DD924 /* WidgetKit.framework */; };
 		A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515D2D798A69002DD924 /* SwiftUI.framework */; };
 		A3BA516C2D798A6A002DD924 /* FlowKit Controller WidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		A3DEAD582EDB93FE00AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F9BC7F2D6FA547002298ED /* HomeAutomationKit */; };
-		A3DEAD592EDB93FE00AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */; };
-		A3DEAD692EDC5DA100AC511A /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEAD682EDC5DA100AC511A /* ControllerKit */; };
+		A3DEADC42EDC67F200AC511A /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEADC32EDC67F200AC511A /* ControllerKit */; };
+		A3DEADC62EDC67F200AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEADC52EDC67F200AC511A /* HomeAutomationKit */; };
+		A3DEADC82EDC67F900AC511A /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEADC72EDC67F900AC511A /* ControllerKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,8 +81,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */,
-				A3DEAD692EDC5DA100AC511A /* ControllerKit in Frameworks */,
 				A3BA515C2D798A69002DD924 /* WidgetKit.framework in Frameworks */,
+				A3DEADC82EDC67F900AC511A /* ControllerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,9 +90,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A3DEAD592EDB93FE00AC511A /* HomeAutomationKit in Frameworks */,
-				A3DEAD582EDB93FE00AC511A /* HomeAutomationKit in Frameworks */,
-				A34A9D0E2ED5036300D34BB3 /* ControllerKit in Frameworks */,
+				A3DEADC42EDC67F200AC511A /* ControllerKit in Frameworks */,
+				A3DEADC62EDC67F200AC511A /* HomeAutomationKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -168,7 +166,7 @@
 			);
 			name = "FlowKit Controller WidgetExtensionExtension";
 			packageProductDependencies = (
-				A3DEAD682EDC5DA100AC511A /* ControllerKit */,
+				A3DEADC72EDC67F900AC511A /* ControllerKit */,
 			);
 			productName = "FlowKit Controller WidgetExtensionExtension";
 			productReference = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */;
@@ -190,9 +188,8 @@
 			);
 			name = "FlowKit Controller";
 			packageProductDependencies = (
-				A3F9BC7F2D6FA547002298ED /* HomeAutomationKit */,
-				A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */,
-				A34A9D0D2ED5036300D34BB3 /* ControllerKit */,
+				A3DEADC32EDC67F200AC511A /* ControllerKit */,
+				A3DEADC52EDC67F200AC511A /* HomeAutomationKit */,
 			);
 			productName = HomeAutomation;
 			productReference = A3ECEDB12D6A841D00E56665 /* FlowKit Controller.app */;
@@ -227,6 +224,7 @@
 			mainGroup = A3ECEDA82D6A841D00E56665;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A3DEADB02EDC678300AC511A /* XCLocalSwiftPackageReference "../.." */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A3ECEDB22D6A841D00E56665 /* Products */;
@@ -608,22 +606,25 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		A3DEADB02EDC678300AC511A /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
-		A34A9D0D2ED5036300D34BB3 /* ControllerKit */ = {
+		A3DEADC32EDC67F200AC511A /* ControllerKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ControllerKit;
 		};
-		A3DEAD682EDC5DA100AC511A /* ControllerKit */ = {
+		A3DEADC52EDC67F200AC511A /* HomeAutomationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HomeAutomationKit;
+		};
+		A3DEADC72EDC67F900AC511A /* ControllerKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ControllerKit;
-		};
-		A3E34F252D7B1E87002B0C63 /* HomeAutomationKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = HomeAutomationKit;
-		};
-		A3F9BC7F2D6FA547002298ED /* HomeAutomationKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = HomeAutomationKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

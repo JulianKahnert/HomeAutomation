@@ -7,7 +7,9 @@
 
 import Foundation
 import Logging
+#if canImport(os)
 import LoggingOSLog
+#endif
 
 public protocol Log {
     var log: Logger { get }
@@ -25,7 +27,13 @@ public extension Log {
 
 public func initLogging(withFileLogging: Bool, logLevel: Logger.Level) {
     LoggingSystem.bootstrap { label in
-        var handlers: [LogHandler] = [LoggingOSLog(label: label)]
+        var handlers: [LogHandler] = []
+
+        #if canImport(os)
+        handlers.append(LoggingOSLog(label: label))
+        #else
+        handlers.append(StreamLogHandler.standardOutput(label: label))
+        #endif
 
         if withFileLogging {
             let stream = FileLogHandler.FileHandlerOutputStream(basePath: URL.documentsDirectory)

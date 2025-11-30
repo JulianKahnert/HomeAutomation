@@ -68,7 +68,7 @@ let package = Package(
             name: "Shared",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
-                .product(name: "LoggingOSLog", package: "swift-log-oslog"),
+                .product(name: "LoggingOSLog", package: "swift-log-oslog", condition: .when(platforms: [.macOS, .iOS, .macCatalyst, .tvOS, .watchOS, .visionOS])),
             ]
         ),
         .target(

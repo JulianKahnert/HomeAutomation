@@ -40,56 +40,20 @@ public final class CustomActorSystem: Sendable {
     private let log = Logger(label: "ActorSystem")
     private let actorSystem: ClusterSystem
 
-    /// Stream of connection status changes derived from cluster events
-    /// Uses cluster.events.share() to allow multiple consumers
+    /// Stream of connection status changes derived from cluster events.
+    /// Returns a shared async sequence that allows multiple consumers.
+    ///
+    /// Note: While this is a computed property, each access returns the same underlying
+    /// shared sequence created by `.share()`. The share operator manages a single subscription
+    /// to the source sequence and multicasts events to all consumers.
     public var connectionStatus: some AsyncSequence<ConnectionStatus, Never> {
         actorSystem.cluster.events
-            .compactMap { [weak actorSystem, log] event -> ConnectionStatus? in
-                log.info("Cluster event: \(event)")
-
-                guard let actorSystem else { return nil }
-
-                // Extract member from event
-                let member: Cluster.Member? = switch event {
-                case .membershipChange(let change):
-                    change.member
-                case .reachabilityChange(let change):
-                    change.member
-                case .snapshot(let members):
-                    members.first(where: { $0.node == actorSystem.cluster.node })
-                case .leadershipChange:
-                    nil
-                default:
-                    nil
-                }
-
-                // Only process events for our own node
-                guard let member, member.node == actorSystem.cluster.node else {
-                    return nil
-                }
-
-                // Map member status to connection status
-                switch member.status {
-                case .joining:
-                    log.info("Member joined: \(member.node)")
-                    return .joining
-
-                case .up:
-                    log.info("Member is up: \(member.node)")
-                    return .up
-
-                case .removed:
-                    log.warning("Member removed: \(member.node)")
-                    return .error
-
-                case .leaving:
-                    log.info("Member leaving: \(member.node)")
-                    return nil
-
-                default:
-                    log.warning("Unknown membership status: \(member.status)")
-                    return nil
-                }
+            .compactMap { [weak actorSystem, log] event in
+                Self.mapEventToConnectionStatus(
+                    event: event,
+                    actorSystem: actorSystem,
+                    log: log
+                )
             }
             .share()
     }
@@ -112,6 +76,76 @@ public final class CustomActorSystem: Sendable {
 
         settings.logging.logLevel = .warning
         actorSystem = await ClusterSystem(nodeId.id, settings: settings)
+    }
+
+    /// Maps cluster events to connection status for the local node
+    /// - Parameters:
+    ///   - event: The cluster event to process
+    ///   - actorSystem: The actor system (weak reference to avoid retain cycles)
+    ///   - log: Logger instance for event logging
+    /// - Returns: Connection status if the event is relevant for the local node, nil otherwise
+    private static func mapEventToConnectionStatus(
+        event: Cluster.Event,
+        actorSystem: ClusterSystem?,
+        log: Logger
+    ) -> ConnectionStatus? {
+        log.info("Cluster event: \(event)")
+
+        guard let actorSystem else { return nil }
+
+        // Extract member from event
+        let member: Cluster.Member? = switch event {
+        case .membershipChange(let change):
+            change.member
+        case .reachabilityChange(let change):
+            change.member
+        case .snapshot(let members):
+            members.first(where: { $0.node == actorSystem.cluster.node })
+        case .leadershipChange:
+            nil
+        default:
+            nil
+        }
+
+        // Only process events for our own node
+        guard let member, member.node == actorSystem.cluster.node else {
+            return nil
+        }
+
+        // Map member status to connection status
+        return Self.mapMemberStatusToConnectionStatus(member: member, log: log)
+    }
+
+    /// Maps cluster member status to connection status
+    /// - Parameters:
+    ///   - member: The cluster member
+    ///   - log: Logger instance for status logging
+    /// - Returns: Connection status if the member status is relevant, nil otherwise
+    private static func mapMemberStatusToConnectionStatus(
+        member: Cluster.Member,
+        log: Logger
+    ) -> ConnectionStatus? {
+        switch member.status {
+        case .joining:
+            log.info("Member joined: \(member.node)")
+            return .joining
+
+        case .up:
+            log.info("Member is up: \(member.node)")
+            return .up
+
+        case .removed:
+            log.warning("Member removed: \(member.node)")
+            return .error
+
+        case .leaving:
+            log.info("Member leaving: \(member.node)")
+            return nil
+
+        default:
+            log.warning("Unknown membership status: \(member.status)")
+            return nil
+        }
     }
 
     public var endpointDescription: String {

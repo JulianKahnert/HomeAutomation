@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 06.02.25.
 //
 
+import AsyncAlgorithms
 import Distributed
 import DistributedCluster
 import Foundation
@@ -35,59 +36,65 @@ public enum DiscoveryMode: Sendable {
     case staticEndpoint(CustomActorSystem.Address)
 }
 
-/// Actor to manage connection status in a thread-safe way
-actor ConnectionStatusActor {
-    private(set) var status: ConnectionStatus = .joining
-    private var continuations: [UUID: AsyncStream<ConnectionStatus>.Continuation] = [:]
-
-    func updateStatus(_ newStatus: ConnectionStatus) {
-        guard status != newStatus else { return }
-        status = newStatus
-
-        // Notify all stream subscribers
-        for continuation in continuations.values {
-            continuation.yield(newStatus)
-        }
-    }
-
-    func createStream() -> AsyncStream<ConnectionStatus> {
-        AsyncStream { continuation in
-            let id = UUID()
-            continuations[id] = continuation
-
-            // Yield the current status immediately
-            continuation.yield(status)
-
-            // Clean up when the stream terminates
-            continuation.onTermination = { [weak self] _ in
-                Task {
-                    await self?.removeContinuation(id)
-                }
-            }
-        }
-    }
-
-    private func removeContinuation(_ id: UUID) {
-        continuations.removeValue(forKey: id)
-    }
-}
-
 public final class CustomActorSystem: Sendable {
     private let log = Logger(label: "ActorSystem")
     private let actorSystem: ClusterSystem
-    private let statusActor: ConnectionStatusActor
 
-    /// Stream of connection status changes (pushes updates when status changes)
-    public var connectionStatus: AsyncStream<ConnectionStatus> {
-        get async {
-            await statusActor.createStream()
-        }
+    /// Stream of connection status changes derived from cluster events
+    /// Uses cluster.events.share() to allow multiple consumers
+    public var connectionStatus: some AsyncSequence<ConnectionStatus, Never> {
+        actorSystem.cluster.events
+            .compactMap { [weak actorSystem, log] event -> ConnectionStatus? in
+                log.info("Cluster event: \(event)")
+
+                guard let actorSystem else { return nil }
+
+                // Extract member from event
+                let member: Cluster.Member? = switch event {
+                case .membershipChange(let change):
+                    change.member
+                case .reachabilityChange(let change):
+                    change.member
+                case .snapshot(let members):
+                    members.first(where: { $0.node == actorSystem.cluster.node })
+                case .leadershipChange:
+                    nil
+                default:
+                    nil
+                }
+
+                // Only process events for our own node
+                guard let member, member.node == actorSystem.cluster.node else {
+                    return nil
+                }
+
+                // Map member status to connection status
+                switch member.status {
+                case .joining:
+                    log.info("Member joined: \(member.node)")
+                    return .joining
+
+                case .up:
+                    log.info("Member is up: \(member.node)")
+                    return .up
+
+                case .removed:
+                    log.warning("Member removed: \(member.node)")
+                    return .error
+
+                case .leaving:
+                    log.info("Member leaving: \(member.node)")
+                    return nil
+
+                default:
+                    log.warning("Unknown membership status: \(member.status)")
+                    return nil
+                }
+            }
+            .share()
     }
 
     public init(nodeId: NodeIdentity, host: String = "0.0.0.0", port: Int, discovery: DiscoveryMode) async {
-        // Initialize connection status actor
-        statusActor = ConnectionStatusActor()
-
         // Setup cluster settings
         var settings = ClusterSystemSettings(name: nodeId.id, host: host, port: port)
 
@@ -105,65 +112,6 @@ public final class CustomActorSystem: Sendable {
 
         settings.logging.logLevel = .warning
         actorSystem = await ClusterSystem(nodeId.id, settings: settings)
-
-        // Start monitoring cluster events for connection status
-        Task {
-            await self.monitorClusterEvents()
-        }
-    }
-
-    /// Monitor cluster events and update connection status
-    private func monitorClusterEvents() async {
-        for await event in actorSystem.cluster.events {
-            log.info("Cluster event: \(event)")
-            await updateConnectionState(event)
-        }
-    }
-
-    /// Update connection state based on cluster events
-    private func updateConnectionState(_ event: Cluster.Event) async {
-        switch event {
-        case .membershipChange(let change):
-            await handleChange(of: change.member)
-        case .reachabilityChange(let change):
-            await handleChange(of: change.member)
-        case .leadershipChange:
-            // Leader changes don't affect our connection status
-            break
-        case .snapshot(let members):
-            // Snapshot events are informational only
-            guard let member = members.first(where: { $0.node == actorSystem.cluster.node }) else { break }
-            await handleChange(of: member)
-        default:
-            log.warning("Unknown cluster event type: \(event)")
-        }
-    }
-
-    /// Handle cluster membership changes
-    private func handleChange(of member: Cluster.Member) async {
-        guard actorSystem.cluster.node == member.node else { return }
-
-        switch member.status {
-        case .joining:
-            log.info("Member joined: \(member.node)")
-            await statusActor.updateStatus(.joining)
-
-        case .up:
-            log.info("Member is up: \(member.node)")
-            // Update to 'up' status when we or another member is fully up
-            await statusActor.updateStatus(.up)
-
-        case .leaving:
-            log.info("Member leaving: \(member.node)")
-
-        case .removed:
-            log.warning("Member removed: \(member.node)")
-            // If we're tracking a specific server and it's removed, mark as error
-            await statusActor.updateStatus(.error)
-
-        default:
-            log.warning("Unknown membership change: \(member)")
-        }
     }
 
     public var endpointDescription: String {

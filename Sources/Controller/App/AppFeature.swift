@@ -50,7 +50,6 @@ struct AppFeature: Sendable {
     // MARK: - Action
 
     enum Action: Sendable, BindableAction {
-        case onAppear
         case selectedTabChanged(Tab)
         case automations(AutomationsFeature.Action)
         case actions(ActionsFeature.Action)
@@ -63,6 +62,9 @@ struct AppFeature: Sendable {
 
         // Background tasks
         case refreshWindowStates
+
+        // Scene phase changes
+        case scenePhaseChanged(old: ScenePhase, new: ScenePhase)
 
         case binding(BindingAction<State>)
     }
@@ -92,13 +94,6 @@ struct AppFeature: Sendable {
 
         Reduce { state, action in
             switch action {
-            case .onAppear:
-                return .run { send in
-                    async let monitoring: Void = send(.startMonitoringLiveActivities)
-                    async let refresh: Void = send(.refreshWindowStates)
-                    _ = await (monitoring, refresh)
-                }
-
             case let .selectedTabChanged(tab):
                 state.selectedTab = tab
                 return .none
@@ -155,6 +150,30 @@ struct AppFeature: Sendable {
                     await send(.settings(.refreshWindowStates))
                 }
 
+            // MARK: - Scene Phase Changes
+
+            case let .scenePhaseChanged(old: oldPhase, new: newPhase):
+                // Handle transitions to active state
+                // This covers both:
+                // - Initial app launch (inactive -> active)
+                // - Return from background (background -> active)
+                guard newPhase == .active else {
+                    return .none
+                }
+
+                // Only refresh when transitioning FROM inactive or background TO active
+                guard oldPhase == .inactive || oldPhase == .background else {
+                    return .none
+                }
+
+                // Refresh all tabs and start monitoring when app becomes active
+                return .merge(
+                    .send(.automations(.refresh)),
+                    .send(.actions(.refresh)),
+                    .send(.refreshWindowStates),
+                    .send(.startMonitoringLiveActivities)
+                )
+
             case .binding:
                 return .none
             }
@@ -207,8 +226,8 @@ struct AppView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .onAppear {
-            store.send(.onAppear)
+        .onSceneChange { oldPhase, newPhase in
+            store.send(.scenePhaseChanged(old: oldPhase, new: newPhase))
         }
     }
 }

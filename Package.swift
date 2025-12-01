@@ -18,7 +18,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", from: "4.117.0"),
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.119.2"),
         // 🗄 An ORM for SQL and NoSQL databases.
         .package(url: "https://github.com/vapor/fluent.git", from: "4.13.0"),
         // 🐬 Fluent driver for MySQL.
@@ -27,19 +27,19 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.3"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.10.0"),
-        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.7.0"),
-        .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.8.3"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.2.0"),
         // TCA and related
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.23.1"),
         .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.7.4"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", from: "5.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.4"),
-        .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", from: "0.2.1"),
+        .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", from: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
 //        .package(url: "https://github.com/swift-server-community/APNSwift", branch: "main")
-        .package(url: "https://github.com/swift-server-community/APNSwift", from: "6.1.0")
+        .package(url: "https://github.com/swift-server-community/APNSwift", from: "6.2.0")
     ],
     targets: [
         .executableTarget(

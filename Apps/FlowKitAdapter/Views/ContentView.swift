@@ -37,7 +37,8 @@ struct ContentView: View {
             .task {
                 // Subscribe to connection status changes
                 guard let actorSystem else { return }
-                for await status in actorSystem.connectionStatus {
+                let sequence = actorSystem.connectionStatus as! any AsyncSequence<ConnectionStatus, Never>
+                for await status in sequence {
                     connectionStatus = status
                 }
             }

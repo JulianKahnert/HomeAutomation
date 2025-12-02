@@ -39,13 +39,12 @@ public enum DiscoveryMode: Sendable {
 public final class CustomActorSystem: Sendable {
     private let log = Logger(label: "ActorSystem")
     private let actorSystem: ClusterSystem
-    private let statusChannel: AsyncChannel<ConnectionStatus>
+    nonisolated(unsafe) private let _connectionStatus: Any
 
     /// Stream of connection status changes derived from cluster events.
-    /// Returns a shared async sequence that allows multiple consumers.
-    /// The channel is created once during initialization and shared across all consumers.
-    public var connectionStatus: AsyncChannel<ConnectionStatus> {
-        statusChannel
+    /// Shared sequence created once during initialization.
+    public var connectionStatus: Any {
+        _connectionStatus
     }
 
     public init(nodeId: NodeIdentity, host: String = "0.0.0.0", port: Int, discovery: DiscoveryMode) async {
@@ -67,32 +66,28 @@ public final class CustomActorSystem: Sendable {
         settings.logging.logLevel = .warning
         actorSystem = await ClusterSystem(nodeId.id, settings: settings)
 
-        // Create a single AsyncChannel that will be shared across all consumers
-        statusChannel = AsyncChannel<ConnectionStatus>()
-
-        // Start a background task that forwards cluster events to the channel
-        Task {
-            for await event in actorSystem.cluster.events {
-                if let status = Self.mapEventToConnectionStatus(
+        // Create shared connection status sequence once using compactMap + share
+        let currentNode = actorSystem.cluster.node
+        _connectionStatus = actorSystem.cluster.events
+            .compactMap { [log] event in
+                Self.mapEventToConnectionStatus(
                     event: event,
-                    actorSystem: actorSystem,
+                    currentNode: currentNode,
                     log: log
-                ) {
-                    await statusChannel.send(status)
-                }
+                )
             }
-        }
+            .share()
     }
 
     /// Maps cluster events to connection status for the local node
     /// - Parameters:
     ///   - event: The cluster event to process
-    ///   - actorSystem: The actor system (weak reference to avoid retain cycles)
+    ///   - currentNode: The current node to filter events for
     ///   - log: Logger instance for event logging
     /// - Returns: Connection status if the event is relevant for the local node, nil otherwise
     private static func mapEventToConnectionStatus(
         event: Cluster.Event,
-        actorSystem: ClusterSystem,
+        currentNode: Cluster.Node,
         log: Logger
     ) -> ConnectionStatus? {
         log.info("Cluster event: \(event)")
@@ -104,7 +99,7 @@ public final class CustomActorSystem: Sendable {
         case .reachabilityChange(let change):
             change.member
         case .snapshot(let members):
-            members.first(where: { $0.node == actorSystem.cluster.node })
+            members.first(where: { $0.node == currentNode })
         case .leadershipChange:
             nil
         default:
@@ -112,7 +107,7 @@ public final class CustomActorSystem: Sendable {
         }
 
         // Only process events for our own node
-        guard let member, member.node == actorSystem.cluster.node else {
+        guard let member, member.node == currentNode else {
             return nil
         }
 

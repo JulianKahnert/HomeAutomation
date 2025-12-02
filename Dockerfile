@@ -1,13 +1,15 @@
+# syntax=docker/dockerfile:1
 # ================================
 # Build image
 # ================================
 FROM swift:6.2-noble AS build
 
-# Install OS updates
+# Install OS updates and dependencies in a single layer
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
     && apt-get -q update \
     && apt-get -q dist-upgrade -y \
-    && apt-get install -y libjemalloc-dev
+    && apt-get install -y libjemalloc-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set up a build area
 WORKDIR /build
@@ -17,16 +19,23 @@ WORKDIR /build
 # as long as your Package.swift/Package.resolved
 # files do not change.
 COPY ./Package.* ./
-RUN swift package resolve
+
+# Use cache mounts for SPM to speed up dependency resolution
+RUN --mount=type=cache,target=/build/.build/checkouts \
+    --mount=type=cache,target=/build/.build/repositories \
+    swift package resolve
 
 # Copy entire repo into container
 COPY . .
 
-# Build the application, with optimizations, with static linking, and using jemalloc
-# N.B.: The static version of jemalloc is incompatible with the static Swift runtime.
-RUN swift build -c release \
+# Build with cache mounts and parallel compilation
+# Use all available CPU cores for faster compilation
+RUN --mount=type=cache,target=/build/.build/checkouts \
+    --mount=type=cache,target=/build/.build/repositories \
+    swift build -c release \
         --product Server \
         --static-swift-stdlib \
+        -Xswiftc -j$(nproc) \
         -Xlinker -ljemalloc
 
 # Switch to the staging area

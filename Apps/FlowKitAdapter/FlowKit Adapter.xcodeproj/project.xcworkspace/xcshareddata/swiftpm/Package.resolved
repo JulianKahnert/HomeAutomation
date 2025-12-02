@@ -1,5 +1,5 @@
 {
-  "originHash" : "5cb3b822615aafcda852c501b21166ec2cf1d87914167df82f24f507271404aa",
+  "originHash" : "c0ed5b7efddff79aa580ae59201bf1fa681faf28b0da835c4606553ebe0e303a",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms",
       "state" : {
-        "revision" : "2773d4125311133a2f705ec374c363a935069d45",
-        "version" : "1.1.0"
+        "revision" : "6c050d5ef8e1aa6342528460db614e9770d7f804",
+        "version" : "1.1.1"
       }
     },
     {

@@ -48,6 +48,14 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Resolve Package Dependencies for ${{ matrix.app.name }}
+        working-directory: ${{ matrix.app.path }}
+        run: |
+          xcodebuild \
+            -project "${{ matrix.app.project }}" \
+            -scheme "${{ matrix.app.scheme }}" \
+            -resolvePackageDependencies
+
       - name: Build ${{ matrix.app.name }}
         working-directory: ${{ matrix.app.path }}
         run: |

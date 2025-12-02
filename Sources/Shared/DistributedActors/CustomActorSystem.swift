@@ -39,11 +39,11 @@ public enum DiscoveryMode: Sendable {
 public final class CustomActorSystem: Sendable {
     private let log = Logger(label: "ActorSystem")
     private let actorSystem: ClusterSystem
-    nonisolated(unsafe) private let _connectionStatus: Any
+    nonisolated(unsafe) private let _connectionStatus: any AsyncSequence<ConnectionStatus, Never>
 
     /// Stream of connection status changes derived from cluster events.
     /// Shared sequence created once during initialization.
-    public var connectionStatus: Any {
+    public var connectionStatus: any AsyncSequence<ConnectionStatus, Never> {
         _connectionStatus
     }
 

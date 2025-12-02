@@ -48,13 +48,26 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Resolve Package Dependencies for ${{ matrix.app.name }}
+      - name: Check Package.resolved is up to date for ${{ matrix.app.name }}
         working-directory: ${{ matrix.app.path }}
         run: |
+          # Resolve dependencies to update Package.resolved
           xcodebuild \
             -project "${{ matrix.app.project }}" \
             -scheme "${{ matrix.app.scheme }}" \
             -resolvePackageDependencies
+
+          # Check if Package.resolved was modified
+          RESOLVED_PATH="${{ matrix.app.project }}/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+          if git diff --exit-code "$RESOLVED_PATH"; then
+            echo "✅ Package.resolved is up to date"
+          else
+            echo "❌ Package.resolved is out of date!"
+            echo "Please run the following command and commit the changes:"
+            echo "cd ${{ matrix.app.path }} && xcodebuild -project '${{ matrix.app.project }}' -scheme '${{ matrix.app.scheme }}' -resolvePackageDependencies"
+            git diff "$RESOLVED_PATH"
+            exit 1
+          fi
 
       - name: Build ${{ matrix.app.name }}
         working-directory: ${{ matrix.app.path }}

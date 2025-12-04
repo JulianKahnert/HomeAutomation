@@ -11,7 +11,7 @@ import HAModels
 public final class LightBulbDimmable: SwitchDevice, @unchecked Sendable {
     public convenience init(query: EntityId.Query) {
         self.init(switchId: EntityId(query: query, characteristic: .switcher),
-                  brightnessId: EntityId(query: query, characteristic: .switcher),
+                  brightnessId: EntityId(query: query, characteristic: .brightness),
                   colorTemperatureId: nil,
                   rgbId: nil)
     }

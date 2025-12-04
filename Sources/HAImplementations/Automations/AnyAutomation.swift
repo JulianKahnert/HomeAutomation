@@ -9,7 +9,6 @@ import HAModels
 
 public enum AnyAutomation: Codable, Sendable {
     case createScene(CreateScene)
-    case energyLowPrice(EnergyLowPrice)
     #if canImport(WeatherKit)
     case gardenWatering(GardenWatering)
     #endif
@@ -26,7 +25,6 @@ public enum AnyAutomation: Codable, Sendable {
     public var automation: any Automatable {
         switch self {
         case .createScene(let createScene): return createScene
-        case .energyLowPrice(let energyLowPrice): return energyLowPrice
         case .motionAtNight(let motionAtNight): return motionAtNight
         case .turnOnForDuration(let turnOnForDuration): return turnOnForDuration
         #if canImport(WeatherKit)
@@ -45,7 +43,6 @@ public enum AnyAutomation: Codable, Sendable {
     public var automationTypes: [Automatable.Type] {
         var tmp: [Automatable.Type] = [
             CreateScene.self,
-            EnergyLowPrice.self,
             HealthCheck.self,
             MaintenanceAutomation.self,
             MotionAtNight.self,
@@ -66,8 +63,6 @@ public enum AnyAutomation: Codable, Sendable {
     public static func create(from automation: any Automatable) -> AnyAutomation {
         if let createScene = automation as? CreateScene {
             return .createScene(createScene)
-        } else if let energyLowPrice = automation as? EnergyLowPrice {
-            return .energyLowPrice(energyLowPrice)
         } else if let healthCheck = automation as? HealthCheck {
             return .healthCheck(healthCheck)
         } else if let maintenanceAutomation = automation as? MaintenanceAutomation {

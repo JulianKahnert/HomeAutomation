@@ -1,11 +1,5 @@
 # Setup Server
 
-## Prerequisites
-
-If using the "EnergyLowPrice" automation, you need to change the Tibber API key with the URL "https://api.tibber.com/v1-beta/gql".
-It will be set automatically when the automation runs for the first time.
-
-
 ## Setup
 
 ```

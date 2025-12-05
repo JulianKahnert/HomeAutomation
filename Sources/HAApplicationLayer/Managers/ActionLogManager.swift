@@ -1,20 +1,18 @@
 //
-//  ActionLogger.swift
-//  HAModels
+//  ActionLogManager.swift
+//  HomeAutomationKit
 //
 //  Created by Julian Kahnert on 14.11.25.
 //
 
-import Foundation
+import HAModels
 
-public actor ActionLogger {
-    public static let shared = ActionLogger()
-
+public actor ActionLogManager {
     public static let maxEntries = 1000
 
     private var actions: [ActionLogItem] = []
 
-    private init() {}
+    public init() {}
 
     public func log(
         action: HomeManagableAction,

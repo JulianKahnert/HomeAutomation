@@ -136,7 +136,7 @@ struct OpenAPIController: APIProtocol {
     func getActions(_ input: Operations.GetActions.Input) async throws -> Operations.GetActions.Output {
         let limit = input.query.limit
 
-        let actionItems = await ActionLogger.shared.getActions(limit: limit)
+        let actionItems = await request.application.homeManager.getActionLog(limit: limit)
 
         // Map to OpenAPI schema types
         let schemaItems = actionItems.compactMap { item -> Components.Schemas.ActionLogItem? in
@@ -157,7 +157,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func clearActions(_ input: Operations.ClearActions.Input) async throws -> Operations.ClearActions.Output {
-        await ActionLogger.shared.clear()
+        await request.application.homeManager.clearActionLog()
         return .ok
     }
 

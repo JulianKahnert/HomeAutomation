@@ -8,10 +8,7 @@
 import Distributed
 import DistributedCluster
 import HAModels
-
-extension NodeIdentity {
-    public static let homeKitAdapter = NodeIdentity(id: "homeKitAdapter")
-}
+import Shared
 
 public extension DistributedReception.Key {
     static var homeKitCommandReceiver: DistributedReception.Key<HomeKitCommandReceiver> {

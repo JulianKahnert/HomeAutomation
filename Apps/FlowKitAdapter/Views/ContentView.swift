@@ -7,12 +7,15 @@
 
 import Adapter
 import HAModels
+import Shared
 import SwiftUI
 
 struct ContentView: View {
     @Binding var shouldCrashIfActorSystemInitFails: Bool
     @Binding var entities: [EntityStorageItem]
+    let actorSystem: CustomActorSystem?
     @State private var showSettings = false
+    @State private var connectionStatus: ConnectionStatus = .joining
     @AppStorage("ActorSystemServerAddress") private var serverAddress = CustomActorSystem.Address(host: "localhost", port: 8888)
 
     var body: some View {
@@ -26,10 +29,44 @@ struct ContentView: View {
             .navigationDestination(isPresented: $showSettings) {
                 SettingsView(serverAddress: $serverAddress)
             }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ConnectionStatusView(status: connectionStatus)
+                }
+            }
+            .task {
+                // Subscribe to connection status changes
+                guard let actorSystem else { return }
+                let sequence = actorSystem.connectionStatus as! any AsyncSequence<ConnectionStatus, Never>
+                for await status in sequence {
+                    connectionStatus = status
+                }
+            }
+        }
+    }
+}
+
+struct ConnectionStatusView: View {
+    let status: ConnectionStatus
+
+    var body: some View {
+        Circle()
+            .fill(statusColor)
+            .frame(width: 12, height: 12)
+    }
+
+    private var statusColor: Color {
+        switch status {
+        case .up:
+            return .green
+        case .joining:
+            return .yellow
+        case .error:
+            return .red
         }
     }
 }
 
 #Preview {
-    ContentView(shouldCrashIfActorSystemInitFails: .constant(true), entities: .constant([]))
+    ContentView(shouldCrashIfActorSystemInitFails: .constant(true), entities: .constant([]), actorSystem: nil)
 }

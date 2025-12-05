@@ -38,6 +38,7 @@ let package = Package(
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", from: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
+        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.1.1"),
 //        .package(url: "https://github.com/swift-server-community/APNSwift", branch: "main")
         .package(url: "https://github.com/swift-server-community/APNSwift", from: "6.2.0")
     ],
@@ -69,6 +70,8 @@ let package = Package(
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "LoggingOSLog", package: "swift-log-oslog", condition: .when(platforms: [.macOS, .iOS, .macCatalyst, .tvOS, .watchOS, .visionOS])),
+                .product(name: "DistributedCluster", package: "swift-distributed-actors"),
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ]
         ),
         .target(

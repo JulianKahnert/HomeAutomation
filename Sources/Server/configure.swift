@@ -8,6 +8,7 @@ import HAApplicationLayer
 import HAImplementations
 import HAModels
 import Logging
+import Shared
 import Vapor
 import VaporAPNS
 
@@ -145,7 +146,7 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - actor system setup
 
-    let actorSystem = await CustomActorSystem(nodeId: .server, port: 8888)
+    let actorSystem = await CustomActorSystem(nodeId: .server, port: 8888, discovery: .none)
     let eventReceiver = actorSystem.makeLocalActor(actorId: .homeEventReceiver) { system in
         HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: system)
     }

@@ -21,6 +21,10 @@ struct AppFeature: Sendable {
         var automations = AutomationsFeature.State()
         var actions = ActionsFeature.State()
         var settings = SettingsFeature.State()
+
+        var openWindowsCount: Int? {
+            settings.windowContentState?.windowStates.count
+        }
     }
 
     // MARK: - Tab
@@ -224,6 +228,7 @@ struct AppView: View {
                     )
                 )
             }
+            .badge(store.openWindowsCount)
         }
         .tabViewStyle(.sidebarAdaptable)
         .onSceneChange { oldPhase, newPhase in

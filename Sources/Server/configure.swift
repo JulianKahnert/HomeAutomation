@@ -159,12 +159,14 @@ public func configure(_ app: Application) async throws {
                                                     apnsClient: apnsClient,
                                                     notificationTopic: notificationTopic)
 
+    let actionLogManager = ActionLogManager()
     let homeManager = await HomeManager(getAdapter: {
         await actorSystem.lookup(.homeKitCommandReceiver)
     },
                                         storageRepo: app.entityStorageDbRepository,
                                         notificationSender: notificationSender,
-                                        location: app.homeAutomationConfigService.location)
+                                        location: app.homeAutomationConfigService.location,
+                                        actionLogManager: actionLogManager)
     app.homeManager = homeManager
     let automationService = try AutomationService(using: homeManager,
                                                   getAutomations: {

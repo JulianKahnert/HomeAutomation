@@ -15,6 +15,7 @@ public final class HomeManager: HomeManagable {
     nonisolated private static let maxWindowOpenDuration = Duration.minutes(15).timeInterval
     private let log = Logger(label: "HomeManager")
     private let windowManager: WindowManager
+    private let actionLogManager: ActionLogManager
 
     private let getAdapter: () async -> (any EntityAdapterable)?
     private let location: Location
@@ -24,8 +25,9 @@ public final class HomeManager: HomeManagable {
     private let commandCache = Cache<String, HomeManagableAction>(entryLifetime: .minutes(2))
     private var failedActions: [EntityId: HomeManagableAction] = [:]
 
-    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, notificationSender: NotificationSender, location: Location) {
+    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, notificationSender: NotificationSender, location: Location, actionLogManager: ActionLogManager) {
         self.windowManager = WindowManager(notificationSender: notificationSender)
+        self.actionLogManager = actionLogManager
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
         self.notificationSender = notificationSender
@@ -95,9 +97,7 @@ public final class HomeManager: HomeManagable {
                 log.info("Skipping duplicate command: [\(action)]")
 
                 // Log the cached/skipped action
-                Task {
-                    await ActionLogger.shared.log(action: action, hasCacheHit: true)
-                }
+                await actionLogManager.log(action: action, hasCacheHit: true)
 
                 return
             }
@@ -112,9 +112,7 @@ public final class HomeManager: HomeManagable {
             try await getAdapter().get(with: log).perform(action)
 
             // Log successful execution
-            Task {
-                await ActionLogger.shared.log(action: action, hasCacheHit: false)
-            }
+            await actionLogManager.log(action: action, hasCacheHit: false)
         } catch {
             let entityId = action.entityId
 
@@ -200,6 +198,14 @@ public final class HomeManager: HomeManagable {
 
     public func getWindowStates() async -> [WindowOpenState] {
         await windowManager.getWindowStates()
+    }
+
+    public func getActionLog(limit: Int?) async -> [ActionLogItem] {
+        await actionLogManager.getActions(limit: limit)
+    }
+
+    public func clearActionLog() async {
+        await actionLogManager.clear()
     }
 
     private func popAllFailedActions() -> [HomeManagableAction] {

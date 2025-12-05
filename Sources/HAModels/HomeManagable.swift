@@ -27,6 +27,8 @@ public protocol HomeManagable: Sendable {
     func getLocation() async -> Location
     func sendNotification(title: String, message: String) async
     func getWindowStates() async -> [WindowOpenState]
+    func getActionLog(limit: Int?) async -> [ActionLogItem]
+    func clearActionLog() async
 }
 
 public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equatable {

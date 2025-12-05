@@ -228,7 +228,7 @@ struct AppView: View {
                     )
                 )
             }
-            .badge(store.openWindowsCount)
+            .badge(store.openWindowsCount ?? 0)
         }
         .tabViewStyle(.sidebarAdaptable)
         .onSceneChange { oldPhase, newPhase in

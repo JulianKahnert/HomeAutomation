@@ -6,10 +6,12 @@
 //
 
 import Distributed
+import Foundation
 import HAModels
 import Logging
 
-final class MockHomeAdapter: @unchecked Sendable {
+@HomeManagerActor
+final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     let entityStream: AsyncStream<EntityStorageItem>
     let entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation
@@ -24,18 +26,18 @@ final class MockHomeAdapter: @unchecked Sendable {
         self.entityStreamContinuation = entityStreamContinuation
     }
 
-    func perform(_ action: HomeManagableAction) async throws {
+    func perform(_ action: HomeManagableAction) async {
 
         let item = storageItems.first(where: { $0.entityId == action.entityId })
 
         switch action {
         case .turnOn:
-            let item = try item.get(with: log)
+            guard let item = try? item.get(with: log) else { break }
             let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, motionDetected: nil, illuminance: nil, isDeviceOn: true, isContactOpen: nil, isDoorLocked: nil, stateOfCharge: nil, isHeaterActive: nil)
             storageItems.append(newItem)
              entityStreamContinuation.yield(newItem)
         case .turnOff:
-            let item = try item.get(with: log)
+            guard let item = try? item.get(with: log) else { break }
             let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, motionDetected: nil, illuminance: nil, isDeviceOn: false, isContactOpen: nil, isDoorLocked: nil, stateOfCharge: nil, isHeaterActive: nil)
             storageItems.append(newItem)
         case .setBrightness:
@@ -45,7 +47,7 @@ final class MockHomeAdapter: @unchecked Sendable {
         case .setRGB:
             break
         case .lockDoor:
-            let item = try item.get(with: log)
+            guard let item = try? item.get(with: log) else { break }
             let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, motionDetected: nil, illuminance: nil, isDeviceOn: nil, isContactOpen: nil, isDoorLocked: true, stateOfCharge: nil, isHeaterActive: nil)
             storageItems.append(newItem)
         case .addEntityToScene:
@@ -91,10 +93,6 @@ final class MockHomeAdapter: @unchecked Sendable {
         return Set(items)
     }
 
-    func getAllEntitiesLive() async -> [EntityStorageItem] {
-        return storageItems
-    }
-
     func getEntityStream() async -> AsyncStream<EntityStorageItem> {
         return entityStream
     }
@@ -102,6 +100,51 @@ final class MockHomeAdapter: @unchecked Sendable {
     func findEntity(_ entity: EntityId) async throws {
     }
 
-    func trigger(scene sceneName: String) async throws {
+    func trigger(scene sceneName: String) async {
+    }
+
+    func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
+        guard let item = storageItems.last(where: { $0.entityId == entityId }) else {
+            struct EntityNotFoundError: Error {}
+            throw EntityNotFoundError()
+        }
+        return item
+    }
+
+    func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem? {
+        let matching = storageItems.filter { $0.entityId == entityId }
+        return matching.count > 1 ? matching[matching.count - 2] : nil
+    }
+
+    func getAllEntitiesLive() async throws -> [EntityStorageItem] {
+        return storageItems
+    }
+
+    func addEntityHistory(_ item: EntityStorageItem) async {
+        storageItems.append(item)
+    }
+
+    func maintenance() async throws {
+    }
+
+    func deleteStorageEntries(olderThan date: Date) async throws {
+    }
+
+    func getLocation() async -> Location {
+        return Location(latitude: 0, longitude: 0)
+    }
+
+    func sendNotification(title: String, message: String) async {
+    }
+
+    func getWindowStates() async -> [WindowOpenState] {
+        return []
+    }
+
+    func getActionLog(limit: Int?) async -> [ActionLogItem] {
+        return []
+    }
+
+    func clearActionLog() async {
     }
 }

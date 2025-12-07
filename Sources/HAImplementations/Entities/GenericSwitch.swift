@@ -9,10 +9,11 @@ import Foundation
 import HAModels
 
 public final class GenericSwitch: SwitchDevice, @unchecked Sendable {
-    public convenience init(query: EntityId.Query) {
+    public convenience init(query: EntityId.Query, skipColorTemperature: Bool = false) {
         self.init(switchId: EntityId(query: query, characteristic: .switcher),
                   brightnessId: nil,
                   colorTemperatureId: nil,
-                  rgbId: nil)
+                  rgbId: nil,
+                  skipColorTemperature: skipColorTemperature)
     }
 }

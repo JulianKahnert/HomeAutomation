@@ -64,7 +64,6 @@ public struct WindowOpen: Automatable {
         log.debug("Start sending notification")
         let message = "\(windowContact.contactSensorId.name) (\(windowContact.contactSensorId.placeId))"
 
-        await TibberService()?.sendNotification(title: "🪟 offen", message: message)
         await hm.sendNotification(title: "🪟 offen", message: message)
         log.debug("End sending notification")
     }

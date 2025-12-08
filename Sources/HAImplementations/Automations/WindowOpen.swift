@@ -44,11 +44,11 @@ public struct WindowOpen: Automatable {
         }
 
         // Set window state for tracking
+        let opened = Date()
         let name = "\(windowContact.contactSensorId.name) (\(windowContact.contactSensorId.placeId))"
-        let state = WindowOpenState(name: name, opened: Date(), maxOpenDuration: notificationWait.timeInterval)
+        let state = WindowOpenState(name: name, opened: opened, maxOpenDuration: notificationWait.timeInterval)
         await hm.setWindowOpenState(entityId: windowContact.contactSensorId, to: state)
 
-        let opened = Date()
         let end = opened.addingTimeInterval(notificationWait.timeInterval)
 
         log.debug("Start sleeping for \(notificationWait.description) before sending notification")

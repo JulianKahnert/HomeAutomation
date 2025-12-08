@@ -27,6 +27,7 @@ public protocol HomeManagable: Sendable {
     func getLocation() async -> Location
     func sendNotification(title: String, message: String) async
     func getWindowStates() async -> [WindowOpenState]
+    func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async
     func getActionLog(limit: Int?) async -> [ActionLogItem]
     func clearActionLog() async
 }

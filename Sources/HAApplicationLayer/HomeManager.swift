@@ -22,7 +22,6 @@ public final class HomeManager: HomeManagable {
     private let storageRepo: StorageRepository
     private let notificationSender: NotificationSender
     private let entityCache = Cache<EntityId, EntityStorageItem>(entryLifetime: .hours(2))
-    private let commandCache = Cache<String, HomeManagableAction>(entryLifetime: .minutes(2))
     private var failedActions: [EntityId: HomeManagableAction] = [:]
 
     public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, notificationSender: NotificationSender, location: Location, actionLogManager: ActionLogManager) {
@@ -86,33 +85,19 @@ public final class HomeManager: HomeManagable {
     }
 
     private func perform(_ action: HomeManagableAction, addToFaliedActions: Bool) async {
-        // Check if this is a duplicate command within the deduplication window
-        let cacheKey = "\(action.entityId)-\(action.actionName)"
+        // Log action and check if it's a duplicate (cache hit)
+        let hasCacheHit = await actionLogManager.log(action: action)
 
-        // Check if action is in cache
-        if let cachedAction = await commandCache.value(forKey: cacheKey) {
-            // Compare the cached action with the current action
-            // If they are the same (including values), skip execution
-            if cachedAction == action {
-                log.info("Skipping duplicate command: [\(action)]")
-
-                // Log the cached/skipped action
-                await actionLogManager.log(action: action, hasCacheHit: true)
-
-                return
-            }
-            // Different value - update cache and execute
-            log.debug("Same action type but different value, executing: [\(action)]")
+        if hasCacheHit {
+            log.info("Skipping duplicate command: [\(action)]")
+            return
         }
 
-        // Mark command as executed
-        await commandCache.insert(action, forKey: cacheKey)
+        // Not a cache hit - execute the action
+        log.debug("Executing action: [\(action)]")
 
         do {
             try await getAdapter().get(with: log).perform(action)
-
-            // Log successful execution
-            await actionLogManager.log(action: action, hasCacheHit: false)
         } catch {
             let entityId = action.entityId
 

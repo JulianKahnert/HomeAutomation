@@ -12,8 +12,8 @@ public struct WindowOpenState: Hashable, Encodable, Sendable {
     public let opened: Date
     public let maxOpenDuration: TimeInterval
 
-    public init(name: String, opened: Date, maxOpenDuration: TimeInterval) {
-        self.name = name
+    public init(entityId: EntityId, opened: Date, maxOpenDuration: TimeInterval) {
+        self.name = "\(entityId.name) (\(entityId.placeId))"
         self.opened = opened
         self.maxOpenDuration = maxOpenDuration
     }

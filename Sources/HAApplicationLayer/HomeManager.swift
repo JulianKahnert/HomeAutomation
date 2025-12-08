@@ -12,7 +12,6 @@ import Shared
 
 @HomeManagerActor
 public final class HomeManager: HomeManagable {
-    nonisolated private static let maxWindowOpenDuration = Duration.minutes(15).timeInterval
     private let log = Logger(label: "HomeManager")
     private let windowManager: WindowManager
     private let actionLogManager: ActionLogManager
@@ -124,19 +123,8 @@ public final class HomeManager: HomeManagable {
         log.debug("Adding entity item to storage \(item.entityId)")
         await entityCache.insert(item, forKey: item.entityId)
 
-        // persist item in the background, e.g. don't block automation execution
+        // Persist item in the background to avoid blocking automation execution
         Task.detached(priority: .background) {
-
-            // update window state
-            if let isContactOpen = item.isContactOpen {
-                var windowOpenState: WindowOpenState?
-                if isContactOpen {
-                    let name = "\(item.entityId.name) (\(item.entityId.placeId))"
-                    windowOpenState = WindowOpenState(name: name, opened: Date(), maxOpenDuration: Self.maxWindowOpenDuration)
-                }
-                await self.windowManager.setWindowOpenState(entityId: item.entityId, to: windowOpenState)
-            }
-
             do {
                 if var currentItem = try await self.storageRepo.getCurrent(item.entityId) {
 
@@ -183,6 +171,10 @@ public final class HomeManager: HomeManagable {
 
     public func getWindowStates() async -> [WindowOpenState] {
         await windowManager.getWindowStates()
+    }
+
+    public func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
+        await windowManager.setWindowOpenState(entityId: entityId, to: state)
     }
 
     public func getActionLog(limit: Int?) async -> [ActionLogItem] {

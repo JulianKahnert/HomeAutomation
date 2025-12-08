@@ -36,13 +36,18 @@ public struct WindowOpen: Automatable {
         log.debug("Executing 'WindowOpen' automation")
         let isWindowOpen = try await windowContact.isContactOpen(with: hm)
 
-        // stop this automation and do not notify anyone, if the window is closed
+        // Clear window state when window closes early
         guard isWindowOpen else {
             log.debug("Skipping 'WindowOpen' automation, window is closed")
+            await hm.setWindowOpenState(entityId: windowContact.contactSensorId, to: nil)
             return
         }
 
+        // Set window state for tracking
         let opened = Date()
+        let state = WindowOpenState(entityId: windowContact.contactSensorId, opened: opened, maxOpenDuration: notificationWait.timeInterval)
+        await hm.setWindowOpenState(entityId: windowContact.contactSensorId, to: state)
+
         let end = opened.addingTimeInterval(notificationWait.timeInterval)
 
         log.debug("Start sleeping for \(notificationWait.description) before sending notification")

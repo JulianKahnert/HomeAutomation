@@ -1,6 +1,7 @@
 excluded: # paths to ignore during linting. Takes precedence over `included`.
   - .build
   - ArchiverLib/.build
+  - Apps/**/.build
   - Shared/*
 
 disabled_rules: # rule identifiers to exclude from running

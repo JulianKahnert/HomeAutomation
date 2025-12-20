@@ -12,13 +12,16 @@ public actor HomeManagerActor: GlobalActor {
     public static let shared = HomeManagerActor()
 }
 
+public protocol EntityValidator {
+    func findEntity(_ entity: EntityId) async throws
+}
+
 @HomeManagerActor
-public protocol HomeManagable: Sendable {
+public protocol HomeManagable: EntityValidator, Sendable {
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem
     func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
     func addEntityHistory(_ item: EntityStorageItem) async
-    func findEntity(_ entity: EntityId) async throws
 
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async

@@ -37,7 +37,7 @@ open class MotionSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
         return try item.stateOfCharge.get(with: log)
     }
 
-    public func validate(with hm: any HomeManagable) async throws {
+    public func validate(with hm: any EntityValidator) async throws {
         try await hm.findEntity(motionSensorId)
         if let lightSensorId {
             try await hm.findEntity(lightSensorId)

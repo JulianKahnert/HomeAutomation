@@ -8,7 +8,7 @@
 import Shared
 
 public protocol Validatable {
-    func validate(with: HomeManagable) async throws
+    func validate(with: EntityValidator) async throws
 }
 
 open class SwitchDevice: Codable, @unchecked Sendable, Validatable, Log {
@@ -78,7 +78,7 @@ open class SwitchDevice: Codable, @unchecked Sendable, Validatable, Log {
         await hm.perform(.setRGB(rgbId, rgb: rgb))
     }
 
-    public func validate(with hm: HomeManagable) async throws {
+    public func validate(with hm: EntityValidator) async throws {
         try await hm.findEntity(switchId)
         if let brightnessId {
             try await hm.findEntity(brightnessId)

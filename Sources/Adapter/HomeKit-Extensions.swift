@@ -190,6 +190,16 @@ extension HMCharacteristic: @retroactive Comparable {
             return characteristicType == HMCharacteristicTypeTargetLockMechanismState
         case .heating:
             return service?.serviceType == HMServiceTypeHeaterCooler && characteristicType == HMCharacteristicTypeActive
+        case .temperatureSensor:
+            return service?.serviceType == HMCharacteristicTypeCurrentTemperature
+        case .relativeHumiditySensor:
+            return service?.serviceType == HMCharacteristicTypeCurrentRelativeHumidity
+        case .carbonDioxideSensorId:
+            return service?.serviceType == HMCharacteristicTypeCarbonDioxideLevel
+        case .pmDensitySensor:
+            return service?.serviceType == HMCharacteristicTypePM2_5Density
+        case .airQualitySensor:
+            return service?.serviceType == HMCharacteristicTypeAirQuality
         }
     }
 
@@ -204,14 +214,14 @@ extension HMCharacteristic: @retroactive Comparable {
         guard let type = entityCharacteristicType else { return false }
 
         switch type {
-        case .motionSensor, .lightSensor, .switcher, .contactSensor:
+        case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId:
             return true
-        case .batterySensor, .brightness, .colorTemperature, .color, .heating, .valve, .lock:
+        case .batterySensor, .brightness, .colorTemperature, .color, .heating, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor:
             return false
         }
     }
 
-    private static let skippableCharacteristics = Set(["Active", "Air Quality", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Current Heater Cooler State", "Current Heating Cooling State", "Current Relative Humidity", "Current Temperature", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Target Heating Cooling State", "Target Temperature", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event"])
+    private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Target Heating Cooling State", "Target Temperature", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event"])
     var entityCharacteristicType: CharacteristicsType? {
         if characteristicType == HMCharacteristicTypeMotionDetected || characteristicType == HMCharacteristicTypeOccupancyDetected {
             return .motionSensor
@@ -242,6 +252,21 @@ extension HMCharacteristic: @retroactive Comparable {
 
         } else if service?.serviceType == HMServiceTypeHeaterCooler && characteristicType == HMCharacteristicTypeActive {
             return .heating
+
+        } else if characteristicType == HMCharacteristicTypeCurrentTemperature {
+            return .temperatureSensor
+
+        } else if characteristicType == HMCharacteristicTypeCurrentRelativeHumidity {
+            return .relativeHumiditySensor
+
+        } else if characteristicType == HMCharacteristicTypeCarbonDioxideLevel {
+            return .carbonDioxideSensorId
+
+        } else if characteristicType == HMCharacteristicTypePM2_5Density {
+            return .pmDensitySensor
+
+        } else if characteristicType == HMCharacteristicTypeAirQuality {
+            return .airQualitySensor
 
         } else {
             guard !Self.skippableCharacteristics.contains(localizedDescription) else { return nil }

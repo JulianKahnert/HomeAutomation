@@ -7,7 +7,7 @@
 
 import HAModels
 
-public protocol HomeKitAdapterable: Sendable {
+public protocol HomeKitAdapterable: EntityValidator, Sendable {
 //    func getEntityStream() async -> AsyncStream<EntityStorageItem>
     func getAllEntitiesLive() async -> [EntityStorageItem]
     func findEntity(_ entity: EntityId) async throws
@@ -196,49 +196,45 @@ public final class HomeKitAdapter: HomeKitAdapterable {
     /// during local development. Use this when adding support for new HomeKit devices.
     ///
     /// - Parameter entityId: The EntityId of any characteristic belonging to the accessory
-    public func debugPrintAccessory(entityId: EntityId) async {
+    public func debugPrintAccessory(placeId: String, name: String) async {
         let homes = await homeKitHomeManager.getHomes()
-        let characteristics = homes.flatMap(\.accessories)
-            .flatMap(\.services)
-            .flatMap(\.characteristics)
-            .sorted()
+        let accessories = homes.flatMap(\.accessories)
 
-        guard let characteristic = characteristics.first(where: { $0.entityId == entityId }),
-              let accessory = characteristic.service?.accessory else {
-            log.info("❌ Accessory for entityId '\(entityId)' not found")
+        guard let accessory = accessories.first(where: { $0.room?.name == placeId && $0.name == name }) else {
+            log.info("❌ Accessory for entityId '\(name) [\(placeId)]' not found")
             return
         }
 
-        log.info("\n=== Debug Info for Accessory with EntityId '\(entityId)' ===")
-        log.info("Accessory Name: \(accessory.name)")
-        log.info("Unique Identifier: \(accessory.uniqueIdentifier)")
-        log.info("Services: \(accessory.services.count)")
+        var output = "\n=== Debug Info for Accessory with EntityId '\(name) [\(placeId)]' ===\n"
+        output += "Accessory Name: \(accessory.name)\n"
+        output += "Unique Identifier: \(accessory.uniqueIdentifier)\n"
+        output += "Services: \(accessory.services.count)"
 
         for service in accessory.services {
-            log.info("\n📦 Service: \(service.localizedDescription) (\(service.serviceType))")
+            output += "\n\n📦 Service: \(service.localizedDescription) (\(service.serviceType))"
 
             for char in service.characteristics {
-                log.info("  └─ \(char.localizedDescription)")
-                log.info("     Type: \(char.characteristicType)")
-                log.info("     Value: \(char.value ?? "nil")")
-                log.info("     Properties: \(char.properties)")
+                output += "\n  └─ \(char.localizedDescription)"
+                output += "\n     Value: \(char.value ?? "nil")"
+                output += "\n     Properties: \(char.properties)"
 
                 if let metadata = char.metadata {
-                    if let min = metadata.minimumValue { log.info("     Min: \(min)") }
-                    if let max = metadata.maximumValue { log.info("     Max: \(max)") }
-                    if let step = metadata.stepValue { log.info("     Step: \(step)") }
-                    if let format = metadata.format { log.info("     Format: \(format)") }
+                    if let min = metadata.minimumValue { output += "\n     Min: \(min)" }
+                    if let max = metadata.maximumValue { output += "\n     Max: \(max)" }
+                    if let step = metadata.stepValue { output += "\n     Step: \(step)" }
+                    if let format = metadata.format { output += "\n     Format: \(format)" }
                 }
 
                 // Show what EntityId would look like for this characteristic
                 if let entityCharType = char.entityCharacteristicType,
                    let charEntityId = char.entityId {
-                    log.info("     ✅ EntityId: \(charEntityId)")
-                    log.info("     CharacteristicType: .\(entityCharType)")
+                    output += "\n     ✅ EntityId: \(charEntityId)"
+                    output += "\n     CharacteristicType: .\(entityCharType)"
                 }
             }
         }
-        log.info("\n=== End Debug Info ===\n")
+        output += "\n\n=== End Debug Info ===\n"
+        log.info("\(output)")
     }
 
     /// Prints all accessories and their entityIds for basic characteristics
@@ -247,26 +243,30 @@ public final class HomeKitAdapter: HomeKitAdapterable {
     /// This is useful when you want to inspect a specific device using debugPrintAccessory.
     public func debugPrintAllAccessories() async {
         let homes = await homeKitHomeManager.getHomes()
-        log.info("\n=== All HomeKit Accessories ===")
+        log.info("=== All HomeKit Accessories ===")
 
         for home in homes {
-            log.info("\n🏠 Home: \(home.name)")
-            for accessory in home.accessories.sorted(by: { $0.room < $1.room }) {
-                log.info("  📱 \(accessory.name)")
-                log.info("     Accessory ID: \(accessory.uniqueIdentifier)")
+            for accessory in home.accessories.sorted(by: { ($0.room?.name ?? "") < ($1.room?.name ?? "") }) {
+                let roomName = accessory.room?.name ?? "No Room"
+                var output = "🏠 Home: \(home.name)\n"
+                output += "📱 \(accessory.name) (Room: \(roomName))\n"
+                output += "Accessory ID: \(accessory.uniqueIdentifier)"
 
                 // Print entityIds for common characteristics
                 for service in accessory.services {
                     for char in service.characteristics.filter({ $0.isReadable }) {
                         if let entityCharType = char.entityCharacteristicType,
                            let entityId = char.entityId {
-                            log.info("     - [\(entityCharType)] \(entityId)")
+                            output += "\n- [\(entityCharType)] \(entityId)"
                         }
                     }
                 }
+
+                log.info("\(output)")
             }
         }
-        log.info("\n=== End All Accessories ===\n")
+
+        log.info("=== End All Accessories ===")
     }
     #endif
 }

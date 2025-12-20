@@ -7,6 +7,7 @@
 
 public enum CharacteristicsType: String, Sendable, Codable {
     case motionSensor, lightSensor, batterySensor, contactSensor
+    case temperatureSensor, relativeHumiditySensor, carbonDioxideSensorId, pmDensitySensor, airQualitySensor
     case switcher, brightness, colorTemperature, color, valve
     case lock
     case heating

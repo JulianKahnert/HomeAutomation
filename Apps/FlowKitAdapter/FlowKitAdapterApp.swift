@@ -49,6 +49,30 @@ struct FlowKitAdapter: App, Log {
                     entityStream: entityStream,
                     entityStreamContinuation: entityStreamContinuation)
 
+                // MARK: - Device Debug Helper (uncomment for development)
+
+                /*
+                #if DEBUG
+                // Print all accessories to find the entityId you want to inspect
+                Task {
+                    try? await Task.sleep(for: .seconds(2))  // Wait for adapter to initialize
+                    await adapter.debugPrintAllAccessories()
+
+                    // Then inspect a specific device by its entityId
+                    // Copy an entityId from the output above
+                    let placeId = "Room Name"
+                    let name = "Device Name"
+
+                    await adapter.debugPrintAccessory(placeId: placeId, name: name)
+                    
+                    // validate entity
+                    let sensor = IkeaAlpstugaSensor(query: .init(placeId: placeId, name: name))
+                    try! await sensor.validate(with: adapter)
+                    log.info("Found valid sensor: \(sensor)")
+                }
+                #endif
+                */
+
                 commandReceiver = actorSystem.makeLocalActor(actorId: .homeKitCommandReceiver) { system in
                     HomeKitCommandReceiver(actorSystem: system, adapter: adapter)
                 }

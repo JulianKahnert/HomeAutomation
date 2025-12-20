@@ -18,7 +18,7 @@ open class ValveDevice: Codable, @unchecked Sendable, Validatable, Log {
         await hm.perform(.setValve(valveId, active: active))
     }
 
-    public func validate(with hm: any HomeManagable) async throws {
+    public func validate(with hm: any EntityValidator) async throws {
         try await hm.findEntity(valveId)
     }
 }

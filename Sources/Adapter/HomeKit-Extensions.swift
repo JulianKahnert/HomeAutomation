@@ -167,30 +167,7 @@ extension HMCharacteristic: @retroactive Comparable {
     }
 
     func isCharacteristicsType(_ type: CharacteristicsType) -> Bool {
-        switch type {
-        case .batterySensor:
-            return characteristicType == HMCharacteristicTypeBatteryLevel
-        case .contactSensor:
-            return characteristicType == HMCharacteristicTypeContactState
-        case .lightSensor:
-            return characteristicType == HMCharacteristicTypeCurrentLightLevel
-        case .motionSensor:
-            return characteristicType == HMCharacteristicTypeMotionDetected || characteristicType == HMCharacteristicTypeOccupancyDetected
-        case .brightness:
-            return characteristicType == HMCharacteristicTypeBrightness
-        case .colorTemperature:
-            return characteristicType == HMCharacteristicTypeColorTemperature
-        case .color:
-            return characteristicType == HMCharacteristicTypeHue
-        case .switcher:
-            return characteristicType == HMCharacteristicTypePowerState
-        case .valve:
-            return service?.serviceType == HMServiceTypeValve && characteristicType == HMCharacteristicTypeInUse
-        case .lock:
-            return characteristicType == HMCharacteristicTypeTargetLockMechanismState
-        case .heating:
-            return service?.serviceType == HMServiceTypeHeaterCooler && characteristicType == HMCharacteristicTypeActive
-        }
+        entityCharacteristicType == type
     }
 
     var entityId: EntityId? {
@@ -204,50 +181,21 @@ extension HMCharacteristic: @retroactive Comparable {
         guard let type = entityCharacteristicType else { return false }
 
         switch type {
-        case .motionSensor, .lightSensor, .switcher, .contactSensor:
+        case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId:
             return true
-        case .batterySensor, .brightness, .colorTemperature, .color, .heating, .valve, .lock:
+        case .batterySensor, .brightness, .colorTemperature, .color, .heating, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor:
             return false
         }
     }
 
-    private static let skippableCharacteristics = Set(["Active", "Air Quality", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Current Heater Cooler State", "Current Heating Cooling State", "Current Relative Humidity", "Current Temperature", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Target Heating Cooling State", "Target Temperature", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event"])
+    private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Target Heating Cooling State", "Target Temperature", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event"])
     var entityCharacteristicType: CharacteristicsType? {
-        if characteristicType == HMCharacteristicTypeMotionDetected || characteristicType == HMCharacteristicTypeOccupancyDetected {
-            return .motionSensor
-
-        } else if characteristicType == HMCharacteristicTypeCurrentLightLevel {
-            return .lightSensor
-
-        } else if characteristicType == HMCharacteristicTypeBatteryLevel {
-            return .batterySensor
-
-        } else if characteristicType == HMCharacteristicTypeContactState {
-            return .contactSensor
-
-        } else if characteristicType == HMCharacteristicTypePowerState {
-            return .switcher
-
-        } else if characteristicType == HMCharacteristicTypeBrightness {
-            return .brightness
-
-        } else if characteristicType == HMCharacteristicTypeColorTemperature {
-            return .colorTemperature
-
-        } else if characteristicType == HMCharacteristicTypeHue {
-            return .color
-
-        } else if service?.serviceType == HMServiceTypeValve && characteristicType == HMCharacteristicTypeInUse {
-            return .valve
-
-        } else if service?.serviceType == HMServiceTypeHeaterCooler && characteristicType == HMCharacteristicTypeActive {
-            return .heating
-
-        } else {
+        guard let homeKitCharacteristic = HomeKitCharacteristic(characteristicType: characteristicType) else {
             guard !Self.skippableCharacteristics.contains(localizedDescription) else { return nil }
             homeKitLogger.warning("Failed to get entity characteristic type for \(self.service?.name ?? "") @ \(self.service?.accessory?.room?.name ?? ""): \(self.localizedDescription)")
             return nil
         }
+        return homeKitCharacteristic.toCharacteristicsType(serviceType: service?.serviceType)
     }
 }
 

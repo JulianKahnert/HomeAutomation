@@ -18,7 +18,7 @@ open class HeatSwitchDevice: Codable, @unchecked Sendable, Validatable, Log {
         await hm.perform(.setHeating(heatSwitchId, active: active))
     }
 
-    public func validate(with hm: any HomeManagable) async throws {
+    public func validate(with hm: any EntityValidator) async throws {
         try await hm.findEntity(heatSwitchId)
     }
 }

@@ -7,7 +7,7 @@
 
 import HAModels
 
-public protocol HomeKitAdapterable: Sendable {
+public protocol HomeKitAdapterable: EntityValidator, Sendable {
 //    func getEntityStream() async -> AsyncStream<EntityStorageItem>
     func getAllEntitiesLive() async -> [EntityStorageItem]
     func findEntity(_ entity: EntityId) async throws
@@ -176,6 +176,89 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             .filter(\.isReadable)
             .sorted()
     }
+
+    // MARK: - Debug Helpers
+
+    #if DEBUG
+    /// Prints all characteristics for a specific accessory identified by entityId
+    ///
+    /// This method helps developers understand what properties are available on a device
+    /// during local development. Use this when adding support for new HomeKit devices.
+    ///
+    /// - Parameter entityId: The EntityId of any characteristic belonging to the accessory
+    public func debugPrintAccessory(placeId: String, name: String) async {
+        let homes = await homeKitHomeManager.getHomes()
+        let accessories = homes.flatMap(\.accessories)
+
+        guard let accessory = accessories.first(where: { $0.room?.name == placeId && $0.name == name }) else {
+            log.info("❌ Accessory for entityId '\(name) [\(placeId)]' not found")
+            return
+        }
+
+        var output = "\n=== Debug Info for Accessory with EntityId '\(name) [\(placeId)]' ===\n"
+        output += "Accessory Name: \(accessory.name)\n"
+        output += "Unique Identifier: \(accessory.uniqueIdentifier)\n"
+        output += "Services: \(accessory.services.count)"
+
+        for service in accessory.services {
+            output += "\n\n📦 Service: \(service.localizedDescription) (\(service.serviceType))"
+
+            for char in service.characteristics {
+                output += "\n  └─ \(char.localizedDescription)"
+                output += "\n     Value: \(char.value ?? "nil")"
+                output += "\n     Properties: \(char.properties)"
+
+                if let metadata = char.metadata {
+                    if let min = metadata.minimumValue { output += "\n     Min: \(min)" }
+                    if let max = metadata.maximumValue { output += "\n     Max: \(max)" }
+                    if let step = metadata.stepValue { output += "\n     Step: \(step)" }
+                    if let format = metadata.format { output += "\n     Format: \(format)" }
+                }
+
+                // Show what EntityId would look like for this characteristic
+                if let entityCharType = char.entityCharacteristicType,
+                   let charEntityId = char.entityId {
+                    output += "\n     ✅ EntityId: \(charEntityId)"
+                    output += "\n     CharacteristicType: .\(entityCharType)"
+                }
+            }
+        }
+        output += "\n\n=== End Debug Info ===\n"
+        log.info("\(output)")
+    }
+
+    /// Prints all accessories and their entityIds for basic characteristics
+    ///
+    /// Use this method to discover available accessories and their EntityIds.
+    /// This is useful when you want to inspect a specific device using debugPrintAccessory.
+    public func debugPrintAllAccessories() async {
+        let homes = await homeKitHomeManager.getHomes()
+        log.info("=== All HomeKit Accessories ===")
+
+        for home in homes {
+            for accessory in home.accessories.sorted(by: { ($0.room?.name ?? "") < ($1.room?.name ?? "") }) {
+                let roomName = accessory.room?.name ?? "No Room"
+                var output = "🏠 Home: \(home.name)\n"
+                output += "📱 \(accessory.name) (Room: \(roomName))\n"
+                output += "Accessory ID: \(accessory.uniqueIdentifier)"
+
+                // Print entityIds for common characteristics
+                for service in accessory.services {
+                    for char in service.characteristics.filter({ $0.isReadable }) {
+                        if let entityCharType = char.entityCharacteristicType,
+                           let entityId = char.entityId {
+                            output += "\n- [\(entityCharType)] \(entityId)"
+                        }
+                    }
+                }
+
+                log.info("\(output)")
+            }
+        }
+
+        log.info("=== End All Accessories ===")
+    }
+    #endif
 }
 
 extension HomeManagableAction.SceneEntityAction {

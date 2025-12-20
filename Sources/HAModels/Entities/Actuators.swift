@@ -7,7 +7,7 @@
 
 import Foundation
 
-public final class HeatSwitch: HeatSwitchDevice, @unchecked Sendable {
+public final class HeatSwitch: HeatSwitchDevice {
     public convenience init(query: EntityId.Query) {
         self.init(heatSwitchId: EntityId(query: query, characteristic: .heating))
     }

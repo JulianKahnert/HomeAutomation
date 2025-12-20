@@ -9,7 +9,7 @@ import Shared
 
 /// IKEA white light bulb that uses brightness control for turning off.
 /// Some IKEA light bulbs do not turn off properly when only turnOff is called.
-public final class IkeaLightBulbWhite: SwitchDevice, @unchecked Sendable {
+public final class IkeaLightBulbWhite: SwitchDevice {
 
     /// Turns off the light by setting brightness to 0 instead of using the power switch.
     override public func turnOff(with hm: HomeManagable) async {

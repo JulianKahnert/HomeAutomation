@@ -30,16 +30,6 @@ public final class HomeKitAdapter: HomeKitAdapterable {
 
     public init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
         self.homeKitHomeManager = HomeKitHomeManager(entityStream: entityStream, entityStreamContinuation: entityStreamContinuation)
-
-//        Task.detached {
-//            try! await Task.sleep(for: .seconds(1))
-//            
-//            print("debugging start")
-//            let entity = EntityId(placeId: "Garten", name: "Garage Front R", characteristicsName: nil, characteristic: .brightness)
-////            try! await self.perform(.turnOn(entity))
-//            try! await self.perform(.setBrightness(entity, 0.1))
-//            print("debugging end")
-//        }
     }
 
     public  func getAllEntitiesLive() async -> [EntityStorageItem] {

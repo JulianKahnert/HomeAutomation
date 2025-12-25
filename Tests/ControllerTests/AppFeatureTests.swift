@@ -29,6 +29,7 @@ struct AppFeatureTests {
         await store.send(.scenePhaseChanged(old: .inactive, new: .active))
 
         // Verify that refresh actions are dispatched to all child features
+        // Note: Actions may arrive in any order due to parallel execution via .merge()
         await store.receive(\.automations.refresh) { state in
             state.automations.isLoading = true
             state.automations.error = nil
@@ -37,6 +38,11 @@ struct AppFeatureTests {
         await store.receive(\.actions.refresh) { state in
             state.actions.isLoading = true
             state.actions.alert = nil
+        }
+
+        await store.receive(\.history.refresh) { state in
+            state.history.isLoading = true
+            state.history.alert = nil
         }
 
         await store.receive(\.refreshWindowStates)
@@ -49,6 +55,12 @@ struct AppFeatureTests {
         }
 
         // Verify that the refresh operations complete
+        // History response comes first because it's synchronous
+        await store.receive(\.history.entitiesResponse) { state in
+            state.history.isLoading = false
+            state.history.entities = []
+        }
+
         await store.receive(\.automations.automationsResponse) { state in
             state.automations.isLoading = false
         }
@@ -88,6 +100,11 @@ struct AppFeatureTests {
             state.actions.alert = nil
         }
 
+        await store.receive(\.history.refresh) { state in
+            state.history.isLoading = true
+            state.history.alert = nil
+        }
+
         await store.receive(\.refreshWindowStates)
 
         await store.receive(\.startMonitoringLiveActivities)
@@ -98,6 +115,11 @@ struct AppFeatureTests {
         }
 
         // Verify that the refresh operations complete
+        await store.receive(\.history.entitiesResponse) { state in
+            state.history.isLoading = false
+            state.history.entities = []
+        }
+
         await store.receive(\.automations.automationsResponse) { state in
             state.automations.isLoading = false
         }
@@ -127,7 +149,6 @@ struct AppFeatureTests {
         await store.send(.scenePhaseChanged(old: .background, new: .active))
 
         // All refresh actions should be dispatched
-        // The order may vary due to parallel execution, but all should arrive
         await store.receive(\.automations.refresh) { state in
             state.automations.isLoading = true
             state.automations.error = nil
@@ -136,6 +157,11 @@ struct AppFeatureTests {
         await store.receive(\.actions.refresh) { state in
             state.actions.isLoading = true
             state.actions.alert = nil
+        }
+
+        await store.receive(\.history.refresh) { state in
+            state.history.isLoading = true
+            state.history.alert = nil
         }
 
         await store.receive(\.refreshWindowStates)
@@ -148,6 +174,11 @@ struct AppFeatureTests {
         }
 
         // Complete all operations
+        await store.receive(\.history.entitiesResponse) { state in
+            state.history.isLoading = false
+            state.history.entities = []
+        }
+
         await store.receive(\.automations.automationsResponse) { state in
             state.automations.isLoading = false
         }
@@ -181,9 +212,11 @@ struct AppFeatureTests {
         // Wait for all actions to complete
         await store.receive(\.automations.refresh)
         await store.receive(\.actions.refresh)
+        await store.receive(\.history.refresh)
         await store.receive(\.refreshWindowStates)
         await store.receive(\.startMonitoringLiveActivities)
         await store.receive(\.settings.refreshWindowStates)
+        await store.receive(\.history.entitiesResponse)
         await store.receive(\.automations.automationsResponse)
         await store.receive(\.actions.actionsResponse)
         await store.receive(\.settings.windowStatesResponse)
@@ -194,6 +227,7 @@ struct AppFeatureTests {
         #expect(finalState.actions.actions.count == 1)
         #expect(finalState.settings.windowContentState?.windowStates.count == 1)
         #expect(finalState.settings.windowContentState?.windowStates.first?.name == "Living Room Window")
+        #expect(finalState.history.entities.count == 2)  // Preview value has 2 entities
     }
 
     @Test("scenePhaseChanged ignores non-active transitions")
@@ -256,6 +290,11 @@ struct AppFeatureTests {
             state.actions.alert = nil
         }
 
+        await store.receive(\.history.refresh) { state in
+            state.history.isLoading = true
+            state.history.alert = nil
+        }
+
         await store.receive(\.refreshWindowStates)
 
         await store.receive(\.startMonitoringLiveActivities)
@@ -263,6 +302,12 @@ struct AppFeatureTests {
         await store.receive(\.settings.refreshWindowStates) { state in
             state.settings.isLoadingWindowStates = true
             state.settings.error = nil
+        }
+
+        // Wait for all operations to complete
+        await store.receive(\.history.entitiesResponse) { state in
+            state.history.isLoading = false
+            state.history.entities = []
         }
 
         await store.receive(\.automations.automationsResponse) { state in

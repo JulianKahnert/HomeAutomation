@@ -161,4 +161,81 @@ struct OpenAPIController: APIProtocol {
         return .ok
     }
 
+    // MARK: - /entities
+
+    func getEntitiesWithHistory(_ input: Operations.GetEntitiesWithHistory.Input) async throws -> Operations.GetEntitiesWithHistory.Output {
+        // Get all unique entity IDs that have history
+        let entityIds = try await request.application.entityStorageDbRepository.getAllEntityIds()
+
+        // Map EntityIds to EntityInfo
+        let entityInfos = entityIds.map { entityId in
+            Components.Schemas.EntityInfo(
+                id: "\(entityId.placeId)_\(entityId.name)_\(entityId.characteristicType.rawValue)",
+                entityId: Components.Schemas.EntityId(
+                    placeId: entityId.placeId,
+                    name: entityId.name,
+                    characteristicsName: entityId.characteristicsName ?? "",
+                    characteristicType: entityId.characteristicType.rawValue
+                )
+            )
+        }
+
+        return .ok(.init(body: .json(entityInfos)))
+    }
+
+    // MARK: - /entities/history
+
+    func getEntityHistory(_ input: Operations.GetEntityHistory.Input) async throws -> Operations.GetEntityHistory.Output {
+        // Extract and validate required query parameters
+        guard let characteristicType = CharacteristicsType(rawValue: input.query.characteristicType) else {
+            throw Abort(.badRequest, reason: "Invalid characteristic type: \(input.query.characteristicType)")
+        }
+
+        let entityId = EntityId(
+            placeId: input.query.placeId,
+            name: input.query.name,
+            characteristicsName: input.query.characteristicsName,
+            characteristic: characteristicType
+        )
+
+        // Extract optional date parameters (already parsed by OpenAPI)
+        let startDate = input.query.startDate
+        let endDate = input.query.endDate
+        let cursor = input.query.cursor
+        let limit = input.query.limit ?? 100
+
+        // Query history from repository
+        let historyItems = try await request.application.entityStorageDbRepository.getHistory(
+            for: entityId,
+            startDate: startDate,
+            endDate: endDate,
+            cursor: cursor,
+            limit: limit
+        )
+
+        // Map to OpenAPI schema types
+        let schemaItems = historyItems.map { item in
+            Components.Schemas.EntityHistoryItem(
+                timestamp: item.timestamp,
+                motionDetected: item.motionDetected,
+                illuminanceInLux: item.illuminance?.value,
+                isDeviceOn: item.isDeviceOn,
+                isContactOpen: item.isContactOpen,
+                isDoorLocked: item.isDoorLocked,
+                stateOfCharge: item.stateOfCharge,
+                isHeaterActive: item.isHeaterActive
+            )
+        }
+
+        // Calculate next cursor (timestamp of last item, or nil if no more data)
+        let nextCursor = schemaItems.last?.timestamp
+
+        let response = Components.Schemas.EntityHistoryResponse(
+            items: schemaItems,
+            nextCursor: nextCursor
+        )
+
+        return .ok(.init(body: .json(response)))
+    }
+
 }

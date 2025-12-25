@@ -91,6 +91,63 @@ public struct ServerClient {
         let response = try await client.clearActions()
         _ = try response.ok
     }
+
+    public func getEntityIdsWithHistory() async throws -> [EntityInfo] {
+        let response = try await client.getEntitiesWithHistory()
+        return try response.ok.body.json.compactMap { entity -> EntityInfo? in
+            guard let characteristic = CharacteristicsType(rawValue: entity.entityId.characteristicType) else {
+                print("Failed to parse characteristic type: \(entity.entityId.characteristicType)")
+                assertionFailure("Failed to parse characteristic type")
+                return nil
+            }
+            let characteristicsName = entity.entityId.characteristicsName?.isEmpty == false ? entity.entityId.characteristicsName : nil
+            let entityId = EntityId(placeId: entity.entityId.placeId,
+                                   name: entity.entityId.name,
+                                   characteristicsName: characteristicsName,
+                                   characteristic: characteristic)
+            return EntityInfo(entityId: entityId)
+        }
+    }
+
+    public func getEntityHistory(
+        entityId: EntityId,
+        startDate: Date? = nil,
+        endDate: Date? = nil,
+        cursor: Date? = nil,
+        limit: Int = 100
+    ) async throws -> EntityHistoryResponse {
+        let query = Operations.GetEntityHistory.Input.Query(
+            placeId: entityId.placeId,
+            name: entityId.name,
+            characteristicsName: entityId.characteristicsName,
+            characteristicType: entityId.characteristicType.rawValue,
+            startDate: startDate,
+            endDate: endDate,
+            cursor: cursor,
+            limit: limit
+        )
+
+        let response = try await client.getEntityHistory(query: query)
+        let historyResponse = try response.ok.body.json
+
+        let items = historyResponse.items.compactMap { item -> EntityHistoryItem? in
+            EntityHistoryItem(
+                timestamp: item.timestamp,
+                motionDetected: item.motionDetected,
+                illuminanceInLux: item.illuminanceInLux,
+                isDeviceOn: item.isDeviceOn,
+                isContactOpen: item.isContactOpen,
+                isDoorLocked: item.isDoorLocked,
+                stateOfCharge: item.stateOfCharge,
+                isHeaterActive: item.isHeaterActive
+            )
+        }
+
+        return EntityHistoryResponse(
+            items: items,
+            nextCursor: historyResponse.nextCursor
+        )
+    }
 }
 
 extension Components.Schemas.PushDevice.TokenTypePayload {

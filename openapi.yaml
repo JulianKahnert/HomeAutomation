@@ -145,6 +145,91 @@ paths:
         "200":
           description: Action logs cleared successfully.
 
+  /entities:
+    get:
+      summary: Get entities with history
+      description: Retrieve a list of all entities that have historical data available.
+      operationId: getEntitiesWithHistory
+      responses:
+        "200":
+          description: A success response with all entities that have history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EntityInfo"
+
+  /entities/history:
+    get:
+      summary: Get entity history
+      description: Retrieve historical data for a specific entity with optional time range and pagination.
+      operationId: getEntityHistory
+      parameters:
+        - name: placeId
+          in: query
+          description: The place identifier of the entity
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: The name of the entity
+          required: true
+          schema:
+            type: string
+        - name: characteristicsName
+          in: query
+          description: Optional characteristics name of the entity
+          required: false
+          schema:
+            type: string
+        - name: characteristicType
+          in: query
+          description: The characteristic type of the entity
+          required: true
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          description: ISO 8601 timestamp for the start of the time range (inclusive)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          description: ISO 8601 timestamp for the end of the time range (exclusive)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: cursor
+          in: query
+          description: ISO 8601 timestamp cursor for pagination (fetch items older than this)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Maximum number of history items to return (default 100, max 1000)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: A success response with entity history data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityHistoryResponse"
+        "400":
+          description: Bad request - invalid parameters.
+
 components:
   schemas:
     Automation:
@@ -251,3 +336,61 @@ components:
         - placeId
         - name
         - characteristicType
+
+    EntityHistoryItem:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: The ISO timestamp of this historical data point.
+        motionDetected:
+          type: boolean
+          description: Motion sensor state (if applicable).
+        illuminanceInLux:
+          type: number
+          description: Illuminance in lux (if applicable).
+        isDeviceOn:
+          type: boolean
+          description: Device power state (if applicable).
+        isContactOpen:
+          type: boolean
+          description: Contact sensor state (if applicable).
+        isDoorLocked:
+          type: boolean
+          description: Door lock state (if applicable).
+        stateOfCharge:
+          type: integer
+          description: Battery state of charge percentage (if applicable).
+        isHeaterActive:
+          type: boolean
+          description: Heater active state (if applicable).
+      required:
+        - timestamp
+
+    EntityHistoryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityHistoryItem"
+          description: Array of historical data points.
+        nextCursor:
+          type: string
+          format: date-time
+          description: Cursor for the next page of results (timestamp of the last item, or null if no more data).
+      required:
+        - items
+
+    EntityInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier composed of placeId, name, and characteristic type.
+        entityId:
+          $ref: "#/components/schemas/EntityId"
+      required:
+        - id
+        - entityId

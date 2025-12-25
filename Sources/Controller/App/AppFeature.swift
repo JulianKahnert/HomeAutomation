@@ -20,6 +20,7 @@ struct AppFeature: Sendable {
         var selectedTab: Tab = .automations
         var automations = AutomationsFeature.State()
         var actions = ActionsFeature.State()
+        var history = HistoryFeature.State()
         var settings = SettingsFeature.State()
 
         var openWindowsCount: Int? {
@@ -32,12 +33,14 @@ struct AppFeature: Sendable {
     enum Tab: Sendable, Equatable, CaseIterable {
         case automations
         case actions
+        case history
         case settings
 
         var title: String {
             switch self {
             case .automations: return "Automations"
             case .actions: return "Actions"
+            case .history: return "History"
             case .settings: return "Settings"
             }
         }
@@ -46,6 +49,7 @@ struct AppFeature: Sendable {
             switch self {
             case .automations: return "lamp.floor"
             case .actions: return "list.bullet.clipboard"
+            case .history: return "chart.line.uptrend.xyaxis"
             case .settings: return "gear"
             }
         }
@@ -57,6 +61,7 @@ struct AppFeature: Sendable {
         case selectedTabChanged(Tab)
         case automations(AutomationsFeature.Action)
         case actions(ActionsFeature.Action)
+        case history(HistoryFeature.Action)
         case settings(SettingsFeature.Action)
 
         // Live Activities & Push Notifications
@@ -92,6 +97,10 @@ struct AppFeature: Sendable {
             ActionsFeature()
         }
 
+        Scope(state: \.history, action: \.history) {
+            HistoryFeature()
+        }
+
         Scope(state: \.settings, action: \.settings) {
             SettingsFeature()
         }
@@ -106,6 +115,9 @@ struct AppFeature: Sendable {
                 return .none
 
             case .actions:
+                return .none
+
+            case .history:
                 return .none
 
             case .settings:
@@ -174,6 +186,7 @@ struct AppFeature: Sendable {
                 return .merge(
                     .send(.automations(.refresh)),
                     .send(.actions(.refresh)),
+                    .send(.history(.refresh)),
                     .send(.refreshWindowStates),
                     .send(.startMonitoringLiveActivities)
                 )
@@ -212,6 +225,19 @@ struct AppView: View {
                     store: store.scope(
                         state: \.actions,
                         action: \.actions
+                    )
+                )
+            }
+
+            Tab(
+                AppFeature.Tab.history.title,
+                systemImage: AppFeature.Tab.history.systemImage,
+                value: AppFeature.Tab.history
+            ) {
+                HistoryView(
+                    store: store.scope(
+                        state: \.history,
+                        action: \.history
                     )
                 )
             }

@@ -202,13 +202,19 @@ extension HMCharacteristic: @retroactive Comparable {
         // Normalize to 0...1 (warm...cold) using the same logic as setColorTemperature
         guard let mired = value as? Int,
               let minimumValue = metadata?.minimumValue,
-              let maximumValue = metadata?.maximumValue else { return nil }
+              let maximumValue = metadata?.maximumValue else {
+            assertionFailure("ColorTemperature characteristic missing required data - value: \(String(describing: value)), min: \(String(describing: metadata?.minimumValue)), max: \(String(describing: metadata?.maximumValue))")
+            return nil
+        }
 
         let min = Float(truncating: minimumValue)
         let max = Float(truncating: maximumValue)
         let range = max - min
 
-        guard range > 0 else { return nil }
+        guard range > 0 else {
+            assertionFailure("ColorTemperature characteristic has invalid range - min: \(min), max: \(max), range: \(range)")
+            return nil
+        }
 
         // Invert because lower mired = colder light, but we want 0 = warm, 1 = cold
         let normalized = 1 - (Float(mired) - min) / range
@@ -220,7 +226,10 @@ extension HMCharacteristic: @retroactive Comparable {
               characteristicType == HMCharacteristicTypeHue else { return nil }
 
         try await readValue()
-        guard let hue = value as? Float else { return nil }
+        guard let hue = value as? Float else {
+            assertionFailure("Hue characteristic value is not Float - value: \(String(describing: value))")
+            return nil
+        }
 
         // Find saturation and brightness characteristics in the same service
         var saturation: Float = 1.0

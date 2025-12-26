@@ -277,11 +277,11 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let temperature = value as? Float else {
+        guard let temperature = value as? Double else {
             assertionFailure("Temperature characteristic value is not Float - value: \(String(describing: value))")
             return nil
         }
-        return .init(value: Double(temperature), unit: .celsius)
+        return .init(value: temperature, unit: .celsius)
     }
 
     private func getRelativeHumidity() async throws -> Double? {
@@ -289,11 +289,11 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let humidity = value as? Float else {
+        guard let humidity = value as? Double else {
             assertionFailure("RelativeHumidity characteristic value is not Float - value: \(String(describing: value))")
             return nil
         }
-        return Double(humidity)
+        return humidity
     }
 
     private func getCarbonDioxideLevel() async throws -> Int? {
@@ -348,10 +348,6 @@ extension HMCharacteristic: @retroactive Comparable {
         return state == .active
     }
 
-    func isCharacteristicsType(_ type: CharacteristicsType) -> Bool {
-        entityCharacteristicType == type
-    }
-
     var entityId: EntityId? {
         guard let placeId = service?.accessory?.room?.name,
               let name = service?.accessory?.name,
@@ -364,7 +360,7 @@ extension HMCharacteristic: @retroactive Comparable {
         entityCharacteristicType != nil
     }
 
-    private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Target Heating Cooling State", "Target Temperature", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event"])
+    private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Target Heating Cooling State", "Target Temperature", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event", "Smoke Detected", "Leak Detected"])
     var entityCharacteristicType: CharacteristicsType? {
         guard let homeKitCharacteristic = HomeKitCharacteristic(characteristicType: characteristicType) else {
             guard !Self.skippableCharacteristics.contains(localizedDescription) else { return nil }

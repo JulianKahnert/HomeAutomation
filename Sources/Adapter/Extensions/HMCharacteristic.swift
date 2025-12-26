@@ -193,16 +193,26 @@ extension HMCharacteristic: @retroactive Comparable {
         return brightness
     }
 
-    private func getColorTemperature() async throws -> Int? {
+    private func getColorTemperature() async throws -> Float? {
         guard characteristicType == HMCharacteristicTypeColorTemperature else { return nil }
 
         try await readValue()
 
         // HomeKit returns color temperature in mired (micro-reciprocal degrees)
-        // Convert to Kelvin: K = 1,000,000 / mired
-        guard let mired = value as? Int, mired > 0 else { return nil }
-        let kelvin = 1_000_000 / mired
-        return kelvin
+        // Normalize to 0...1 (warm...cold) using the same logic as setColorTemperature
+        guard let mired = value as? Int,
+              let minimumValue = metadata?.minimumValue,
+              let maximumValue = metadata?.maximumValue else { return nil }
+
+        let min = Float(truncating: minimumValue)
+        let max = Float(truncating: maximumValue)
+        let range = max - min
+
+        guard range > 0 else { return nil }
+
+        // Invert because lower mired = colder light, but we want 0 = warm, 1 = cold
+        let normalized = 1 - (Float(mired) - min) / range
+        return normalized
     }
 
     private func getColor() async throws -> RGB? {

@@ -89,7 +89,8 @@ struct EntityCharacteristicView: View {
         case .colorTemperature:
             if let colorTemp = item.colorTemperature {
                 Spacer()
-                Label("\(colorTemp)K", systemImage: "light.ribbon")
+                // Display as percentage: 0% = warm, 100% = cold
+                Label("\(Int(colorTemp * 100))%", systemImage: "light.ribbon")
             }
         case .color:
             if let color = item.color {

@@ -31,9 +31,9 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// Light brightness level (0-100)
     public let brightness: Int?
 
-    /// Color temperature in Kelvin (K)
-    /// Converted from HomeKit's mired value: K = 1,000,000 / mired
-    public let colorTemperature: Int?
+    /// Color temperature normalized to 0...1 (warm...cold)
+    /// Normalized from HomeKit's mired value using device min/max capabilities
+    public let colorTemperature: Float?
 
     /// RGB color value
     public let color: RGB?
@@ -90,7 +90,7 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         illuminance: Measurement<UnitIlluminance>? = nil,
         isDeviceOn: Bool? = nil,
         brightness: Int? = nil,
-        colorTemperature: Int? = nil,
+        colorTemperature: Float? = nil,
         color: RGB? = nil,
         isContactOpen: Bool? = nil,
         isDoorLocked: Bool? = nil,

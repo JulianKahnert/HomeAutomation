@@ -278,8 +278,7 @@ extension HMCharacteristic: @retroactive Comparable {
     }
 
     private func getPMDensity() async throws -> Double? {
-        guard characteristicType == HMCharacteristicTypePM2_5Density ||
-              characteristicType == HMCharacteristicTypePM10Density else { return nil }
+        guard characteristicType == HMCharacteristicTypePM2_5Density else { return nil }
 
         try await readValue()
 

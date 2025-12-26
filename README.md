@@ -13,7 +13,8 @@ Write testable HomeKit automations in Swift that run 24/7 on your server.
 
 ```swift
 public struct MotionAtNight: Automatable {
-    public let motionSensors: [MotionSensorDevice]
+    public let motionSensor: MotionSensorDevice
+
     public let lightSensor: MotionSensorDevice
     public let lights: [SwitchDevice]
 
@@ -101,7 +102,3 @@ Add your automation to `Sources/HAImplementations/Automations/` and register in 
 
 - [Server Setup](./docs/setup-server.md)
 - [FlowKit Adapter Setup](./docs/setup-FlowKitAdapter.md)
-
-## License
-
-MIT

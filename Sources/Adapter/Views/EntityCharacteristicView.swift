@@ -110,7 +110,7 @@ struct EntityCharacteristicView: View {
     }
 }
 
-//#Preview {
+// #Preview {
 //    HStack {
 //        EntityCharacteristicView(
 //            item: EntityStorageItem(
@@ -121,4 +121,4 @@ struct EntityCharacteristicView: View {
 //            type: .brightness
 //        )
 //    }
-//}
+// }

@@ -1,6 +1,6 @@
 //
-//  Extensions.swift
-//  HomeAutomationKit
+//  HMCharacteristic.swift
+//  Adapter
 //
 //  Created by Julian Kahnert on 21.07.24.
 //
@@ -48,21 +48,38 @@ extension HMCharacteristic: @retroactive Comparable {
             let motionDetected = try await hasMotion()
             let illuminance = try await getIlluminance()
             let isDeviceOn = try await isDeviceOn()
+            let brightness = try await getBrightness()
+            let colorTemperature = try await getColorTemperature()
+            let color = try await getColor()
             let isContactOpen = try await isContactOpen()
             let isDoorLocked = try await isDoorLocked()
             let stateOfCharge = try await getStateOfCharge()
             let isHeaterActive = try await getHeaterState()
-            
-            // TODO: implement ALL characteristic getters (analog to e.g. getStateOfCharge and getHeaterState etc.) and init EntityStorageItem with ALL properties
+            let temperature = try await getTemperature()
+            let relativeHumidity = try await getRelativeHumidity()
+            let carbonDioxideLevel = try await getCarbonDioxideLevel()
+            let pmDensity = try await getPMDensity()
+            let airQuality = try await getAirQuality()
+            let valveOpen = try await getValveOpen()
+
             return EntityStorageItem(entityId: entityId,
                                      timestamp: timestamp,
                                      motionDetected: motionDetected,
                                      illuminance: illuminance,
                                      isDeviceOn: isDeviceOn,
+                                     brightness: brightness,
+                                     colorTemperature: colorTemperature,
+                                     color: color,
                                      isContactOpen: isContactOpen,
                                      isDoorLocked: isDoorLocked,
                                      stateOfCharge: stateOfCharge,
-                                     isHeaterActive: isHeaterActive)
+                                     isHeaterActive: isHeaterActive,
+                                     temperatureInC: temperature,
+                                     relativeHumidity: relativeHumidity,
+                                     carbonDioxideSensorId: carbonDioxideLevel,
+                                     pmDensity: pmDensity,
+                                     airQuality: airQuality,
+                                     valveOpen: valveOpen)
         } catch {
             // this might occur when e.g. the IKEA hub or a device is not available
             homeKitLogger.critical("Error while getting characteristic data - \(self.service?.accessory?.room?.name ?? "")@\(self.service?.accessory?.name ?? "") - \(self)\n\(error)")
@@ -165,6 +182,126 @@ extension HMCharacteristic: @retroactive Comparable {
         guard let isHeatingActive = value as? Bool else { return nil }
 
         return isHeatingActive
+    }
+
+    private func getBrightness() async throws -> Int? {
+        guard characteristicType == HMCharacteristicTypeBrightness else { return nil }
+
+        try await readValue()
+
+        guard let brightness = value as? Int else { return nil }
+        return brightness
+    }
+
+    private func getColorTemperature() async throws -> Int? {
+        guard characteristicType == HMCharacteristicTypeColorTemperature else { return nil }
+
+        try await readValue()
+
+        guard let colorTemp = value as? Int else { return nil }
+        return colorTemp
+    }
+
+    private func getColor() async throws -> RGB? {
+        guard let service,
+              characteristicType == HMCharacteristicTypeHue else { return nil }
+
+        try await readValue()
+        guard let hue = value as? Float else { return nil }
+
+        // Find saturation and brightness characteristics in the same service
+        var saturation: Float = 1.0
+        var brightness: Float = 1.0
+
+        for characteristic in service.characteristics {
+            if characteristic.characteristicType == HMCharacteristicTypeSaturation {
+                try await characteristic.readValue()
+                saturation = (characteristic.value as? Float ?? 100.0) / 100.0
+            } else if characteristic.characteristicType == HMCharacteristicTypeBrightness {
+                try await characteristic.readValue()
+                brightness = (characteristic.value as? Float ?? 100.0) / 100.0
+            }
+        }
+
+        // Convert HSV to RGB
+        let h = hue / 360.0
+        let s = saturation
+        let v = brightness
+
+        let hi = Int(h * 6)
+        let f = h * 6 - Float(hi)
+        let p = v * (1 - s)
+        let q = v * (1 - f * s)
+        let t = v * (1 - (1 - f) * s)
+
+        let (r, g, b): (Float, Float, Float)
+        switch hi {
+        case 0: (r, g, b) = (v, t, p)
+        case 1: (r, g, b) = (q, v, p)
+        case 2: (r, g, b) = (p, v, t)
+        case 3: (r, g, b) = (p, q, v)
+        case 4: (r, g, b) = (t, p, v)
+        default: (r, g, b) = (v, p, q)
+        }
+
+        return RGB(red: r, green: g, blue: b)
+    }
+
+    private func getTemperature() async throws -> Measurement<UnitTemperature>? {
+        guard characteristicType == HMCharacteristicTypeCurrentTemperature else { return nil }
+
+        try await readValue()
+
+        guard let temperature = value as? Float else { return nil }
+        return .init(value: Double(temperature), unit: .celsius)
+    }
+
+    private func getRelativeHumidity() async throws -> Double? {
+        guard characteristicType == HMCharacteristicTypeCurrentRelativeHumidity else { return nil }
+
+        try await readValue()
+
+        guard let humidity = value as? Float else { return nil }
+        return Double(humidity)
+    }
+
+    private func getCarbonDioxideLevel() async throws -> Int? {
+        guard characteristicType == HMCharacteristicTypeCarbonDioxideLevel else { return nil }
+
+        try await readValue()
+
+        guard let co2Level = value as? Float else { return nil }
+        return Int(co2Level)
+    }
+
+    private func getPMDensity() async throws -> Double? {
+        guard characteristicType == HMCharacteristicTypePM2_5Density ||
+              characteristicType == HMCharacteristicTypePM10Density else { return nil }
+
+        try await readValue()
+
+        guard let density = value as? Float else { return nil }
+        return Double(density)
+    }
+
+    private func getAirQuality() async throws -> Int? {
+        guard characteristicType == HMCharacteristicTypeAirQuality else { return nil }
+
+        try await readValue()
+
+        guard let quality = value as? Int else { return nil }
+        return quality
+    }
+
+    private func getValveOpen() async throws -> Bool? {
+        guard let service,
+              service.serviceType == HMServiceTypeValve,
+              characteristicType == HMCharacteristicTypeActive else { return nil }
+
+        try await readValue()
+
+        guard let isOpen = value as? Bool else { return nil }
+        return isOpen
     }
 
     func isCharacteristicsType(_ type: CharacteristicsType) -> Bool {

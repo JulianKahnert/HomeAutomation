@@ -19,7 +19,7 @@ public struct ContentView: View {
         self._shouldCrashIfActorSystemInitFails = shouldCrashIfActorSystemInitFails
         self._entities = entities
     }
-    
+
     public var body: some View {
         NavigationStack {
             EntitiesListView(

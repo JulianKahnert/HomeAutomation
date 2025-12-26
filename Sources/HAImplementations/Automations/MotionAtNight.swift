@@ -8,9 +8,6 @@
 import Foundation
 import HAModels
 
-// Küche: min 0.5
-// Wohnzimmer: min 0.3
-
 public struct MotionAtNight: Automatable {
     // threshold under which the automation should be triggered
     private static let thresholdInLux = 60.0

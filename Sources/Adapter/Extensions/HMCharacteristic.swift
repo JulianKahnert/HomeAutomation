@@ -245,28 +245,9 @@ extension HMCharacteristic: @retroactive Comparable {
             }
         }
 
-        // Convert HSV to RGB
-        let h = hue / 360.0
-        let s = saturation
-        let v = brightness
-
-        let hi = Int(h * 6)
-        let f = h * 6 - Float(hi)
-        let p = v * (1 - s)
-        let q = v * (1 - f * s)
-        let t = v * (1 - (1 - f) * s)
-
-        let (r, g, b): (Float, Float, Float)
-        switch hi {
-        case 0: (r, g, b) = (v, t, p)
-        case 1: (r, g, b) = (q, v, p)
-        case 2: (r, g, b) = (p, v, t)
-        case 3: (r, g, b) = (p, q, v)
-        case 4: (r, g, b) = (t, p, v)
-        default: (r, g, b) = (v, p, q)
-        }
-
-        return RGB(red: r, green: g, blue: b)
+        // Convert HSV to RGB using the utility function
+        let h = hue / 360.0  // Normalize 0-360° to 0-1
+        return rgb(h: h, s: saturation, v: brightness)
     }
 
     private func getTemperature() async throws -> Measurement<UnitTemperature>? {

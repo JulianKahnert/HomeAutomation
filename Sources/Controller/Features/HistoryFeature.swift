@@ -155,6 +155,7 @@ struct HistoryView: View {
             ) { detailStore in
                 EntityHistoryDetailView(store: detailStore)
                     .navigationTitle(detailStore.entity.displayName)
+                    .navigationSubtitle(detailStore.entity.formattedCharacteristicDisplayName)
             }
             .sensoryFeedback(.selection, trigger: store.selectedEntityId)
             .refreshable {

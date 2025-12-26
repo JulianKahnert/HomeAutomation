@@ -21,14 +21,9 @@ struct EntityHistoryDetailFeature: Sendable {
         let entity: EntityInfo
         var historyItems: [EntityHistoryItem] = []
         var isLoading = false
-        var isLoadingMore = false
+        var timeRange: TimeRange = .hour
         var nextCursor: Date?
-        var timeRange: TimeRange = .day
         @Presents var alert: AlertState<Action.Alert>?
-
-        var hasMore: Bool {
-            nextCursor != nil
-        }
 
         var chartData: [EntityHistoryItem] {
             historyItems
@@ -44,8 +39,6 @@ struct EntityHistoryDetailFeature: Sendable {
                 start = now.addingTimeInterval(-86400)
             case .week:
                 start = now.addingTimeInterval(-604800)
-            case .month:
-                start = now.addingTimeInterval(-2592000)
             }
             return (start, now)
         }
@@ -55,14 +48,12 @@ struct EntityHistoryDetailFeature: Sendable {
         case hour = "1h"
         case day = "24h"
         case week = "7d"
-        case month = "30d"
 
         var displayName: String {
             switch self {
             case .hour: return "Last Hour"
             case .day: return "Last 24 Hours"
             case .week: return "Last 7 Days"
-            case .month: return "Last 30 Days"
             }
         }
     }
@@ -72,7 +63,7 @@ struct EntityHistoryDetailFeature: Sendable {
     enum Action: Sendable, BindableAction {
         case onAppear
         case refresh
-        case loadMore
+        case loadNextPage
         case historyResponse(Result<EntityHistoryResponse, Error>)
         case timeRangeChanged(TimeRange)
         case binding(BindingAction<State>)
@@ -101,8 +92,8 @@ struct EntityHistoryDetailFeature: Sendable {
             case .refresh:
                 state.isLoading = true
                 state.alert = nil
-                state.nextCursor = nil
                 state.historyItems = []
+                state.nextCursor = nil
 
                 let entityId = state.entity.entityId
                 let dateRange = state.dateRange
@@ -114,19 +105,18 @@ struct EntityHistoryDetailFeature: Sendable {
                                 entityId,
                                 dateRange.start,
                                 dateRange.end,
-                                nil, // no cursor for initial load
-                                100  // limit
+                                nil,
+                                5000  // Higher limit for initial load
                             )
                         }
                     ))
                 }
 
-            case .loadMore:
-                guard !state.isLoadingMore, let cursor = state.nextCursor else {
+            case .loadNextPage:
+                guard let cursor = state.nextCursor else {
                     return .none
                 }
 
-                state.isLoadingMore = true
                 let entityId = state.entity.entityId
                 let dateRange = state.dateRange
 
@@ -138,7 +128,7 @@ struct EntityHistoryDetailFeature: Sendable {
                                 dateRange.start,
                                 dateRange.end,
                                 cursor,
-                                100
+                                1000
                             )
                         }
                     ))
@@ -146,9 +136,8 @@ struct EntityHistoryDetailFeature: Sendable {
 
             case let .historyResponse(.success(response)):
                 state.isLoading = false
-                state.isLoadingMore = false
 
-                // Append new items and sort by timestamp descending
+                // Append new items and remove duplicates
                 let newItems = response.items.filter { newItem in
                     !state.historyItems.contains(where: { $0.id == newItem.id })
                 }
@@ -156,11 +145,17 @@ struct EntityHistoryDetailFeature: Sendable {
                 state.historyItems.sort { $0.timestamp > $1.timestamp }
 
                 state.nextCursor = response.nextCursor
+
+                // Automatically load next page if there's more data
+                if response.nextCursor != nil {
+                    return .run { send in
+                        await send(.loadNextPage)
+                    }
+                }
                 return .none
 
             case let .historyResponse(.failure(error)):
                 state.isLoading = false
-                state.isLoadingMore = false
                 state.alert = AlertState {
                     TextState("Error")
                 } actions: {
@@ -231,19 +226,6 @@ struct EntityHistoryDetailView: View {
                             historyRow(item)
                             Divider()
                         }
-
-                        if store.hasMore {
-                            Button {
-                                store.send(.loadMore)
-                            } label: {
-                                if store.isLoadingMore {
-                                    ProgressView()
-                                } else {
-                                    Text("Load More")
-                                }
-                            }
-                            .padding()
-                        }
                     }
                     .background(.secondary.opacity(0.1))
                     .cornerRadius(8)
@@ -263,6 +245,8 @@ struct EntityHistoryDetailView: View {
 
     @ViewBuilder
     private var chartView: some View {
+        let dateRange = store.state.dateRange
+
         Chart {
             ForEach(store.chartData) { item in
                 if let value = item.primaryValue {
@@ -271,7 +255,6 @@ struct EntityHistoryDetailView: View {
                         y: .value("Value", value)
                     )
                     .foregroundStyle(.blue)
-                    .interpolationMethod(.catmullRom)
 
                     PointMark(
                         x: .value("Time", item.timestamp),
@@ -281,6 +264,7 @@ struct EntityHistoryDetailView: View {
                 }
             }
         }
+        .chartXScale(domain: dateRange.start...dateRange.end)
         .chartXAxis {
             AxisMarks(values: .automatic) { _ in
                 AxisGridLine()

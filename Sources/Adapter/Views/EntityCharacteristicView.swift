@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 26.12.24.
 //
 
+#if canImport(SwiftUI)
 import HAModels
 import SwiftUI
 
@@ -122,3 +123,4 @@ struct EntityCharacteristicView: View {
 //        )
 //    }
 // }
+#endif

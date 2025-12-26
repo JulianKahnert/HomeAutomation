@@ -5,13 +5,13 @@
 //  Created by Julian Kahnert on 14.11.25.
 //
 
+#if canImport(SwiftUI)
 import HAModels
 import SwiftUI
 
 struct EntitiesListView: View {
     @Binding var shouldCrashIfActorSystemInitFails: Bool
     @Binding var entities: [EntityStorageItem]
-    @Binding var serverAddress: CustomActorSystem.Address
     @Binding var showSettings: Bool
 
     var body: some View {
@@ -32,10 +32,6 @@ struct EntitiesListView: View {
             }
             .listRowBackground((item.stateOfCharge ?? 100) <= 5 ? Color.yellow.opacity(0.2) : nil)
         }
-        .navigationTitle(serverAddress.description)
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
         .toolbar {
             ToolbarItem {
                 Toggle(isOn: $shouldCrashIfActorSystemInitFails, label: {
@@ -55,7 +51,7 @@ struct EntitiesListView: View {
     EntitiesListView(
         shouldCrashIfActorSystemInitFails: .constant(true),
         entities: .constant([]),
-        serverAddress: .constant(CustomActorSystem.Address(host: "localhost", port: 8888)),
         showSettings: .constant(false)
     )
 }
+#endif

@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 05.02.25.
 //
 
+#if canImport(SwiftUI)
 import Adapter
 import HAImplementations
 import SwiftUI
@@ -46,3 +47,4 @@ struct SettingsView: View {
 #Preview {
     SettingsView(serverAddress: .constant(.init(host: "localhost", port: 8888)))
 }
+#endif

@@ -1,76 +1,107 @@
-# HomeAutomation
+# HomeAutomation (FlowKit)
 
-**HomeAutomation** is smart home automation system that connects to [HomeKit](https://developer.apple.com/documentation/homekit).
+Write testable HomeKit automations in Swift that run 24/7 on your server.
 
-By subscribing to events that happen in the HomeKit ecosystem, you are able to perform complex automations that can be written and tested in Swift.
+## Why FlowKit?
 
-Main goals:
+- **Write in Swift**: Testable, type-safe automations vs HomeKit's limited rules
+- **Complex Logic**: Multi-sensor triggers, weather APIs, energy pricing, time-based conditions
+- **24/7 Server Runtime**: Runs independently of iOS devices being unlocked
+- **Built-in Automations**: Motion-activated lighting, window monitoring, garden watering, energy optimization
 
-* ability to create of complex automations (see `HAImplemenations`)
-* cooperation with HomeKit: You can/should still use the Home.app/HomePods etc. for manually setting entities
+## Example Automation
+
+```swift
+public struct MotionAtNight: Automatable {
+    public let motionSensors: [MotionSensorDevice]
+    public let lightSensor: MotionSensorDevice
+    public let lights: [SwitchDevice]
+
+    public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
+        let motionDetected = try await motionSensor.motionDetectedState(with: hm)
+        let lux = try await lightSensor.illuminanceState(with: hm)
+        return motionDetected && lux.value < 60.0
+    }
+
+    public func execute(using hm: HomeManagable) async throws {
+        await lights.forEach { $0.setBrightness(to: 0.3, with: hm) }
+        try await Task.sleep(for: .seconds(60))
+        await lights.forEach { $0.turnOff(with: hm) }
+    }
+}
+```
+
+**More Examples**: [MotionAtNight.swift](Sources/HAImplementations/Automations/MotionAtNight.swift) • [WindowOpen.swift](Sources/HAImplementations/Automations/WindowOpen.swift) • [GardenWatering.swift](Sources/HAImplementations/Automations/GardenWatering.swift)
+
+## Prerequisites
+
+- **HomeKit Setup**: Existing HomeKit home with compatible devices
+- **Apple Device**: iPhone/iPad or Mac (FlowKit Adapter must run in foreground)
+- **Server**: Docker + MySQL-compatible database
+- **Developer Tools**: Swift 6.0+, Xcode (for building iOS apps)
+- **Optional**: Tibber API key (for energy price automations)
+
+## Quick Start
+
+1. **Deploy Server**:
+   ```bash
+   docker-compose build
+   docker-compose up -d
+   ```
+
+2. **Configure Database**: Set `DATABASE_URL` environment variable (MySQL connection string)
+
+3. **Build & Run FlowKit Adapter**:
+   ```bash
+   cd Apps/FlowKitAdapter
+   xcodebuild -scheme "FlowKit Adapter" -configuration Release
+   ```
+   Launch app, grant HomeKit permissions, configure server URL
+
+4. **Write Automations**: Implement `Automatable` protocol in `Sources/HAImplementations/Automations/`
+
+**[Detailed Setup →](./docs/setup-server.md)**
 
 ## Architecture
 
 ```mermaid
----
-title: FlowKit Architecture
----
-
-flowchart TB
-    subgraph iOS/catalyst
-        subgraph FlowKitAdapterApp
-            subgraph ActorSystem Part 1
-                HomeKitCommandReceiver[HomeKit Command Reveiver]
-                HomeEventReceiverRef[HomeEvent Reveiver Ref]
-            end
-            HomeKit[fa:fa-home HomeKit]
-            FlowKitAdapter
-        end
-    end
-
-    WebSocket@{ shape: das, label: "WebSocket" }
-
-    subgraph Docker
-    subgraph HomeAutomationServer
-         subgraph ActorSystem Part 2
-                HomeKitCommandReceiverRef[HomeKit Command Reveiver Ref]
-                HomeEventReceiver[HomeEvent Reveiver]
-            end
-        HomeAutomationService{{fa:fa-server Home Automation Service}}
-        StorageAdapter[Storage Adapter]
-    end
-    subgraph MySQL
-        MySQLDB[(MySQL Database)]
-    end
-    end
-
-    HomeAutomationService -->|run commands, e.g. turnOn light| HomeKitCommandReceiverRef
-    HomeKitCommandReceiverRef -->|WebSocket| HomeKitCommandReceiver
-    HomeKitCommandReceiver -->FlowKitAdapter
-
-    FlowKitAdapter -->|HomeEvent, e.g. light turned on| HomeEventReceiverRef
-    HomeEventReceiverRef -->|WebSocket| HomeEventReceiver
-    HomeEventReceiver --> HomeAutomationService
-    FlowKitAdapter <--> HomeKit
-    HomeAutomationService <--> StorageAdapter
-
-    StorageAdapter <--> MySQLDB
+flowchart LR
+    HomeKit[HomeKit Devices] <--> Adapter[FlowKit Adapter<br/>iOS/Mac App]
+    Adapter <-->|WebSocket| Server[FlowKit Server<br/>Docker/Vapor]
+    Server <--> DB[(MySQL)]
+    Server --> Automations[Your Swift<br/>Automations]
 ```
 
-## Project Structure & Glossary
+**Distributed System**: Adapter forwards HomeKit events to server via WebSocket, server executes automations and sends commands back.
 
-* `FlowKit Server`: [Vapor](https://vapor.codes) server that contains the business logic e.g. receives `HomeEvent`s, triggers automations, servers the config and persists Entities.
-* `HomeAutomationKit`: Package the contains the entities etc. that are shared between the server and other parts of the system.
-* `FlowKit Adapter`: A macOS catalyst/iOS app that must run in foreground (because of HomeKit privacy implications). It sends `HomeEvent`s to the server and receives commands (e.g. `HomeManagableAction`) that will be forwarded to HomeKit.
+## Project Structure
 
+- `Sources/HAImplementations/Automations/` - Built-in automation examples
+- `Sources/HAModels/` - Shared models (entities, events, devices)
+- `Sources/Server/` - Vapor server business logic
+- `Apps/FlowKitAdapter/` - iOS/macOS HomeKit bridge app
+- `Apps/FlowKitController/` - iOS management app
 
-Besides the main project structure there are a few more elements in the project that are defined here:
+## Writing Custom Automations
 
-* Entity: characteristic of a device in HomeKit, e.g. the light sensor of a Eve Motion device.
-* HomeEvent: event that might trigger an automation, e.g. `.sunrise` or the change of an entity.
-* HomeManagableAction: action that will can be processed by the `FlowKit Adapter` app.
+Implement the `Automatable` protocol:
+
+```swift
+public protocol Automatable {
+    var name: String { get }
+    var triggerEntityIds: Set<EntityId> { get }  // Sensors/devices that trigger this
+    func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool
+    func execute(using hm: HomeManagable) async throws
+}
+```
+
+Add your automation to `Sources/HAImplementations/Automations/` and register in `AnyAutomation`.
 
 ## Further Information
 
-* [Server Setup](./docs/setup-server.md)
-* [FlowKit Adapter Setup](./docs/setup-FlowKitAdapter.md)
+- [Server Setup](./docs/setup-server.md)
+- [FlowKit Adapter Setup](./docs/setup-FlowKitAdapter.md)
+
+## License
+
+MIT

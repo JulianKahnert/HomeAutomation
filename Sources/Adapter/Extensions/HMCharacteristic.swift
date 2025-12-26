@@ -52,7 +52,8 @@ extension HMCharacteristic: @retroactive Comparable {
             let isDoorLocked = try await isDoorLocked()
             let stateOfCharge = try await getStateOfCharge()
             let isHeaterActive = try await getHeaterState()
-
+            
+            // TODO: implement ALL characteristic getters (analog to e.g. getStateOfCharge and getHeaterState etc.) and init EntityStorageItem with ALL properties
             return EntityStorageItem(entityId: entityId,
                                      timestamp: timestamp,
                                      motionDetected: motionDetected,
@@ -178,14 +179,8 @@ extension HMCharacteristic: @retroactive Comparable {
     }
 
     var shouldSubscribe: Bool {
-        guard let type = entityCharacteristicType else { return false }
-
-        switch type {
-        case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId:
-            return true
-        case .batterySensor, .brightness, .colorTemperature, .color, .heating, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor:
-            return false
-        }
+        // true if we know the characteristic
+        entityCharacteristicType != nil
     }
 
     private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Target Heating Cooling State", "Target Temperature", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event"])
@@ -193,27 +188,10 @@ extension HMCharacteristic: @retroactive Comparable {
         guard let homeKitCharacteristic = HomeKitCharacteristic(characteristicType: characteristicType) else {
             guard !Self.skippableCharacteristics.contains(localizedDescription) else { return nil }
             homeKitLogger.warning("Failed to get entity characteristic type for \(self.service?.name ?? "") @ \(self.service?.accessory?.room?.name ?? ""): \(self.localizedDescription)")
+            assertionFailure()
             return nil
         }
         return homeKitCharacteristic.toCharacteristicsType(serviceType: service?.serviceType)
-    }
-}
-
-extension HMAction {
-    var characteristic: HMCharacteristic? {
-        value(forKey: "characteristic") as? HMCharacteristic
-    }
-}
-
-extension HMAccessory {
-    var home: HMHome? {
-        value(forKey: "home") as? HMHome
-    }
-}
-
-extension HMActionSet {
-    var home: HMHome? {
-        value(forKey: "home") as? HMHome
     }
 }
 #endif

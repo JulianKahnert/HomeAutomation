@@ -8,12 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		A302FDFC2D6E4EFE003FAB98 /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A302FDFB2D6E4EFE003FAB98 /* HomeAutomationKit */; };
-		A3B9B3362EC7C5A900AE2620 /* EntitiesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B9B3352EC7C5A900AE2620 /* EntitiesListView.swift */; };
 		A3BC6BAC2D6916E3001BE1D5 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */; };
 		A3BC6BAD2D6916E3001BE1D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */; };
-		A3BC6BAE2D6916E3001BE1D5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA82D6916E3001BE1D5 /* ContentView.swift */; };
-		A3BC6BAF2D6916E3001BE1D5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA92D6916E3001BE1D5 /* SettingsView.swift */; };
-		A3BC6BB02D6916E3001BE1D5 /* CircadianLightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */; };
 		A3BC6BB12D6916E3001BE1D5 /* FlowKitAdapterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapterApp.swift */; };
 		A3DEAD552EDB93FE00AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */; };
 		A3DEAD562EDB93FE00AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3EC945C2D63E8870009361C /* HomeAutomationKit */; };
@@ -22,15 +18,11 @@
 
 /* Begin PBXFileReference section */
 		A326E81D2C06528B00486F8E /* FlowKit Adapter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "FlowKit Adapter.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		A3B9B3352EC7C5A900AE2620 /* EntitiesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitiesListView.swift; sourceTree = "<group>"; };
 		A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A3BC6BA22D6916E3001BE1D5 /* FlowKitAdapter.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlowKitAdapter.entitlements; sourceTree = "<group>"; };
 		A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowKitAdapterApp.swift; sourceTree = "<group>"; };
 		A3BC6BA42D6916E3001BE1D5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircadianLightView.swift; sourceTree = "<group>"; };
-		A3BC6BA82D6916E3001BE1D5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		A3BC6BA92D6916E3001BE1D5 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,7 +48,6 @@
 				A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapterApp.swift */,
 				A3BC6BA42D6916E3001BE1D5 /* Info.plist */,
 				A3BC6BA62D6916E3001BE1D5 /* Preview Content */,
-				A3BC6BAA2D6916E3001BE1D5 /* Views */,
 				A326E81E2C06528B00486F8E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -75,17 +66,6 @@
 				A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
-			sourceTree = "<group>";
-		};
-		A3BC6BAA2D6916E3001BE1D5 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				A3B9B3352EC7C5A900AE2620 /* EntitiesListView.swift */,
-				A3BC6BA72D6916E3001BE1D5 /* CircadianLightView.swift */,
-				A3BC6BA82D6916E3001BE1D5 /* ContentView.swift */,
-				A3BC6BA92D6916E3001BE1D5 /* SettingsView.swift */,
-			);
-			path = Views;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -167,10 +147,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A3BC6BAE2D6916E3001BE1D5 /* ContentView.swift in Sources */,
-				A3B9B3362EC7C5A900AE2620 /* EntitiesListView.swift in Sources */,
-				A3BC6BAF2D6916E3001BE1D5 /* SettingsView.swift in Sources */,
-				A3BC6BB02D6916E3001BE1D5 /* CircadianLightView.swift in Sources */,
 				A3BC6BB12D6916E3001BE1D5 /* FlowKitAdapterApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -9,7 +9,7 @@
 
 import Foundation
 
-public struct RGB: Sendable, Codable, Equatable {
+public struct RGB: Sendable, Hashable, Codable, Equatable {
     public let red: Float
     public let green: Float
     public let blue: Float

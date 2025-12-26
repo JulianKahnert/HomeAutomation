@@ -9,13 +9,18 @@ import Adapter
 import HAModels
 import SwiftUI
 
-struct ContentView: View {
+public struct ContentView: View {
     @Binding var shouldCrashIfActorSystemInitFails: Bool
     @Binding var entities: [EntityStorageItem]
     @State private var showSettings = false
     @AppStorage("ActorSystemServerAddress") private var serverAddress = CustomActorSystem.Address(host: "localhost", port: 8888)
 
-    var body: some View {
+    public init(shouldCrashIfActorSystemInitFails: Binding<Bool>, entities: Binding<[EntityStorageItem]>) {
+        self._shouldCrashIfActorSystemInitFails = shouldCrashIfActorSystemInitFails
+        self._entities = entities
+    }
+    
+    public var body: some View {
         NavigationStack {
             EntitiesListView(
                 shouldCrashIfActorSystemInitFails: $shouldCrashIfActorSystemInitFails,

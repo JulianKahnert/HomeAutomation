@@ -9,7 +9,7 @@
 
 import Foundation
 
-public struct RGB: Sendable, Codable, Equatable {
+public struct RGB: Sendable, Hashable, Codable, Equatable {
     public let red: Float
     public let green: Float
     public let blue: Float
@@ -70,4 +70,30 @@ public func hsv(from rgb: RGB) -> (h: Float, s: Float, v: Float) {
     let h = hue(max, delta) * 60 // In degrees
 
     return (h: (h < 0 ? h + 360 : h), s: s, v: v)
+}
+
+/// Converts HSV color space to RGB
+/// - Parameters:
+///   - h: Hue value (0...1), representing 0-360 degrees normalized
+///   - s: Saturation value (0...1)
+///   - v: Value/Brightness (0...1)
+/// - Returns: RGB color with components in 0...1 range
+public func rgb(h: Float, s: Float, v: Float) -> RGB {
+    let hi = Int(h * 6)
+    let f = h * 6 - Float(hi)
+    let p = v * (1 - s)
+    let q = v * (1 - f * s)
+    let t = v * (1 - (1 - f) * s)
+
+    let (r, g, b): (Float, Float, Float)
+    switch hi {
+    case 0: (r, g, b) = (v, t, p)
+    case 1: (r, g, b) = (q, v, p)
+    case 2: (r, g, b) = (p, v, t)
+    case 3: (r, g, b) = (p, q, v)
+    case 4: (r, g, b) = (t, p, v)
+    default: (r, g, b) = (v, p, q)
+    }
+
+    return RGB(red: r, green: g, blue: b)
 }

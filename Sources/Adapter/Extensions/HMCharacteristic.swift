@@ -117,7 +117,10 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let illuminance = value as? Double else { return nil }
+        guard let illuminance = value as? Double else {
+            assertionFailure("Illuminance characteristic value is not Double - value: \(String(describing: value))")
+            return nil
+        }
         return .init(value: illuminance, unit: .lux)
     }
 
@@ -130,7 +133,10 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let value = value as? Bool else { return nil }
+        guard let value = value as? Bool else {
+            assertionFailure("PowerState characteristic value is not Bool - value: \(String(describing: value))")
+            return nil
+        }
         return value
     }
 
@@ -142,7 +148,10 @@ extension HMCharacteristic: @retroactive Comparable {
         try await readValue()
 
         guard let value = value as? Int,
-              let contactState = HMCharacteristicValueContactState(rawValue: value) else { return nil }
+              let contactState = HMCharacteristicValueContactState(rawValue: value) else {
+            assertionFailure("ContactState characteristic value is not valid - value: \(String(describing: value))")
+            return nil
+        }
 
         return contactState != .detected
     }
@@ -155,7 +164,10 @@ extension HMCharacteristic: @retroactive Comparable {
         try await readValue()
 
         guard let value = value as? Int,
-              let contactState = HMCharacteristicValueLockMechanismState(rawValue: value) else { return nil }
+              let contactState = HMCharacteristicValueLockMechanismState(rawValue: value) else {
+            assertionFailure("LockMechanismState characteristic value is not valid - value: \(String(describing: value))")
+            return nil
+        }
 
         return contactState == .secured
     }
@@ -167,7 +179,10 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let stateOfCharge = value as? Int64 else { return nil }
+        guard let stateOfCharge = value as? Int64 else {
+            assertionFailure("BatteryLevel characteristic value is not Int64 - value: \(String(describing: value))")
+            return nil
+        }
 
         return Int(stateOfCharge)
     }
@@ -193,7 +208,10 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let brightness = value as? Int else { return nil }
+        guard let brightness = value as? Int else {
+            assertionFailure("Brightness characteristic value is not Int - value: \(String(describing: value))")
+            return nil
+        }
         return brightness
     }
 
@@ -259,7 +277,10 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let temperature = value as? Float else { return nil }
+        guard let temperature = value as? Float else {
+            assertionFailure("Temperature characteristic value is not Float - value: \(String(describing: value))")
+            return nil
+        }
         return .init(value: Double(temperature), unit: .celsius)
     }
 
@@ -268,7 +289,10 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let humidity = value as? Float else { return nil }
+        guard let humidity = value as? Float else {
+            assertionFailure("RelativeHumidity characteristic value is not Float - value: \(String(describing: value))")
+            return nil
+        }
         return Double(humidity)
     }
 
@@ -277,7 +301,10 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let co2Level = value as? Float else { return nil }
+        guard let co2Level = value as? Float else {
+            assertionFailure("CarbonDioxideLevel characteristic value is not Float - value: \(String(describing: value))")
+            return nil
+        }
         return Int(co2Level)
     }
 
@@ -286,7 +313,10 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let density = value as? Float else { return nil }
+        guard let density = value as? Float else {
+            assertionFailure("PMDensity characteristic value is not Float - value: \(String(describing: value))")
+            return nil
+        }
         return Double(density)
     }
 
@@ -295,7 +325,10 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let quality = value as? Int else { return nil }
+        guard let quality = value as? Int else {
+            assertionFailure("AirQuality characteristic value is not Int - value: \(String(describing: value))")
+            return nil
+        }
         return quality
     }
 

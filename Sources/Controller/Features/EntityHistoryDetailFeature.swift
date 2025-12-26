@@ -294,6 +294,7 @@ struct EntityHistoryDetailView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     EntityHistoryDetailView(
         store: Store(
@@ -305,3 +306,4 @@ struct EntityHistoryDetailView: View {
         }
     )
 }
+#endif

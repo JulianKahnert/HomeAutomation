@@ -129,47 +129,51 @@ struct HistoryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.entities.isEmpty && !store.isLoading {
-                    ContentUnavailableView(
-                        "No Entities",
-                        systemImage: "chart.line.uptrend.xyaxis",
-                        description: Text("Entity history will appear here.\n\nNote: Entity discovery is not yet implemented. You can manually navigate to entity details once entities are tracked.")
-                    )
-                } else {
-                    List(selection: $store.selectedEntityId) {
-                        ForEach(store.filteredEntities) { entity in
-                            entityRow(entity)
-                                .tag(entity.id)
-                        }
+            contentView
+                .navigationTitle("History")
+                .navigationDestination(
+                    item: $store.scope(state: \.selectedEntityDetail, action: \.selectedEntityDetail)
+                ) { detailStore in
+                    EntityHistoryDetailView(store: detailStore)
+                        .navigationTitle(detailStore.entity.displayName)
+                }
+                .sensoryFeedback(.selection, trigger: store.selectedEntityId)
+                .refreshable {
+                    store.send(.refresh)
+                }
+                .onAppear {
+                    store.send(.onAppear)
+                }
+                .overlay {
+                    if store.isLoading && store.entities.isEmpty {
+                        ProgressView()
                     }
-                    .searchable(
-                        text: $store.searchText,
-                        prompt: "Search entities..."
-                    )
                 }
-            }
-            .navigationTitle("History")
-            .navigationDestination(
-                item: $store.scope(state: \.selectedEntityDetail, action: \.selectedEntityDetail)
-            ) { detailStore in
-                EntityHistoryDetailView(store: detailStore)
-                    .navigationTitle(detailStore.entity.displayName)
-                    .navigationSubtitle(detailStore.entity.formattedCharacteristicDisplayName)
-            }
-            .sensoryFeedback(.selection, trigger: store.selectedEntityId)
-            .refreshable {
-                store.send(.refresh)
-            }
-            .onAppear {
-                store.send(.onAppear)
-            }
-            .overlay {
-                if store.isLoading && store.entities.isEmpty {
-                    ProgressView()
+                .alert(store: store.scope(state: \.$alert, action: \.alert))
+        }
+    }
+
+    @ViewBuilder
+    private var contentView: some View {
+        Group {
+            if store.entities.isEmpty && !store.isLoading {
+                ContentUnavailableView(
+                    "No Entities",
+                    systemImage: "chart.line.uptrend.xyaxis",
+                    description: Text("Entity history will appear here.\n\nNote: Entity discovery is not yet implemented. You can manually navigate to entity details once entities are tracked.")
+                )
+            } else {
+                List(selection: $store.selectedEntityId) {
+                    ForEach(store.filteredEntities) { entity in
+                        entityRow(entity)
+                            .tag(entity.id)
+                    }
                 }
+                .searchable(
+                    text: $store.searchText,
+                    prompt: "Search entities..."
+                )
             }
-            .alert(store: store.scope(state: \.$alert, action: \.alert))
         }
     }
 

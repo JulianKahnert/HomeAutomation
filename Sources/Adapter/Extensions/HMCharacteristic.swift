@@ -179,9 +179,13 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let isHeatingActive = value as? Bool else { return nil }
+        guard let rawValue = value as? Int,
+              let state = HMCharacteristicValueActivationState(rawValue: rawValue) else {
+            assertionFailure("Active characteristic value is not valid - value: \(String(describing: value))")
+            return nil
+        }
 
-        return isHeatingActive
+        return state == .active
     }
 
     private func getBrightness() async throws -> Int? {
@@ -302,8 +306,13 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let isOpen = value as? Bool else { return nil }
-        return isOpen
+        guard let rawValue = value as? Int,
+              let state = HMCharacteristicValueActivationState(rawValue: rawValue) else {
+            assertionFailure("Active characteristic value is not valid - value: \(String(describing: value))")
+            return nil
+        }
+
+        return state == .active
     }
 
     func isCharacteristicsType(_ type: CharacteristicsType) -> Bool {

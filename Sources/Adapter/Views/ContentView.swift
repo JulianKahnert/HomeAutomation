@@ -6,7 +6,6 @@
 //
 
 #if canImport(SwiftUI)
-import Adapter
 import HAModels
 import SwiftUI
 

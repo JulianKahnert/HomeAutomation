@@ -198,8 +198,11 @@ extension HMCharacteristic: @retroactive Comparable {
 
         try await readValue()
 
-        guard let colorTemp = value as? Int else { return nil }
-        return colorTemp
+        // HomeKit returns color temperature in mired (micro-reciprocal degrees)
+        // Convert to Kelvin: K = 1,000,000 / mired
+        guard let mired = value as? Int, mired > 0 else { return nil }
+        let kelvin = 1_000_000 / mired
+        return kelvin
     }
 
     private func getColor() async throws -> RGB? {

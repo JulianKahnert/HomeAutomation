@@ -31,7 +31,8 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// Light brightness level (0-100)
     public let brightness: Int?
 
-    /// Color temperature in mireds
+    /// Color temperature in Kelvin (K)
+    /// Converted from HomeKit's mired value: K = 1,000,000 / mired
     public let colorTemperature: Int?
 
     /// RGB color value

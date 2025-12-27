@@ -2,8 +2,6 @@
 //  EntityStorageDbRepositoryTests.swift
 //  HomeAutomation
 //
-//  Created by Claude on 27.12.25.
-//
 
 import Foundation
 @testable import HAModels

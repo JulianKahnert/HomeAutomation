@@ -148,7 +148,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
         }
     }
 
-    internal static func mapDbItem(_ item: EntityStorageDbItem) -> EntityStorageItem {
+    static func mapDbItem(_ item: EntityStorageDbItem) -> EntityStorageItem {
         var illuminance: Measurement<UnitIlluminance>?
         if let illuminanceInLux = item.illuminanceInLux {
             illuminance = .init(value: illuminanceInLux, unit: .lux)
@@ -188,7 +188,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                  valveOpen: item.valveOpen)
     }
 
-    internal static func map(_ item: EntityStorageItem) -> EntityStorageDbItem {
+    static func map(_ item: EntityStorageItem) -> EntityStorageDbItem {
         return EntityStorageDbItem(timestamp: item.timestamp,
                                    entityPlaceId: item.entityId.placeId,
                                    entityServiceName: item.entityId.name,

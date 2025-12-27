@@ -148,11 +148,22 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
         }
     }
 
-    private static func mapDbItem(_ item: EntityStorageDbItem) -> EntityStorageItem {
+    static func mapDbItem(_ item: EntityStorageDbItem) -> EntityStorageItem {
         var illuminance: Measurement<UnitIlluminance>?
         if let illuminanceInLux = item.illuminanceInLux {
             illuminance = .init(value: illuminanceInLux, unit: .lux)
         }
+
+        var temperatureInC: Measurement<UnitTemperature>?
+        if let tempC = item.temperatureInC {
+            temperatureInC = .init(value: tempC, unit: .celsius)
+        }
+
+        var color: RGB?
+        if let red = item.colorRed, let green = item.colorGreen, let blue = item.colorBlue {
+            color = RGB(red: red, green: green, blue: blue)
+        }
+
         let entityId = EntityId(placeId: item.entityPlaceId,
                                 name: item.entityServiceName,
                                 characteristicsName: item.entityCharacteristicsName,
@@ -162,13 +173,22 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                  motionDetected: item.motionDetected,
                                  illuminance: illuminance,
                                  isDeviceOn: item.isDeviceOn,
+                                 brightness: item.brightness,
+                                 colorTemperature: item.colorTemperature,
+                                 color: color,
                                  isContactOpen: item.isContactOpen,
                                  isDoorLocked: item.isDoorLocked,
                                  stateOfCharge: item.stateOfCharge,
-                                 isHeaterActive: item.isHeaterActive)
+                                 isHeaterActive: item.isHeaterActive,
+                                 temperatureInC: temperatureInC,
+                                 relativeHumidity: item.relativeHumidity,
+                                 carbonDioxideSensorId: item.carbonDioxideSensorId,
+                                 pmDensity: item.pmDensity,
+                                 airQuality: item.airQuality,
+                                 valveOpen: item.valveOpen)
     }
 
-    private static func map(_ item: EntityStorageItem) -> EntityStorageDbItem {
+    static func map(_ item: EntityStorageItem) -> EntityStorageDbItem {
         return EntityStorageDbItem(timestamp: item.timestamp,
                                    entityPlaceId: item.entityId.placeId,
                                    entityServiceName: item.entityId.name,
@@ -180,6 +200,17 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                    isContactOpen: item.isContactOpen,
                                    isDoorLocked: item.isDoorLocked,
                                    stateOfCharge: item.stateOfCharge,
-                                   isHeaterActive: item.isHeaterActive)
+                                   isHeaterActive: item.isHeaterActive,
+                                   brightness: item.brightness,
+                                   colorTemperature: item.colorTemperature,
+                                   colorRed: item.color?.red,
+                                   colorGreen: item.color?.green,
+                                   colorBlue: item.color?.blue,
+                                   temperatureInC: item.temperatureInC?.converted(to: .celsius).value,
+                                   relativeHumidity: item.relativeHumidity,
+                                   carbonDioxideSensorId: item.carbonDioxideSensorId,
+                                   pmDensity: item.pmDensity,
+                                   airQuality: item.airQuality,
+                                   valveOpen: item.valveOpen)
     }
 }

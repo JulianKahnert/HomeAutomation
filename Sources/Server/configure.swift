@@ -67,6 +67,7 @@ public func configure(_ app: Application) async throws {
 
     app.migrations.add(CreateEntityStorageDbItem())
     app.migrations.add(DeviceTokenItem())
+    app.migrations.add(AddSensorFields())
 
     // MARK: - configure APNS
 

@@ -136,10 +136,21 @@ public struct ServerClient {
                 motionDetected: item.motionDetected,
                 illuminanceInLux: item.illuminanceInLux,
                 isDeviceOn: item.isDeviceOn,
+                brightness: item.brightness,
+                colorTemperature: item.colorTemperature,
+                colorRed: item.colorRed,
+                colorGreen: item.colorGreen,
+                colorBlue: item.colorBlue,
                 isContactOpen: item.isContactOpen,
                 isDoorLocked: item.isDoorLocked,
                 stateOfCharge: item.stateOfCharge,
-                isHeaterActive: item.isHeaterActive
+                isHeaterActive: item.isHeaterActive,
+                temperatureInC: item.temperatureInC,
+                relativeHumidity: item.relativeHumidity,
+                carbonDioxideSensorId: item.carbonDioxideSensorId,
+                pmDensity: item.pmDensity,
+                airQuality: item.airQuality,
+                valveOpen: item.valveOpen
             )
         }
 

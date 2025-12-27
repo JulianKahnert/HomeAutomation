@@ -353,6 +353,25 @@ components:
         isDeviceOn:
           type: boolean
           description: Device power state (if applicable).
+        brightness:
+          type: integer
+          description: Light brightness level 0-100 (if applicable).
+        colorTemperature:
+          type: number
+          format: float
+          description: Color temperature normalized to 0...1 warm...cold (if applicable).
+        colorRed:
+          type: number
+          format: float
+          description: RGB color red component 0...1 (if applicable).
+        colorGreen:
+          type: number
+          format: float
+          description: RGB color green component 0...1 (if applicable).
+        colorBlue:
+          type: number
+          format: float
+          description: RGB color blue component 0...1 (if applicable).
         isContactOpen:
           type: boolean
           description: Contact sensor state (if applicable).
@@ -365,6 +384,24 @@ components:
         isHeaterActive:
           type: boolean
           description: Heater active state (if applicable).
+        temperatureInC:
+          type: number
+          description: Temperature in Celsius (if applicable).
+        relativeHumidity:
+          type: number
+          description: Relative humidity percentage 0-100 (if applicable).
+        carbonDioxideSensorId:
+          type: integer
+          description: Carbon dioxide level in ppm (if applicable).
+        pmDensity:
+          type: number
+          description: Particulate matter density PM2.5/PM10 (if applicable).
+        airQuality:
+          type: integer
+          description: Air quality index (if applicable).
+        valveOpen:
+          type: boolean
+          description: Valve open state (if applicable).
       required:
         - timestamp
 

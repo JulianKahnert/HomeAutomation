@@ -220,10 +220,21 @@ struct OpenAPIController: APIProtocol {
                 motionDetected: item.motionDetected,
                 illuminanceInLux: item.illuminance?.value,
                 isDeviceOn: item.isDeviceOn,
+                brightness: item.brightness,
+                colorTemperature: item.colorTemperature,
+                colorRed: item.color?.red,
+                colorGreen: item.color?.green,
+                colorBlue: item.color?.blue,
                 isContactOpen: item.isContactOpen,
                 isDoorLocked: item.isDoorLocked,
                 stateOfCharge: item.stateOfCharge,
-                isHeaterActive: item.isHeaterActive
+                isHeaterActive: item.isHeaterActive,
+                temperatureInC: item.temperatureInC?.value,
+                relativeHumidity: item.relativeHumidity,
+                carbonDioxideSensorId: item.carbonDioxideSensorId,
+                pmDensity: item.pmDensity,
+                airQuality: item.airQuality,
+                valveOpen: item.valveOpen
             )
         }
 

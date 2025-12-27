@@ -53,6 +53,148 @@ Before committing changes that affect iOS apps:
 - `Apps/FlowKitController/` - Home Automation Controller iOS app
 - `Tests/` - Unit tests
 
+## Database & API Schema Updates
+
+### ⚠️ CRITICAL: When Adding New Entity Fields
+
+When adding new sensor fields or entity properties, you MUST update **all three layers**:
+
+#### 1. Database Migration (REQUIRED)
+Create a new migration file in `Sources/Server/Migrations/`:
+
+```bash
+# Example: 04_AddNewSensorFields.swift
+```
+
+**Template:**
+```swift
+import Fluent
+
+struct AddNewSensorFields: AsyncMigration {
+    func prepare(on database: Database) async throws {
+        try await database.schema("entityItems")
+            .field("newFieldName", .double)  // or .int, .bool, .string
+            .update()
+    }
+
+    func revert(on database: Database) async throws {
+        try await database.schema("entityItems")
+            .deleteField("newFieldName")
+            .update()
+    }
+}
+```
+
+**Don't forget to register it in `Sources/Server/configure.swift`:**
+```swift
+app.migrations.add(AddNewSensorFields())
+```
+
+#### 2. Update Database Model
+File: `Sources/Server/Models/EntityStorageDbItem.swift`
+
+- Add `@Field` property to the model
+- Update `map()` method to convert FROM `EntityStorageItem`
+- Update `mapDbItem()` function to convert TO `EntityStorageItem`
+
+#### 3. Update OpenAPI Schema (REQUIRED)
+File: `openapi.yaml`
+
+Update the `EntityHistoryItem` schema with ALL fields:
+```yaml
+EntityHistoryItem:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    timestamp:
+      type: string
+      format: date-time
+    newFieldName:  # ADD YOUR NEW FIELD HERE
+      type: number
+      format: double
+      nullable: true
+```
+
+#### 4. Update API Response Model
+File: `Sources/HAModels/EntityHistoryItem.swift`
+
+- Add the new field as an optional property
+- Update the `Codable` mapping if needed
+
+#### 5. Update Chart Display Logic (Optional)
+File: `Sources/Controller/Extensions/EntityHistoryItem+Chart.swift`
+
+Add your field to `primaryValue` getter with appropriate priority:
+```swift
+var primaryValue: Double? {
+    if let newField { return newField }  // Add here
+    if let temperatureInC { return temperatureInC }
+    // ... rest of priority list
+}
+```
+
+#### 6. Update Server Controller
+File: `Sources/Server/Controllers/OpenAPIController.swift`
+
+In `getEntityHistory()`, ensure the field is mapped from `EntityStorageItem` to the OpenAPI response.
+
+### Model Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ EntityStorageItem (Domain Model)                            │
+│ - Full entity with EntityId                                 │
+│ - Type-safe (Measurement<T>, RGB struct)                    │
+│ - Used in: Adapter, HomeManager, Automations                │
+│ File: Sources/HAModels/EntityStorageItem.swift              │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│ EntityStorageDbItem (Database/ORM Model)                    │
+│ - Fluent model with @Field wrappers                         │
+│ - Direct database schema mapping                            │
+│ - Used in: EntityStorageDbRepository                        │
+│ File: Sources/Server/Models/EntityStorageDbItem.swift       │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│ EntityHistoryItem (API/Transport Model)                     │
+│ - Lightweight, no EntityId                                  │
+│ - Simple types (Double, Int) for JSON                       │
+│ - Used in: OpenAPI responses, iOS UI                        │
+│ File: Sources/HAModels/EntityHistoryItem.swift              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**When to update each:**
+- **EntityStorageItem**: When HomeKit adapter reads new characteristics
+- **EntityStorageDbItem**: ALWAYS when adding fields that need persistence
+- **EntityHistoryItem**: ALWAYS when fields should appear in history charts
+
+### Migration Checklist
+
+When adding new entity fields, verify ALL of these:
+
+- [ ] Created migration file in `Sources/Server/Migrations/`
+- [ ] Registered migration in `Sources/Server/configure.swift`
+- [ ] Updated `EntityStorageDbItem` model with `@Field` property
+- [ ] Updated `map()` method in EntityStorageDbItem (TO database)
+- [ ] Updated `mapDbItem()` function (FROM database)
+- [ ] Updated `openapi.yaml` schema with new fields
+- [ ] Updated `EntityHistoryItem.swift` with new properties
+- [ ] Updated OpenAPIController mapping logic
+- [ ] Updated chart display logic (if visualization needed)
+- [ ] Tested with `swift build` and app builds
+
+**Example PRs that missed migrations:**
+- PR #89: Added entity history but no migration for new fields
+- PR #90: Server changes but OpenAPI schema incomplete
+- PR #93: ✅ Correct implementation with migration + full schema
+
 ## Common Issues
 
 ### "Cannot find [Type] in scope" in Xcode build

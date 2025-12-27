@@ -143,6 +143,16 @@ let package = Package(
             name: "ControllerTests",
             dependencies: ["Controller"],
             path: "Tests/ControllerTests"
+        ),
+        .testTarget(
+            name: "ServerTests",
+            dependencies: [
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "XCTVapor", package: "vapor"),
+                "Server",
+                "HAModels"
+            ],
+            path: "Tests/ServerTests"
         )
     ]
 )

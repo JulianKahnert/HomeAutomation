@@ -19,38 +19,17 @@ extension EntityHistoryItem {
         }
         return Color(red: Double(r), green: Double(g), blue: Double(b))
     }
-    /// Calculates hue (color tone) from RGB values
-    /// - Returns: Hue in degrees (0-360°), or nil if no color data
+
+    /// Returns the hue (color tone) in degrees (0-360°) from RGB values
+    /// Uses the existing RGB.hue helper from HAModels
     private var hue: Double? {
         guard let r = colorRed,
               let g = colorGreen,
               let b = colorBlue else {
             return nil
         }
-
-        let max = max(r, g, b)
-        let min = min(r, g, b)
-        let delta = max - min
-
-        // If no color saturation (grayscale), hue is undefined
-        guard delta > 0.0001 else {
-            return 0.0
-        }
-
-        var hue: Double
-        if max == r {
-            hue = 60.0 * ((Double(g) - Double(b)) / Double(delta))
-        } else if max == g {
-            hue = 60.0 * (2.0 + (Double(b) - Double(r)) / Double(delta))
-        } else {
-            hue = 60.0 * (4.0 + (Double(r) - Double(g)) / Double(delta))
-        }
-
-        if hue < 0 {
-            hue += 360.0
-        }
-
-        return hue
+        let rgb = RGB(red: r, green: g, blue: b)
+        return Double(rgb.hue)
     }
 
     /// Returns the primary value for this history item based on available data

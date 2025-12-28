@@ -19,6 +19,11 @@ public struct RGB: Sendable, Hashable, Codable, Equatable {
         self.green = green
         self.blue = blue
     }
+
+    /// Returns the hue component (0-360°) of this RGB color
+    public var hue: Float {
+        hsv(from: self).h
+    }
 }
 
 public func componentsForColorTemperature(normalzied value: Float) -> RGB {

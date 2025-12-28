@@ -7,11 +7,34 @@
 
 import Foundation
 import HAModels
+import SwiftUI
 
 extension EntityHistoryItem {
+    /// Returns a SwiftUI Color from RGB values if available
+    public var color: Color? {
+        guard let r = colorRed,
+              let g = colorGreen,
+              let b = colorBlue else {
+            return nil
+        }
+        return Color(red: Double(r), green: Double(g), blue: Double(b))
+    }
+
+    /// Returns the hue (color tone) in degrees (0-360°) from RGB values
+    /// Uses the existing RGB.hue helper from HAModels
+    private var hue: Double? {
+        guard let r = colorRed,
+              let g = colorGreen,
+              let b = colorBlue else {
+            return nil
+        }
+        let rgb = RGB(red: r, green: g, blue: b)
+        return Double(rgb.hue)
+    }
+
     /// Returns the primary value for this history item based on available data
     /// Used for chart visualization
-    /// Priority order: numeric sensors > percentage sensors > boolean sensors
+    /// Priority order: numeric sensors > percentage sensors > boolean sensors > color (hue)
     public var primaryValue: Double? {
         // Temperature (high priority - common sensor)
         if let temperatureInC {
@@ -68,6 +91,10 @@ extension EntityHistoryItem {
         if let valveOpen {
             return valveOpen ? 1.0 : 0.0
         }
+        // Color as hue (last priority)
+        if let hue {
+            return hue
+        }
         return nil
     }
 
@@ -117,6 +144,10 @@ extension EntityHistoryItem {
         }
         if let valveOpen {
             return valveOpen ? "Open" : "Closed"
+        }
+        // Color as hue
+        if let hue {
+            return "\(String(format: "%.0f", hue))° hue"
         }
         return "No data"
     }

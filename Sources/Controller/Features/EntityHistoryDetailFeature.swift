@@ -23,10 +23,19 @@ struct EntityHistoryDetailFeature: Sendable {
         var isLoading = false
         var timeRange: TimeRange = .hour
         var nextCursor: Date?
+        var selectedDate: Date?
         @Presents var alert: AlertState<Action.Alert>?
 
         var chartData: [EntityHistoryItem] {
             historyItems
+        }
+
+        var selectedItem: EntityHistoryItem? {
+            guard let selectedDate else { return nil }
+            return historyItems.min(by: { item1, item2 in
+                abs(item1.timestamp.timeIntervalSince(selectedDate)) <
+                abs(item2.timestamp.timeIntervalSince(selectedDate))
+            })
         }
 
         var dateRange: (start: Date, end: Date) {
@@ -255,16 +264,47 @@ struct EntityHistoryDetailView: View {
                         y: .value("Value", value)
                     )
                     .foregroundStyle(.blue)
-
-                    PointMark(
-                        x: .value("Time", item.timestamp),
-                        y: .value("Value", value)
-                    )
-                    .foregroundStyle(.blue)
                 }
+            }
+
+            // Show selection indicator
+            if let selectedItem = store.selectedItem,
+               let value = selectedItem.primaryValue {
+                RuleMark(
+                    x: .value("Selected", selectedItem.timestamp)
+                )
+                .foregroundStyle(.gray.opacity(0.3))
+                .lineStyle(StrokeStyle(lineWidth: 2))
+                .annotation(
+                    position: .top,
+                    spacing: 0,
+                    overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
+                ) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(selectedItem.valueDescription)
+                            .font(.caption.bold())
+                        Text(selectedItem.timestamp.formatted(date: .omitted, time: .shortened))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(6)
+                    .background {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(.background)
+                            .shadow(radius: 2)
+                    }
+                }
+
+                PointMark(
+                    x: .value("Selected", selectedItem.timestamp),
+                    y: .value("Value", value)
+                )
+                .foregroundStyle(.blue)
+                .symbolSize(50)
             }
         }
         .chartXScale(domain: dateRange.start...dateRange.end)
+        .chartXSelection(value: $store.selectedDate)
         .chartXAxis {
             AxisMarks(values: .automatic) { _ in
                 AxisGridLine()

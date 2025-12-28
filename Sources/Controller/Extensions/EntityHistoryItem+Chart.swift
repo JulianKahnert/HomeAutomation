@@ -7,8 +7,18 @@
 
 import Foundation
 import HAModels
+import SwiftUI
 
 extension EntityHistoryItem {
+    /// Returns a SwiftUI Color from RGB values if available
+    public var color: Color? {
+        guard let r = colorRed,
+              let g = colorGreen,
+              let b = colorBlue else {
+            return nil
+        }
+        return Color(red: Double(r), green: Double(g), blue: Double(b))
+    }
     /// Calculates hue (color tone) from RGB values
     /// - Returns: Hue in degrees (0-360°), or nil if no color data
     private var hue: Double? {

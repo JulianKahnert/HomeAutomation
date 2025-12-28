@@ -279,6 +279,17 @@ struct EntityHistoryDetailView: View {
     @ViewBuilder
     private func historyRow(_ item: EntityHistoryItem) -> some View {
         HStack {
+            // Color indicator (if color data available)
+            if let color = item.color {
+                Circle()
+                    .fill(color)
+                    .frame(width: 24, height: 24)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                    )
+            }
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.timestamp.formatted(date: .abbreviated, time: .shortened))
                     .font(.caption)

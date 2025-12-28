@@ -9,9 +9,43 @@ import Foundation
 import HAModels
 
 extension EntityHistoryItem {
+    /// Calculates hue (color tone) from RGB values
+    /// - Returns: Hue in degrees (0-360°), or nil if no color data
+    private var hue: Double? {
+        guard let r = colorRed,
+              let g = colorGreen,
+              let b = colorBlue else {
+            return nil
+        }
+
+        let max = max(r, g, b)
+        let min = min(r, g, b)
+        let delta = max - min
+
+        // If no color saturation (grayscale), hue is undefined
+        guard delta > 0.0001 else {
+            return 0.0
+        }
+
+        var hue: Double
+        if max == r {
+            hue = 60.0 * ((Double(g) - Double(b)) / Double(delta))
+        } else if max == g {
+            hue = 60.0 * (2.0 + (Double(b) - Double(r)) / Double(delta))
+        } else {
+            hue = 60.0 * (4.0 + (Double(r) - Double(g)) / Double(delta))
+        }
+
+        if hue < 0 {
+            hue += 360.0
+        }
+
+        return hue
+    }
+
     /// Returns the primary value for this history item based on available data
     /// Used for chart visualization
-    /// Priority order: numeric sensors > percentage sensors > boolean sensors
+    /// Priority order: numeric sensors > percentage sensors > boolean sensors > color (hue)
     public var primaryValue: Double? {
         // Temperature (high priority - common sensor)
         if let temperatureInC {
@@ -68,6 +102,10 @@ extension EntityHistoryItem {
         if let valveOpen {
             return valveOpen ? 1.0 : 0.0
         }
+        // Color as hue (last priority)
+        if let hue {
+            return hue
+        }
         return nil
     }
 
@@ -117,6 +155,10 @@ extension EntityHistoryItem {
         }
         if let valveOpen {
             return valveOpen ? "Open" : "Closed"
+        }
+        // Color as hue
+        if let hue {
+            return "\(String(format: "%.0f", hue))° hue"
         }
         return "No data"
     }

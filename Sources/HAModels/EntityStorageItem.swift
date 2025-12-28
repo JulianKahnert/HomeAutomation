@@ -136,4 +136,27 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
 
 public enum EntityStorageError: Error {
     case notFound
+    case invalidData(String)
+}
+
+public extension EntityStorageItem {
+    /// Returns true if all sensor fields are nil, indicating an invalid/empty storage item
+    var hasNoSensorData: Bool {
+        return motionDetected == nil &&
+               _illuminanceInLux == nil &&
+               isDeviceOn == nil &&
+               brightness == nil &&
+               colorTemperature == nil &&
+               color == nil &&
+               isContactOpen == nil &&
+               isDoorLocked == nil &&
+               stateOfCharge == nil &&
+               isHeaterActive == nil &&
+               _temperatureInC == nil &&
+               relativeHumidity == nil &&
+               carbonDioxideSensorId == nil &&
+               pmDensity == nil &&
+               airQuality == nil &&
+               valveOpen == nil
+    }
 }

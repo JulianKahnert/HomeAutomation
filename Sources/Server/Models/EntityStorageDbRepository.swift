@@ -60,6 +60,13 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
     }
 
     func add(_ item: EntityStorageItem) async throws {
+        // Validate that the item contains at least one sensor value
+        guard !item.hasNoSensorData else {
+            log.critical("Rejected EntityStorageItem with all nil sensor fields - entityId: \(item.entityId), timestamp: \(item.timestamp)")
+            // Throw validation error
+            throw EntityStorageError.invalidData("Cannot store entity history item with all nil sensor fields for entityId: \(item.entityId)")
+        }
+
         try await Self.map(item).save(on: database)
     }
 

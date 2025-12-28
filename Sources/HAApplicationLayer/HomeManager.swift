@@ -138,6 +138,14 @@ public final class HomeManager: HomeManagable {
                     // no current item found add it to the store directly
                     try await self.storageRepo.add(item)
                 }
+            } catch let error as EntityStorageError {
+                // Validation error - log at debug level since this is expected for empty items
+                if case .invalidData(let reason) = error {
+                    self.log.debug("Skipping invalid entity item: \(reason)")
+                } else {
+                    self.log.critical("Storage error: \(error)")
+                    assertionFailure()
+                }
             } catch {
                 self.log.critical("Failed to persist entity item \(error)")
                 assertionFailure()

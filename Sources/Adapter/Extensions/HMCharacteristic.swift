@@ -83,7 +83,7 @@ extension HMCharacteristic: @retroactive Comparable {
         } catch {
             // this might occur when e.g. the IKEA hub or a device is not available
             homeKitLogger.critical("Error while getting characteristic data - \(self.service?.accessory?.room?.name ?? "")@\(self.service?.accessory?.name ?? "") - \(self)\n\(error)")
-            return EntityStorageItem(entityId: entityId)
+            return nil
         }
     }
 

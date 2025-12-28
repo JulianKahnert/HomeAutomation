@@ -335,4 +335,36 @@ final class EntityStorageDbRepositoryTests: XCTestCase {
         XCTAssertEqual(lhs.pmDensity, rhs.pmDensity, message, file: file, line: line)
         XCTAssertEqual(lhs.airQuality, rhs.airQuality, message, file: file, line: line)
     }
+
+    /// Tests validation logic for EntityStorageItem with all nil sensor fields
+    func testHasNoSensorData_AllNilFields() {
+        let entityId = EntityId(placeId: "Living Room", name: "Light", characteristicsName: nil, characteristic: .switcher)
+        let emptyItem = EntityStorageItem(entityId: entityId)
+
+        XCTAssertTrue(emptyItem.hasNoSensorData, "Item with all nil sensor fields should be detected as invalid")
+    }
+
+    /// Tests validation logic for EntityStorageItem with at least one sensor field
+    func testHasNoSensorData_WithMotionDetected() {
+        let entityId = EntityId(placeId: "Living Room", name: "Motion", characteristicsName: nil, characteristic: .motionSensor)
+        let validItem = EntityStorageItem(entityId: entityId, motionDetected: true)
+
+        XCTAssertFalse(validItem.hasNoSensorData, "Item with motionDetected should be valid")
+    }
+
+    /// Tests validation logic for EntityStorageItem with temperature field
+    func testHasNoSensorData_WithTemperature() {
+        let entityId = EntityId(placeId: "Living Room", name: "Sensor", characteristicsName: nil, characteristic: .temperatureSensor)
+        let validItem = EntityStorageItem(entityId: entityId, temperatureInC: Measurement(value: 22.5, unit: .celsius))
+
+        XCTAssertFalse(validItem.hasNoSensorData, "Item with temperature should be valid")
+    }
+
+    /// Tests validation logic for EntityStorageItem with brightness field
+    func testHasNoSensorData_WithBrightness() {
+        let entityId = EntityId(placeId: "Living Room", name: "Light", characteristicsName: nil, characteristic: .brightness)
+        let validItem = EntityStorageItem(entityId: entityId, brightness: 75)
+
+        XCTAssertFalse(validItem.hasNoSensorData, "Item with brightness should be valid")
+    }
 }

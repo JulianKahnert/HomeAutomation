@@ -6,7 +6,6 @@
 //
 
 #if canImport(SwiftUI)
-import HAImplementations
 import Shared
 import SwiftUI
 

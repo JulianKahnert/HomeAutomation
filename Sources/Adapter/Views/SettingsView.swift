@@ -7,6 +7,7 @@
 
 #if canImport(SwiftUI)
 import HAImplementations
+import Shared
 import SwiftUI
 
 struct SettingsView: View {

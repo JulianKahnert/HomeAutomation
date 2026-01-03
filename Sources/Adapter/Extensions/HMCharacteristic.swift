@@ -356,8 +356,17 @@ extension HMCharacteristic: @retroactive Comparable {
     }
 
     var shouldSubscribe: Bool {
-        // true if we know the characteristic
-        entityCharacteristicType != nil
+        // false if we don't know the characteristic
+        guard let entityCharacteristicType else { return false }
+
+        // We have to reduce the amount of events we subscribe to, because HomeKit can not handle all subscriptions.
+        // It will leave skip important notifications like contactSensors.
+        switch entityCharacteristicType {
+        case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId:
+            return true
+        case .batterySensor, .brightness, .colorTemperature, .color, .heating, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor:
+            return false
+        }
     }
 
     private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Target Heating Cooling State", "Target Temperature", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event", "Smoke Detected", "Leak Detected"])

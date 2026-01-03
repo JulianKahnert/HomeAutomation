@@ -27,13 +27,19 @@ struct FlowKitApp {
 }
 
 struct FlowKitAdapter: App, Log {
-    @AppStorage("ShouldCrashIfActorSystemInitFails") private var shouldCrashIfActorSystemInitFails = false
-    @State private var logTask: Task<Void, Never>?
+    @AppStorage("ActorSystemServerAddress") private var serverAddress = CustomActorSystem.Address(host: "localhost", port: 8888)
     @State private var entities: [EntityStorageItem] = []
+    @State private var actorSystem: CustomActorSystem?
+    @State private var connectionStatus: ConnectionStatus = .joining
+    @State private var statusObservationTask: Task<Void, Never>?
+    @State private var entityObservationTask: Task<Void, Never>?
 
     var body: some Scene {
         WindowGroup {
-            ContentView(shouldCrashIfActorSystemInitFails: $shouldCrashIfActorSystemInitFails, entities: $entities)
+            ContentView(
+                entities: $entities,
+                connectionStatus: $connectionStatus
+            )
             .task {
                 Self.log.info("runloop task called")
 
@@ -41,76 +47,67 @@ struct FlowKitAdapter: App, Log {
                 guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
 
                 try? await Task.sleep(for: .seconds(1))
-                let actorSystem = await CustomActorSystem(nodeId: .homeKitAdapter, port: 7777)
-
-                let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(
-                    of: EntityStorageItem.self, bufferingPolicy: .unbounded)
-                let adapter = HomeKitAdapter(
-                    entityStream: entityStream,
-                    entityStreamContinuation: entityStreamContinuation)
-
-                // MARK: - Device Debug Helper (uncomment for development)
-
-                /*
-                #if DEBUG
-                // Print all accessories to find the entityId you want to inspect
+                await initializeActorSystem()
+            }
+            .onChange(of: serverAddress) { _, newValue in
                 Task {
-                    try? await Task.sleep(for: .seconds(2))  // Wait for adapter to initialize
-                    await adapter.debugPrintAllAccessories()
-
-                    // Then inspect a specific device by its entityId
-                    // Copy an entityId from the output above
-                    let placeId = "Room Name"
-                    let name = "Device Name"
-
-                    await adapter.debugPrintAccessory(placeId: placeId, name: name)
-                    
-                    // validate entity
-                    let sensor = IkeaAlpstugaSensor(query: .init(placeId: placeId, name: name))
-                    try! await sensor.validate(with: adapter)
-                    log.info("Found valid sensor: \(sensor)")
+                    Self.log.info("Server address changed to \(newValue), reinitializing actor system")
+                    await initializeActorSystem()
                 }
-                #endif
-                */
+            }
+        }
+    }
 
-                commandReceiver = actorSystem.makeLocalActor(actorId: .homeKitCommandReceiver) { system in
-                    HomeKitCommandReceiver(actorSystem: system, adapter: adapter)
+    private func initializeActorSystem() async {
+        // Initialize with configured server address
+        let system = await CustomActorSystem(role: .homeKitAdapter(serverAddress: serverAddress))
+        self.actorSystem = system
+
+        let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(
+            of: EntityStorageItem.self, bufferingPolicy: .unbounded)
+        let adapter = HomeKitAdapter(
+            entityStream: entityStream,
+            entityStreamContinuation: entityStreamContinuation)
+
+        commandReceiver = await system.makeLocalActor(actorId: .homeKitCommandReceiver) { @Sendable actorSys in
+            HomeKitCommandReceiver(actorSystem: actorSys, adapter: adapter)
+        }
+        _ = await system.checkIn(actorId: .homeKitCommandReceiver, commandReceiver)
+        
+        statusObservationTask?.cancel()
+        statusObservationTask = Task {
+            for await status in await system.connectionStatus {
+                connectionStatus = status
+            }
+        }
+
+        // Start long lived entity processing loop
+        entityObservationTask?.cancel()
+        entityObservationTask = Task {
+            var receiver: HomeEventReceiver?
+            Task {
+                for await foundReceiver in await system.listing(of: .homeEventReceiver) {
+                    Self.log.info("Get new HomeEventReceiver")
+                    receiver = foundReceiver
                 }
-                _ = await actorSystem.checkIn(actorId: .homeKitCommandReceiver, commandReceiver)
+            }
 
-                if shouldCrashIfActorSystemInitFails {
-                    do {
-                        try await actorSystem.waitForThisNode(is: .up, within: .seconds(10))
-                    } catch {
-                        fatalError("Actor system initialization failed: \(error)")
+            for await entity in entityStream {
+                // saving the data locally for the ui
+                self.entities = self.entities.suffix(99) + [entity]
+
+                do {
+                    if receiver == nil {
+                        receiver = await system.lookup(.homeEventReceiver)
                     }
-                }
-
-                var receiver: HomeEventReceiver?
-                Task {
-                    for await foundReceiver in await actorSystem.listing(of: .homeEventReceiver) {
-                        Self.log.info("Get new HomeEventReceiver")
-                        receiver = foundReceiver
+                    if receiver == nil {
+                        Self.log.error("Failed to resolve HomeEventReceiver actor")
                     }
-                }
 
-                for await entity in entityStream {
-                    // saving the data locally for the ui
-                    self.entities = self.entities.suffix(99) + [entity]
-
-                    do {
-                        if receiver == nil {
-                            receiver = await actorSystem.lookup(.homeEventReceiver)
-                            if receiver == nil {
-                                Self.log.error("Failed to resolve HomeEventReceiver actor")
-                            }
-                        }
-
-                        // this might be very slow, when no server is connected
-                        try await receiver?.process(event: .change(entity: entity))
-                    } catch {
-                        Self.log.error("Failed to process event: \(error)")
-                    }
+                    // this might be very slow, when no server is connected
+                    try await receiver?.process(event: .change(entity: entity))
+                } catch {
+                    Self.log.error("Failed to process event: \(error)")
                 }
             }
         }

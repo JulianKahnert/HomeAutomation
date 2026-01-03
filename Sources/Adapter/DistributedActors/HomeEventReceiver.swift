@@ -9,10 +9,7 @@ import Distributed
 import DistributedCluster
 import HAModels
 import Logging
-
-extension NodeIdentity {
-    public static let server = NodeIdentity(id: "server")
-}
+import Shared
 
 public extension DistributedReception.Key {
     static var homeEventReceiver: DistributedReception.Key<HomeEventReceiver> {

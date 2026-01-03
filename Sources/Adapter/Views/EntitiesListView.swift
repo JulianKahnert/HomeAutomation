@@ -10,7 +10,6 @@ import HAModels
 import SwiftUI
 
 struct EntitiesListView: View {
-    @Binding var shouldCrashIfActorSystemInitFails: Bool
     @Binding var entities: [EntityStorageItem]
     @Binding var showSettings: Bool
 
@@ -34,11 +33,6 @@ struct EntitiesListView: View {
         }
         .toolbar {
             ToolbarItem {
-                Toggle(isOn: $shouldCrashIfActorSystemInitFails, label: {
-                    Text("Should wait for ActorSystem?")
-                })
-            }
-            ToolbarItem {
                 Button("Preferences", systemImage: "gear") {
                     showSettings.toggle()
                 }
@@ -49,7 +43,6 @@ struct EntitiesListView: View {
 
 #Preview {
     EntitiesListView(
-        shouldCrashIfActorSystemInitFails: .constant(true),
         entities: .constant([]),
         showSettings: .constant(false)
     )

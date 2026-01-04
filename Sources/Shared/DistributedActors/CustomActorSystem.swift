@@ -40,11 +40,11 @@ public enum SystemRole: Sendable {
             return "homeKitAdapter"
         }
     }
-    
+
     var host: String {
         "0.0.0.0"
     }
-    
+
     var port: Int {
         switch self {
         case .server:
@@ -55,7 +55,7 @@ public enum SystemRole: Sendable {
     }
 }
 
-public actor CustomActorSystem: Sendable {
+public actor CustomActorSystem {
     private static let log = Logger(label: "CustomActorSystem")
     private let systemRole: SystemRole
     private let actorSystem: ClusterSystem
@@ -88,6 +88,19 @@ public actor CustomActorSystem: Sendable {
         }
 
         settings.logging.logLevel = .warning
+
+        // CRITICAL: Server must never auto-shutdown on cluster down events
+        // The server is the central infrastructure for home automation and must remain
+        // available to allow cluster reformation and manual recovery. The default
+        // .gracefulShutdown behavior is designed for orchestrated cloud deployments
+        // (e.g., Kubernetes) where failed pods are automatically replaced.
+        //
+        // Server (.none): Never auto-shutdown - allows manual recovery
+        // Adapter (.gracefulShutdown default): Can safely restart and reconnect
+        if case .server = role {
+            settings.onDownAction = .none
+        }
+
         actorSystem = await ClusterSystem(role.name, settings: settings)
 
         // Create shared connection status sequence once using compactMap + share
@@ -96,14 +109,14 @@ public actor CustomActorSystem: Sendable {
                 Self.mapEventToConnectionStatus(event: event)
             }
             .share()
-        
+
         switch role {
         case .homeKitAdapter:
             tryReconnectIfNeededInBackground()
         default:
             break
         }
-        
+
         Task {
             for await status in connectionStatus {
                 currentConnectionStatus = status
@@ -169,7 +182,7 @@ public actor CustomActorSystem: Sendable {
                     assertionFailure()
                     return
                 }
-                
+
                 do {
                     Self.log.debug("wait for node")
                     try await actorSystem.cluster.waitFor(actorSystem.cluster.node, .up, within: .seconds(10))
@@ -185,7 +198,7 @@ public actor CustomActorSystem: Sendable {
                 } catch {
                     Self.log.error("Failed to initialize the actor system: \(error)")
                 }
-                
+
                 Self.log.debug("waiting 20s")
                 try await Task.sleep(for: .seconds(20))
                 Self.log.debug("waiting 20s - finished")

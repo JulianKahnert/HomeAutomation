@@ -53,6 +53,56 @@ Before committing changes that affect iOS apps:
 - `Apps/FlowKitController/` - Home Automation Controller iOS app
 - `Tests/` - Unit tests
 
+## Git Workflow
+
+This project follows the **Git-Flow** branching model:
+
+### Branch Structure
+
+- **`main`** - Production-ready releases only
+  - Receives git tags for version releases
+  - Never commit directly to this branch
+
+- **`develop`** - Integration branch for features
+  - Never work directly on this branch
+  - All feature branches merge here via pull requests
+
+### Feature Development
+
+1. **Always branch from `develop`:**
+   ```bash
+   git checkout develop
+   git pull
+   git checkout -b feature/<issue-number>-description
+   ```
+
+2. **Branch naming convention:**
+   - Format: `feature/<issue-number>-description`
+   - Example: `feature/99-prevent-server-shutdown`
+   - Use lowercase and hyphens for readability
+
+3. **Creating pull requests:**
+   - Base branch: `develop` (NOT `main`)
+   - Target: Merge your feature branch into `develop`
+   - After approval, features are merged to `develop`
+
+4. **Release process:**
+   - When ready for release, `develop` is merged to `main`
+   - Git tags are created on `main` for version tracking
+
+### Quick Reference
+
+```bash
+# Start new feature
+git checkout develop && git pull && git checkout -b feature/123-my-feature
+
+# Keep feature branch updated
+git checkout develop && git pull && git checkout feature/123-my-feature && git merge develop
+
+# Create PR (always target develop)
+gh pr create --base develop --head feature/123-my-feature
+```
+
 ## Database & API Schema Updates
 
 ### ⚠️ CRITICAL: When Adding New Entity Fields

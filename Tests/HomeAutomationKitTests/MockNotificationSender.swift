@@ -13,7 +13,7 @@ final class MockNotificationSender: NotificationSender, @unchecked Sendable {
         // Mock implementation - does nothing
     }
 
-    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState) async {
+    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String) async {
         // Mock implementation - does nothing
     }
 

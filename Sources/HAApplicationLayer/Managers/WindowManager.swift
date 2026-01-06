@@ -26,7 +26,7 @@ actor WindowManager {
         if !windowStates.isEmpty {
             await startOrUpdateOpenWindowActivities(with: windowStates)
         } else {
-            await notificationSender.endAllLiveActivities(ofActivityType: "WindowAttributes")
+            await notificationSender.endAllLiveActivities(ofActivityType: WindowContentState.activityTypeName)
         }
     }
 
@@ -48,6 +48,6 @@ actor WindowManager {
         }
         let contentState = WindowContentState(windowStates: states)
 
-        await notificationSender.startOrUpdateLiveActivity(contentState: contentState)
+        await notificationSender.startOrUpdateLiveActivity(contentState: contentState, activityName: WindowContentState.activityTypeName)
     }
 }

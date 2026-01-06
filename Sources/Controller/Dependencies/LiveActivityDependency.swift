@@ -109,7 +109,7 @@ extension LiveActivityDependency: DependencyKey {
                         for await tokenData in activity.pushTokenUpdates {
                             let token = await PushToken(deviceName: UIDevice.current.name,
                                                         tokenString: tokenData.hexadecimalString,
-                                                        type: .liveActivityUpdate(activityName: String(describing: activity.self)))
+                                                        type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName))
                             continuation.yield(token)
                         }
                     }

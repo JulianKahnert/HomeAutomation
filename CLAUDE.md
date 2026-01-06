@@ -21,6 +21,60 @@ cd Apps/FlowKitController
 xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -sdk iphonesimulator -configuration Debug build
 ```
 
+## Local Development with Docker
+
+For local development and testing, the database and application can be started using Docker Compose.
+
+### Setup
+
+The Docker Compose configuration is maintained in a separate repository:
+**https://github.com/JulianKahnert/HomeAutomation-config-template**
+
+```bash
+# Clone the config repository (if not already done)
+git clone https://github.com/JulianKahnert/HomeAutomation-config-template.git
+
+# Start services
+docker-compose up -d
+```
+
+This starts:
+- **app** - HomeAutomation server (ports 8080, 8888)
+- **db** - MySQL 9 database (port 3306)
+- **migrate** - Database migration service (manual activation)
+
+### Database Connection Details
+
+- **Host**: `db` (inside Docker network only)
+- **Port**: 3306
+- **Database**: `vapor_database`
+- **Username**: `vapor_username`
+- **Password**: `vapor_password`
+
+### Debugging Database
+
+For debugging purposes, you can directly access the MySQL database:
+
+```bash
+# Connect to the database
+docker exec -it homeautomation-config-template-db-1 mysql -u vapor_username -pvapor_password vapor_database
+
+# Useful commands
+SHOW TABLES;
+DESCRIBE entityItems;
+SELECT * FROM entityItems ORDER BY timestamp DESC LIMIT 10;
+```
+
+View application and database logs:
+
+```bash
+# Application logs
+docker logs -f homeautomation-config-template-app-1
+
+# Database logs
+docker logs -f homeautomation-config-template-db-1
+```
+
 ## Pre-Commit Checklist
 
 Before committing changes that affect iOS apps:

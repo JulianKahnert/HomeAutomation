@@ -40,8 +40,7 @@ actor PushNotifcationService: NotificationSender {
 
         for deviceToken in deviceTokens {
             do {
-                try await apnsClient.sendAlertNotification(
-                    notification, deviceToken: deviceToken.tokenString)
+                try await apnsClient.sendAlertNotification(notification, deviceToken: deviceToken.tokenString)
             } catch {
                 Self.logger.critical(
                     "Failed to send push notification to \(deviceToken.deviceName) [\(deviceToken.tokenType)]: \(error.localizedDescription)"
@@ -53,8 +52,7 @@ actor PushNotifcationService: NotificationSender {
         }
     }
 
-    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState)
-        async {
+    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String) async {
         Self.logger.debug("Start or update live activity")
 
         do {
@@ -69,9 +67,9 @@ actor PushNotifcationService: NotificationSender {
             var deviceTokens: [DeviceToken] = []
             for token in allDeviceTokens {
                 if token.tokenType == "liveActivityUpdate",
-                    let date = token.updatedAt ?? token.createdAt,
+                   let date = token.updatedAt ?? token.createdAt,
                    date < Date().addingTimeInterval(-1 * Duration.hours(4).timeInterval),
-                    let tokenId = token.id {
+                   let tokenId = token.id {
 
                     // delete liveActivityUpdate tokens that are older than 4 hours
                     try await DeviceToken
@@ -91,10 +89,9 @@ actor PushNotifcationService: NotificationSender {
                 var usedToken: DeviceToken?
                 do {
                     if let updateToken = tokens.first(where: {
-                        $0.tokenType == "liveActivityUpdate"
+                        $0.tokenType == "liveActivityUpdate" && $0.activityType == activityName
                     }) {
-                        Self.logger.info(
-                            "Update LiveActivity (on: \(updateToken.deviceName)): \(contentState)")
+                        Self.logger.info("Update LiveActivity (on: \(updateToken.deviceName)): \(contentState)")
                         let notification = APNSLiveActivityNotification<ContentState>(
                             expiration: .none,
                             priority: .consideringDevicePower,
@@ -105,33 +102,28 @@ actor PushNotifcationService: NotificationSender {
 
                         // if an update token was found, we assume a live activity was found, so we use this token
                         usedToken = updateToken
-                        let response = try await apnsClient.sendLiveActivityNotification(
-                            notification, deviceToken: updateToken.tokenString)
+                        let response = try await apnsClient.sendLiveActivityNotification(notification, deviceToken: updateToken.tokenString)
                         Self.logger.debug("Received send live activity response: \(response)")
 
                     } else if let startToken = tokens.first(where: {
                         $0.tokenType == "liveActivityStart"
                     }) {
-                        Self.logger.info(
-                            "Starting LiveActivity (on: \(startToken.deviceName)): \(contentState)")
-                        let notification = APNSStartLiveActivityNotification<
-                            ContentState, ContentState
-                        >(
+                        Self.logger.info("Starting LiveActivity (on: \(startToken.deviceName)): \(contentState)")
+                        let notification = APNSStartLiveActivityNotification<ContentState, ContentState>(
                             expiration: .none,
                             priority: .immediately,
                             appID: notificationTopic,
                             contentState: contentState,
                             timestamp: Int(Date().timeIntervalSince1970),
                             attributes: contentState,
-                            attributesType: "WindowAttributes",
+                            attributesType: activityName,
                             alert: APNSAlertNotificationContent(
                                 title: .raw("empty"),
                                 body: .raw("empty")))
 
                         // start a new live activity
                         usedToken = startToken
-                        try await apnsClient.sendStartLiveActivityNotification(
-                            notification, deviceToken: startToken.tokenString)
+                        try await apnsClient.sendStartLiveActivityNotification(notification, deviceToken: startToken.tokenString)
                     } else {
                         assertionFailure("Should find at least one start token")
                     }
@@ -160,8 +152,7 @@ actor PushNotifcationService: NotificationSender {
 
     func endAllLiveActivities(ofActivityType activityType: String) async {
         do {
-            let deviceTokens =
-                try await DeviceToken
+            let deviceTokens = try await DeviceToken
                 .query(on: database)
                 .filter(\.$activityType == activityType)
                 .all()
@@ -179,8 +170,7 @@ actor PushNotifcationService: NotificationSender {
 
             for deviceToken in deviceTokens {
                 do {
-                    let response = try await apnsClient.sendLiveActivityNotification(
-                        notification, deviceToken: deviceToken.tokenString)
+                    let response = try await apnsClient.sendLiveActivityNotification(notification, deviceToken: deviceToken.tokenString)
                     Self.logger.debug("Received send live activity response: \(response)")
 
                     // delete token when ending the live activity
@@ -214,7 +204,7 @@ actor PushNotifcationService: NotificationSender {
         do {
             try await DeviceToken
                 .query(on: database)
-                .filter(\.$activityType == "WindowAttributes")
+                .filter(\.$activityType == activityType)
                 .delete()
         } catch {
             Self.logger.critical("Failed to delete old token")

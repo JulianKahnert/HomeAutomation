@@ -73,7 +73,7 @@ struct FlowKitAdapter: App, Log {
             HomeKitCommandReceiver(actorSystem: actorSys, adapter: adapter)
         }
         _ = await system.checkIn(actorId: .homeKitCommandReceiver, commandReceiver)
-        
+
         statusObservationTask?.cancel()
         statusObservationTask = Task {
             for await status in await system.connectionStatus {

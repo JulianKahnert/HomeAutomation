@@ -12,15 +12,25 @@ import Testing
 
 @HomeManagerActor
 struct SetLightPropertiesTests {
-    let light1 = EntityId(placeId: "room1", name: "light1", characteristicsName: nil, characteristic: .switcher)
-    let light2 = EntityId(placeId: "room1", name: "light2", characteristicsName: nil, characteristic: .switcher)
+    let light1 = SwitchDevice(
+        switchId: EntityId(placeId: "room1", name: "light1", characteristicsName: nil, characteristic: .switcher),
+        brightnessId: EntityId(placeId: "room1", name: "light1", characteristicsName: nil, characteristic: .brightness),
+        colorTemperatureId: EntityId(placeId: "room1", name: "light1", characteristicsName: nil, characteristic: .colorTemperature),
+        rgbId: EntityId(placeId: "room1", name: "light1", characteristicsName: nil, characteristic: .color)
+    )
+    let light2 = SwitchDevice(
+        switchId: EntityId(placeId: "room1", name: "light2", characteristicsName: nil, characteristic: .switcher),
+        brightnessId: EntityId(placeId: "room1", name: "light2", characteristicsName: nil, characteristic: .brightness),
+        colorTemperatureId: EntityId(placeId: "room1", name: "light2", characteristicsName: nil, characteristic: .colorTemperature),
+        rgbId: EntityId(placeId: "room1", name: "light2", characteristicsName: nil, characteristic: .color)
+    )
 
     @Test("Test with only RGB set")
     func executeWithOnlyRGB() async throws {
         let automation = SetLightProperties(
             "set-rgb-only",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1, light2],
+            lights: [light1, light2],
             targetColor: RGB(red: 1.0, green: 0.5, blue: 0.3),
             targetColorTemperature: nil,
             targetBrightness: nil,
@@ -44,7 +54,7 @@ struct SetLightPropertiesTests {
         let automation = SetLightProperties(
             "set-color-temp-only",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1, light2],
+            lights: [light1, light2],
             targetColor: nil,
             targetColorTemperature: 3000,
             targetBrightness: nil,
@@ -68,7 +78,7 @@ struct SetLightPropertiesTests {
         let automation = SetLightProperties(
             "set-brightness-only",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1, light2],
+            lights: [light1, light2],
             targetColor: nil,
             targetColorTemperature: nil,
             targetBrightness: 75,
@@ -92,7 +102,7 @@ struct SetLightPropertiesTests {
         let automation = SetLightProperties(
             "set-all-properties",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1, light2],
+            lights: [light1, light2],
             targetColor: RGB(red: 1.0, green: 0.8, blue: 0.6),
             targetColorTemperature: 2700,
             targetBrightness: 80,
@@ -115,7 +125,7 @@ struct SetLightPropertiesTests {
         let automation = SetLightProperties(
             "set-nothing",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1, light2],
+            lights: [light1, light2],
             targetColor: nil,
             targetColorTemperature: nil,
             targetBrightness: nil,
@@ -139,7 +149,7 @@ struct SetLightPropertiesTests {
         let automation = SetLightProperties(
             "test-delays",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1],
+            lights: [light1],
             targetColor: RGB(red: 1.0, green: 1.0, blue: 1.0),
             targetColorTemperature: 3000,
             targetBrightness: 100,
@@ -162,13 +172,18 @@ struct SetLightPropertiesTests {
     func executeParallelWithinPropertyGroups() async throws {
         // Create many lights to test parallel execution
         let manyLights = (1...10).map { i in
-            EntityId(placeId: "room1", name: "light\(i)", characteristicsName: nil, characteristic: .switcher)
+            SwitchDevice(
+                switchId: EntityId(placeId: "room1", name: "light\(i)", characteristicsName: nil, characteristic: .switcher),
+                brightnessId: EntityId(placeId: "room1", name: "light\(i)", characteristicsName: nil, characteristic: .brightness),
+                colorTemperatureId: EntityId(placeId: "room1", name: "light\(i)", characteristicsName: nil, characteristic: .colorTemperature),
+                rgbId: EntityId(placeId: "room1", name: "light\(i)", characteristicsName: nil, characteristic: .color)
+            )
         }
 
         let automation = SetLightProperties(
             "test-parallel",
             at: Time(hour: 20, minute: 0),
-            targetLights: manyLights,
+            lights: manyLights,
             targetColor: RGB(red: 1.0, green: 1.0, blue: 1.0),
             targetColorTemperature: nil,
             targetBrightness: nil,
@@ -189,7 +204,7 @@ struct SetLightPropertiesTests {
         let automation = SetLightProperties(
             "test-trigger",
             at: Time(hour: 20, minute: 30),
-            targetLights: [light1],
+            lights: [light1],
             targetColor: RGB(red: 1.0, green: 1.0, blue: 1.0),
             targetColorTemperature: nil,
             targetBrightness: nil
@@ -231,7 +246,7 @@ struct SetLightPropertiesTests {
         let automation = SetLightProperties(
             "test-entity-ids",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1, light2],
+            lights: [light1, light2],
             targetColor: RGB(red: 1.0, green: 1.0, blue: 1.0),
             targetColorTemperature: nil,
             targetBrightness: nil
@@ -247,7 +262,7 @@ struct SetLightPropertiesTests {
         let automationHigh = SetLightProperties(
             "test-clamp-high",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1],
+            lights: [light1],
             targetColor: nil,
             targetColorTemperature: 10000,
             targetBrightness: nil,
@@ -265,7 +280,7 @@ struct SetLightPropertiesTests {
         let automationLow = SetLightProperties(
             "test-clamp-low",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1],
+            lights: [light1],
             targetColor: nil,
             targetColorTemperature: 1000,
             targetBrightness: nil,
@@ -285,7 +300,7 @@ struct SetLightPropertiesTests {
         let automationHigh = SetLightProperties(
             "test-brightness-high",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1],
+            lights: [light1],
             targetColor: nil,
             targetColorTemperature: nil,
             targetBrightness: 150,
@@ -302,7 +317,7 @@ struct SetLightPropertiesTests {
         let automationLow = SetLightProperties(
             "test-brightness-low",
             at: Time(hour: 20, minute: 0),
-            targetLights: [light1],
+            lights: [light1],
             targetColor: nil,
             targetColorTemperature: nil,
             targetBrightness: -10,

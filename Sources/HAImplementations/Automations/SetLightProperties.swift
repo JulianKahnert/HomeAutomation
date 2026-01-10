@@ -15,8 +15,8 @@ public struct SetLightProperties: Automatable {
     /// The time when this automation should trigger
     public let triggerTime: Time
 
-    /// Array of light entity IDs that will have their properties set
-    public let targetLights: [EntityId]
+    /// The array of light devices to control.
+    public let lights: [SwitchDevice]
 
     /// Optional RGB color to set on the lights. If nil, color will not be changed.
     public let targetColor: RGB?
@@ -38,7 +38,7 @@ public struct SetLightProperties: Automatable {
     public init(
         _ name: String,
         at triggerTime: Time,
-        targetLights: [EntityId],
+        lights: [SwitchDevice],
         targetColor: RGB? = nil,
         targetColorTemperature: Int? = nil,
         targetBrightness: Int? = nil,
@@ -46,7 +46,7 @@ public struct SetLightProperties: Automatable {
     ) {
         self.name = name
         self.triggerTime = triggerTime
-        self.targetLights = targetLights
+        self.lights = lights
         self.targetColor = targetColor
         self.targetColorTemperature = targetColorTemperature
         self.targetBrightness = targetBrightness
@@ -58,15 +58,15 @@ public struct SetLightProperties: Automatable {
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        log.debug("Setting light properties for \(targetLights.count) lights")
+        log.debug("Setting light properties for \(lights.count) lights")
 
         // Apply RGB color if specified
         if let targetColor {
             log.debug("Setting RGB color: \(targetColor)")
             try await withThrowingTaskGroup(of: Void.self) { group in
-                for lightId in targetLights {
+                for light in lights {
                     group.addTask {
-                        await hm.perform(.setRGB(lightId, rgb: targetColor))
+                        await light.setColor(to: targetColor, with: hm)
                     }
                 }
                 try await group.waitForAll()
@@ -85,9 +85,9 @@ public struct SetLightProperties: Automatable {
             let clampedTemp = max(0, min(1, normalizedTemp))
 
             try await withThrowingTaskGroup(of: Void.self) { group in
-                for lightId in targetLights {
+                for light in lights {
                     group.addTask {
-                        await hm.perform(.setColorTemperature(lightId, clampedTemp))
+                        await light.setColorTemperature(to: clampedTemp, with: hm)
                     }
                 }
                 try await group.waitForAll()
@@ -105,9 +105,9 @@ public struct SetLightProperties: Automatable {
             let clampedBrightness = max(0, min(1, normalizedBrightness))
 
             try await withThrowingTaskGroup(of: Void.self) { group in
-                for lightId in targetLights {
+                for light in lights {
                     group.addTask {
-                        await hm.perform(.setBrightness(lightId, clampedBrightness))
+                        await light.setBrightness(to: clampedBrightness, with: hm)
                     }
                 }
                 try await group.waitForAll()

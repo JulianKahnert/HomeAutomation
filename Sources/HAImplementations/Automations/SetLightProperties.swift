@@ -18,14 +18,16 @@ public struct SetLightProperties: Automatable {
     /// The array of light devices to control.
     public let lights: [SwitchDevice]
 
-    /// Optional RGB color to set on the lights. If nil, color will not be changed.
-    public let targetColor: RGB?
+    /// Optional RGB color to set on the lights.
+    public let color: RGB?
 
-    /// Optional color temperature in Kelvin to set on the lights. If nil, color temperature will not be changed.
-    public let targetColorTemperature: Int?
+    /// Optional color temperature as a normalized value between 0 and 1.
+    /// Where 0 represents the warmest (lowest Kelvin) and 1 represents the coolest (highest Kelvin).
+    public let colorTemperature: Double?
 
-    /// Optional brightness level (0-100) to set on the lights. If nil, brightness will not be changed.
-    public let targetBrightness: Int?
+    /// Optional brightness as a normalized value between 0 and 1.
+    /// Where 0 is off and 1 is maximum brightness.
+    public let brightness: Double?
 
     /// Duration to wait between setting each property type (RGB → color temp → brightness).
     /// Defaults to 300ms to prevent flickering.
@@ -39,17 +41,17 @@ public struct SetLightProperties: Automatable {
         _ name: String,
         at triggerTime: Time,
         lights: [SwitchDevice],
-        targetColor: RGB? = nil,
-        targetColorTemperature: Int? = nil,
-        targetBrightness: Int? = nil,
+        color: RGB? = nil,
+        colorTemperature: Double? = nil,
+        brightness: Double? = nil,
         delayBetweenProperties: Duration = .milliseconds(300)
     ) {
         self.name = name
         self.triggerTime = triggerTime
         self.lights = lights
-        self.targetColor = targetColor
-        self.targetColorTemperature = targetColorTemperature
-        self.targetBrightness = targetBrightness
+        self.color = color
+        self.colorTemperature = colorTemperature
+        self.brightness = brightness
         self.delayBetweenProperties = delayBetweenProperties
     }
 
@@ -61,12 +63,12 @@ public struct SetLightProperties: Automatable {
         log.debug("Setting light properties for \(lights.count) lights")
 
         // Apply RGB color if specified
-        if let targetColor {
-            log.debug("Setting RGB color: \(targetColor)")
+        if let color {
+            log.debug("Setting RGB color: \(color)")
             try await withThrowingTaskGroup(of: Void.self) { group in
                 for light in lights {
                     group.addTask {
-                        await light.setColor(to: targetColor, with: hm)
+                        await light.setColor(to: color, with: hm)
                     }
                 }
                 try await group.waitForAll()
@@ -77,17 +79,12 @@ public struct SetLightProperties: Automatable {
         }
 
         // Apply color temperature if specified
-        if let targetColorTemperature {
-            log.debug("Setting color temperature: \(targetColorTemperature)K")
-            // Convert Kelvin to normalized value (0...1)
-            // Typical range is 2000K (warm) to 4000K (cool)
-            let normalizedTemp = Float(targetColorTemperature - 2000) / 2000.0
-            let clampedTemp = max(0, min(1, normalizedTemp))
-
+        if let colorTemperature {
+            log.debug("Setting color temperature: \(colorTemperature)")
             try await withThrowingTaskGroup(of: Void.self) { group in
                 for light in lights {
                     group.addTask {
-                        await light.setColorTemperature(to: clampedTemp, with: hm)
+                        await light.setColorTemperature(to: Float(colorTemperature), with: hm)
                     }
                 }
                 try await group.waitForAll()
@@ -98,16 +95,12 @@ public struct SetLightProperties: Automatable {
         }
 
         // Apply brightness if specified
-        if let targetBrightness {
-            log.debug("Setting brightness: \(targetBrightness)%")
-            // Convert percentage (0-100) to normalized value (0...1)
-            let normalizedBrightness = Float(targetBrightness) / 100.0
-            let clampedBrightness = max(0, min(1, normalizedBrightness))
-
+        if let brightness {
+            log.debug("Setting brightness: \(brightness)")
             try await withThrowingTaskGroup(of: Void.self) { group in
                 for light in lights {
                     group.addTask {
-                        await light.setBrightness(to: clampedBrightness, with: hm)
+                        await light.setBrightness(to: Float(brightness), with: hm)
                     }
                 }
                 try await group.waitForAll()

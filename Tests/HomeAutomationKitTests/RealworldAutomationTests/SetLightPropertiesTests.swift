@@ -31,9 +31,9 @@ struct SetLightPropertiesTests {
             "set-rgb-only",
             at: Time(hour: 20, minute: 0),
             lights: [light1, light2],
-            targetColor: RGB(red: 1.0, green: 0.5, blue: 0.3),
-            targetColorTemperature: nil,
-            targetBrightness: nil,
+            color: RGB(red: 1.0, green: 0.5, blue: 0.3),
+            colorTemperature: nil,
+            brightness: nil,
             delayBetweenProperties: .milliseconds(10)
         )
 
@@ -55,9 +55,9 @@ struct SetLightPropertiesTests {
             "set-color-temp-only",
             at: Time(hour: 20, minute: 0),
             lights: [light1, light2],
-            targetColor: nil,
-            targetColorTemperature: 3000,
-            targetBrightness: nil,
+            color: nil,
+            colorTemperature: 0.5,
+            brightness: nil,
             delayBetweenProperties: .milliseconds(10)
         )
 
@@ -79,9 +79,9 @@ struct SetLightPropertiesTests {
             "set-brightness-only",
             at: Time(hour: 20, minute: 0),
             lights: [light1, light2],
-            targetColor: nil,
-            targetColorTemperature: nil,
-            targetBrightness: 75,
+            color: nil,
+            colorTemperature: nil,
+            brightness: 0.75,
             delayBetweenProperties: .milliseconds(10)
         )
 
@@ -103,9 +103,9 @@ struct SetLightPropertiesTests {
             "set-all-properties",
             at: Time(hour: 20, minute: 0),
             lights: [light1, light2],
-            targetColor: RGB(red: 1.0, green: 0.8, blue: 0.6),
-            targetColorTemperature: 2700,
-            targetBrightness: 80,
+            color: RGB(red: 1.0, green: 0.8, blue: 0.6),
+            colorTemperature: 0.35,
+            brightness: 0.8,
             delayBetweenProperties: .milliseconds(10)
         )
 
@@ -126,9 +126,9 @@ struct SetLightPropertiesTests {
             "set-nothing",
             at: Time(hour: 20, minute: 0),
             lights: [light1, light2],
-            targetColor: nil,
-            targetColorTemperature: nil,
-            targetBrightness: nil,
+            color: nil,
+            colorTemperature: nil,
+            brightness: nil,
             delayBetweenProperties: .milliseconds(10)
         )
 
@@ -150,9 +150,9 @@ struct SetLightPropertiesTests {
             "test-delays",
             at: Time(hour: 20, minute: 0),
             lights: [light1],
-            targetColor: RGB(red: 1.0, green: 1.0, blue: 1.0),
-            targetColorTemperature: 3000,
-            targetBrightness: 100,
+            color: RGB(red: 1.0, green: 1.0, blue: 1.0),
+            colorTemperature: 0.5,
+            brightness: 1.0,
             delayBetweenProperties: delayDuration
         )
 
@@ -184,9 +184,9 @@ struct SetLightPropertiesTests {
             "test-parallel",
             at: Time(hour: 20, minute: 0),
             lights: manyLights,
-            targetColor: RGB(red: 1.0, green: 1.0, blue: 1.0),
-            targetColorTemperature: nil,
-            targetBrightness: nil,
+            color: RGB(red: 1.0, green: 1.0, blue: 1.0),
+            colorTemperature: nil,
+            brightness: nil,
             delayBetweenProperties: .milliseconds(10)
         )
 
@@ -205,9 +205,9 @@ struct SetLightPropertiesTests {
             "test-trigger",
             at: Time(hour: 20, minute: 30),
             lights: [light1],
-            targetColor: RGB(red: 1.0, green: 1.0, blue: 1.0),
-            targetColorTemperature: nil,
-            targetBrightness: nil
+            color: RGB(red: 1.0, green: 1.0, blue: 1.0),
+            colorTemperature: nil,
+            brightness: nil
         )
 
         let mockAdapter = MockHomeAdapter()
@@ -247,87 +247,86 @@ struct SetLightPropertiesTests {
             "test-entity-ids",
             at: Time(hour: 20, minute: 0),
             lights: [light1, light2],
-            targetColor: RGB(red: 1.0, green: 1.0, blue: 1.0),
-            targetColorTemperature: nil,
-            targetBrightness: nil
+            color: RGB(red: 1.0, green: 1.0, blue: 1.0),
+            colorTemperature: nil,
+            brightness: nil
         )
 
         // SetLightProperties is time-based, not entity-based
         #expect(automation.triggerEntityIds.isEmpty)
     }
 
-    @Test("Test color temperature value clamping")
-    func testColorTemperatureClamping() async throws {
-        // Test with very high color temperature (should be clamped to 1.0)
-        let automationHigh = SetLightProperties(
-            "test-clamp-high",
+    @Test("Test color temperature normalized values")
+    func testColorTemperatureNormalizedValues() async throws {
+        // Test with minimum value (0.0 - warmest)
+        let automationMin = SetLightProperties(
+            "test-min-temp",
             at: Time(hour: 20, minute: 0),
             lights: [light1],
-            targetColor: nil,
-            targetColorTemperature: 10000,
-            targetBrightness: nil,
+            color: nil,
+            colorTemperature: 0.0,
+            brightness: nil,
             delayBetweenProperties: .milliseconds(10)
         )
 
-        let mockAdapterHigh = MockHomeAdapter()
-        try await automationHigh.execute(using: mockAdapterHigh)
+        let mockAdapterMin = MockHomeAdapter()
+        try await automationMin.execute(using: mockAdapterMin)
 
-        // Should execute without error (clamping happens internally)
-        let traceMapHigh = mockAdapterHigh.getSortedTraceMap()
-        #expect(traceMapHigh.contains("action.setColorTemperature: 1"))
+        let traceMapMin = mockAdapterMin.getSortedTraceMap()
+        #expect(traceMapMin.contains("action.setColorTemperature: 1"))
 
-        // Test with very low color temperature (should be clamped to 0.0)
-        let automationLow = SetLightProperties(
-            "test-clamp-low",
+        // Test with maximum value (1.0 - coolest)
+        let automationMax = SetLightProperties(
+            "test-max-temp",
             at: Time(hour: 20, minute: 0),
             lights: [light1],
-            targetColor: nil,
-            targetColorTemperature: 1000,
-            targetBrightness: nil,
+            color: nil,
+            colorTemperature: 1.0,
+            brightness: nil,
             delayBetweenProperties: .milliseconds(10)
         )
 
-        let mockAdapterLow = MockHomeAdapter()
-        try await automationLow.execute(using: mockAdapterLow)
+        let mockAdapterMax = MockHomeAdapter()
+        try await automationMax.execute(using: mockAdapterMax)
 
-        let traceMapLow = mockAdapterLow.getSortedTraceMap()
-        #expect(traceMapLow.contains("action.setColorTemperature: 1"))
+        let traceMapMax = mockAdapterMax.getSortedTraceMap()
+        #expect(traceMapMax.contains("action.setColorTemperature: 1"))
     }
 
-    @Test("Test brightness value clamping")
-    func testBrightnessClamping() async throws {
-        // Test with brightness over 100 (should be clamped to 1.0)
-        let automationHigh = SetLightProperties(
-            "test-brightness-high",
+    @Test("Test brightness normalized values")
+    func testBrightnessNormalizedValues() async throws {
+        // Test with minimum value (0.0 - off)
+        let automationMin = SetLightProperties(
+            "test-brightness-min",
             at: Time(hour: 20, minute: 0),
             lights: [light1],
-            targetColor: nil,
-            targetColorTemperature: nil,
-            targetBrightness: 150,
+            color: nil,
+            colorTemperature: nil,
+            brightness: 0.0,
             delayBetweenProperties: .milliseconds(10)
         )
 
-        let mockAdapterHigh = MockHomeAdapter()
-        try await automationHigh.execute(using: mockAdapterHigh)
+        let mockAdapterMin = MockHomeAdapter()
+        try await automationMin.execute(using: mockAdapterMin)
 
-        let traceMapHigh = mockAdapterHigh.getSortedTraceMap()
-        #expect(traceMapHigh.contains("action.setBrightness: 1"))
+        let traceMapMin = mockAdapterMin.getSortedTraceMap()
+        #expect(traceMapMin.contains("action.setBrightness: 1"))
 
-        // Test with negative brightness (should be clamped to 0.0)
-        let automationLow = SetLightProperties(
-            "test-brightness-low",
+        // Test with maximum value (1.0 - maximum brightness)
+        let automationMax = SetLightProperties(
+            "test-brightness-max",
             at: Time(hour: 20, minute: 0),
             lights: [light1],
-            targetColor: nil,
-            targetColorTemperature: nil,
-            targetBrightness: -10,
+            color: nil,
+            colorTemperature: nil,
+            brightness: 1.0,
             delayBetweenProperties: .milliseconds(10)
         )
 
-        let mockAdapterLow = MockHomeAdapter()
-        try await automationLow.execute(using: mockAdapterLow)
+        let mockAdapterMax = MockHomeAdapter()
+        try await automationMax.execute(using: mockAdapterMax)
 
-        let traceMapLow = mockAdapterLow.getSortedTraceMap()
-        #expect(traceMapLow.contains("action.setBrightness: 1"))
+        let traceMapMax = mockAdapterMax.getSortedTraceMap()
+        #expect(traceMapMax.contains("action.setBrightness: 1"))
     }
 }

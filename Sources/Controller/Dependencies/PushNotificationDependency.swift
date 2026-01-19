@@ -16,6 +16,9 @@ import HAModels
 struct PushNotificationDependency: Sendable {
     /// Request authorization for push notifications
     var requestAuthorization: @Sendable () async throws -> Void
+
+    /// Clear all delivered notifications
+    var clearDeliveredNotifications: @Sendable () async -> Void
 }
 
 // MARK: - Dependency Key Implementation
@@ -23,10 +26,12 @@ struct PushNotificationDependency: Sendable {
 extension PushNotificationDependency: TestDependencyKey {
     static let testValue = Self(
         requestAuthorization: { },
+        clearDeliveredNotifications: { }
     )
 
     static let previewValue = Self(
         requestAuthorization: { },
+        clearDeliveredNotifications: { }
     )
 }
 
@@ -40,13 +45,19 @@ extension PushNotificationDependency: DependencyKey {
             requestAuthorization: {
                 try await UNUserNotificationCenter.current().requestAuthorization(options: [.provisional])
                 await UIApplication.shared.registerForRemoteNotifications()
+            },
+            clearDeliveredNotifications: {
+                await UNUserNotificationCenter.current().removeAllDeliveredNotifications()
             }
         )
     }()
 }
 #else
 extension PushNotificationDependency: DependencyKey {
-    static let liveValue = Self()
+    static let liveValue = Self(
+        requestAuthorization: { },
+        clearDeliveredNotifications: { }
+    )
 }
 #endif
 

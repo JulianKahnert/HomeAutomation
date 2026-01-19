@@ -35,5 +35,27 @@ struct PushNotificationDependencyTests {
             try await pushNotification.requestAuthorization()
         }
     }
+
+    @Test("Test value clearDeliveredNotifications doesn't throw")
+    func testClearDeliveredNotificationsTestValue() async throws {
+        await withDependencies {
+            $0.pushNotification = .testValue
+        } operation: {
+            @Dependency(\.pushNotification) var pushNotification
+
+            await pushNotification.clearDeliveredNotifications()
+        }
+    }
+
+    @Test("Preview value clearDeliveredNotifications doesn't throw")
+    func testClearDeliveredNotificationsPreviewValue() async throws {
+        await withDependencies {
+            $0.pushNotification = .previewValue
+        } operation: {
+            @Dependency(\.pushNotification) var pushNotification
+
+            await pushNotification.clearDeliveredNotifications()
+        }
+    }
 }
 #endif

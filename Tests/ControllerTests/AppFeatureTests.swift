@@ -347,4 +347,71 @@ struct AppFeatureTests {
             state.settings.windowContentState = WindowContentState(windowStates: [])
         }
     }
+
+    @Test("scenePhaseChanged dispatches clearDeliveredNotifications on app activation")
+    @MainActor
+    func testClearDeliveredNotificationsOnActivation() async {
+        var didCallClearDeliveredNotifications = false
+
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        } withDependencies: {
+            $0.serverClient = .testValue
+            $0.liveActivity = .testValue
+            $0.pushNotification.clearDeliveredNotifications = {
+                didCallClearDeliveredNotifications = true
+            }
+        }
+
+        await store.send(.scenePhaseChanged(old: .inactive, new: .active))
+
+        // Verify clearDeliveredNotifications action is dispatched
+        await store.receive(\.clearDeliveredNotifications)
+
+        // Continue receiving other actions to exhaust the store
+        await store.receive(\.automations.refresh) { state in
+            state.automations.isLoading = true
+            state.automations.error = nil
+        }
+
+        await store.receive(\.actions.refresh) { state in
+            state.actions.isLoading = true
+            state.actions.alert = nil
+        }
+
+        await store.receive(\.history.refresh) { state in
+            state.history.isLoading = true
+            state.history.alert = nil
+        }
+
+        await store.receive(\.refreshWindowStates)
+
+        await store.receive(\.startMonitoringLiveActivities)
+
+        await store.receive(\.settings.refreshWindowStates) { state in
+            state.settings.isLoadingWindowStates = true
+            state.settings.error = nil
+        }
+
+        await store.receive(\.history.entitiesResponse) { state in
+            state.history.isLoading = false
+            state.history.entities = []
+        }
+
+        await store.receive(\.automations.automationsResponse) { state in
+            state.automations.isLoading = false
+        }
+
+        await store.receive(\.actions.actionsResponse) { state in
+            state.actions.isLoading = false
+        }
+
+        await store.receive(\.settings.windowStatesResponse) { state in
+            state.settings.isLoadingWindowStates = false
+            state.settings.windowContentState = WindowContentState(windowStates: [])
+        }
+
+        // Verify the dependency method was called
+        #expect(didCallClearDeliveredNotifications == true)
+    }
 }

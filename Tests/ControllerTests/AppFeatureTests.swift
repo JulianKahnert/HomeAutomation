@@ -370,10 +370,8 @@ struct AppFeatureTests {
 
         await store.send(.scenePhaseChanged(old: .inactive, new: .active))
 
-        // Verify clearDeliveredNotifications action is dispatched
-        await store.receive(\.clearDeliveredNotifications)
-
-        // Continue receiving other actions to exhaust the store
+        // Verify that all parallel actions are dispatched (including clearDeliveredNotifications)
+        // Note: Actions may arrive in any order due to parallel execution via .merge()
         await store.receive(\.automations.refresh) { state in
             state.automations.isLoading = true
             state.automations.error = nil
@@ -392,6 +390,8 @@ struct AppFeatureTests {
         await store.receive(\.refreshWindowStates)
 
         await store.receive(\.startMonitoringLiveActivities)
+
+        await store.receive(\.clearDeliveredNotifications)
 
         await store.receive(\.settings.refreshWindowStates) { state in
             state.settings.isLoadingWindowStates = true

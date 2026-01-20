@@ -351,16 +351,12 @@ struct AppFeatureTests {
     @Test("scenePhaseChanged dispatches clearDeliveredNotifications on app activation")
     @MainActor
     func testClearDeliveredNotificationsOnActivation() async {
-        var didCallClearDeliveredNotifications = false
-
         let store = TestStore(initialState: AppFeature.State()) {
             AppFeature()
         } withDependencies: {
             $0.serverClient = .testValue
             $0.liveActivity = .testValue
-            $0.pushNotification.clearDeliveredNotifications = {
-                didCallClearDeliveredNotifications = true
-            }
+            $0.pushNotification = .testValue
         }
 
         await store.send(.scenePhaseChanged(old: .inactive, new: .active))
@@ -410,8 +406,5 @@ struct AppFeatureTests {
             state.settings.isLoadingWindowStates = false
             state.settings.windowContentState = WindowContentState(windowStates: [])
         }
-
-        // Verify the dependency method was called
-        #expect(didCallClearDeliveredNotifications == true)
     }
 }

@@ -49,6 +49,8 @@ struct AppFeatureTests {
 
         await store.receive(\.startMonitoringLiveActivities)
 
+        await store.receive(\.clearDeliveredNotifications)
+
         await store.receive(\.settings.refreshWindowStates) { state in
             state.settings.isLoadingWindowStates = true
             state.settings.error = nil
@@ -109,6 +111,8 @@ struct AppFeatureTests {
 
         await store.receive(\.startMonitoringLiveActivities)
 
+        await store.receive(\.clearDeliveredNotifications)
+
         await store.receive(\.settings.refreshWindowStates) { state in
             state.settings.isLoadingWindowStates = true
             state.settings.error = nil
@@ -168,6 +172,8 @@ struct AppFeatureTests {
 
         await store.receive(\.startMonitoringLiveActivities)
 
+        await store.receive(\.clearDeliveredNotifications)
+
         await store.receive(\.settings.refreshWindowStates) { state in
             state.settings.isLoadingWindowStates = true
             state.settings.error = nil
@@ -215,6 +221,7 @@ struct AppFeatureTests {
         await store.receive(\.history.refresh)
         await store.receive(\.refreshWindowStates)
         await store.receive(\.startMonitoringLiveActivities)
+        await store.receive(\.clearDeliveredNotifications)
         await store.receive(\.settings.refreshWindowStates)
         await store.receive(\.history.entitiesResponse)
         await store.receive(\.automations.automationsResponse)
@@ -298,6 +305,8 @@ struct AppFeatureTests {
         await store.receive(\.refreshWindowStates)
 
         await store.receive(\.startMonitoringLiveActivities)
+
+        await store.receive(\.clearDeliveredNotifications)
 
         await store.receive(\.settings.refreshWindowStates) { state in
             state.settings.isLoadingWindowStates = true

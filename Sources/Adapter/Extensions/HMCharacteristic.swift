@@ -362,9 +362,9 @@ extension HMCharacteristic: @retroactive Comparable {
         // We have to reduce the amount of events we subscribe to, because HomeKit can not handle all subscriptions.
         // It will leave skip important notifications like contactSensors.
         switch entityCharacteristicType {
-        case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId:
+        case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId, .brightness, .colorTemperature, .color:
             return true
-        case .batterySensor, .brightness, .colorTemperature, .color, .heating, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor:
+        case .batterySensor, .heating, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor:
             return false
         }
     }

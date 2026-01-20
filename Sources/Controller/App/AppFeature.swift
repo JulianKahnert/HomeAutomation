@@ -68,6 +68,7 @@ struct AppFeature: Sendable {
         case startMonitoringLiveActivities
         case stopMonitoringLiveActivities
         case registerPushToken(PushToken)
+        case clearDeliveredNotifications
 
         // Background tasks
         case refreshWindowStates
@@ -159,6 +160,11 @@ struct AppFeature: Sendable {
                     try await serverClient.registerDevice(token)
                 }
 
+            case .clearDeliveredNotifications:
+                return .run { _ in
+                    await pushNotification.clearDeliveredNotifications()
+                }
+
             // MARK: - Background Tasks
 
             case .refreshWindowStates:
@@ -188,7 +194,8 @@ struct AppFeature: Sendable {
                     .send(.actions(.refresh)),
                     .send(.history(.refresh)),
                     .send(.refreshWindowStates),
-                    .send(.startMonitoringLiveActivities)
+                    .send(.startMonitoringLiveActivities),
+                    .send(.clearDeliveredNotifications)
                 )
 
             case .binding:

@@ -108,7 +108,7 @@ actor PushNotifcationService: NotificationSender {
                     } else if let startToken = tokens.first(where: {
                         $0.tokenType == "liveActivityStart"
                     }) {
-                        Self.logger.info("Starting LiveActivity (on: \(startToken.deviceName)): \(contentState)")
+                        Self.logger.info("Starting LiveActivity (on: \(startToken.deviceName)) with attributesType '\(activityName)': \(contentState)")
                         let notification = APNSStartLiveActivityNotification<ContentState, ContentState>(
                             expiration: .none,
                             priority: .immediately,
@@ -124,6 +124,7 @@ actor PushNotifcationService: NotificationSender {
                         // start a new live activity
                         usedToken = startToken
                         try await apnsClient.sendStartLiveActivityNotification(notification, deviceToken: startToken.tokenString)
+                        Self.logger.info("Successfully sent start live activity notification to \(startToken.deviceName)")
                     } else {
                         assertionFailure("Should find at least one start token")
                     }

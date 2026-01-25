@@ -8,6 +8,13 @@
 import Foundation
 
 public struct WindowContentState: Codable, Hashable, Sendable {
+    /// The name used in APNS `attributes-type` field for push-to-start Live Activities.
+    ///
+    /// IMPORTANT: This value MUST exactly match the name of the `ActivityAttributes` struct
+    /// used in the iOS app (defined in `Sources/Controller/LiveActivity/WindowAttributes.swift`).
+    /// The iOS app registers Live Activities with `Activity<WindowAttributes>`, so Apple's APNS
+    /// uses this string to identify which ActivityAttributes implementation should handle the
+    /// push notification. If the names don't match, the push notification will be silently ignored.
     public static let activityTypeName = "WindowAttributes"
     public let windowStates: [WindowState]
 

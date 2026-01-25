@@ -32,11 +32,20 @@ extension AppDelegate: UIApplicationDelegate {
         logger.info("didReceiveRemoteNotification")
 
         let fetchTask = Task {
+            // Wait for the activity to be created by the push-to-start notification
             let activity = await Activity<WindowAttributes>.activityUpdates.makeAsyncIterator().next()
             logger.info("didReceiveRemoteNotification activity \(activity?.id ?? "")")
-            guard let activity,
-                  let deviceToken = activity.pushToken else {
-                logger.error("FAILED to get pushToken")
+            guard let activity else {
+                logger.error("FAILED to get activity")
+                return UIBackgroundFetchResult.failed
+            }
+
+            // Wait for the push token to become available.
+            // The pushToken property may be nil initially after activity creation,
+            // so we need to observe pushTokenUpdates to get the token asynchronously.
+            let deviceToken = await activity.pushTokenUpdates.makeAsyncIterator().next()
+            guard let deviceToken else {
+                logger.error("FAILED to get pushToken from pushTokenUpdates")
                 return UIBackgroundFetchResult.failed
             }
 
@@ -46,6 +55,7 @@ extension AppDelegate: UIApplicationDelegate {
                                   tokenString: deviceToken.hexadecimalString,
                                   type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName))
             await Self.store.send(.registerPushToken(token)).finish()
+            logger.info("didReceiveRemoteNotification registered update token successfully")
 
             return UIBackgroundFetchResult.newData
         }

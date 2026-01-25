@@ -40,11 +40,12 @@ extension AppDelegate: UIApplicationDelegate {
                 return UIBackgroundFetchResult.failed
             }
 
-            // Send token to TCA store
+            // Send the activity's update token to TCA store and wait for completion.
+            // This token is used to send updates to the running Live Activity.
             let token = PushToken(deviceName: UIDevice.current.name,
                                   tokenString: deviceToken.hexadecimalString,
-                                  type: .pushNotification)
-            Self.store.send(.registerPushToken(token))
+                                  type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName))
+            await Self.store.send(.registerPushToken(token)).finish()
 
             return UIBackgroundFetchResult.newData
         }

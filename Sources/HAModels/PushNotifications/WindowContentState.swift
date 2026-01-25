@@ -8,7 +8,7 @@
 import Foundation
 
 public struct WindowContentState: Codable, Hashable, Sendable {
-    public static let activityTypeName = "WindowContentState"
+    public static let activityTypeName = "WindowAttributes"
     public let windowStates: [WindowState]
 
     public init(windowStates: [WindowState]) {

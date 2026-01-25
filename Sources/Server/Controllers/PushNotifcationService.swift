@@ -127,6 +127,13 @@ actor PushNotifcationService: NotificationSender {
                     } else {
                         assertionFailure("Should find at least one start token")
                     }
+                } catch is CancellationError {
+                    // CancellationError is expected when rapid window state changes occur.
+                    // The automation task gets cancelled when a newer event arrives, which is
+                    // correct behavior - we want to send the most recent state, not stale data.
+                    Self.logger.info(
+                        "[startOrUpdateLiveActivity] Cancelled for \(usedToken?.deviceName ?? "") (superseded by newer state)"
+                    )
                 } catch {
                     if let apnsError = error as? APNSError,
                         let id = apnsError.apnsUniqueID {

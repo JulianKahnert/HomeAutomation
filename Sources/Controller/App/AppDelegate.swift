@@ -27,51 +27,27 @@ public final class AppDelegate: NSObject {
 
 #if os(iOS)
 extension AppDelegate: UIApplicationDelegate {
+    public func application(_ application: UIApplication,
+                           didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        logger.info("App launched (may be foreground or background)")
+
+        // CRITICAL: Start token observation immediately, even if app launches in background.
+        // This is required for push-to-start Live Activities to work correctly.
+        // When the app is launched via push-to-start, it starts in the background and
+        // the SwiftUI scene phase observer (.onSceneChange) is never triggered because
+        // no view is created. By starting observation here, we ensure tokens are registered
+        // regardless of how the app was launched.
+        Self.store.send(.startMonitoringLiveActivities)
+
+        return true
+    }
+
     public func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
-
-        logger.info("didReceiveRemoteNotification")
-
-        let fetchTask = Task {
-            // Wait for the activity to be created by the push-to-start notification
-            let activity = await Activity<WindowAttributes>.activityUpdates.makeAsyncIterator().next()
-            logger.info("didReceiveRemoteNotification activity \(activity?.id ?? "")")
-            guard let activity else {
-                logger.error("FAILED to get activity")
-                return UIBackgroundFetchResult.failed
-            }
-
-            // Wait for the push token to become available.
-            // The pushToken property may be nil initially after activity creation,
-            // so we need to observe pushTokenUpdates to get the token asynchronously.
-            let deviceToken = await activity.pushTokenUpdates.makeAsyncIterator().next()
-            guard let deviceToken else {
-                logger.error("FAILED to get pushToken from pushTokenUpdates")
-                return UIBackgroundFetchResult.failed
-            }
-
-            // Send the activity's update token to TCA store and wait for completion.
-            // This token is used to send updates to the running Live Activity.
-            let token = PushToken(deviceName: UIDevice.current.name,
-                                  tokenString: deviceToken.hexadecimalString,
-                                  type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName))
-            await Self.store.send(.registerPushToken(token)).finish()
-            logger.info("didReceiveRemoteNotification registered update token successfully")
-
-            return UIBackgroundFetchResult.newData
-        }
-
-        let timeoutTask = Task {
-            try await Task.sleep(for: .seconds(5))
-            fetchTask.cancel()
-            logger.error("didReceiveRemoteNotification timeout while getting pushToken")
-            assertionFailure()
-        }
-
-        let result = await fetchTask.value
-        timeoutTask.cancel()
-
-        logger.info("didReceiveRemoteNotification complete")
-        return result
+        // This method is called for regular push notifications, but NOT reliably for push-to-start.
+        // According to Apple Developer Forums, this has ~50% success rate for terminated apps.
+        // Token registration is handled via activityUpdates in LiveActivityDependency instead.
+        logger.info("didReceiveRemoteNotification called")
+        return .noData
     }
 
     public func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {

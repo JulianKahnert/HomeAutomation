@@ -102,15 +102,19 @@ extension LiveActivityDependency: DependencyKey {
             pushTokenUpdates: {
                 AsyncStream { continuation in
                     let task = Task {
-                        guard let activity = Activity<WindowAttributes>.activities.last else {
-                            continuation.finish()
-                            return
-                        }
-                        for await tokenData in activity.pushTokenUpdates {
-                            let token = await PushToken(deviceName: UIDevice.current.name,
-                                                        tokenString: tokenData.hexadecimalString,
-                                                        type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName))
-                            continuation.yield(token)
+                        // Observe activityUpdates to detect both existing and new activities.
+                        // This is CRITICAL for push-to-start: when the app is launched in background
+                        // via push-to-start, the activity doesn't exist yet when this code first runs.
+                        // activityUpdates emits when activities are created (locally or remotely).
+                        for await activity in Activity<WindowAttributes>.activityUpdates {
+                            for await tokenData in activity.pushTokenUpdates {
+                                let token = await PushToken(
+                                    deviceName: UIDevice.current.name,
+                                    tokenString: tokenData.hexadecimalString,
+                                    type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName)
+                                )
+                                continuation.yield(token)
+                            }
                         }
                     }
                     continuation.onTermination = { _ in task.cancel() }

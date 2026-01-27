@@ -4,18 +4,28 @@ import OpenAPIVapor
 import Vapor
 
 func routes(_ app: Application) throws {
-    app.get { _ async in
+    // Create auth middleware
+    let authMiddleware = TokenAuthenticationMiddleware(
+        expectedToken: app.authToken,
+        isAuthDisabled: app.authDisabled
+    )
+
+    // Apply auth to ALL routes
+    let authenticatedRoutes = app.grouped(authMiddleware)
+
+    // Manual routes - now protected
+    authenticatedRoutes.get { _ async in
         "It works!"
     }
 
-    app.get("config") { req in
+    authenticatedRoutes.get("config") { req in
         let location = await req.application.homeAutomationConfigService.location
         let automations = await req.application.homeAutomationConfigService.automations.map(AnyAutomation.create(from:))
 
         return ConfigDTO(location: location, automations: automations)
     }
 
-    app.on(.POST, "config", body: .collect(maxSize: "10mb")) { req in
+    authenticatedRoutes.on(.POST, "config", body: .collect(maxSize: "10mb")) { req in
         let configDTO = try req.content.decode(ConfigDTO.self)
         let skipValidation = req.query["skipValidation"] == "true"
 
@@ -50,8 +60,11 @@ func routes(_ app: Application) throws {
         return configDTO
     }
 
+    // OpenAPI routes - now protected with BOTH auth + request injection
     let requestInjectionMiddleware = OpenAPIRequestInjectionMiddleware()
-    let transport = VaporTransport(routesBuilder: app.grouped(requestInjectionMiddleware))
+    let transport = VaporTransport(
+        routesBuilder: authenticatedRoutes.grouped(requestInjectionMiddleware)
+    )
 
     let handler = OpenAPIController()
     try handler.registerHandlers(on: transport)

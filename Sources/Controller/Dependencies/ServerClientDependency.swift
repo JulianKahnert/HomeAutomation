@@ -186,7 +186,8 @@ extension ServerClientDependency: DependencyKey {
 
     static var client: ServerClient {
         @Shared(.serverURL) var serverURL
-         return ServerClient(url: serverURL)
+        @Shared(.authToken) var authToken
+        return ServerClient(url: serverURL, authToken: authToken)
     }
 
     /// Live implementation will be provided when Xcode project is integrated

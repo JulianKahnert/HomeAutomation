@@ -19,6 +19,7 @@ struct SettingsFeature: Sendable {
     @ObservableState
     struct State: Equatable, Sendable {
         @Shared(.serverURL) var serverURL: URL
+        @Shared(.authToken) var authToken: String = ""
         @Shared(.liveActivitiesEnabled) var liveActivitiesEnabled: Bool = true
         var windowContentState: WindowContentState?
         var isLoadingWindowStates: Bool = false
@@ -28,6 +29,7 @@ struct SettingsFeature: Sendable {
         var isEditingServerURL: Bool = false
         var serverHost: String = "localhost"
         var serverPort: Int = 8080
+        var serverAuthToken: String = ""
 
         // Push notification state
         var isPushAuthorized: Bool = false
@@ -76,6 +78,7 @@ struct SettingsFeature: Sendable {
                 state.isEditingServerURL = true
                 state.serverHost = state.serverURL.host() ?? "localhost"
                 state.serverPort = state.serverURL.port ?? 8080
+                state.serverAuthToken = state.authToken
                 return .none
 
             case .saveServerURL:
@@ -84,6 +87,7 @@ struct SettingsFeature: Sendable {
                 if let url = URL(string: urlString) {
                     state.$serverURL.withLock { $0 = url }
                 }
+                state.$authToken.withLock { $0 = state.serverAuthToken }
                 return .none
 
             case .cancelEditServerURL:
@@ -219,6 +223,11 @@ struct SettingsView: View {
         if store.isEditingServerURL {
             TextField("Host", text: $store.serverHost)
             TextField("Port", value: $store.serverPort, format: .number.grouping(.never))
+            SecureField("Auth Token", text: $store.serverAuthToken)
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                #endif
 
             Button("Save") {
                 store.send(.saveServerURL)

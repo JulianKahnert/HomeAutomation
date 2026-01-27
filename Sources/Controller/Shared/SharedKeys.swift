@@ -20,6 +20,13 @@ extension SharedKey where Self == AppStorageKey<URL>.Default {
     }
 }
 
+extension SharedKey where Self == AppStorageKey<String>.Default {
+    /// Authentication token for the FlowKit backend
+    static var authToken: Self {
+        Self[.appStorage("authToken", store: .standard), default: ""]
+    }
+}
+
 extension SharedKey where Self == AppStorageKey<Bool>.Default {
     /// Whether Live Activities are enabled
     static var liveActivitiesEnabled: Self {

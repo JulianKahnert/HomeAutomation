@@ -95,4 +95,30 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
              self.storage[HomeAutomationConfigControllerKey.self] = newValue
          }
      }
+
+     private struct AuthTokenKey: StorageKey {
+         typealias Value = String
+     }
+
+     var authToken: String {
+         get {
+             self.storage[AuthTokenKey.self]!
+         }
+         set {
+             self.storage[AuthTokenKey.self] = newValue
+         }
+     }
+
+     private struct AuthDisabledKey: StorageKey {
+         typealias Value = Bool
+     }
+
+     var authDisabled: Bool {
+         get {
+             self.storage[AuthDisabledKey.self] ?? false
+         }
+         set {
+             self.storage[AuthDisabledKey.self] = newValue
+         }
+     }
  }

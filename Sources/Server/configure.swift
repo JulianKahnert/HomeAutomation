@@ -29,6 +29,45 @@ public func configure(_ app: Application) async throws {
     app.logger.info("Using timezone: \(TimeZone.current.description)")
     app.logger.info("Using environment: \(app.environment.name) (isRelease: \(app.environment.isRelease))")
 
+    // MARK: - authentication setup
+
+    #if DEBUG
+    let authDisabled = Environment.get("AUTH_DISABLED") == "true"
+    let authToken: String
+
+    if authDisabled {
+        app.logger.warning("🔓 Authentication DISABLED - THIS SHOULD ONLY BE USED FOR DEBUGGING")
+        authToken = "" // Not used when disabled
+    } else {
+        guard let token = Environment.get("AUTH_TOKEN"), !token.isEmpty else {
+            fatalError("""
+                ❌ FATAL: AUTH_TOKEN environment variable is required when authentication is enabled.
+
+                To fix this:
+                1. Set AUTH_TOKEN environment variable: export AUTH_TOKEN="your-secure-token"
+                2. OR disable auth for debugging: export AUTH_DISABLED=true
+
+                Generate a secure token: openssl rand -base64 32
+                """)
+        }
+        authToken = token
+        app.logger.info("✅ Authentication enabled with token from AUTH_TOKEN")
+    }
+    #else
+    // RELEASE: Always require authentication
+    guard let authToken = Environment.get("AUTH_TOKEN"), !authToken.isEmpty else {
+        fatalError("""
+            ❌ FATAL: AUTH_TOKEN environment variable is required in release builds.
+            Generate a secure token: openssl rand -base64 32
+            """)
+    }
+    let authDisabled = false
+    app.logger.info("✅ Authentication enabled with token from AUTH_TOKEN")
+    #endif
+
+    app.authToken = authToken
+    app.authDisabled = authDisabled
+
     // MARK: - env parsing
 
     #if DEBUG

@@ -12,10 +12,22 @@ import OpenAPIURLSession
 public struct ServerClient {
     private let client: Client
 
-    public init(url: URL) {
+    public init(url: URL, authToken: String? = nil) {
+        // Create URLSession with authentication header if token is provided
+        let session: URLSession
+        if let authToken = authToken, !authToken.isEmpty {
+            let configuration = URLSessionConfiguration.default
+            configuration.httpAdditionalHeaders = [
+                "Authorization": "Bearer \(authToken)"
+            ]
+            session = URLSession(configuration: configuration)
+        } else {
+            session = URLSession.shared
+        }
+
         self.client = Client(
             serverURL: url,
-            transport: URLSessionTransport()
+            transport: URLSessionTransport(configuration: .init(session: session))
         )
     }
 

@@ -75,6 +75,61 @@ docker logs -f homeautomation-config-template-app-1
 docker logs -f homeautomation-config-template-db-1
 ```
 
+### Authentication
+
+The Vapor HTTP server (port 8080) requires token-based authentication for all endpoints.
+
+#### Configuration
+
+```bash
+# Generate a secure random token
+openssl rand -base64 32
+
+# Set in environment
+export AUTH_TOKEN="your-secure-token-here"
+```
+
+#### Making Authenticated Requests
+
+Use the standard HTTP `Authorization` header with Bearer token:
+
+```bash
+curl -H "Authorization: Bearer your-token-here" http://localhost:8080/config
+```
+
+#### Debugging Without Authentication
+
+⚠️ **DEBUG BUILDS ONLY** - Disable authentication for local testing:
+
+```bash
+export AUTH_DISABLED=true
+```
+
+This should NEVER be used in production deployments.
+
+#### Docker Compose Setup
+
+Update your `docker-compose.yml`:
+
+```yaml
+services:
+  app:
+    environment:
+      - AUTH_TOKEN=${AUTH_TOKEN}
+```
+
+Create/update `.env` file:
+```bash
+AUTH_TOKEN=your-secure-token-here
+```
+
+#### Security Notes
+
+- Authentication is **enabled by default** (secure by default)
+- Server **crashes on startup** if `AUTH_TOKEN` is missing (fail-safe)
+- All endpoints on port 8080 require authentication
+- Port 8888 (distributed actor system) is NOT affected
+
 ## Pre-Commit Checklist
 
 Before committing changes that affect iOS apps:

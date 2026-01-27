@@ -50,16 +50,25 @@ public struct MotionAtNight: Automatable {
    docker-compose up -d
    ```
 
-2. **Configure Database**: Set `DATABASE_URL` environment variable (MySQL connection string)
+2. **Configure Authentication**: Generate and set API token
+   ```bash
+   # Generate secure token
+   openssl rand -base64 32
 
-3. **Build & Run FlowKit Adapter**:
+   # Set in environment (add to .env or docker-compose.yml)
+   export AUTH_TOKEN="your-generated-token-here"
+   ```
+
+3. **Configure Database**: Set `DATABASE_URL` environment variable (MySQL connection string)
+
+4. **Build & Run FlowKit Adapter**:
    ```bash
    cd Apps/FlowKitAdapter
    xcodebuild -scheme "FlowKit Adapter" -configuration Release
    ```
-   Launch app, grant HomeKit permissions, configure server URL
+   Launch app, grant HomeKit permissions, configure server URL and auth token in settings
 
-4. **Write Automations**: Implement `Automatable` protocol in `Sources/HAImplementations/Automations/`
+5. **Write Automations**: Implement `Automatable` protocol in `Sources/HAImplementations/Automations/`
 
 **[Detailed Setup →](./docs/setup-server.md)**
 
@@ -74,6 +83,8 @@ flowchart LR
 ```
 
 **Distributed System**: Adapter forwards HomeKit events to server via WebSocket, server executes automations and sends commands back.
+
+**Security**: All HTTP endpoints (port 8080) require Bearer token authentication. Configure `AUTH_TOKEN` environment variable before deployment.
 
 ## Project Structure
 

@@ -129,27 +129,6 @@ final class AuthenticationIntegrationTests: XCTestCase {
         })
     }
 
-    // MARK: - Alternative Header Format Tests
-
-    func testRootEndpointWithXAPITokenHeader() async throws {
-        // Test with X-API-Token header - should succeed
-        try await app.test(.GET, "/", beforeRequest: { req in
-            req.headers.add(name: "X-API-Token", value: "test-integration-token-123")
-        }, afterResponse: { res async in
-            XCTAssertEqual(res.status, .ok)
-            XCTAssertEqual(res.body.string, "It works!")
-        })
-    }
-
-    func testConfigGetWithXAPITokenHeader() async throws {
-        // Test with X-API-Token header - should succeed
-        try await app.test(.GET, "/config", beforeRequest: { req in
-            req.headers.add(name: "X-API-Token", value: "test-integration-token-123")
-        }, afterResponse: { res async in
-            XCTAssertEqual(res.status, .ok)
-        })
-    }
-
     // MARK: - Multiple Endpoints Test
 
     func testMultipleEndpointsAllProtected() async throws {

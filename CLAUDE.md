@@ -91,14 +91,10 @@ export AUTH_TOKEN="your-secure-token-here"
 
 #### Making Authenticated Requests
 
-**Option 1: Bearer Token (recommended)**
+Use the standard HTTP `Authorization` header with Bearer token:
+
 ```bash
 curl -H "Authorization: Bearer your-token-here" http://localhost:8080/config
-```
-
-**Option 2: Custom Header**
-```bash
-curl -H "X-API-Token: your-token-here" http://localhost:8080/config
 ```
 
 #### Debugging Without Authentication

@@ -44,28 +44,6 @@ final class TokenAuthenticationTests: XCTestCase {
         })
     }
 
-    func testValidXAPITokenAuthentication() async throws {
-        // Setup
-        let testToken = "test-secure-token-456"
-        app.authToken = testToken
-        app.authDisabled = false
-
-        let authMiddleware = TokenAuthenticationMiddleware(
-            expectedToken: testToken,
-            isAuthDisabled: false
-        )
-
-        app.grouped(authMiddleware).get("test") { _ in "Success" }
-
-        // Test
-        try await app.test(.GET, "/test", beforeRequest: { req in
-            req.headers.add(name: "X-API-Token", value: testToken)
-        }, afterResponse: { res async in
-            XCTAssertEqual(res.status, .ok)
-            XCTAssertEqual(res.body.string, "Success")
-        })
-    }
-
     // MARK: - Invalid Authentication Tests
 
     func testMissingTokenReturns401() async throws {
@@ -104,28 +82,6 @@ final class TokenAuthenticationTests: XCTestCase {
         // Test - wrong token
         try await app.test(.GET, "/test", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer wrong-token")
-        }, afterResponse: { res async in
-            XCTAssertEqual(res.status, .unauthorized)
-            XCTAssertTrue(res.body.string.contains("Invalid or missing authentication token"))
-        })
-    }
-
-    func testInvalidXAPITokenReturns401() async throws {
-        // Setup
-        let testToken = "correct-token"
-        app.authToken = testToken
-        app.authDisabled = false
-
-        let authMiddleware = TokenAuthenticationMiddleware(
-            expectedToken: testToken,
-            isAuthDisabled: false
-        )
-
-        app.grouped(authMiddleware).get("test") { _ in "Success" }
-
-        // Test - wrong token
-        try await app.test(.GET, "/test", beforeRequest: { req in
-            req.headers.add(name: "X-API-Token", value: "wrong-token")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
             XCTAssertTrue(res.body.string.contains("Invalid or missing authentication token"))
@@ -230,7 +186,7 @@ final class TokenAuthenticationTests: XCTestCase {
 
         // Test route3 - authenticated POST
         try await app.test(.POST, "/route3", beforeRequest: { req in
-            req.headers.add(name: "X-API-Token", value: testToken)
+            req.headers.add(name: .authorization, value: "Bearer \(testToken)")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .ok)
             XCTAssertEqual(res.body.string, "Route 3")
@@ -255,27 +211,6 @@ final class TokenAuthenticationTests: XCTestCase {
         // Test - empty token after "Bearer "
         try await app.test(.GET, "/test", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer ")
-        }, afterResponse: { res async in
-            XCTAssertEqual(res.status, .unauthorized)
-        })
-    }
-
-    func testEmptyXAPITokenReturns401() async throws {
-        // Setup
-        let testToken = "test-token"
-        app.authToken = testToken
-        app.authDisabled = false
-
-        let authMiddleware = TokenAuthenticationMiddleware(
-            expectedToken: testToken,
-            isAuthDisabled: false
-        )
-
-        app.grouped(authMiddleware).get("test") { _ in "Success" }
-
-        // Test - empty X-API-Token
-        try await app.test(.GET, "/test", beforeRequest: { req in
-            req.headers.add(name: "X-API-Token", value: "")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
         })

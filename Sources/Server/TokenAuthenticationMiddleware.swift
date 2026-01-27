@@ -37,13 +37,10 @@ struct TokenAuthenticationMiddleware: AsyncMiddleware {
 
     private func extractToken(from request: Request) -> String? {
         // Check Authorization: Bearer <token>
-        if let authHeader = request.headers[.authorization].first {
-            if authHeader.hasPrefix("Bearer ") {
-                return String(authHeader.dropFirst(7))
-            }
+        guard let authHeader = request.headers[.authorization].first,
+              authHeader.hasPrefix("Bearer ") else {
+            return nil
         }
-
-        // Check X-API-Token: <token>
-        return request.headers["X-API-Token"].first
+        return String(authHeader.dropFirst(7))
     }
 }

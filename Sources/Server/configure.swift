@@ -39,7 +39,7 @@ public func configure(_ app: Application) async throws {
         app.logger.warning("🔓 Authentication DISABLED - THIS SHOULD ONLY BE USED FOR DEBUGGING")
         authToken = "" // Not used when disabled
     } else {
-        guard let token = Environment.get("AUTH_TOKEN") else {
+        guard let token = Environment.get("AUTH_TOKEN"), !token.isEmpty else {
             fatalError("""
                 ❌ FATAL: AUTH_TOKEN environment variable is required when authentication is enabled.
 
@@ -55,7 +55,7 @@ public func configure(_ app: Application) async throws {
     }
     #else
     // RELEASE: Always require authentication
-    guard let authToken = Environment.get("AUTH_TOKEN") else {
+    guard let authToken = Environment.get("AUTH_TOKEN"), !authToken.isEmpty else {
         fatalError("""
             ❌ FATAL: AUTH_TOKEN environment variable is required in release builds.
             Generate a secure token: openssl rand -base64 32

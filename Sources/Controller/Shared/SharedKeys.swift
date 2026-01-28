@@ -15,7 +15,7 @@ import Sharing
 extension SharedKey where Self == AppStorageKey<URL>.Default {
     /// Server URL for the FlowKit backend
     static var serverURL: Self {
-        let defaultValue = URL(string: "http://localhost:8080/")!
+        let defaultValue = URL(string: "http://localhost:8080")!
         return Self[.appStorage("serverURL", store: .standard), default: defaultValue]
     }
 }

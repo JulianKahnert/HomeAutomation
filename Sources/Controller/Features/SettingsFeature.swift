@@ -27,8 +27,7 @@ struct SettingsFeature: Sendable {
 
         // Server URL editing state
         var isEditingServerURL: Bool = false
-        var serverHost: String = "localhost"
-        var serverPort: Int = 8080
+        var serverURLString: String = ""
         var serverAuthToken: String = ""
 
         // Push notification state
@@ -76,14 +75,21 @@ struct SettingsFeature: Sendable {
 
             case .editServerURL:
                 state.isEditingServerURL = true
-                state.serverHost = state.serverURL.host() ?? "localhost"
-                state.serverPort = state.serverURL.port ?? 8080
+                // Remove trailing slash if present for cleaner editing
+                state.serverURLString = state.serverURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                 state.serverAuthToken = state.authToken
                 return .none
 
             case .saveServerURL:
                 state.isEditingServerURL = false
-                let urlString = "http://\(state.serverHost):\(state.serverPort)/"
+                // Parse and validate the URL
+                var urlString = state.serverURLString.trimmingCharacters(in: .whitespaces)
+
+                // Add trailing slash if not present (required for proper URL handling)
+                if !urlString.hasSuffix("/") {
+                    urlString += "/"
+                }
+
                 if let url = URL(string: urlString) {
                     state.$serverURL.withLock { $0 = url }
                 }
@@ -215,14 +221,19 @@ struct SettingsView: View {
                 }
             }
 
-            Text(store.serverURL.absoluteString)
+            Text(store.serverURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
 
         if store.isEditingServerURL {
-            TextField("Host", text: $store.serverHost)
-            TextField("Port", value: $store.serverPort, format: .number.grouping(.never))
+            TextField("Server URL (e.g. http://localhost:8080)", text: $store.serverURLString)
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                #endif
+
             SecureField("Auth Token", text: $store.serverAuthToken)
                 .autocorrectionDisabled()
                 #if os(iOS)

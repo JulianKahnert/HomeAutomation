@@ -55,7 +55,12 @@ extension HomeKitAdapter {
             let home = try actionSet.home.get(with: log)
 
             log.info("Executing action set: \(actionSet.name) [\(home.description)]")
-            try await home.executeActionSet(actionSet)
+            do {
+                try await home.executeActionSet(actionSet)
+            } catch {
+                log.critical("Failed to execute action set '\(actionSet.name)': \(error)")
+                throw error
+            }
         }
 
         func updateEntities() async {
@@ -172,7 +177,7 @@ extension HomeKitAdapter.HomeKitHomeManager: HMHomeDelegate {
     }
 
     func home(_ home: HMHome, didEncounterError error: any Error, for accessory: HMAccessory) {
-        log.info("home:didEncounterError accessory \(accessory.name)")
+        log.error("home:didEncounterError accessory '\(accessory.name)': \(error)")
         update(homes: manager.homes)
     }
 

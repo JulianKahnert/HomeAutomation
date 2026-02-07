@@ -59,8 +59,7 @@ extension HomeKitAdapter {
         }
 
         func updateEntities() async {
-            log.debug("subscribeToCharacteristicNotifications")
-
+            let start = ContinuousClock.now
             let homes = await homesPublisher.get()
 
             let allCharacteristics = Set(homes.flatMap(\.accessories)
@@ -69,7 +68,11 @@ extension HomeKitAdapter {
                 .filter(\.isReadable)
                 .filter(\.isNotifiable))
 
+            log.info("updateEntities() — processing \(allCharacteristics.count) characteristics")
+
             // subscribe all new characteristics
+            var subscriptionChanges = 0
+            var subscriptionErrors = 0
             for characteristic in allCharacteristics.sorted() {
                 guard let accessory = characteristic.service?.accessory else {
                     fatalError("Could not set delegate on accessory")
@@ -84,8 +87,10 @@ extension HomeKitAdapter {
                     let isSubscribed = characteristic.isNotificationEnabled
                     if shouldSubscribe != isSubscribed {
                         try await characteristic.enableNotification(shouldSubscribe)
+                        subscriptionChanges += 1
                     }
                 } catch {
+                    subscriptionErrors += 1
                     log.critical("Failed to enable notification on accessory \(accessory.name) - error \(error)")
 
                     #if DEBUG
@@ -115,17 +120,23 @@ extension HomeKitAdapter {
             for item in items.compactMap(\.self) {
                 self.entityStreamContinuation.yield(item)
             }
+
+            let duration = start.duration(to: .now)
+            log.info("updateEntities() — completed in \(duration) (changes: \(subscriptionChanges), errors: \(subscriptionErrors))")
         }
 
         private func update(homes: [HMHome]) {
-            log.info("update accessories")
+            log.info("update(homes:) — starting with \(homes.count) homes")
             for home in homes {
                 home.delegate = self
             }
 
             Task {
+                let start = ContinuousClock.now
                 await homesPublisher.send(homes)
                 await updateEntities()
+                let duration = start.duration(to: .now)
+                log.info("update(homes:) — completed in \(duration)")
             }
         }
 

@@ -32,8 +32,11 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         self.homeKitHomeManager = HomeKitHomeManager(entityStream: entityStream, entityStreamContinuation: entityStreamContinuation)
     }
 
-    public  func getAllEntitiesLive() async -> [EntityStorageItem] {
+    public func getAllEntitiesLive() async -> [EntityStorageItem] {
+        let start = ContinuousClock.now
         let characteristics = await getCharacteristics()
+        log.info("getAllEntitiesLive() — querying \(characteristics.count) characteristics")
+
         let items = await withTaskGroup(of: Optional<EntityStorageItem>.self) { group in
             for characteristic in characteristics {
                 group.addTask(priority: .low) {
@@ -46,7 +49,10 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             }
         }
 
-        return items.compactMap(\.self)
+        let result = items.compactMap(\.self)
+        let duration = start.duration(to: .now)
+        log.info("getAllEntitiesLive() — returned \(result.count) entities from \(characteristics.count) characteristics in \(duration)")
+        return result
     }
 
     public func findEntity(_ entity: EntityId) async throws {

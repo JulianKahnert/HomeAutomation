@@ -87,6 +87,7 @@ public actor CustomActorSystem {
             settings.discovery = ServiceDiscoverySettings(static: [endpoint])
         }
 
+        settings.remoteCall.defaultTimeout = .seconds(15)
         settings.logging.logLevel = .warning
 
         // CRITICAL: Server must never auto-shutdown on cluster down events

@@ -45,14 +45,25 @@ public distributed actor HomeKitCommandReceiver {
     }
 
     public distributed func perform(_ action: HomeManagableAction) async throws {
-        try await adapter.perform(action)
+        do {
+            try await adapter.perform(action)
+        } catch {
+            log.critical("perform(_:) — failed action '\(action)': \(error)")
+            throw error
+        }
     }
 
     public distributed func trigger(scene sceneName: String) async throws {
         log.info("trigger(scene:) — received remote call for '\(sceneName)'")
         let start = ContinuousClock.now
-        try await adapter.trigger(scene: sceneName)
-        let duration = start.duration(to: .now)
-        log.info("trigger(scene:) — completed '\(sceneName)' in \(duration)")
+        do {
+            try await adapter.trigger(scene: sceneName)
+            let duration = start.duration(to: .now)
+            log.info("trigger(scene:) — completed '\(sceneName)' in \(duration)")
+        } catch {
+            let duration = start.duration(to: .now)
+            log.critical("trigger(scene:) — failed '\(sceneName)' after \(duration): \(error)")
+            throw error
+        }
     }
 }

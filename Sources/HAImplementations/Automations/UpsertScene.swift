@@ -44,8 +44,12 @@ public struct UpsertScene: Automatable {
             for entity in entities {
                 if entity.isDeviceOn != nil {
                     await hm.perform(.addEntityToScene(entity.entityId, sceneName: sceneName, targetValue: .off))
-                } else if entity.isDoorLocked != nil {
-                    await hm.perform(.addEntityToScene(entity.entityId, sceneName: sceneName, targetValue: .lockDoor))
+                
+// We skip locks, because we receive this error when we include a lock in the automation, so we skip "  Error Domain=HMErrorDomain Code=82 "Operation requires device to be unlocked."
+//                } else if entity.isDoorLocked != nil {
+//                    await hm.perform(.addEntityToScene(entity.entityId, sceneName: sceneName, targetValue: .lockDoor))
+                    
+// We don't want to change any heating settings
 //                } else if entity.isHeaterActive != nil {
 //                    // turn on all heaters after they might be turned of for the fire place
 //                    await hm.perform(.addEntityToScene(entity.entityId, sceneName: Self.sceneNameGoodNight, targetValue: .on))

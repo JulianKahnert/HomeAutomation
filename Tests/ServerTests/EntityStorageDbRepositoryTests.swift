@@ -278,7 +278,7 @@ final class EntityStorageDbRepositoryTests: XCTestCase {
         _ rhs: EntityStorageItem,
         accuracy: Double = 0.001,
         message: String,
-        file: StaticString = #file,
+        file: StaticString = #filePath,
         line: UInt = #line
     ) {
         // Entity ID

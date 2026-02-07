@@ -15,7 +15,7 @@ struct SharedKeysTests {
     @Test("Server URL has correct default value")
     func testServerURLDefault() async {
         let url = Shared(.serverURL).wrappedValue
-        #expect(url.absoluteString == "http://localhost:8080/")
+        #expect(url.absoluteString == "http://localhost:8080")
     }
 
     @Test("Live Activities enabled default value")

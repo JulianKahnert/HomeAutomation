@@ -65,7 +65,12 @@ public final class HomeManager: HomeManagable {
     }
 
     public func getAllEntitiesLive() async throws -> [EntityStorageItem] {
-        return try await getAdapter().get(with: log).getAllEntitiesLive()
+        log.info("getAllEntitiesLive() — starting distributed actor call")
+        let start = ContinuousClock.now
+        let entities = try await getAdapter().get(with: log).getAllEntitiesLive()
+        let duration = start.duration(to: .now)
+        log.info("getAllEntitiesLive() — returned \(entities.count) entities in \(duration)")
+        return entities
     }
 
     public func findEntity(_ entityId: EntityId) async throws {
@@ -112,10 +117,15 @@ public final class HomeManager: HomeManagable {
     }
 
     public func trigger(scene sceneName: String) async {
+        log.info("Triggering scene '\(sceneName)' — starting distributed actor call")
+        let start = ContinuousClock.now
         do {
             try await getAdapter().get(with: log).trigger(scene: sceneName)
+            let duration = start.duration(to: .now)
+            log.info("Triggering scene '\(sceneName)' — completed in \(duration)")
         } catch {
-            log.critical("Failed to trigger scene [\(sceneName)]\n\(error)")
+            let duration = start.duration(to: .now)
+            log.critical("Failed to trigger scene '\(sceneName)' after \(duration)\n\(error)")
         }
     }
 

@@ -28,7 +28,7 @@ public struct TriggerScene: Automatable {
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        log.debug("Trigger scene: '\(sceneName)'")
+        log.info("Trigger scene: '\(sceneName)'")
 
         await hm.trigger(scene: sceneName)
     }

@@ -87,6 +87,7 @@ public actor CustomActorSystem {
             settings.discovery = ServiceDiscoverySettings(static: [endpoint])
         }
 
+        settings.remoteCall.defaultTimeout = .seconds(15)
         settings.logging.logLevel = .warning
 
         // CRITICAL: Server must never auto-shutdown on cluster down events
@@ -187,7 +188,7 @@ public actor CustomActorSystem {
                     Self.log.debug("wait for node")
                     try await actorSystem.cluster.waitFor(actorSystem.cluster.node, .up, within: .seconds(10))
 
-                    Self.log.info("get status: \(currentConnectionStatus)")
+                    Self.log.info("get status: \(String(describing: currentConnectionStatus))")
                     if currentConnectionStatus != .up,
                        case .homeKitAdapter(serverAddress: let address) = systemRole {
                         Self.log.warning("the node (\(systemRole) is up but there is no connection - joining again for 30s")

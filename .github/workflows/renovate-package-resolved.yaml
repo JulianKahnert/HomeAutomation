@@ -7,7 +7,7 @@ on:
 
 jobs:
   update-package-resolved:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions:
       contents: write
 
@@ -18,18 +18,19 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Setup Swift
-        uses: vapor/swiftly-action@v0.2
-        with:
-          toolchain: latest
-
       - name: Run swift package resolve
         run: swift package resolve
+
+      - name: Resolve package dependencies for iOS apps
+        run: |
+          cd "Apps/FlowKitAdapter" && xcodebuild -project "FlowKit Adapter.xcodeproj" -scheme "FlowKit Adapter" -resolvePackageDependencies
+          cd ../..
+          cd "Apps/FlowKitController" && xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -resolvePackageDependencies
 
       - name: Check for changes in Package.resolved
         id: changes
         run: |
-          if git diff --quiet Package.resolved; then
+          if git diff --quiet Package.resolved "Apps/FlowKitAdapter/FlowKit Adapter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "Apps/FlowKitController/FlowKit Controller.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
             echo "changed=true" >> $GITHUB_OUTPUT
@@ -40,6 +41,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add Package.resolved
+          git add Package.resolved "Apps/FlowKitAdapter/FlowKit Adapter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "Apps/FlowKitController/FlowKit Controller.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
           git commit -m "Package.resolved updated"
           git push

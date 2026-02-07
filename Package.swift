@@ -128,7 +128,8 @@ let package = Package(
         .testTarget(
             name: "SharedTests",
             dependencies: [
-                "Shared"
+                "Shared",
+                "HAModels"
             ]
         ),
         .testTarget(

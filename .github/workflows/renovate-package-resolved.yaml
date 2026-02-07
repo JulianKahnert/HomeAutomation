@@ -26,10 +26,15 @@ jobs:
       - name: Run swift package resolve
         run: swift package resolve
 
+      - name: Sync Package.resolved to iOS app projects
+        run: |
+          cp Package.resolved "Apps/FlowKitAdapter/FlowKit Adapter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+          cp Package.resolved "Apps/FlowKitController/FlowKit Controller.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+
       - name: Check for changes in Package.resolved
         id: changes
         run: |
-          if git diff --quiet Package.resolved; then
+          if git diff --quiet Package.resolved "Apps/FlowKitAdapter/FlowKit Adapter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "Apps/FlowKitController/FlowKit Controller.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
             echo "changed=true" >> $GITHUB_OUTPUT
@@ -40,6 +45,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add Package.resolved
+          git add Package.resolved "Apps/FlowKitAdapter/FlowKit Adapter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "Apps/FlowKitController/FlowKit Controller.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
           git commit -m "Package.resolved updated"
           git push

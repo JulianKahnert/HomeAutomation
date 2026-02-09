@@ -31,7 +31,8 @@ public actor AutomationService {
                         }
 
                         self.log.info("Running automation \(automation.name)")
-                        let task = Task {
+                        let task = Task { [weak self] in
+                            guard let self else { return }
                             do {
                                 try await automation.execute(using: self.homeManager)
                             } catch is CancellationError {

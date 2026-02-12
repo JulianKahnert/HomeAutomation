@@ -8,7 +8,7 @@
 import Foundation
 import HAModels
 
-public final class IkeaLightBulbColored: SwitchDevice, @unchecked Sendable {
+public final class IkeaLightBulbColored: SwitchDevice {
     public convenience init(query: EntityId.Query, skipColorTemperature: Bool = false) {
         self.init(switchId: EntityId(query: query, characteristic: .switcher),
                   brightnessId: EntityId(query: query, characteristic: .brightness),

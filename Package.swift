@@ -38,7 +38,7 @@ let package = Package(
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", from: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
-        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.1.1"),
+        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.1.2"),
         .package(url: "https://github.com/swift-server-community/APNSwift", from: "6.4.0")
     ],
     targets: [

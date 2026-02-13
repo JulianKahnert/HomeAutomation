@@ -1,6 +1,7 @@
 import HAImplementations
 import HAModels
 import OpenAPIVapor
+import SQLKit
 import Vapor
 
 func routes(_ app: Application) throws {
@@ -16,6 +17,14 @@ func routes(_ app: Application) throws {
     // Manual routes - now protected
     authenticatedRoutes.get { _ async in
         "It works!"
+    }
+
+    authenticatedRoutes.get("health") { req async throws -> HTTPStatus in
+        guard let sql = req.db as? any SQLDatabase else {
+            throw Abort(.internalServerError, reason: "Database does not support SQL queries")
+        }
+        try await sql.raw("SELECT 1").run()
+        return .ok
     }
 
     authenticatedRoutes.get("config") { req in

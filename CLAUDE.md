@@ -1,5 +1,20 @@
 # Claude Code Development Guide
 
+## Architecture Overview
+
+```
+┌──────────────┐   distributed actors   ┌──────────────┐   REST/OpenAPI   ┌──────────────┐
+│   Adapter    │◄──────(port 8888)─────►│    Server     │◄───(port 8080)──►│  Controller  │
+│  (HomeKit)   │                        │   (Vapor)     │                  │  (iOS app)   │
+└──────┬───────┘                        └──────┬────────┘                  └──────────────┘
+       │                                       │
+   HomeKit API                            MySQL + APNS
+```
+
+- **Server** — Vapor app (runs as Docker container, Swift 6.2, Ubuntu Noble, jemalloc). HTTP API (OpenAPI), MySQL persistence, database migrations, scheduled jobs, APNS push notifications, automations engine. Configured via [HomeAutomation-config-template](https://github.com/JulianKahnert/HomeAutomation-config-template).
+- **Adapter** (FlowKit Adapter / HomeKitAdapterApp) — Bridges HomeKit entities to the Server via `swift-distributed-actors` on port 8888. No business logic; reads HomeKit characteristics and forwards state.
+- **Controller** (FlowKit Controller) — iOS app using TCA (The Composable Architecture). Activates/deactivates automations, shows switched devices, entity state history charts, window Live Activities. Communicates with Server via generated OpenAPI client.
+
 ## Build Commands
 
 ### Swift Package (Server/Library)
@@ -13,7 +28,7 @@ cd Apps/FlowKitAdapter
 xcodebuild -project "FlowKit Adapter.xcodeproj" -scheme "FlowKit Adapter" -sdk iphonesimulator -configuration Debug build
 ```
 
-**Note**: After creating new Swift files in `Apps/FlowKitAdapter/Views/`, you must add them to the Xcode project manually using Xcode or update the `.pbxproj` file.
+**Note**: After creating new Swift files in `Apps/FlowKitAdapter/`, you must add them to the Xcode project manually using Xcode or update the `.pbxproj` file.
 
 ### FlowKitController (iOS App)
 ```bash
@@ -23,11 +38,11 @@ xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" 
 
 ## Local Development with Docker
 
-For local development and testing, the database and application can be started using Docker Compose.
+Docker Compose starts the server and MySQL database for local development.
 
 ### Setup
 
-The Docker Compose configuration is maintained in a separate repository:
+Docker Compose configuration is in a separate repository:
 **https://github.com/JulianKahnert/HomeAutomation-config-template**
 
 ```bash
@@ -53,7 +68,7 @@ This starts:
 
 ### Debugging Database
 
-For debugging purposes, you can directly access the MySQL database:
+Access the MySQL database directly:
 
 ```bash
 # Connect to the database
@@ -157,10 +172,31 @@ Before committing changes that affect iOS apps:
 
 ## Project Structure
 
-- `Sources/` - Swift Package modules (HAModels, Adapter, Server, etc.)
-- `Apps/FlowKitAdapter/` - HomeKit Adapter iOS app
-- `Apps/FlowKitController/` - Home Automation Controller iOS app
-- `Tests/` - Unit tests
+### SPM Modules (`Sources/`)
+
+- `Server` — Vapor executable: HTTP API (OpenAPI), database, migrations, scheduled jobs, APNS
+- `Adapter` — HomeKit bridge, distributed actors for Server communication
+- `Controller` — TCA features, views, Live Activities for FlowKit Controller
+- `ServerClient` — Generated OpenAPI client for Controller → Server communication
+- `HAModels` — Shared domain models (entities, automations, storage items)
+- `HAApplicationLayer` — HomeManager, AutomationService
+- `HAImplementations` — Concrete automations (14 types), Tibber integration
+- `Shared` — Logging, distributed actor system, utilities
+
+### Apps (`Apps/`)
+
+- `FlowKitAdapter/` — Xcode project for HomeKit Adapter iOS/macOS app
+- `FlowKitController/` — Xcode project for Controller iOS app + widget extension
+- `HomeKitAdapterApp/` — Alternative adapter app target
+
+### Tests (`Tests/`)
+
+- `SharedTests`, `HomeAutomationKitTests`, `ControllerTests`, `ServerTests`
+
+### Other
+
+- `Dockerfile` — Multi-stage Docker build (Swift 6.2, Ubuntu Noble, jemalloc)
+- `openapi.yaml` — OpenAPI spec; both `Server` and `ServerClient` use `swift-openapi-generator`
 
 ## Git Workflow
 
@@ -353,6 +389,21 @@ When adding new entity fields, verify ALL of these:
 - PR #89: Added entity history but no migration for new fields
 - PR #90: Server changes but OpenAPI schema incomplete
 - PR #93: ✅ Correct implementation with migration + full schema
+
+## CI / GitHub Actions
+
+PR checks run on `main` and `develop` branches (`.github/workflows/pr-checks.yml`):
+
+- **Swift Package Build & Test** — `swift build` + `swift test` on macOS
+- **iOS Apps Build** — Matrix build of FlowKitAdapter and FlowKitController (includes Package.resolved freshness check)
+- **Docker Build** — Builds the Server Docker image on Ubuntu
+
+Additional workflows: `docker-branches.yaml` (branch image builds), `docker-tag.yaml` (tagged releases), `renovate-package-resolved.yaml` (dependency updates).
+
+## Documentation
+
+- `docs/setup-FlowKitAdapter.md` — Adapter setup: launchctl, iOS guided access, logging
+- `docs/setup-server.md` — Server Docker setup, log levels, migration
 
 ## Common Issues
 

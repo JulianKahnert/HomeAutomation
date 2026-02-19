@@ -40,20 +40,14 @@ struct FlowKitAdapter: App, Log {
                 entities: $entities,
                 connectionStatus: $connectionStatus
             )
-            .task {
-                Self.log.info("runloop task called")
+            .task(id: serverAddress) {
+                Self.log.info("runloop task called for address: \(serverAddress)")
 
                 // do not start run loop when running in preview canvas
                 guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
 
                 try? await Task.sleep(for: .seconds(1))
                 await initializeActorSystem()
-            }
-            .onChange(of: serverAddress) { _, newValue in
-                Task {
-                    Self.log.info("Server address changed to \(newValue), reinitializing actor system")
-                    await initializeActorSystem()
-                }
             }
         }
     }

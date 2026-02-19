@@ -69,19 +69,21 @@ struct OpenAPIController: APIProtocol {
         case .pushNotification, .liveActivityStart:
             assert(token.activityType == nil, "For pushNotification and liveActivityStart, activityType should be nil")
 
-            // first delete all previous token
-            try await DeviceToken
+            // upsert: update existing token or create new one
+            if let existing = try await DeviceToken
                 .query(on: request.db)
                 .filter(\.$deviceName == token.deviceName)
                 .filter(\.$tokenType == token.tokenType.rawValue)
-                .delete()
-
-            // add the new token
-            let newPushDevice = DeviceToken(deviceName: token.deviceName,
-                                            tokenString: token.tokenString,
-                                            tokenType: token.tokenType.rawValue,
-                                            activityType: token.activityType) // for pushNotification & liveActivityStart - this should always be nil
-            try await newPushDevice.save(on: request.db)
+                .first() {
+                existing.tokenString = token.tokenString
+                try await existing.save(on: request.db)
+            } else {
+                let newPushDevice = DeviceToken(deviceName: token.deviceName,
+                                                tokenString: token.tokenString,
+                                                tokenType: token.tokenType.rawValue,
+                                                activityType: token.activityType)
+                try await newPushDevice.save(on: request.db)
+            }
             return .ok
 
         case .liveActivityUpdate:
@@ -90,29 +92,20 @@ struct OpenAPIController: APIProtocol {
                 return .internalServerError
             }
 
-            // delete other tokens with that activity type
-            try await DeviceToken
+            // upsert: update existing token or create new one
+            if let existing = try await DeviceToken
                 .query(on: request.db)
                 .filter(\.$deviceName == token.deviceName)
-                .filter(\.$tokenString != token.tokenString)
                 .filter(\.$tokenType == token.tokenType.rawValue)
                 .filter(\.$activityType == activityType)
-                .delete()
-
-            // insert the new token, if needed
-            let numberOfPushDevices = try await DeviceToken
-                .query(on: request.db)
-                .filter(\.$deviceName == token.deviceName)
-                .filter(\.$tokenString == token.tokenString)
-                .filter(\.$tokenType == token.tokenType.rawValue)
-                .filter(\.$activityType == activityType)
-                .count()
-            if numberOfPushDevices == 0 {
+                .first() {
+                existing.tokenString = token.tokenString
+                try await existing.save(on: request.db)
+            } else {
                 let newPushDevice = DeviceToken(deviceName: token.deviceName,
                                                 tokenString: token.tokenString,
                                                 tokenType: token.tokenType.rawValue,
                                                 activityType: activityType)
-
                 try await newPushDevice.save(on: request.db)
             }
             return .ok

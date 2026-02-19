@@ -74,7 +74,7 @@ actor PushNotifcationService: NotificationSender {
                     // delete liveActivityUpdate tokens that are older than 4 hours
                     try await DeviceToken
                         .query(on: database)
-                        .filter(\.$id != tokenId)
+                        .filter(\.$id == tokenId)
                         .delete()
 
                 } else {
@@ -117,9 +117,7 @@ actor PushNotifcationService: NotificationSender {
                             timestamp: Int(Date().timeIntervalSince1970),
                             attributes: contentState,
                             attributesType: activityName,
-                            alert: APNSAlertNotificationContent(
-                                title: .raw("empty"),
-                                body: .raw("empty")))
+                            alert: APNSAlertNotificationContent())
 
                         // start a new live activity
                         usedToken = startToken

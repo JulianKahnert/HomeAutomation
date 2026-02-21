@@ -109,6 +109,10 @@ actor PushNotifcationService: NotificationSender {
                         $0.tokenType == "liveActivityStart"
                     }) {
                         Self.logger.info("Starting LiveActivity (on: \(startToken.deviceName)) with attributesType '\(activityName)': \(contentState)")
+                        // alert with non-empty title/body is required for push-to-start Live Activities
+                        // to be displayed on the device. Omitting or using an empty
+                        // APNSAlertNotificationContent() causes iOS to silently drop the notification
+                        // and the Live Activity will never appear.
                         let notification = APNSStartLiveActivityNotification<ContentState, ContentState>(
                             expiration: .none,
                             priority: .immediately,
@@ -117,7 +121,9 @@ actor PushNotifcationService: NotificationSender {
                             timestamp: Int(Date().timeIntervalSince1970),
                             attributes: contentState,
                             attributesType: activityName,
-                            alert: APNSAlertNotificationContent())
+                            alert: APNSAlertNotificationContent(
+                                title: .raw("empty"),
+                                body: .raw("empty")))
 
                         // start a new live activity
                         usedToken = startToken

@@ -1,5 +1,5 @@
 {
-  "originHash" : "3fc786907d7c49374f75455d0ec55026ac0d791c55af48f9dbaf892b63695d05",
+  "originHash" : "3648fc66dc2249e7942672a3513f670752c3f49f2d36ae717ed9535ed953cc65",
   "pins" : [
     {
       "identity" : "apns",
@@ -249,8 +249,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/swift-composable-architecture",
       "state" : {
-        "revision" : "df934d9c5a274a6f6a7bdcec73fbcb330149ff8b",
-        "version" : "1.23.2"
+        "revision" : "74a5fa0d02b17ba5bbd9743dc49b4d7f3bbbed96",
+        "version" : "1.24.1"
       }
     },
     {
@@ -438,8 +438,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-runtime",
       "state" : {
-        "revision" : "7cdf33371bf89b23b9cf4fd3ce8d3c825c28fbe8",
-        "version" : "1.9.0"
+        "revision" : "16c8eb7f65d28f5ddb8cb0dc1be5ec32e796fe45",
+        "version" : "1.10.1"
       }
     },
     {
@@ -546,8 +546,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "6d06e13021c299aa3300986f4eb5bb143d17ac9b",
-        "version" : "4.121.2"
+        "revision" : "a8db2dbda8b3cdc8a61bd35128590bd296e85563",
+        "version" : "4.121.3"
       }
     },
     {

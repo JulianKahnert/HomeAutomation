@@ -10,20 +10,20 @@ import Foundation
 import HAModels
 import Sharing
 
-// MARK: - AppStorage-backed (UserDefaults)
+// MARK: - Keychain-backed (survives app reinstalls)
 
-extension SharedKey where Self == AppStorageKey<URL>.Default {
+extension SharedKey where Self == KeychainKey<URL>.Default {
     /// Server URL for the FlowKit backend
     static var serverURL: Self {
         let defaultValue = URL(string: "http://localhost:8080")!
-        return Self[.appStorage("serverURL", store: .standard), default: defaultValue]
+        return Self[.keychain("serverURL"), default: defaultValue]
     }
 }
 
-extension SharedKey where Self == AppStorageKey<String>.Default {
+extension SharedKey where Self == KeychainKey<String>.Default {
     /// Authentication token for the FlowKit backend
     static var authToken: Self {
-        Self[.appStorage("authToken", store: .standard), default: ""]
+        Self[.keychain("authToken"), default: ""]
     }
 }
 

@@ -101,6 +101,7 @@ extension KeychainKey {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
     }
 
@@ -120,19 +121,18 @@ extension KeychainKey {
     private func writeToKeychain(_ value: Value) {
         guard let data = encode(value) else { return }
 
-        // Try to update existing item first
-        let status = SecItemCopyMatching(baseQuery() as CFDictionary, nil)
+        // Delete and re-add to ensure the accessibility attribute is up-to-date.
+        // SecItemUpdate cannot change kSecAttrAccessible on existing items.
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
 
-        if status == errSecSuccess {
-            let attributes: [String: Any] = [
-                kSecValueData as String: data,
-            ]
-            SecItemUpdate(baseQuery() as CFDictionary, attributes as CFDictionary)
-        } else {
-            var query = baseQuery()
-            query[kSecValueData as String] = data
-            SecItemAdd(query as CFDictionary, nil)
-        }
+        var query = baseQuery()
+        query[kSecValueData as String] = data
+        SecItemAdd(query as CFDictionary, nil)
     }
 }
 

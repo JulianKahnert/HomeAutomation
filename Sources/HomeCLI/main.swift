@@ -1,12 +1,12 @@
 import Foundation
 
-struct LightCLIError: Error, CustomStringConvertible {
+struct HomeCLIError: Error, CustomStringConvertible {
     let description: String
 }
 
 func printUsage() {
     let usage = """
-    Usage: light-cli --name <lamp-name> [--color <hex>] [--brightness <0-100>]
+    Usage: home-cli --name <lamp-name> [--color <hex>] [--brightness <0-100>]
 
     Options:
       --name, -n        Name of the lamp (required)
@@ -14,8 +14,8 @@ func printUsage() {
       --brightness, -b  Brightness level 0-100
 
     Environment:
-      LIGHT_CLI_HOST    Server host (default: localhost)
-      LIGHT_CLI_PORT    Server port (default: 8080)
+      HOME_CLI_HOST     Server host (default: localhost)
+      HOME_CLI_PORT     Server port (default: 8080)
       AUTH_TOKEN        Bearer token for authentication
     """
     print(usage)
@@ -32,33 +32,33 @@ func parseArgs() throws -> (name: String, color: String?, brightness: Int?) {
         switch args[i] {
         case "--name", "-n":
             i += 1
-            guard i < args.count else { throw LightCLIError(description: "Missing value for --name") }
+            guard i < args.count else { throw HomeCLIError(description: "Missing value for --name") }
             name = args[i]
         case "--color", "-c":
             i += 1
-            guard i < args.count else { throw LightCLIError(description: "Missing value for --color") }
+            guard i < args.count else { throw HomeCLIError(description: "Missing value for --color") }
             color = args[i]
         case "--brightness", "-b":
             i += 1
-            guard i < args.count else { throw LightCLIError(description: "Missing value for --brightness") }
+            guard i < args.count else { throw HomeCLIError(description: "Missing value for --brightness") }
             guard let b = Int(args[i]), (0...100).contains(b) else {
-                throw LightCLIError(description: "Brightness must be an integer between 0 and 100")
+                throw HomeCLIError(description: "Brightness must be an integer between 0 and 100")
             }
             brightness = b
         case "--help", "-h":
             printUsage()
             exit(0)
         default:
-            throw LightCLIError(description: "Unknown argument: \(args[i])")
+            throw HomeCLIError(description: "Unknown argument: \(args[i])")
         }
         i += 1
     }
 
     guard let name else {
-        throw LightCLIError(description: "Missing required argument: --name")
+        throw HomeCLIError(description: "Missing required argument: --name")
     }
     guard color != nil || brightness != nil else {
-        throw LightCLIError(description: "At least one of --color or --brightness must be provided")
+        throw HomeCLIError(description: "At least one of --color or --brightness must be provided")
     }
 
     return (name, color, brightness)
@@ -67,8 +67,8 @@ func parseArgs() throws -> (name: String, color: String?, brightness: Int?) {
 func run() async throws {
     let parsed = try parseArgs()
 
-    let host = ProcessInfo.processInfo.environment["LIGHT_CLI_HOST"] ?? "localhost"
-    let port = ProcessInfo.processInfo.environment["LIGHT_CLI_PORT"] ?? "8080"
+    let host = ProcessInfo.processInfo.environment["HOME_CLI_HOST"] ?? "localhost"
+    let port = ProcessInfo.processInfo.environment["HOME_CLI_PORT"] ?? "8080"
     let authToken = ProcessInfo.processInfo.environment["AUTH_TOKEN"]
 
     let url = URL(string: "http://\(host):\(port)/lights/set")!
@@ -91,7 +91,7 @@ func run() async throws {
 
     let (_, response) = try await URLSession.shared.data(for: request)
     guard let httpResponse = response as? HTTPURLResponse else {
-        throw LightCLIError(description: "Invalid response from server")
+        throw HomeCLIError(description: "Invalid response from server")
     }
 
     switch httpResponse.statusCode {
@@ -114,7 +114,7 @@ func run() async throws {
 
 do {
     try await run()
-} catch let error as LightCLIError {
+} catch let error as HomeCLIError {
     print("Error: \(error.description)")
     printUsage()
     exit(1)

@@ -43,7 +43,8 @@ let package = Package(
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.1.2"),
-        .package(url: "https://github.com/swift-server-community/APNSwift", from: "6.4.0")
+        .package(url: "https://github.com/swift-server-community/APNSwift", from: "6.4.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0")
     ],
     targets: [
         .executableTarget(
@@ -130,7 +131,11 @@ let package = Package(
             path: "Sources/Controller"
         ),
         .executableTarget(
-            name: "HomeCLI"
+            name: "HomeCLI",
+            dependencies: [
+                "Shared",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ]
         ),
         .testTarget(
             name: "SharedTests",

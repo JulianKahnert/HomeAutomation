@@ -148,7 +148,7 @@ paths:
   /lights/set:
     post:
       summary: Set light properties
-      description: Set color and/or brightness of a light by name. Looks up matching entities from live HomeKit data.
+      description: Set color and/or brightness of a light by placeId and name.
       operationId: setLightProperties
       requestBody:
         required: true
@@ -159,8 +159,6 @@ paths:
       responses:
         "200":
           description: Light properties were set successfully.
-        "404":
-          description: No light found with the given name.
         "400":
           description: Bad request - invalid parameters.
 
@@ -359,9 +357,12 @@ components:
     SetLightRequest:
       type: object
       properties:
+        placeId:
+          type: string
+          description: The place identifier (e.g. room name).
         name:
           type: string
-          description: The name of the light (matched against entity names, case-insensitive).
+          description: The name of the light entity.
         hexColor:
           type: string
           description: Hex color string (e.g. "#FF0000" or "FF0000").
@@ -371,6 +372,7 @@ components:
           maximum: 100
           description: Brightness level 0-100.
       required:
+        - placeId
         - name
 
     EntityHistoryItem:

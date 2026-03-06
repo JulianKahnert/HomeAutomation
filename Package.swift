@@ -16,6 +16,10 @@ let package = Package(
             name: "ControllerKit",
             targets: ["Controller"]
         ),
+        .executable(
+            name: "home",
+            targets: ["HomeCLI"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.121.3"),

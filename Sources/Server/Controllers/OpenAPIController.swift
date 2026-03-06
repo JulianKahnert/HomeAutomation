@@ -161,16 +161,6 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.badRequest, reason: "Invalid JSON body")
         }
 
-        let searchName = body.name.lowercased()
-
-        // Find matching entities from live HomeKit data
-        let allEntities = try await request.application.homeManager.getAllEntitiesLive()
-        let matchingEntities = allEntities.filter { $0.entityId.name.lowercased() == searchName }
-
-        guard !matchingEntities.isEmpty else {
-            return .notFound
-        }
-
         // Set RGB color if hex provided
         if let hexColor = body.hexColor {
             let hex = hexColor.hasPrefix("#") ? String(hexColor.dropFirst()) : hexColor
@@ -184,18 +174,16 @@ struct OpenAPIController: APIProtocol {
             let blue = Float(hexInt & 0xFF) / 255.0
             let rgb = RGB(red: red, green: green, blue: blue)
 
-            for entity in matchingEntities where entity.entityId.characteristicType == .color {
-                await request.application.homeManager.perform(.setRGB(entity.entityId, rgb: rgb))
-            }
+            let colorId = EntityId(placeId: body.placeId, name: body.name, characteristicsName: nil, characteristic: .color)
+            await request.application.homeManager.perform(.setRGB(colorId, rgb: rgb))
         }
 
         // Set brightness if provided
         if let brightness = body.brightness {
             let normalizedBrightness = Float(brightness) / 100.0
 
-            for entity in matchingEntities where entity.entityId.characteristicType == .brightness {
-                await request.application.homeManager.perform(.setBrightness(entity.entityId, normalizedBrightness))
-            }
+            let brightnessId = EntityId(placeId: body.placeId, name: body.name, characteristicsName: nil, characteristic: .brightness)
+            await request.application.homeManager.perform(.setBrightness(brightnessId, normalizedBrightness))
         }
 
         return .ok

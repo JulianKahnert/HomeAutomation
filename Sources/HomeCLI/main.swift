@@ -6,9 +6,10 @@ struct HomeCLIError: Error, CustomStringConvertible {
 
 func printUsage() {
     let usage = """
-    Usage: home-cli --name <lamp-name> [--color <hex>] [--brightness <0-100>]
+    Usage: home --place <place-id> --name <lamp-name> [--color <hex>] [--brightness <0-100>]
 
     Options:
+      --place, -p       Place identifier / room name (required)
       --name, -n        Name of the lamp (required)
       --color, -c       Hex color value (e.g. "#FF0000" or "FF0000")
       --brightness, -b  Brightness level 0-100
@@ -21,8 +22,9 @@ func printUsage() {
     print(usage)
 }
 
-func parseArgs() throws -> (name: String, color: String?, brightness: Int?) {
+func parseArgs() throws -> (placeId: String, name: String, color: String?, brightness: Int?) {
     let args = CommandLine.arguments
+    var placeId: String?
     var name: String?
     var color: String?
     var brightness: Int?
@@ -30,6 +32,10 @@ func parseArgs() throws -> (name: String, color: String?, brightness: Int?) {
     var i = 1
     while i < args.count {
         switch args[i] {
+        case "--place", "-p":
+            i += 1
+            guard i < args.count else { throw HomeCLIError(description: "Missing value for --place") }
+            placeId = args[i]
         case "--name", "-n":
             i += 1
             guard i < args.count else { throw HomeCLIError(description: "Missing value for --name") }
@@ -54,6 +60,9 @@ func parseArgs() throws -> (name: String, color: String?, brightness: Int?) {
         i += 1
     }
 
+    guard let placeId else {
+        throw HomeCLIError(description: "Missing required argument: --place")
+    }
     guard let name else {
         throw HomeCLIError(description: "Missing required argument: --name")
     }
@@ -61,7 +70,7 @@ func parseArgs() throws -> (name: String, color: String?, brightness: Int?) {
         throw HomeCLIError(description: "At least one of --color or --brightness must be provided")
     }
 
-    return (name, color, brightness)
+    return (placeId, name, color, brightness)
 }
 
 func run() async throws {
@@ -79,7 +88,7 @@ func run() async throws {
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
     }
 
-    var body: [String: Any] = ["name": parsed.name]
+    var body: [String: Any] = ["placeId": parsed.placeId, "name": parsed.name]
     if let color = parsed.color {
         body["hexColor"] = color
     }
@@ -96,10 +105,7 @@ func run() async throws {
 
     switch httpResponse.statusCode {
     case 200:
-        print("OK - Light '\(parsed.name)' updated")
-    case 404:
-        print("Error: No light found with name '\(parsed.name)'")
-        exit(1)
+        print("OK - Light '\(parsed.placeId)/\(parsed.name)' updated")
     case 400:
         print("Error: Bad request - check your parameters")
         exit(1)

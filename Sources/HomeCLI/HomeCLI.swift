@@ -29,9 +29,8 @@ struct Setup: AsyncParsableCommand {
 
     func run() async throws {
         #if canImport(Security)
-        let keychain = KeychainHelper()
-        keychain.writeString("serverURL", value: url)
-        keychain.writeString("authToken", value: token)
+        KeychainHelper.writeString("serverURL", value: url)
+        KeychainHelper.writeString("authToken", value: token)
         print("OK - Credentials stored in Keychain")
         #else
         print("Error: Keychain is not available on this platform")
@@ -124,7 +123,7 @@ struct SetLight: AsyncParsableCommand {
     private func resolveServerURL() throws -> String {
         if let url { return url }
         #if canImport(Security)
-        if let stored = KeychainHelper().readString("serverURL") { return stored }
+        if let stored = KeychainHelper.readString("serverURL") { return stored }
         #endif
         throw ValidationError("No server URL configured. Run 'home setup' or pass --url")
     }
@@ -132,7 +131,7 @@ struct SetLight: AsyncParsableCommand {
     private func resolveAuthToken() -> String? {
         if let token { return token }
         #if canImport(Security)
-        return KeychainHelper().readString("authToken")
+        return KeychainHelper.readString("authToken")
         #else
         return nil
         #endif

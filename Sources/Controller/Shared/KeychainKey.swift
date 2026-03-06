@@ -33,7 +33,6 @@ extension SharedReaderKey {
 
 public struct KeychainKey<Value: Sendable>: SharedKey {
     private let key: String
-    private let helper: KeychainHelper
     private let encode: @Sendable (Value) -> String?
     private let decode: @Sendable (String) -> Value?
 
@@ -43,7 +42,7 @@ public struct KeychainKey<Value: Sendable>: SharedKey {
 
     public func load(context: LoadContext<Value>, continuation: LoadContinuation<Value>) {
         let value: Value?
-        if let raw = helper.readString(key) {
+        if let raw = KeychainHelper.readString(key) {
             value = decode(raw)
         } else {
             value = nil
@@ -60,7 +59,7 @@ public struct KeychainKey<Value: Sendable>: SharedKey {
 
     public func save(_ value: Value, context: SaveContext, continuation: SaveContinuation) {
         if let raw = encode(value) {
-            helper.writeString(key, value: raw)
+            KeychainHelper.writeString(key, value: raw)
         }
         continuation.resume()
     }
@@ -71,7 +70,6 @@ public struct KeychainKey<Value: Sendable>: SharedKey {
 extension KeychainKey where Value == String {
     init(key: String) {
         self.key = key
-        self.helper = KeychainHelper()
         self.encode = { $0 }
         self.decode = { $0 }
     }
@@ -80,7 +78,6 @@ extension KeychainKey where Value == String {
 extension KeychainKey where Value == URL {
     init(key: String) {
         self.key = key
-        self.helper = KeychainHelper()
         self.encode = { $0.absoluteString }
         self.decode = { URL(string: $0) }
     }

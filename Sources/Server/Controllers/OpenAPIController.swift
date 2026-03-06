@@ -154,6 +154,41 @@ struct OpenAPIController: APIProtocol {
         return .ok
     }
 
+    // MARK: - /lights/set
+
+    func setLightProperties(_ input: Operations.SetLightProperties.Input) async throws -> Operations.SetLightProperties.Output {
+        guard case let .json(body) = input.body else {
+            throw Abort(.badRequest, reason: "Invalid JSON body")
+        }
+
+        // Set RGB color if hex provided
+        if let hexColor = body.hexColor {
+            let hex = hexColor.hasPrefix("#") ? String(hexColor.dropFirst()) : hexColor
+            guard hex.count == 6,
+                  let hexInt = UInt32(hex, radix: 16) else {
+                throw Abort(.badRequest, reason: "Invalid hex color: \(hexColor)")
+            }
+
+            let red = Float((hexInt >> 16) & 0xFF) / 255.0
+            let green = Float((hexInt >> 8) & 0xFF) / 255.0
+            let blue = Float(hexInt & 0xFF) / 255.0
+            let rgb = RGB(red: red, green: green, blue: blue)
+
+            let colorId = EntityId(placeId: body.placeId, name: body.name, characteristicsName: nil, characteristic: .color)
+            await request.application.homeManager.perform(.setRGB(colorId, rgb: rgb))
+        }
+
+        // Set brightness if provided
+        if let brightness = body.brightness {
+            let normalizedBrightness = Float(brightness) / 100.0
+
+            let brightnessId = EntityId(placeId: body.placeId, name: body.name, characteristicsName: nil, characteristic: .brightness)
+            await request.application.homeManager.perform(.setBrightness(brightnessId, normalizedBrightness))
+        }
+
+        return .ok
+    }
+
     // MARK: - /entities
 
     func getEntitiesWithHistory(_ input: Operations.GetEntitiesWithHistory.Input) async throws -> Operations.GetEntitiesWithHistory.Output {

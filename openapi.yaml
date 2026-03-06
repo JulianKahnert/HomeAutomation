@@ -145,6 +145,23 @@ paths:
         "200":
           description: Action logs cleared successfully.
 
+  /lights/set:
+    post:
+      summary: Set light properties
+      description: Set color and/or brightness of a light by placeId and name.
+      operationId: setLightProperties
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetLightRequest"
+      responses:
+        "200":
+          description: Light properties were set successfully.
+        "400":
+          description: Bad request - invalid parameters.
+
   /entities:
     get:
       summary: Get entities with history
@@ -336,6 +353,27 @@ components:
         - placeId
         - name
         - characteristicType
+
+    SetLightRequest:
+      type: object
+      properties:
+        placeId:
+          type: string
+          description: The place identifier (e.g. room name).
+        name:
+          type: string
+          description: The name of the light entity.
+        hexColor:
+          type: string
+          description: Hex color string (e.g. "#FF0000" or "FF0000").
+        brightness:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Brightness level 0-100.
+      required:
+        - placeId
+        - name
 
     EntityHistoryItem:
       type: object

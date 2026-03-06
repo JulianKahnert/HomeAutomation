@@ -1,5 +1,5 @@
 {
-  "originHash" : "b2eca998d0fb02a855c1730630a4fc6333921a9dfb178a29449b2bd4fd795748",
+  "originHash" : "2ee9c63f1b785847da497ad031be08bab04e47218277101a5b13daf069352b10",
   "pins" : [
     {
       "identity" : "apns",
@@ -116,15 +116,6 @@
       "state" : {
         "revision" : "343b2c1793058fcc53c1bd7e2907f8e3a4d640fb",
         "version" : "3.9.0"
-      }
-    },
-    {
-      "identity" : "opencombine",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/OpenCombine/OpenCombine.git",
-      "state" : {
-        "revision" : "8576f0d579b27020beccbccc3ea6844f3ddfc2c2",
-        "version" : "0.14.0"
       }
     },
     {
@@ -438,8 +429,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-runtime",
       "state" : {
-        "revision" : "f039fa6d6338aab5164f3d1be16281524c9a8f89",
-        "version" : "1.11.0"
+        "revision" : "16c8eb7f65d28f5ddb8cb0dc1be5ec32e796fe45",
+        "version" : "1.10.1"
       }
     },
     {

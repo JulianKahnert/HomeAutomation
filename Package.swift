@@ -125,6 +125,9 @@ let package = Package(
             ],
             path: "Sources/Controller"
         ),
+        .executableTarget(
+            name: "HomeCLI"
+        ),
         .testTarget(
             name: "SharedTests",
             dependencies: [

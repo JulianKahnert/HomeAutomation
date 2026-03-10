@@ -190,7 +190,14 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - actor system setup
 
-    let actorSystem = await CustomActorSystem(role: .server)
+    // When the FlowKit Adapter restarts (e.g. due to HomeKit HMErrorDomain Code=74 errors),
+    // the new adapter instance sends .restInPeace to the server via SWIM protocol, marking
+    // the server's cluster node as .down. After this, the server cannot communicate with the
+    // adapter anymore — all HomeKit commands fail. This state is unrecoverable without a
+    // process restart. The onDown closure terminates the process so Docker can restart the container.
+    let actorSystem = await CustomActorSystem(role: .server, onDown: {
+        exit(1)
+    })
     app.customActorSystem = actorSystem
     let eventReceiver = await actorSystem.makeLocalActor(actorId: .homeEventReceiver) { system in
         HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: system)
@@ -229,8 +236,7 @@ public func configure(_ app: Application) async throws {
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
-        DatabaseCleanupJob(homeManager: app.homeManager),
-        AdapterConnectionWatchdogJob(actorSystem: actorSystem)
+        DatabaseCleanupJob(homeManager: app.homeManager)
     ]
 
     Task.detached {

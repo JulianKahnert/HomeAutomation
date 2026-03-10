@@ -74,7 +74,12 @@ public actor CustomActorSystem {
         currentConnectionStatus
     }
 
-    public init(role: SystemRole) async {
+    /// - Parameters:
+    ///   - role: The system role (server or adapter)
+    ///   - onDown: Optional closure called when the connection is lost and does not recover within 60s.
+    ///     The built-in `onDownAction: .gracefulShutdown` only shuts down the actor system, not the
+    ///     hosting process. This closure allows the caller to terminate the entire process (e.g. `exit(1)`).
+    public init(role: SystemRole, onDown: (@Sendable () -> Void)? = nil) async {
         self.systemRole = role
 
         // Setup cluster settings
@@ -95,14 +100,10 @@ public actor CustomActorSystem {
         settings.remoteCall.defaultTimeout = .seconds(15)
         settings.logging.logLevel = .warning
 
-        // CRITICAL: Server must never auto-shutdown on cluster down events
-        // The server is the central infrastructure for home automation and must remain
-        // available to allow cluster reformation and manual recovery. The default
-        // .gracefulShutdown behavior is designed for orchestrated cloud deployments
-        // (e.g., Kubernetes) where failed pods are automatically replaced.
-        //
-        // Server (.none): Never auto-shutdown - allows manual recovery
-        // Adapter (.gracefulShutdown default): Can safely restart and reconnect
+        // We handle down events ourselves via the onDown closure instead of using the
+        // built-in .gracefulShutdown, which only shuts down the actor system but not
+        // the hosting process (Vapor server). We need a full process exit so Docker
+        // can restart the container.
         if case .server = role {
             settings.onDownAction = .none
         }
@@ -126,6 +127,19 @@ public actor CustomActorSystem {
         Task {
             for await status in connectionStatus {
                 currentConnectionStatus = status
+
+                if status == .error, let onDown {
+                    Self.log.warning("Connection lost. Waiting 60s for reconnection...")
+                    try? await Task.sleep(for: .seconds(60))
+
+                    guard currentConnectionStatus != .up else {
+                        Self.log.info("Reconnected during grace period.")
+                        continue
+                    }
+
+                    Self.log.critical("Still disconnected after grace period. Calling onDown handler.")
+                    onDown()
+                }
             }
         }
     }
@@ -148,6 +162,8 @@ public actor CustomActorSystem {
             return nil
         case .down, .removed:
             return .error
+        default:
+            return nil
         }
     }
 

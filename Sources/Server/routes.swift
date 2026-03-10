@@ -24,6 +24,12 @@ func routes(_ app: Application) throws {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
         try await sql.raw("SELECT 1").run()
+
+        let connectionStatus = await req.application.customActorSystem.latestConnectionStatus
+        guard connectionStatus == .up else {
+            throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(String(describing: connectionStatus))")
+        }
+
         return .ok
     }
 

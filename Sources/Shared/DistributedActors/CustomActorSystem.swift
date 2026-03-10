@@ -69,6 +69,11 @@ public actor CustomActorSystem {
         _connectionStatus
     }
 
+    /// Returns the most recent connection status, or nil if no event has been received yet.
+    public var latestConnectionStatus: ConnectionStatus? {
+        currentConnectionStatus
+    }
+
     public init(role: SystemRole) async {
         self.systemRole = role
 
@@ -137,18 +142,12 @@ public actor CustomActorSystem {
         switch change.member.status {
         case .joining:
             return .joining
-
         case .up:
             return .up
-
-        case .removed:
-            return .error
-
         case .leaving:
             return nil
-
-        default:
-            return nil
+        case .down, .removed:
+            return .error
         }
     }
 

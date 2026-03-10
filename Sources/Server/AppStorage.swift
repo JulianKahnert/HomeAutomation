@@ -9,6 +9,7 @@ import Adapter
 import HAApplicationLayer
 import HAImplementations
 import HAModels
+import Shared
 import Vapor
 
 private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
@@ -41,6 +42,19 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          }
          set {
              self.storage[HomeEventsContinuationKey.self] = newValue
+         }
+     }
+
+     private struct CustomActorSystemKey: StorageKey {
+         typealias Value = CustomActorSystem
+     }
+
+     var customActorSystem: CustomActorSystem {
+         get {
+             self.storage[CustomActorSystemKey.self]!
+         }
+         set {
+             self.storage[CustomActorSystemKey.self] = newValue
          }
      }
 

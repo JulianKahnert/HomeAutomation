@@ -191,6 +191,7 @@ public func configure(_ app: Application) async throws {
     // MARK: - actor system setup
 
     let actorSystem = await CustomActorSystem(role: .server)
+    app.customActorSystem = actorSystem
     let eventReceiver = await actorSystem.makeLocalActor(actorId: .homeEventReceiver) { system in
         HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: system)
     }
@@ -228,7 +229,8 @@ public func configure(_ app: Application) async throws {
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
-        DatabaseCleanupJob(homeManager: app.homeManager)
+        DatabaseCleanupJob(homeManager: app.homeManager),
+        AdapterConnectionWatchdogJob(actorSystem: actorSystem)
     ]
 
     Task.detached {

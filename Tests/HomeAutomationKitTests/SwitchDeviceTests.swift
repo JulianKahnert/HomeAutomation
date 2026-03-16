@@ -90,7 +90,7 @@ struct SwitchDeviceTests {
 
         // Verify no setColorTemperature action was performed
         let traceMap = await mockAdapter.getSortedTraceMap()
-        #expect(!traceMap.contains { $0.contains("setColorTemperature") })
+        #expect(traceMap.contains { $0.contains("setColorTemperature") } == false)
     }
 
     @Test("Test setColorTemperature works normally when skip is false")
@@ -148,6 +148,6 @@ struct SwitchDeviceTests {
 
         // Verify no RGB action was performed
         let traceMap = await mockAdapter.getSortedTraceMap()
-        #expect(!traceMap.contains { $0.contains("setRGB") })
+        #expect(traceMap.contains { $0.contains("setRGB") } == false)
     }
 }

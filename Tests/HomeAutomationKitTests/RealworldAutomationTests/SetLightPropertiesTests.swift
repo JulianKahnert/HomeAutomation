@@ -45,8 +45,8 @@ struct SetLightPropertiesTests {
         // Should call setRGB for both lights
         #expect(traceMap.contains("action.setRGB: 2"))
         // Should not call setColorTemperature or setBrightness
-        #expect(!traceMap.contains { $0.contains("setColorTemperature") })
-        #expect(!traceMap.contains { $0.contains("setBrightness") })
+        #expect(traceMap.contains { $0.contains("setColorTemperature") } == false)
+        #expect(traceMap.contains { $0.contains("setBrightness") } == false)
     }
 
     @Test("Test with only color temperature set")
@@ -69,8 +69,8 @@ struct SetLightPropertiesTests {
         // Should call setColorTemperature for both lights
         #expect(traceMap.contains("action.setColorTemperature: 2"))
         // Should not call setRGB or setBrightness
-        #expect(!traceMap.contains { $0.contains("setRGB") })
-        #expect(!traceMap.contains { $0.contains("setBrightness") })
+        #expect(traceMap.contains { $0.contains("setRGB") } == false)
+        #expect(traceMap.contains { $0.contains("setBrightness") } == false)
     }
 
     @Test("Test with only brightness set")
@@ -93,8 +93,8 @@ struct SetLightPropertiesTests {
         // Should call setBrightness for both lights
         #expect(traceMap.contains("action.setBrightness: 2"))
         // Should not call setRGB or setColorTemperature
-        #expect(!traceMap.contains { $0.contains("setRGB") })
-        #expect(!traceMap.contains { $0.contains("setColorTemperature") })
+        #expect(traceMap.contains { $0.contains("setRGB") } == false)
+        #expect(traceMap.contains { $0.contains("setColorTemperature") } == false)
     }
 
     @Test("Test with all properties set")
@@ -138,9 +138,9 @@ struct SetLightPropertiesTests {
         let traceMap = mockAdapter.getSortedTraceMap()
 
         // Should not perform any actions
-        #expect(!traceMap.contains { $0.contains("setRGB") })
-        #expect(!traceMap.contains { $0.contains("setColorTemperature") })
-        #expect(!traceMap.contains { $0.contains("setBrightness") })
+        #expect(traceMap.contains { $0.contains("setRGB") } == false)
+        #expect(traceMap.contains { $0.contains("setColorTemperature") } == false)
+        #expect(traceMap.contains { $0.contains("setBrightness") } == false)
     }
 
     @Test("Test that delays are applied between property types")
@@ -220,7 +220,7 @@ struct SetLightPropertiesTests {
         components.month = 7
         components.day = 20
         let calendar = Calendar.current
-        let correctDate = calendar.date(from: components)!
+        let correctDate = try #require(calendar.date(from: components))
         let correctEvent = HomeEvent.time(date: correctDate)
 
         // Should trigger at the correct time
@@ -234,7 +234,7 @@ struct SetLightPropertiesTests {
         incorrectComponents.year = 2024
         incorrectComponents.month = 7
         incorrectComponents.day = 20
-        let incorrectDate = calendar.date(from: incorrectComponents)!
+        let incorrectDate = try #require(calendar.date(from: incorrectComponents))
         let incorrectEvent = HomeEvent.time(date: incorrectDate)
 
         let shouldNotTrigger = try await automation.shouldTrigger(with: incorrectEvent, using: mockAdapter)

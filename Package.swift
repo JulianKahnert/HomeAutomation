@@ -34,7 +34,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.11.0"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.2.0"),
         // TCA and related
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.24.1"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.25.2"),
         .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.7.4"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", from: "5.0.0"),

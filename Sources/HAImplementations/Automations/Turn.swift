@@ -35,15 +35,18 @@ public struct Turn: Automatable {
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
         if onlyBeforeSunrise {
             let isTimeEqual = time.isEqual(event)
+            guard isTimeEqual else { return false }
 
+            // Uses Sun.sunriseElevation — the same method ClockJob uses to
+            // emit .sunrise events — so both always agree on the sunrise minute.
             let location = await hm.getLocation()
-            let elevation = Sun.position(latitude: location.latitude, longitude: location.longitude, date: Date())?.elevation
-            guard let elevation else {
-                assertionFailure("Failed to get sun elevation")
-                return isTimeEqual
+            guard case .time(let date) = event else { return false }
+            guard let elevation = Sun.sunriseElevation(for: date, latitude: location.latitude, longitude: location.longitude) else {
+                assertionFailure("Failed to get sunrise time")
+                return true
             }
 
-            return isTimeEqual && elevation < 0
+            return elevation == .below
         } else {
             return time.isEqual(event)
         }

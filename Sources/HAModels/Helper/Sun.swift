@@ -53,6 +53,41 @@ public struct SunSchedule {
 }
 
 public class Sun {
+
+    /// Relation of a date to a sun event, compared at minute granularity.
+    public enum SunElevation {
+        case below
+        case horizon
+        case above
+    }
+
+    /// Returns the sun elevation state relative to sunrise for the given date.
+    /// Used by both `ClockJob` and `Turn.onlyBeforeSunrise` to ensure consistent behavior.
+    public static func sunriseElevation(for date: Date, latitude: Double, longitude: Double, timeZone: TimeZone = .current) -> SunElevation? {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        guard let schedule = Self.schedule(latitude: latitude, longitude: longitude, date: date, calendar: calendar, timeZone: timeZone),
+              let sunrise = schedule.sunrise else { return nil }
+        return switch calendar.compare(date, to: sunrise.date, toGranularity: .minute) {
+        case .orderedAscending: .below
+        case .orderedSame: .horizon
+        case .orderedDescending: .above
+        }
+    }
+
+    /// Returns the sun elevation state relative to sunset for the given date.
+    public static func sunsetElevation(for date: Date, latitude: Double, longitude: Double, timeZone: TimeZone = .current) -> SunElevation? {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        guard let schedule = Self.schedule(latitude: latitude, longitude: longitude, date: date, calendar: calendar, timeZone: timeZone),
+              let sunset = schedule.sunset else { return nil }
+        return switch calendar.compare(date, to: sunset.date, toGranularity: .minute) {
+        case .orderedAscending: .above
+        case .orderedSame: .horizon
+        case .orderedDescending: .below
+        }
+    }
+
     public static func schedule(latitude: Double, longitude: Double, date: Date?) -> SunSchedule? {
         return schedule(latitude: latitude, longitude: longitude, date: date, calendar: nil, timeZone: nil)
     }

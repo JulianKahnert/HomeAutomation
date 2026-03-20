@@ -21,12 +21,9 @@ struct ClockJob: Job, Log {
             homeEventsContinuation.yield(.time(date: date))
 
             // trigger sunset/sunrise event
-            let sunSchedule = Sun.schedule(latitude: location.latitude, longitude: location.longitude, date: date)
-            if let sunrise = sunSchedule?.sunrise,
-               Calendar.current.isDate(sunrise.date, equalTo: date, toGranularity: .minute) {
+            if Sun.sunriseElevation(for: date, latitude: location.latitude, longitude: location.longitude) == .horizon {
                 homeEventsContinuation.yield(.sunrise)
-            } else if let sunset = sunSchedule?.sunset,
-                      Calendar.current.isDate(sunset.date, equalTo: date, toGranularity: .minute) {
+            } else if Sun.sunsetElevation(for: date, latitude: location.latitude, longitude: location.longitude) == .horizon {
                 homeEventsContinuation.yield(.sunset)
             }
         }

@@ -8,10 +8,17 @@
 import ComposableArchitecture
 import Foundation
 import HAModels
+import Logging
 import SwiftUI
 
 @Reducer
 struct AppFeature: Sendable {
+
+    private static let logger = Logger(label: "AppFeature")
+
+    private enum CancelID {
+        case liveActivityMonitoring
+    }
 
     // MARK: - State
 
@@ -128,11 +135,12 @@ struct AppFeature: Sendable {
 
             case .startMonitoringLiveActivities:
                 guard state.settings.liveActivitiesEnabled else {
+                    Self.logger.debug("Skipping live activity monitoring (disabled)")
                     return .none
                 }
 
+                Self.logger.info("Starting live activity token monitoring")
                 return .run { send in
-                    // Monitor push tokens for Live Activities
                     await withTaskGroup(of: Void.self) { group in
                         group.addTask {
                             for await token in await liveActivity.pushToStartTokenUpdates() {
@@ -147,6 +155,7 @@ struct AppFeature: Sendable {
                         }
                     }
                 }
+                .cancellable(id: CancelID.liveActivityMonitoring, cancelInFlight: true)
 
             case .stopMonitoringLiveActivities:
                 return .run { _ in
@@ -156,8 +165,14 @@ struct AppFeature: Sendable {
             // MARK: - Push Notifications
 
             case let .registerPushToken(token):
+                Self.logger.info("Registering push token: type=\(token.type)")
                 return .run { _ in
-                    try await serverClient.registerDevice(token)
+                    do {
+                        try await serverClient.registerDevice(token)
+                        Self.logger.info("Successfully registered push token: type=\(token.type)")
+                    } catch {
+                        Self.logger.error("Failed to register push token: type=\(token.type), error=\(error)")
+                    }
                 }
 
             case .clearDeliveredNotifications:
@@ -175,10 +190,8 @@ struct AppFeature: Sendable {
             // MARK: - Scene Phase Changes
 
             case let .scenePhaseChanged(old: oldPhase, new: newPhase):
-                // Handle transitions to active state
-                // This covers both:
-                // - Initial app launch (inactive -> active)
-                // - Return from background (background -> active)
+                Self.logger.info("Scene phase: \(oldPhase) -> \(newPhase)")
+
                 guard newPhase == .active else {
                     return .none
                 }

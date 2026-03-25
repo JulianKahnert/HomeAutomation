@@ -129,6 +129,21 @@ actor PushNotifcationService: NotificationSender {
                         usedToken = startToken
                         try await apnsClient.sendStartLiveActivityNotification(notification, deviceToken: startToken.tokenString)
                         Self.logger.info("Successfully sent start live activity notification to \(startToken.deviceName)")
+
+                        // Delete the start token after successful Push-to-Start to prevent
+                        // duplicate Live Activities. Without this, a second call (e.g. another
+                        // window opening before the update token roundtrip completes) would find
+                        // the same start token and create another activity.
+                        //
+                        // The token lifecycle ensures recovery:
+                        // 1. iOS invalidates the used push-to-start token after delivery
+                        // 2. iOS generates a new push-to-start token via pushToStartTokenUpdates
+                        // 3. The app re-registers the new token with the server
+                        // 4. If the app was not woken (force-quit / iOS budget), the token is
+                        //    re-registered when the user next opens the app
+                        try? await DeviceToken.query(on: database)
+                            .filter(\.$tokenString == startToken.tokenString)
+                            .delete()
                     } else {
                         assertionFailure("Should find at least one start token")
                     }

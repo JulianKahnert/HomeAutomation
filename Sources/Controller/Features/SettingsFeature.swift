@@ -33,6 +33,9 @@ struct SettingsFeature: Sendable {
         // Push notification state
         var isPushAuthorized: Bool = false
         var deviceToken: Data?
+
+        // Log viewer
+        @Presents var logViewer: LogViewerFeature.State?
     }
 
     // MARK: - Action
@@ -48,6 +51,8 @@ struct SettingsFeature: Sendable {
         case windowStatesResponse(Result<[WindowContentState.WindowState], Error>)
         case requestPushAuthorization
         case dismissError
+        case showLogViewer
+        case logViewer(PresentationAction<LogViewerFeature.Action>)
         case binding(BindingAction<State>)
     }
 
@@ -158,9 +163,19 @@ struct SettingsFeature: Sendable {
                 state.error = nil
                 return .none
 
+            case .showLogViewer:
+                state.logViewer = LogViewerFeature.State()
+                return .none
+
+            case .logViewer:
+                return .none
+
             case .binding:
                 return .none
             }
+        }
+        .ifLet(\.$logViewer, action: \.logViewer) {
+            LogViewerFeature()
         }
     }
 }
@@ -196,8 +211,28 @@ struct SettingsView: View {
                     }
                 }
                 #endif
+
+                Section {
+                    Button {
+                        store.send(.showLogViewer)
+                    } label: {
+                        HStack {
+                            Label("View Logs", systemImage: "doc.text.magnifyingglass")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Diagnostics")
+                }
             }
             .navigationTitle("Settings")
+            .navigationDestination(
+                item: $store.scope(state: \.logViewer, action: \.logViewer)
+            ) { logStore in
+                LogViewerView(store: logStore)
+            }
             .refreshable {
                 store.send(.refreshWindowStates)
             }

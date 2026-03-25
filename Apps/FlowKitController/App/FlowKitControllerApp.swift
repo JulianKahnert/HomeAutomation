@@ -15,7 +15,7 @@ struct FlowKitApp {
     static func main() {
 
         // we use this workaround to initialize the logging system before anything else is constructed
-        initLogging(withFileLogging: false, logLevel: .debug)
+        initLogging(withFileLogging: true, logLevel: .debug)
 
         // start the app
         FlowKitControllerApp.main()

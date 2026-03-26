@@ -231,7 +231,7 @@ struct SettingsView: View {
             .navigationDestination(
                 item: $store.scope(state: \.logViewer, action: \.logViewer)
             ) { logStore in
-                LogViewerView(store: logStore)
+                LogViewerFeatureView(store: logStore)
             }
             .refreshable {
                 store.send(.refreshWindowStates)

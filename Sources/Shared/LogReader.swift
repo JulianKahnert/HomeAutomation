@@ -2,9 +2,6 @@
 //  LogReader.swift
 //  Shared
 //
-//  Reads JSONL log files written by FileLogHandler.
-//  Dependencies: Foundation only.
-//
 
 import Foundation
 

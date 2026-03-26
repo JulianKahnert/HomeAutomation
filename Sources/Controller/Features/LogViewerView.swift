@@ -42,15 +42,6 @@ struct LogViewerView: View {
         .navigationTitle("Logs")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    onRefresh()
-                } label: {
-                    Label("Reload", systemImage: "arrow.clockwise")
-                }
-                .disabled(isLoading)
-            }
-
-            ToolbarItem(placement: .secondaryAction) {
                 ShareLink(
                     item: exportAsText,
                     preview: SharePreview(
@@ -59,6 +50,15 @@ struct LogViewerView: View {
                     )
                 )
                 .disabled(entries.isEmpty)
+            }
+            
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    onRefresh()
+                } label: {
+                    Label("Reload", systemImage: "arrow.clockwise")
+                }
+                .disabled(isLoading)
             }
         }
         .refreshable {

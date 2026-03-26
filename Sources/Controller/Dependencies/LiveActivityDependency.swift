@@ -71,7 +71,7 @@ extension LiveActivityDependency: TestDependencyKey {
 }
 
 #if os(iOS)
-import ActivityKit
+@preconcurrency import ActivityKit
 import UIKit
 
 private let logger = Logger(label: "LiveActivityDependency")

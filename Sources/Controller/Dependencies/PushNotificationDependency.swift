@@ -47,7 +47,7 @@ extension PushNotificationDependency: DependencyKey {
                 await UIApplication.shared.registerForRemoteNotifications()
             },
             clearDeliveredNotifications: {
-                await UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+                UNUserNotificationCenter.current().removeAllDeliveredNotifications()
             }
         )
     }()

@@ -297,7 +297,10 @@ struct SettingsView: View {
     #if os(iOS)
     @ViewBuilder
     private var liveActivitiesSection: some View {
-        Toggle("Enable Live Activities", isOn: $store.liveActivitiesEnabled)
+        Toggle("Enable Live Activities", isOn: Binding(
+            get: { store.liveActivitiesEnabled },
+            set: { store.send(.toggleLiveActivities($0)) }
+        ))
     }
 
     @ViewBuilder

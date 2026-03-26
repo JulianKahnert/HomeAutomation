@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import Foundation
+import Shared
 import SwiftUI
 
 @Reducer
@@ -31,7 +32,8 @@ struct LogViewerFeature: Sendable {
         }
 
         var exportAsText: String {
-            filteredEntries.reversed().map(\.rawLine).joined(separator: "\n")
+            @Dependency(\.logFile) var logFile
+            return logFile.exportLogText(filteredEntries)
         }
     }
 

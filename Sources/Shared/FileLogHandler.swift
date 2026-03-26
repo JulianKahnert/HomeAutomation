@@ -90,6 +90,13 @@ struct FileLogHandler: LogHandler {
         self.stream = stream
     }
 
+    private static let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .sortedKeys
+        return encoder
+    }()
+
     func log(level: Logger.Level,
                     message: Logger.Message,
                     metadata: Logger.Metadata?,
@@ -102,30 +109,26 @@ struct FileLogHandler: LogHandler {
             ? self.prettyMetadata
             : self.prettify(self.metadata.merging(metadata!, uniquingKeysWith: { _, new in new }))
 
-        let message = "\(self.timestamp()) \(level) \(self.label) :\(prettyMetadata.map { " \($0)" } ?? "") \(message)\n"
+        let fullMessage = prettyMetadata.map { "\($0) " } ?? ""
+        let entry = LogEntry(
+            timestamp: Date(),
+            level: "\(level)",
+            label: self.label,
+            message: "\(fullMessage)\(message)"
+        )
+
+        guard let data = try? Self.encoder.encode(entry),
+              var jsonLine = String(data: data, encoding: .utf8) else {
+            return
+        }
+        jsonLine.append("\n")
+
         Task {
-            await stream.write(message)
+            await stream.write(jsonLine)
         }
     }
 
     private func prettify(_ metadata: Logger.Metadata) -> String? {
         return !metadata.isEmpty ? metadata.map { "\($0)=\($1)" }.joined(separator: " ") : nil
-    }
-
-    private func timestamp() -> String {
-        var buffer = [Int8](repeating: 0, count: 255)
-        var timestamp = time(nil)
-        guard let localTime = localtime(&timestamp) else {
-            // Fallback to ISO8601 formatter if localtime fails
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withColonSeparatorInTimeZone]
-            return formatter.string(from: Date())
-        }
-        strftime(&buffer, buffer.count, "%Y-%m-%dT%H:%M:%S%z", localTime)
-        return buffer.withUnsafeBufferPointer {
-            $0.withMemoryRebound(to: CChar.self) {
-                String(cString: $0.baseAddress!)
-            }
-        }
     }
 }

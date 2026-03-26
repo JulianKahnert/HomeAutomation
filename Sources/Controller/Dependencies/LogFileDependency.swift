@@ -2,29 +2,19 @@
 //  LogFileDependency.swift
 //  ControllerFeatures
 //
-//  Dependency for reading and parsing file-based logs
+//  Dependency for reading JSONL log files written by FileLogHandler
 //
 
 import Dependencies
 import DependenciesMacros
 import Foundation
-
-// MARK: - Log Entry Model
-
-struct LogEntry: Identifiable, Equatable, Sendable {
-    let id: UUID
-    let timestamp: Date
-    let level: String
-    let label: String
-    let message: String
-    let rawLine: String
-}
+import Shared
 
 // MARK: - LogFile Dependency
 
 @DependencyClient
 struct LogFileDependency: Sendable {
-    /// Read log entries from file-based logs within a time window.
+    /// Read log entries from JSONL log files within a time window.
     var readLogEntries: @Sendable (_ since: Date) async -> [LogEntry] = { _ in [] }
 
     /// Format log entries as plain text for export.
@@ -40,26 +30,29 @@ extension LogFileDependency: TestDependencyKey {
         readLogEntries: { _ in
             let now = Date()
             return [
-                LogEntry(id: UUID(), timestamp: now, level: "info", label: "AppFeature", message: "Scene phase: inactive -> active", rawLine: ""),
-                LogEntry(id: UUID(), timestamp: now.addingTimeInterval(-5), level: "info", label: "LiveActivityDependency", message: "activityUpdates emitted activity: id=ABC123", rawLine: ""),
-                LogEntry(id: UUID(), timestamp: now.addingTimeInterval(-10), level: "error", label: "AppFeature", message: "Failed to register push token", rawLine: ""),
-                LogEntry(id: UUID(), timestamp: now.addingTimeInterval(-60), level: "debug", label: "LiveActivityDependency", message: "hasActiveActivities: 1 active", rawLine: ""),
-                LogEntry(id: UUID(), timestamp: now.addingTimeInterval(-120), level: "info", label: "AppDelegate", message: "App launched (may be foreground or background)", rawLine: ""),
+                LogEntry(timestamp: now, level: "info", label: "AppFeature", message: "Scene phase: inactive -> active"),
+                LogEntry(timestamp: now.addingTimeInterval(-5), level: "info", label: "LiveActivityDependency", message: "activityUpdates emitted activity: id=ABC123"),
+                LogEntry(timestamp: now.addingTimeInterval(-10), level: "error", label: "AppFeature", message: "Failed to register push token"),
+                LogEntry(timestamp: now.addingTimeInterval(-60), level: "debug", label: "LiveActivityDependency", message: "hasActiveActivities: 1 active"),
+                LogEntry(timestamp: now.addingTimeInterval(-120), level: "info", label: "AppDelegate", message: "App launched (may be foreground or background)"),
             ]
         },
         exportLogText: { entries in
-            entries.map(\.rawLine).joined(separator: "\n")
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss"
+            return entries.reversed().map { entry in
+                "[\(formatter.string(from: entry.timestamp))] \(entry.level) \(entry.label): \(entry.message)"
+            }.joined(separator: "\n")
         }
     )
 }
 
 extension LogFileDependency: DependencyKey {
     static let liveValue: Self = {
-        let dateFormatter: DateFormatter = {
-            let df = DateFormatter()
-            df.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-            df.locale = Locale(identifier: "en_US_POSIX")
-            return df
+        let decoder: JSONDecoder = {
+            let d = JSONDecoder()
+            d.dateDecodingStrategy = .iso8601
+            return d
         }()
 
         let fileDateFormatter: DateFormatter = {
@@ -75,18 +68,14 @@ extension LogFileDependency: DependencyKey {
                 let maxEntries = 5000
 
                 // Collect file names for the relevant date range
-                var fileNames: [String] = []
+                var fileNames: Set<String> = []
                 var date = since
                 let now = Date()
                 while date <= now {
-                    fileNames.append(fileDateFormatter.string(from: date) + ".txt")
+                    fileNames.insert(fileDateFormatter.string(from: date) + ".txt")
                     date = date.addingTimeInterval(86400)
                 }
-                // Always include today
-                let todayFileName = fileDateFormatter.string(from: now) + ".txt"
-                if !fileNames.contains(todayFileName) {
-                    fileNames.append(todayFileName)
-                }
+                fileNames.insert(fileDateFormatter.string(from: now) + ".txt")
 
                 var entries: [LogEntry] = []
                 for fileName in fileNames {
@@ -96,14 +85,15 @@ extension LogFileDependency: DependencyKey {
                     }
 
                     for line in content.components(separatedBy: .newlines) where !line.isEmpty {
-                        let entry = parseLine(line, dateFormatter: dateFormatter)
-                        if entry.timestamp >= since {
-                            entries.append(entry)
+                        guard let data = line.data(using: .utf8),
+                              let entry = try? decoder.decode(LogEntry.self, from: data),
+                              entry.timestamp >= since else {
+                            continue
                         }
+                        entries.append(entry)
                     }
                 }
 
-                // Sort newest first, cap at maxEntries
                 entries.sort { $0.timestamp > $1.timestamp }
                 if entries.count > maxEntries {
                     entries = Array(entries.prefix(maxEntries))
@@ -111,40 +101,14 @@ extension LogFileDependency: DependencyKey {
                 return entries
             },
             exportLogText: { entries in
-                // Export in chronological order (oldest first)
-                entries.reversed().map(\.rawLine).joined(separator: "\n")
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                return entries.reversed().map { entry in
+                    "[\(formatter.string(from: entry.timestamp))] \(entry.level) \(entry.label): \(entry.message)"
+                }.joined(separator: "\n")
             }
         )
     }()
-
-    private static func parseLine(_ line: String, dateFormatter: DateFormatter) -> LogEntry {
-        // Format: "YYYY-MM-DDTHH:MM:SS+ZZZZ level label :metadata message"
-        let components = line.split(separator: " ", maxSplits: 3, omittingEmptySubsequences: true)
-
-        guard components.count >= 3 else {
-            return LogEntry(id: UUID(), timestamp: .distantPast, level: "?", label: "?", message: line, rawLine: line)
-        }
-
-        let timestampStr = String(components[0])
-        let level = String(components[1])
-        let labelAndMessage = String(components[2...].joined(separator: " "))
-
-        let timestamp = dateFormatter.date(from: timestampStr) ?? .distantPast
-
-        // Split label from message at first ":"
-        let label: String
-        let message: String
-        if let colonIndex = labelAndMessage.firstIndex(of: ":") {
-            label = String(labelAndMessage[..<colonIndex]).trimmingCharacters(in: .whitespaces)
-            let afterColon = labelAndMessage[labelAndMessage.index(after: colonIndex)...]
-            message = String(afterColon).trimmingCharacters(in: .whitespaces)
-        } else {
-            label = labelAndMessage
-            message = ""
-        }
-
-        return LogEntry(id: UUID(), timestamp: timestamp, level: level, label: label, message: message, rawLine: line)
-    }
 }
 
 // MARK: - DependencyValues Extension

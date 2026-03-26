@@ -65,6 +65,7 @@ actor PushNotifcationService: NotificationSender {
             Self.logger.debug("Found tokens \(allDeviceTokens.count)")
 
             var deviceTokens: [DeviceToken] = []
+            var expiredCount = 0
             for token in allDeviceTokens {
                 if token.tokenType == "liveActivityUpdate",
                    let date = token.updatedAt ?? token.createdAt,
@@ -76,13 +77,18 @@ actor PushNotifcationService: NotificationSender {
                         .query(on: database)
                         .filter(\.$id == tokenId)
                         .delete()
+                    expiredCount += 1
 
                 } else {
                     deviceTokens.append(token)
                 }
             }
+            if expiredCount > 0 {
+                Self.logger.info("Deleted \(expiredCount) expired liveActivityUpdate token(s)")
+            }
 
             let deviceMap = Dictionary(grouping: deviceTokens, by: { $0.deviceName })
+            Self.logger.info("Processing \(deviceMap.count) device(s) with \(deviceTokens.count) token(s)")
             for tokens in deviceMap.values {
                 assert(tokens.count <= 2, "Found device with more than 2 tokens")
 

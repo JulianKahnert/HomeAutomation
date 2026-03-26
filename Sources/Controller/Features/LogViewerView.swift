@@ -1,10 +1,6 @@
 //
 //  LogViewerView.swift
 //
-//  Reusable log viewer for JSONL logs written by FileLogHandler.
-//  Dependencies: Foundation, SwiftUI, Shared (LogEntry).
-//  No TCA — portable to any SwiftUI project.
-//
 
 import Foundation
 import Shared

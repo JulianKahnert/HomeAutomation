@@ -20,12 +20,16 @@ actor WindowManager {
 
     /// Set newState to nil, if the window was closed
     func setWindowOpenState(entityId: EntityId, to newState: WindowOpenState?) async {
+        let action = newState != nil ? "opened" : "closed"
+        Self.logger.info("Window \(action): \(entityId.name) (\(entityId.placeId))")
         windowStateIsOpen[entityId] = newState
 
         let windowStates = windowStateIsOpen.values.sorted(by: { $0.name < $1.name })
         if !windowStates.isEmpty {
+            Self.logger.info("Open windows: \(windowStates.map(\.name).joined(separator: ", "))")
             await startOrUpdateOpenWindowActivities(with: windowStates)
         } else {
+            Self.logger.info("All windows closed, ending Live Activities")
             await notificationSender.endAllLiveActivities(ofActivityType: WindowContentState.activityTypeName)
         }
     }

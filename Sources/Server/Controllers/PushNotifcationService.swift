@@ -65,6 +65,7 @@ actor PushNotifcationService: NotificationSender {
             Self.logger.debug("Found tokens \(allDeviceTokens.count)")
 
             var deviceTokens: [DeviceToken] = []
+            var expiredCount = 0
             for token in allDeviceTokens {
                 if token.tokenType == "liveActivityUpdate",
                    let date = token.updatedAt ?? token.createdAt,
@@ -76,13 +77,18 @@ actor PushNotifcationService: NotificationSender {
                         .query(on: database)
                         .filter(\.$id == tokenId)
                         .delete()
+                    expiredCount += 1
 
                 } else {
                     deviceTokens.append(token)
                 }
             }
+            if expiredCount > 0 {
+                Self.logger.info("Deleted \(expiredCount) expired liveActivityUpdate token(s)")
+            }
 
             let deviceMap = Dictionary(grouping: deviceTokens, by: { $0.deviceName })
+            Self.logger.info("Processing \(deviceMap.count) device(s) with \(deviceTokens.count) token(s)")
             for tokens in deviceMap.values {
                 assert(tokens.count <= 2, "Found device with more than 2 tokens")
 
@@ -129,6 +135,21 @@ actor PushNotifcationService: NotificationSender {
                         usedToken = startToken
                         try await apnsClient.sendStartLiveActivityNotification(notification, deviceToken: startToken.tokenString)
                         Self.logger.info("Successfully sent start live activity notification to \(startToken.deviceName)")
+
+                        // Delete the start token after successful Push-to-Start to prevent
+                        // duplicate Live Activities. Without this, a second call (e.g. another
+                        // window opening before the update token roundtrip completes) would find
+                        // the same start token and create another activity.
+                        //
+                        // The token lifecycle ensures recovery:
+                        // 1. iOS invalidates the used push-to-start token after delivery
+                        // 2. iOS generates a new push-to-start token via pushToStartTokenUpdates
+                        // 3. The app re-registers the new token with the server
+                        // 4. If the app was not woken (force-quit / iOS budget), the token is
+                        //    re-registered when the user next opens the app
+                        try? await DeviceToken.query(on: database)
+                            .filter(\.$tokenString == startToken.tokenString)
+                            .delete()
                     } else {
                         assertionFailure("Should find at least one start token")
                     }

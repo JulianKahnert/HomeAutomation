@@ -77,12 +77,14 @@ struct OpenAPIController: APIProtocol {
                 .first() {
                 existing.tokenString = token.tokenString
                 try await existing.save(on: request.db)
+                request.logger.info("Updated existing \(token.tokenType.rawValue) token for \(token.deviceName)")
             } else {
                 let newPushDevice = DeviceToken(deviceName: token.deviceName,
                                                 tokenString: token.tokenString,
                                                 tokenType: token.tokenType.rawValue,
                                                 activityType: token.activityType)
                 try await newPushDevice.save(on: request.db)
+                request.logger.info("Created new \(token.tokenType.rawValue) token for \(token.deviceName)")
             }
             return .ok
 
@@ -101,12 +103,14 @@ struct OpenAPIController: APIProtocol {
                 .first() {
                 existing.tokenString = token.tokenString
                 try await existing.save(on: request.db)
+                request.logger.info("Updated existing liveActivityUpdate token for \(token.deviceName) (activity: \(activityType))")
             } else {
                 let newPushDevice = DeviceToken(deviceName: token.deviceName,
                                                 tokenString: token.tokenString,
                                                 tokenType: token.tokenType.rawValue,
                                                 activityType: activityType)
                 try await newPushDevice.save(on: request.db)
+                request.logger.info("Created new liveActivityUpdate token for \(token.deviceName) (activity: \(activityType))")
             }
             return .ok
         }

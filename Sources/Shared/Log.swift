@@ -49,6 +49,6 @@ public func initLogging(withFileLogging: Bool, logLevel: Logger.Level) {
 
         var mpxHandler = MultiplexLogHandler(handlers)
         mpxHandler.logLevel = logLevel
-        return MultiplexLogHandler(handlers)
+        return mpxHandler
     }
 }

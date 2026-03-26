@@ -8,11 +8,14 @@
 import ComposableArchitecture
 import Foundation
 import HAModels
+import Logging
 import Sharing
 import SwiftUI
 
 @Reducer
 struct SettingsFeature: Sendable {
+
+    private static let logger = Logger(label: "SettingsFeature")
 
     // MARK: - State
 
@@ -33,6 +36,9 @@ struct SettingsFeature: Sendable {
         // Push notification state
         var isPushAuthorized: Bool = false
         var deviceToken: Data?
+
+        // Log viewer
+        @Presents var logViewer: LogViewerFeature.State?
     }
 
     // MARK: - Action
@@ -48,6 +54,8 @@ struct SettingsFeature: Sendable {
         case windowStatesResponse(Result<[WindowContentState.WindowState], Error>)
         case requestPushAuthorization
         case dismissError
+        case showLogViewer
+        case logViewer(PresentationAction<LogViewerFeature.Action>)
         case binding(BindingAction<State>)
     }
 
@@ -101,9 +109,10 @@ struct SettingsFeature: Sendable {
                 return .none
 
             case let .toggleLiveActivities(enabled):
+                Self.logger.info("Live Activities toggled: \(enabled)")
                 state.$liveActivitiesEnabled.withLock { $0 = enabled }
                 if !enabled {
-                    // Stop any running activities when disabled
+                    Self.logger.info("Stopping all Live Activities (user disabled)")
                     return .run { _ in
                         await liveActivity.stopActivity()
                     }
@@ -122,28 +131,32 @@ struct SettingsFeature: Sendable {
             case let .windowStatesResponse(.success(windowStates)):
                 state.isLoadingWindowStates = false
                 state.windowContentState = WindowContentState(windowStates: windowStates)
+                Self.logger.info("Received \(windowStates.count) window state(s)")
 
                 if state.liveActivitiesEnabled {
                     return .run { _ in
                         let hasActive = await liveActivity.hasActiveActivities()
 
-                        // Check empty first to ensure we stop activities when no windows are open,
-                        // even if an activity is currently running (prevents showing empty live activities)
                         if windowStates.isEmpty {
+                            Self.logger.info("No open windows, stopping Live Activities")
                             await liveActivity.stopActivity()
                         } else if hasActive {
+                            Self.logger.info("Updating existing Live Activity with \(windowStates.count) window(s)")
                             await liveActivity.updateActivity(windowStates)
                         } else {
+                            Self.logger.info("No active Live Activity, starting new one with \(windowStates.count) window(s)")
                             try await liveActivity.startActivity(windowStates)
                         }
                     }
                 } else {
+                    Self.logger.debug("Live Activities disabled, skipping activity update")
                     return .none
                 }
 
             case let .windowStatesResponse(.failure(error)):
                 state.isLoadingWindowStates = false
                 state.error = "Failed to load window states: \(error.localizedDescription)"
+                Self.logger.error("Failed to load window states: \(error)")
 
                 return .run { _ in
                     await liveActivity.updateActivity([])
@@ -158,9 +171,19 @@ struct SettingsFeature: Sendable {
                 state.error = nil
                 return .none
 
+            case .showLogViewer:
+                state.logViewer = LogViewerFeature.State()
+                return .none
+
+            case .logViewer:
+                return .none
+
             case .binding:
                 return .none
             }
+        }
+        .ifLet(\.$logViewer, action: \.logViewer) {
+            LogViewerFeature()
         }
     }
 }
@@ -196,8 +219,28 @@ struct SettingsView: View {
                     }
                 }
                 #endif
+
+                Section {
+                    Button {
+                        store.send(.showLogViewer)
+                    } label: {
+                        HStack {
+                            Label("View Logs", systemImage: "doc.text.magnifyingglass")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Diagnostics")
+                }
             }
             .navigationTitle("Settings")
+            .navigationDestination(
+                item: $store.scope(state: \.logViewer, action: \.logViewer)
+            ) { logStore in
+                LogViewerFeatureView(store: logStore)
+            }
             .refreshable {
                 store.send(.refreshWindowStates)
             }
@@ -254,7 +297,10 @@ struct SettingsView: View {
     #if os(iOS)
     @ViewBuilder
     private var liveActivitiesSection: some View {
-        Toggle("Enable Live Activities", isOn: $store.liveActivitiesEnabled)
+        Toggle("Enable Live Activities", isOn: Binding(
+            get: { store.liveActivitiesEnabled },
+            set: { store.send(.toggleLiveActivities($0)) }
+        ))
     }
 
     @ViewBuilder

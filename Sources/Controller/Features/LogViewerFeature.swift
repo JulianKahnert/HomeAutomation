@@ -41,7 +41,7 @@ struct LogViewerFeature: Sendable {
                 state.isLoading = true
                 return .run { send in
                     let since = Date().addingTimeInterval(-86400)
-                    let entries = LogReader.readEntries(since: since)
+                    let entries = LogReader.readEntries(since: since, basePath: .documentsDirectory)
                     await send(.logEntriesLoaded(entries))
                 }
 

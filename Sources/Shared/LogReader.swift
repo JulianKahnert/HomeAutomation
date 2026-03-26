@@ -17,7 +17,7 @@ public enum LogReader {
     ///   - basePath: Directory containing the log files (defaults to Documents).
     ///   - maxEntries: Maximum number of entries to return.
     /// - Returns: Entries sorted newest-first, capped at `maxEntries`.
-    public static func readEntries(since: Date, basePath: URL = .documentsDirectory, maxEntries: Int = 5000) -> [LogEntry] {
+    public static func readEntries(since: Date, basePath: URL, maxEntries: Int = 5000) -> [LogEntry] {
         let fileDateFormatter = DateFormatter()
         fileDateFormatter.dateFormat = "yyyy-MM-dd"
         fileDateFormatter.timeZone = .current

@@ -28,14 +28,14 @@ let package = Package(
         // 🐬 Fluent driver for MySQL.
         .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.8.0"),
         // open api generator
-        .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.4"),
+        .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.11.1"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.11.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.12.0"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.11.0"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.2.0"),
         // TCA and related
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.25.2"),
-        .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.7.4"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.25.3"),
+        .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.8.0"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", from: "5.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.10.1"),
@@ -43,8 +43,8 @@ let package = Package(
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.1.3"),
-        .package(url: "https://github.com/swift-server-community/APNSwift", from: "6.4.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0")
+        .package(url: "https://github.com/swift-server-community/APNSwift", from: "6.5.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.1")
     ],
     targets: [
         .executableTarget(

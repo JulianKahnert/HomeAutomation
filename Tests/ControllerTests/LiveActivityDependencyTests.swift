@@ -15,16 +15,16 @@ import Testing
 @Suite("LiveActivity Dependency Tests")
 struct LiveActivityDependencyTests {
 
-    @Test("Test value returns finished streams")
+    @Test("Test value completes immediately")
     func testTestValue() async throws {
         try await withDependencies {
             $0.liveActivity = .testValue
         } operation: {
             @Dependency(\.liveActivity) var liveActivity
 
-            let tokenStream = await liveActivity.pushTokenUpdates()
+            // Callback-based: testValue closure body is empty, returns immediately
             var tokenCount = 0
-            for await _ in tokenStream {
+            await liveActivity.pushTokenUpdates { _ in
                 tokenCount += 1
             }
             #expect(tokenCount == 0)
@@ -41,9 +41,8 @@ struct LiveActivityDependencyTests {
         } operation: {
             @Dependency(\.liveActivity) var liveActivity
 
-            let tokenStream = await liveActivity.pushTokenUpdates()
             var tokens: [PushToken] = []
-            for await token in tokenStream {
+            await liveActivity.pushTokenUpdates { token in
                 tokens.append(token)
             }
             #expect(tokens.count == 1)

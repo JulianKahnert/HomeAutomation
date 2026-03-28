@@ -31,11 +31,13 @@ struct LiveActivityDependency: Sendable {
     /// Stop the current Live Activity
     var stopActivity: @Sendable () async -> Void
 
-    /// Stream of push token updates for the current activity
-    var pushTokenUpdates: @Sendable () async -> AsyncStream<PushToken> = { .finished }
+    /// Observe push token updates for all activities.
+    /// Runs in the caller's structured concurrency context — cancellation propagates automatically.
+    var pushTokenUpdates: @Sendable (_ onToken: @Sendable (PushToken) async -> Void) async -> Void = { _ in }
 
-    /// Stream of push-to-start tokens
-    var pushToStartTokenUpdates: @Sendable () async -> AsyncStream<PushToken> = { .finished }
+    /// Observe push-to-start token updates.
+    /// Runs in the caller's structured concurrency context — cancellation propagates automatically.
+    var pushToStartTokenUpdates: @Sendable (_ onToken: @Sendable (PushToken) async -> Void) async -> Void = { _ in }
 
     /// Check if Live Activities are currently running
     var hasActiveActivities: @Sendable () async -> Bool = { false }
@@ -48,8 +50,8 @@ extension LiveActivityDependency: TestDependencyKey {
         startActivity: { _ in },
         updateActivity: { _ in },
         stopActivity: { },
-        pushTokenUpdates: { .finished },
-        pushToStartTokenUpdates: { .finished },
+        pushTokenUpdates: { _ in },
+        pushToStartTokenUpdates: { _ in },
         hasActiveActivities: { false }
     )
 
@@ -57,15 +59,11 @@ extension LiveActivityDependency: TestDependencyKey {
         startActivity: { _ in },
         updateActivity: { _ in },
         stopActivity: { },
-        pushTokenUpdates: {
-            AsyncStream { continuation in
-                // Simulate a push token
-                let mockToken = PushToken(deviceName: "preview", tokenString: "1234", type: .pushNotification)
-                continuation.yield(mockToken)
-                continuation.finish()
-            }
+        pushTokenUpdates: { onToken in
+            let mockToken = PushToken(deviceName: "preview", tokenString: "1234", type: .pushNotification)
+            await onToken(mockToken)
         },
-        pushToStartTokenUpdates: { .finished },
+        pushToStartTokenUpdates: { _ in },
         hasActiveActivities: { true }
     )
 }
@@ -115,46 +113,49 @@ extension LiveActivityDependency: DependencyKey {
                     await activity.end(nil, dismissalPolicy: .immediate)
                 }
             },
-            pushTokenUpdates: {
-                AsyncStream { continuation in
-                    let task = Task {
-                        // Use withDiscardingTaskGroup so each activity's token stream is
-                        // observed concurrently. The previous nested for-await blocked the
-                        // outer loop, preventing token observation for newly created activities.
-                        await withDiscardingTaskGroup { group in
-                            for await activity in Activity<WindowAttributes>.activityUpdates {
-                                logger.info("activityUpdates emitted activity: id=\(activity.id)")
-                                group.addTask {
-                                    for await tokenData in activity.pushTokenUpdates {
-                                        let tokenString = tokenData.hexadecimalString
-                                        logger.info("pushTokenUpdates emitted for activity \(activity.id): token=\(String(tokenString.prefix(8)))...")
-                                        let token = await PushToken(
-                                            deviceName: UIDevice.current.name,
-                                            tokenString: tokenString,
-                                            type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName)
-                                        )
-                                        continuation.yield(token)
-                                    }
-                                }
+            pushTokenUpdates: { onToken in
+                // Runs directly in the caller's structured concurrency context.
+                // cancelInFlight: true on the TCA effect cancels this entire tree.
+                await withDiscardingTaskGroup { group in
+                    for await activity in Activity<WindowAttributes>.activityUpdates {
+                        let totalActive = Activity<WindowAttributes>.activities.count
+                        logger.info("activityUpdates emitted activity: id=\(activity.id), totalActive=\(totalActive)")
+
+                        // Fix B: Immediately end older activities to prevent duplicates.
+                        // Push-to-start can create a new activity while old ones still exist
+                        // (e.g. because the end notification was never delivered).
+                        if totalActive > 1 {
+                            let allActivities = Activity<WindowAttributes>.activities
+                            for oldActivity in allActivities where oldActivity.id != activity.id {
+                                logger.info("Ending stale Live Activity: id=\(oldActivity.id)")
+                                await oldActivity.end(nil, dismissalPolicy: .immediate)
+                            }
+                        }
+
+                        group.addTask {
+                            for await tokenData in activity.pushTokenUpdates {
+                                let tokenString = tokenData.hexadecimalString
+                                logger.info("pushTokenUpdates emitted for activity \(activity.id): token=\(String(tokenString.prefix(8)))...")
+                                let token = await PushToken(
+                                    deviceName: UIDevice.current.name,
+                                    tokenString: tokenString,
+                                    type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName)
+                                )
+                                await onToken(token)
                             }
                         }
                     }
-                    continuation.onTermination = { _ in task.cancel() }
                 }
             },
-            pushToStartTokenUpdates: {
-                AsyncStream { continuation in
-                    let task = Task {
-                        for await pushTokenData in Activity<WindowAttributes>.pushToStartTokenUpdates {
-                            let tokenString = pushTokenData.hexadecimalString
-                            logger.info("pushToStartTokenUpdates emitted: token=\(String(tokenString.prefix(8)))...")
-                            let token = await PushToken(deviceName: UIDevice.current.name,
-                                                        tokenString: tokenString,
-                                                        type: .liveActivityStart)
-                            continuation.yield(token)
-                        }
-                    }
-                    continuation.onTermination = { _ in task.cancel() }
+            pushToStartTokenUpdates: { onToken in
+                // Runs directly in the caller's structured concurrency context.
+                for await pushTokenData in Activity<WindowAttributes>.pushToStartTokenUpdates {
+                    let tokenString = pushTokenData.hexadecimalString
+                    logger.info("pushToStartTokenUpdates emitted: token=\(String(tokenString.prefix(8)))...")
+                    let token = await PushToken(deviceName: UIDevice.current.name,
+                                                tokenString: tokenString,
+                                                type: .liveActivityStart)
+                    await onToken(token)
                 }
             },
             hasActiveActivities: {

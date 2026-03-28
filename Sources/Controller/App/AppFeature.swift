@@ -143,13 +143,13 @@ struct AppFeature: Sendable {
                 return .run { send in
                     await withTaskGroup(of: Void.self) { group in
                         group.addTask {
-                            for await token in await liveActivity.pushToStartTokenUpdates() {
+                            await liveActivity.pushToStartTokenUpdates { token in
                                 await send(.registerPushToken(token))
                             }
                         }
 
                         group.addTask {
-                            for await token in await liveActivity.pushTokenUpdates() {
+                            await liveActivity.pushTokenUpdates { token in
                                 await send(.registerPushToken(token))
                             }
                         }

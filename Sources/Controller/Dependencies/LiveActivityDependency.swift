@@ -33,7 +33,7 @@ struct LiveActivityDependency: Sendable {
 
     /// Observe push token updates for all activities.
     /// Runs in the caller's structured concurrency context — cancellation propagates automatically.
-    var pushTokenUpdates: @Sendable (_ onToken: @Sendable (PushToken) async -> Void) async -> Void = { _ in }
+    var pushTokenUpdates: @Sendable (_ onToken: @escaping @Sendable (PushToken) async -> Void) async -> Void = { _ in }
 
     /// Observe push-to-start token updates.
     /// Runs in the caller's structured concurrency context — cancellation propagates automatically.

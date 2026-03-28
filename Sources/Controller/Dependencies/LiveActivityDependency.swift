@@ -121,9 +121,6 @@ extension LiveActivityDependency: DependencyKey {
                         let totalActive = Activity<WindowAttributes>.activities.count
                         logger.info("activityUpdates emitted activity: id=\(activity.id), totalActive=\(totalActive)")
 
-                        // Fix B: Immediately end older activities to prevent duplicates.
-                        // Push-to-start can create a new activity while old ones still exist
-                        // (e.g. because the end notification was never delivered).
                         if totalActive > 1 {
                             let allActivities = Activity<WindowAttributes>.activities
                             for oldActivity in allActivities where oldActivity.id != activity.id {

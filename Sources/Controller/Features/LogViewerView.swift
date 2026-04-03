@@ -51,7 +51,7 @@ struct LogViewerView: View {
                 )
                 .disabled(entries.isEmpty)
             }
-            
+
             ToolbarItem(placement: .secondaryAction) {
                 Button {
                     onRefresh()

@@ -149,7 +149,7 @@ struct HistoryView: View {
                         ProgressView()
                     }
                 }
-                .alert(store: store.scope(state: \.$alert, action: \.alert))
+                .alert($store.scope(state: \.alert, action: \.alert))
         }
     }
 

@@ -97,24 +97,17 @@ struct FileLogHandler: LogHandler {
         return encoder
     }()
 
-    func log(level: Logger.Level,
-                    message: Logger.Message,
-                    metadata: Logger.Metadata?,
-                    source: String,
-                    file: String,
-                    function: String,
-                    line: UInt) {
-
-        let prettyMetadata = metadata?.isEmpty ?? true
-            ? self.prettyMetadata
-            : self.prettify(self.metadata.merging(metadata!, uniquingKeysWith: { _, new in new }))
+    func log(event: LogEvent) {
+        let prettyMetadata = event.metadata?.isEmpty ?? true
+        ? self.prettyMetadata
+        : self.prettify(self.metadata.merging(event.metadata!, uniquingKeysWith: { _, new in new }))
 
         let fullMessage = prettyMetadata.map { "\($0) " } ?? ""
         let entry = LogEntry(
             timestamp: Date(),
-            level: "\(level)",
+            level: "\(event.level)",
             label: self.label,
-            message: "\(fullMessage)\(message)"
+            message: "\(fullMessage)\(event.message)"
         )
 
         guard let data = try? Self.encoder.encode(entry),

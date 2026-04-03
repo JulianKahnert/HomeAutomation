@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -22,29 +22,34 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", from: "4.121.3"),
+        .package(url: "https://github.com/vapor/vapor.git", exact: "4.121.3"),
         // 🗄 An ORM for SQL and NoSQL databases.
-        .package(url: "https://github.com/vapor/fluent.git", from: "4.13.0"),
+        .package(url: "https://github.com/vapor/fluent.git", exact: "4.13.0"),
         // 🐬 Fluent driver for MySQL.
-        .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.8.0"),
+        .package(url: "https://github.com/vapor/fluent-mysql-driver.git", exact: "4.8.0"),
         // open api generator
-        .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.11.1"),
-        .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.12.0"),
-        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.11.0"),
-        .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.2.0"),
+        .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.11.1"),
+        .package(url: "https://github.com/swift-server/swift-openapi-vapor", exact: "1.0.1"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", exact: "1.12.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.11.0"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.2.0"),
         // TCA and related
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.25.5"),
-        .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.8.0"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture",
+                 exact: "1.25.5",
+                 traits: [
+                    "ComposableArchitecture2Deprecations",
+                    "ComposableArchitecture2DeprecationOverloads"
+                 ]),
+        .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.8.0"),
         // other stuff
-        .package(url: "https://github.com/vapor/apns.git", from: "5.0.0"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.11.0"),
-        .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", from: "0.2.2"),
+        .package(url: "https://github.com/vapor/apns.git", exact: "5.0.0"),
+        .package(url: "https://github.com/apple/swift-log.git", exact: "1.11.0"),
+        .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
-        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.1.3"),
-        .package(url: "https://github.com/swift-server-community/APNSwift", from: "6.5.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.1")
+        .package(url: "https://github.com/apple/swift-async-algorithms", exact: "1.1.3"),
+        .package(url: "https://github.com/swift-server-community/APNSwift", exact: "6.5.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.7.1")
     ],
     targets: [
         .executableTarget(

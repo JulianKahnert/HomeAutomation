@@ -217,7 +217,7 @@ struct ActionsView: View {
                     )
                 }
             }
-            .alert(store: store.scope(state: \.$alert, action: \.alert))
+            .alert($store.scope(state: \.alert, action: \.alert))
         }
     }
 

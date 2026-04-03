@@ -169,16 +169,6 @@ public final class HomeManager: HomeManagable {
         return location
     }
 
-    public func sendNotification(title: String, message: String) async {
-        do {
-            log.debug("Sending notification \(title): \(message)")
-            try await notificationSender.sendNotification(title: title, message: message)
-        } catch {
-            log.critical("Failed to send notification: \(error)")
-            assertionFailure()
-        }
-    }
-
     public func sendNotification(title: String, message: String, id: String) async {
         do {
             log.debug("Sending notification \(title): \(message) [id: \(id)]")

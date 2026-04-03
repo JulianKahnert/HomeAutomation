@@ -9,8 +9,6 @@ import Foundation
 import HAModels
 
 final class MockNotificationSender: NotificationSender, @unchecked Sendable {
-    func sendNotification(title: String, message: String) async throws {}
-
     func sendNotification(title: String, message: String, id: String) async throws {}
 
     func clearNotification(id: String) async throws {}

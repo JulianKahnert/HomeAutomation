@@ -8,8 +8,6 @@
 import Foundation
 
 public protocol NotificationSender: Sendable {
-    func sendNotification(title: String, message: String) async throws
-
     /// Sends an alert notification tagged with a stable `id` used as `apns-collapse-id`
     /// and `threadIdentifier`, allowing the notification to be coalesced and later cleared
     /// individually via ``clearNotification(id:)``.
@@ -24,11 +22,6 @@ public protocol NotificationSender: Sendable {
 }
 
 extension NotificationSender {
-    /// Default: falls back to the untagged overload.
-    public func sendNotification(title: String, message: String, id: String) async throws {
-        try await sendNotification(title: title, message: message)
-    }
-
     /// Default: no-op for conformances that don't support background push.
     public func clearNotification(id: String) async throws {}
 }

@@ -30,10 +30,6 @@ actor PushNotifcationService: NotificationSender {
         self.notificationTopic = notificationTopic
     }
 
-    func sendNotification(title: String, message: String) async throws {
-        try await sendAlert(title: title, message: message, id: nil)
-    }
-
     func sendNotification(title: String, message: String, id: String) async throws {
         try await sendAlert(title: title, message: message, id: id)
     }

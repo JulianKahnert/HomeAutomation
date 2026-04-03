@@ -179,6 +179,27 @@ public final class HomeManager: HomeManagable {
         }
     }
 
+    public func sendNotification(title: String, message: String, id: String) async {
+        do {
+            log.debug("Sending notification \(title): \(message) [id: \(id)]")
+            try await notificationSender.sendNotification(title: title, message: message, id: id)
+        } catch {
+            log.critical("Failed to send notification: \(error)")
+            assertionFailure()
+        }
+    }
+
+    public func clearWindowNotification(entityId: EntityId) async {
+        do {
+            let id = entityId.windowNotificationId
+            log.debug("Clearing window notification [id: \(id)]")
+            try await notificationSender.clearNotification(id: id)
+        } catch {
+            log.critical("Failed to clear window notification: \(error)")
+            assertionFailure()
+        }
+    }
+
     public func getWindowStates() async -> [WindowOpenState] {
         await windowManager.getWindowStates()
     }

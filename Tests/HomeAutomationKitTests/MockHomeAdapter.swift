@@ -134,8 +134,11 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return Location(latitude: 0, longitude: 0)
     }
 
-    func sendNotification(title: String, message: String) async {
-    }
+    func sendNotification(title: String, message: String) async {}
+
+    func sendNotification(title: String, message: String, id: String) async {}
+
+    func clearWindowNotification(entityId: EntityId) async {}
 
     func getWindowStates() async -> [WindowOpenState] {
         return []

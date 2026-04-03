@@ -13,6 +13,7 @@ import Shared
 #if os(iOS)
 import ActivityKit
 import UIKit
+import UserNotifications
 #endif
 
 @MainActor
@@ -43,10 +44,24 @@ extension AppDelegate: UIApplicationDelegate {
     }
 
     public func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
-        // This method is called for regular push notifications, but NOT reliably for push-to-start.
-        // According to Apple Developer Forums, this has ~50% success rate for terminated apps.
-        // Token registration is handled via activityUpdates in LiveActivityDependency instead.
         logger.info("didReceiveRemoteNotification called")
+
+        // Background push sent by the server when a window closes.
+        // Remove the matching "window open" notification identified by its threadIdentifier.
+        if let clearId = userInfo["clearNotificationId"] as? String {
+            logger.info("Clearing notification with threadIdentifier: \(clearId)")
+            let center = UNUserNotificationCenter.current()
+            let delivered = await center.deliveredNotifications()
+            let idsToRemove = delivered
+                .filter { $0.request.content.threadIdentifier == clearId }
+                .map(\.request.identifier)
+            if !idsToRemove.isEmpty {
+                center.removeDeliveredNotifications(withIdentifiers: idsToRemove)
+                logger.info("Removed \(idsToRemove.count) notification(s)")
+            }
+            return .newData
+        }
+
         return .noData
     }
 

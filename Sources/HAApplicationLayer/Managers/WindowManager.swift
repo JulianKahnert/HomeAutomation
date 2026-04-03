@@ -24,6 +24,11 @@ actor WindowManager {
         Self.logger.info("Window \(action): \(entityId.name) (\(entityId.placeId))")
         windowStateIsOpen[entityId] = newState
 
+        // Clear the delivered push notification for this specific window
+        if newState == nil {
+            try? await notificationSender.clearNotification(id: entityId.windowNotificationId)
+        }
+
         let windowStates = windowStateIsOpen.values.sorted(by: { $0.name < $1.name })
         if !windowStates.isEmpty {
             Self.logger.info("Open windows: \(windowStates.map(\.name).joined(separator: ", "))")

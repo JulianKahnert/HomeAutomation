@@ -11,6 +11,12 @@ import Foundation
 import HAModels
 import VaporAPNS
 
+/// Payload for `content-available` background pushes that tell the client
+/// to remove a previously delivered notification matched by `threadIdentifier`.
+private struct ClearNotificationPayload: Encodable, Sendable {
+    let clearNotificationId: String
+}
+
 actor PushNotifcationService: NotificationSender {
     private static let logger = Logger(label: "PushNotifcationService")
 
@@ -24,19 +30,57 @@ actor PushNotifcationService: NotificationSender {
         self.notificationTopic = notificationTopic
     }
 
-    func sendNotification(title: String, message: String) async throws {
+    func sendNotification(title: String, message: String, id: String) async throws {
+        try await sendAlert(title: title, message: message, id: id)
+    }
+
+    func clearNotification(id: String) async throws {
+        let deviceTokens = try await DeviceToken
+            .query(on: database)
+            .filter(\.$tokenType == "pushNotification")
+            .all()
+
+        let payload = ClearNotificationPayload(clearNotificationId: id)
+        let notification = APNSBackgroundNotification(
+            expiration: .immediately,
+            topic: notificationTopic,
+            payload: payload
+        )
+
+        for deviceToken in deviceTokens {
+            do {
+                try await apnsClient.sendBackgroundNotification(notification, deviceToken: deviceToken.tokenString)
+            } catch {
+                Self.logger.critical(
+                    "Failed to send clear notification to \(deviceToken.deviceName): \(error.localizedDescription)"
+                )
+                try? await DeviceToken.query(on: database)
+                    .filter(\.$tokenString == deviceToken.tokenString)
+                    .delete()
+            }
+        }
+    }
+
+    // MARK: - Private
+
+    private func sendAlert(title: String, message: String, id: String?) async throws {
         let deviceTokens =
             try await DeviceToken
             .query(on: database)
             .filter(\.$tokenType == "pushNotification")
             .all()
 
-        let notification = APNSAlertNotification(
+        var notification = APNSAlertNotification(
             alert: .init(title: .raw(title), body: .raw(message)),
             expiration: .none,
             priority: .immediately,
             topic: notificationTopic
         )
+
+        if let id {
+            notification.collapseID = id
+            notification.threadID = id
+        }
 
         for deviceToken in deviceTokens {
             do {

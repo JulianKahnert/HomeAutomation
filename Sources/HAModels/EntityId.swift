@@ -49,6 +49,14 @@ public struct EntityId: Sendable, Hashable, Equatable, Codable, CustomStringConv
 }
 
 extension EntityId {
+    /// Stable identifier used as `apns-collapse-id` and `threadIdentifier` for window-open
+    /// notifications so the server can later clear only the notification for a specific window.
+    public var windowNotificationId: String {
+        "window-\(placeId)-\(name)"
+    }
+}
+
+extension EntityId {
     public struct Query: Sendable, CustomStringConvertible {
         public let placeId: PlaceId
         public let name: String

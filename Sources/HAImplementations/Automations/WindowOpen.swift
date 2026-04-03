@@ -64,7 +64,7 @@ public struct WindowOpen: Automatable {
         log.debug("Start sending notification")
         let message = "\(windowContact.contactSensorId.name) (\(windowContact.contactSensorId.placeId))"
 
-        await hm.sendNotification(title: "🪟 offen", message: message)
+        await hm.sendNotification(title: "🪟 offen", message: message, id: windowContact.contactSensorId.windowNotificationId)
         log.debug("End sending notification")
     }
 }

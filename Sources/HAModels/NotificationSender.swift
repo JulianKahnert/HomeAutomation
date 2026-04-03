@@ -20,8 +20,3 @@ public protocol NotificationSender: Sendable {
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String) async
     func endAllLiveActivities(ofActivityType activityType: String) async
 }
-
-extension NotificationSender {
-    /// Default: no-op for conformances that don't support background push.
-    public func clearNotification(id: String) async throws {}
-}

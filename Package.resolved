@@ -1,5 +1,5 @@
 {
-  "originHash" : "d2d3a5e6694d0183e3fc409f0ff380b9d80d3a817eecbe0d273c41d645d9ee93",
+  "originHash" : "f5eace316f2e9a12cb777d9c17f1dab487f073c20b2a09291723ff7a9a956777",
   "pins" : [
     {
       "identity" : "apns",
@@ -116,15 +116,6 @@
       "state" : {
         "revision" : "343b2c1793058fcc53c1bd7e2907f8e3a4d640fb",
         "version" : "3.9.0"
-      }
-    },
-    {
-      "identity" : "opencombine",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/OpenCombine/OpenCombine.git",
-      "state" : {
-        "revision" : "8576f0d579b27020beccbccc3ea6844f3ddfc2c2",
-        "version" : "0.14.0"
       }
     },
     {
@@ -535,10 +526,10 @@
     {
       "identity" : "tibberswift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/juliankahnert/TibberSwift.git",
+      "location" : "https://github.com/ppeelen/TibberSwift.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "d3c4ac0663a4ed5225ea726e88513fb2c1bf7a39"
+        "revision" : "eef53a3fd81cfdc66daddf5ff1e8256dfad6e2d2",
+        "version" : "1.2.0"
       }
     },
     {

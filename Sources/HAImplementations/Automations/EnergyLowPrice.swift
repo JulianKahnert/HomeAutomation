@@ -37,7 +37,7 @@ public struct EnergyLowPrice: Automatable {
             return false
         }
 
-        return Calendar.current.component(.minute, from: date) == 0
+        return Calendar.current.component(.minute, from: date) == 3
     }
 
     public func execute(using hm: HomeManagable) async throws {

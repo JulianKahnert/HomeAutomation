@@ -384,8 +384,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/juliankahnert/TibberSwift.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "d3c4ac0663a4ed5225ea726e88513fb2c1bf7a39"
+        "branch" : "fix/linux-foundation-networking",
+        "revision" : "eaa419ade64d0c3a6503496803a9eaca9f072040"
       }
     },
     {

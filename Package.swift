@@ -45,7 +45,7 @@ let package = Package(
         .package(url: "https://github.com/vapor/apns.git", exact: "5.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.11.0"),
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
-        .package(url: "https://github.com/ppeelen/TibberSwift.git", from: "1.2.0"),
+        .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "fix/linux-foundation-networking"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
         .package(url: "https://github.com/apple/swift-async-algorithms", exact: "1.1.3"),
         .package(url: "https://github.com/swift-server-community/APNSwift", exact: "6.5.0"),

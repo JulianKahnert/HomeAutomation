@@ -1,5 +1,5 @@
 {
-  "originHash" : "f5eace316f2e9a12cb777d9c17f1dab487f073c20b2a09291723ff7a9a956777",
+  "originHash" : "07d69e813cda2012933c5691387de25376970d4c92e721e4a98746356caa912c",
   "pins" : [
     {
       "identity" : "apns",
@@ -526,10 +526,10 @@
     {
       "identity" : "tibberswift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ppeelen/TibberSwift.git",
+      "location" : "https://github.com/juliankahnert/TibberSwift.git",
       "state" : {
-        "revision" : "eef53a3fd81cfdc66daddf5ff1e8256dfad6e2d2",
-        "version" : "1.2.0"
+        "branch" : "fix/linux-foundation-networking",
+        "revision" : "eaa419ade64d0c3a6503496803a9eaca9f072040"
       }
     },
     {

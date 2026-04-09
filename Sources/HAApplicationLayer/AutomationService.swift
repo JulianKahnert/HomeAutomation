@@ -38,7 +38,7 @@ public actor AutomationService {
                             } catch is CancellationError {
                                 // do not throw anything when an automation was cancelled
                             } catch {
-                                self.log.critical("Automation failed with error - \(error)")
+                                self.log.error("Automation failed with error - \(error)")
                             }
 
                             // cancel the current task after completion to get correct results of getActiveAutomationNames
@@ -48,7 +48,7 @@ public actor AutomationService {
                         }
                         await self.set(task: task, with: automation.name)
                     } catch {
-                        self.log.critical("Automation (e.g. shouldTrigger failed with error - \(error)")
+                        self.log.error("Automation shouldTrigger failed with error - \(error)")
                     }
                 }
             }

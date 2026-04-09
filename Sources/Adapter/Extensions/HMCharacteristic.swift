@@ -82,7 +82,7 @@ extension HMCharacteristic: @retroactive Comparable {
                                      valveOpen: valveOpen)
         } catch {
             // this might occur when e.g. the IKEA hub or a device is not available
-            homeKitLogger.critical("Error while getting characteristic data - \(self.service?.accessory?.room?.name ?? "")@\(self.service?.accessory?.name ?? "") - \(self)\n\(error)")
+            homeKitLogger.warning("Error while getting characteristic data - \(self.service?.accessory?.room?.name ?? "")@\(self.service?.accessory?.name ?? "") - \(self)\n\(error)")
             return nil
         }
     }

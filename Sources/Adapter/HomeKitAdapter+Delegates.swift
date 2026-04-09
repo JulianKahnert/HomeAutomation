@@ -58,7 +58,7 @@ extension HomeKitAdapter {
             do {
                 try await home.executeActionSet(actionSet)
             } catch {
-                log.critical("Failed to execute action set '\(actionSet.name)': \(error)")
+                log.error("Failed to execute action set '\(actionSet.name)': \(error)")
                 throw error
             }
         }
@@ -96,7 +96,7 @@ extension HomeKitAdapter {
                     }
                 } catch {
                     subscriptionErrors += 1
-                    log.critical("Failed to enable notification on accessory \(accessory.name) - error \(error)")
+                    log.error("Failed to enable notification on accessory \(accessory.name) - error \(error)")
 
                     #if DEBUG
                     // do not jump to the assertion when there error is:

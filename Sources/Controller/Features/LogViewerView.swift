@@ -79,13 +79,15 @@ struct LogViewerView: View {
 
     @ViewBuilder
     private func logRow(_ entry: LogEntry) -> some View {
+        let isCritical = entry.level.lowercased() == "critical"
+
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(entry.level.uppercased())
-                    .font(.caption2.bold())
+                    .font(isCritical ? .caption.bold() : .caption2.bold())
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(levelColor(entry.level).opacity(0.2))
+                    .background(levelColor(entry.level).opacity(isCritical ? 0.4 : 0.2))
                     .foregroundStyle(levelColor(entry.level))
                     .clipShape(Capsule())
 
@@ -102,15 +104,16 @@ struct LogViewerView: View {
 
             Text(entry.message)
                 .font(.caption)
-                .lineLimit(3)
+                .lineLimit(isCritical ? 10 : 3)
         }
+        .listRowBackground(isCritical ? Color.red.opacity(0.08) : nil)
     }
 
     private func levelColor(_ level: String) -> Color {
         switch level.lowercased() {
         case "debug", "trace": .gray
         case "info", "notice": .blue
-        case "warning": .orange
+        case "warning": .yellow
         case "error": .orange
         case "critical": .red
         default: .secondary
@@ -122,8 +125,9 @@ struct LogViewerView: View {
     NavigationStack {
         LogViewerView(
             entries: [
-                LogEntry(timestamp: Date(), level: "info", label: "AppFeature", message: "Scene phase: inactive -> active"),
-                LogEntry(timestamp: Date().addingTimeInterval(-5), level: "error", label: "AppFeature", message: "Failed to register push token"),
+                LogEntry(timestamp: Date(), level: "critical", label: "HomeManager", message: "Failed to persist entity item Error(connectionReset)"),
+                LogEntry(timestamp: Date().addingTimeInterval(-5), level: "info", label: "AppFeature", message: "Scene phase: inactive -> active"),
+                LogEntry(timestamp: Date().addingTimeInterval(-10), level: "error", label: "AppFeature", message: "Failed to register push token"),
                 LogEntry(timestamp: Date().addingTimeInterval(-60), level: "debug", label: "LiveActivity", message: "hasActiveActivities: 1 active"),
             ],
             isLoading: false,

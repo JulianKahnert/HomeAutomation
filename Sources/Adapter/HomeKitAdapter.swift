@@ -60,7 +60,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         let filteredCharacteristics = characteristics.filter({ $0.entityId == entity })
         guard filteredCharacteristics.count == 1 else {
             log.debug("Found: \(filteredCharacteristics)")
-            log.critical("Validation: Could not find entity \(entity)")
+            log.error("Validation: Could not find entity \(entity)")
             assertionFailure()
             throw OptionalError.notFound
         }
@@ -71,7 +71,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         let filteredCharacteristics = characteristics.filter({ $0.entityId == action.entityId })
         guard filteredCharacteristics.count == 1,
               let characteristic = filteredCharacteristics.first else {
-            log.critical("Failed to get characteristic")
+            log.error("Failed to get characteristic")
             assertionFailure()
             return
         }
@@ -118,7 +118,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             newValue = NSNumber(value: HMCharacteristicValueLockMechanismState.secured.rawValue)
         case .addEntityToScene(_, sceneName: let sceneName, let action):
             guard let home = characteristic.service?.accessory?.home else {
-                log.critical("Failed to get home for characteristic")
+                log.error("Failed to get home for characteristic")
                 assertionFailure()
                 return
             }
@@ -128,7 +128,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
                 try await home.addActionSet(named: sceneName)
             }
             guard let scene = home.actionSets.first(where: { $0.name == sceneName }) else {
-                log.critical("Could not find scene named \(sceneName)")
+                log.error("Could not find scene named \(sceneName)")
                 assertionFailure()
                 return
             }
@@ -173,7 +173,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         do {
             try await homeKitHomeManager.trigger(scene: sceneName)
         } catch {
-            log.critical("Failed to trigger scene '\(sceneName)': \(error)")
+            log.error("Failed to trigger scene '\(sceneName)': \(error)")
             throw error
         }
     }

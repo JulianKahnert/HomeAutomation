@@ -7,6 +7,7 @@
 
 #if canImport(SwiftUI)
 import Shared
+import SharedDistributedCluster
 import SwiftUI
 
 struct SettingsView: View {

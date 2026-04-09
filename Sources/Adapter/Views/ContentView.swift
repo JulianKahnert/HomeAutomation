@@ -8,6 +8,7 @@
 #if canImport(SwiftUI)
 import HAModels
 import Shared
+import SharedDistributedCluster
 import SwiftUI
 
 public struct ContentView: View {

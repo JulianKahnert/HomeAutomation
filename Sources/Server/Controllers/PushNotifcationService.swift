@@ -51,12 +51,16 @@ actor PushNotifcationService: NotificationSender {
             do {
                 try await apnsClient.sendBackgroundNotification(notification, deviceToken: deviceToken.tokenString)
             } catch {
-                Self.logger.critical(
+                Self.logger.warning(
                     "Failed to send clear notification to \(deviceToken.deviceName): \(error.localizedDescription)"
                 )
-                try? await DeviceToken.query(on: database)
-                    .filter(\.$tokenString == deviceToken.tokenString)
-                    .delete()
+                do {
+                    try await DeviceToken.query(on: database)
+                        .filter(\.$tokenString == deviceToken.tokenString)
+                        .delete()
+                } catch {
+                    Self.logger.error("[clearNotification] Failed to delete invalid device token for \(deviceToken.deviceName): \(error)")
+                }
             }
         }
     }
@@ -86,12 +90,16 @@ actor PushNotifcationService: NotificationSender {
             do {
                 try await apnsClient.sendAlertNotification(notification, deviceToken: deviceToken.tokenString)
             } catch {
-                Self.logger.critical(
+                Self.logger.warning(
                     "Failed to send push notification to \(deviceToken.deviceName) [\(deviceToken.tokenType)]: \(error.localizedDescription)"
                 )
-                try? await DeviceToken.query(on: database)
-                    .filter(\.$tokenString == deviceToken.tokenString)
-                    .delete()
+                do {
+                    try await DeviceToken.query(on: database)
+                        .filter(\.$tokenString == deviceToken.tokenString)
+                        .delete()
+                } catch {
+                    Self.logger.error("[sendAlert] Failed to delete invalid device token for \(deviceToken.deviceName): \(error)")
+                }
             }
         }
     }
@@ -191,11 +199,15 @@ actor PushNotifcationService: NotificationSender {
                         // 3. The app re-registers the new token with the server
                         // 4. If the app was not woken (force-quit / iOS budget), the token is
                         //    re-registered when the user next opens the app
-                        try? await DeviceToken.query(on: database)
-                            .filter(\.$tokenString == startToken.tokenString)
-                            .delete()
+                        do {
+                            try await DeviceToken.query(on: database)
+                                .filter(\.$tokenString == startToken.tokenString)
+                                .delete()
+                        } catch {
+                            Self.logger.error("[startOrUpdateLiveActivity] Failed to delete start token for \(startToken.deviceName): \(error)")
+                        }
                     } else {
-                        assertionFailure("Should find at least one start token")
+                        Self.logger.error("[startOrUpdateLiveActivity] No start or update token found for device")
                     }
                 } catch is CancellationError {
                     // CancellationError is expected when rapid window state changes occur.
@@ -207,23 +219,26 @@ actor PushNotifcationService: NotificationSender {
                 } catch {
                     if let apnsError = error as? APNSError,
                         let id = apnsError.apnsUniqueID {
-                        Self.logger.critical(
+                        Self.logger.error(
                             "[startOrUpdateLiveActivity] Error sending push notification apnsUniqueID: \(id.uuidString)"
                         )
                     }
-                    Self.logger.critical(
+                    Self.logger.warning(
                         "[startOrUpdateLiveActivity] Failed to send live activity push notification to \(usedToken?.deviceName ?? "") [\(usedToken?.tokenType ?? "")]: \(error.localizedDescription)"
                     )
-                    try? await DeviceToken.query(on: database)
-                        .filter(\.$tokenString == usedToken?.tokenString ?? "")
-                        .delete()
+                    do {
+                        try await DeviceToken.query(on: database)
+                            .filter(\.$tokenString == usedToken?.tokenString ?? "")
+                            .delete()
+                    } catch {
+                        Self.logger.error("[startOrUpdateLiveActivity] Failed to delete token after error for \(usedToken?.deviceName ?? ""): \(error)")
+                    }
                 }
             }
 
         } catch {
             Self.logger.critical(
                 "Failed to fetch push devices in startOrUpdateOpenWindowActivities: \(error)")
-            assertionFailure()
         }
     }
 
@@ -256,26 +271,29 @@ actor PushNotifcationService: NotificationSender {
                             .filter(\.$tokenString == deviceToken.tokenString)
                             .delete()
                     } catch {
-                        Self.logger.critical("Failed to delete device token: \(error.localizedDescription)")
+                        Self.logger.error("Failed to delete device token: \(error.localizedDescription)")
                     }
                 } catch {
                     if let apnsError = error as? APNSError,
                         let id = apnsError.apnsUniqueID {
-                        Self.logger.critical(
+                        Self.logger.error(
                             "[endAllLiveActivities] Error sending push notification apnsUniqueID: \(id.uuidString)"
                         )
                     }
-                    Self.logger.critical(
+                    Self.logger.warning(
                         "[endAllLiveActivities] Failed to send live activity push notification to \(deviceToken.deviceName) [\(deviceToken.tokenType)]: \(error.localizedDescription)"
                     )
-                    try? await DeviceToken.query(on: database)
-                        .filter(\.$tokenString == deviceToken.tokenString)
-                        .delete()
+                    do {
+                        try await DeviceToken.query(on: database)
+                            .filter(\.$tokenString == deviceToken.tokenString)
+                            .delete()
+                    } catch {
+                        Self.logger.error("[endAllLiveActivities] Failed to delete token for \(deviceToken.deviceName): \(error)")
+                    }
                 }
             }
         } catch {
             Self.logger.critical("Failed to fetch push devices: \(error)")
-            assertionFailure()
         }
 
         do {
@@ -284,8 +302,7 @@ actor PushNotifcationService: NotificationSender {
                 .filter(\.$activityType == activityType)
                 .delete()
         } catch {
-            Self.logger.critical("Failed to delete old token")
-            assertionFailure()
+            Self.logger.error("Failed to delete old token: \(error)")
         }
     }
 }

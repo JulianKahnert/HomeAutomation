@@ -48,7 +48,7 @@ public distributed actor HomeKitCommandReceiver {
         do {
             try await adapter.perform(action)
         } catch {
-            log.critical("perform(_:) — failed action '\(action)': \(error)")
+            log.error("perform(_:) — failed action '\(action)': \(error)")
             throw error
         }
     }
@@ -62,7 +62,7 @@ public distributed actor HomeKitCommandReceiver {
             log.info("trigger(scene:) — completed '\(sceneName)' in \(duration)")
         } catch {
             let duration = start.duration(to: .now)
-            log.critical("trigger(scene:) — failed '\(sceneName)' after \(duration): \(error)")
+            log.error("trigger(scene:) — failed '\(sceneName)' after \(duration): \(error)")
             throw error
         }
     }

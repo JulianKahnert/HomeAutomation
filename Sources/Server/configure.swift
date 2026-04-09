@@ -26,6 +26,8 @@ public func configure(_ app: Application) async throws {
         setenv("TZ", timeZoneString, 1)
         CFTimeZoneResetSystem()
     }
+    let gitCommit = (try? String(contentsOfFile: "git-commit", encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
+    app.logger.info("Git commit: \(gitCommit)")
     app.logger.info("Using timezone: \(TimeZone.current.description)")
     app.logger.info("Using environment: \(app.environment.name) (isRelease: \(app.environment.isRelease))")
 
@@ -211,6 +213,9 @@ public func configure(_ app: Application) async throws {
     let notificationSender = PushNotifcationService(database: app.db,
                                                     apnsClient: apnsClient,
                                                     notificationTopic: notificationTopic)
+
+    // Wire up push notifications for CRITICAL log events
+    await CriticalLogNotifier.shared.configure(notificationSender: notificationSender)
 
     let actionLogManager = ActionLogManager()
     let homeManager = await HomeManager(getAdapter: {

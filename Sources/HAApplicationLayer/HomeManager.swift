@@ -106,9 +106,9 @@ public final class HomeManager: HomeManagable {
             let entityId = action.entityId
 
             if let entity = try? await getCurrentEntity(with: entityId) {
-                log.critical("(\(entityId)) entity \(entity)")
+                log.error("(\(entityId)) entity \(entity)")
             }
-            log.critical("(\(entityId)) Failed to perform action [\(action), addToFaliedActions: \(addToFaliedActions)]\n\(error)")
+            log.error("(\(entityId)) Failed to perform action [\(action), addToFaliedActions: \(addToFaliedActions)]\n\(error)")
 
             if addToFaliedActions {
                 failedActions[entityId] = action
@@ -125,7 +125,7 @@ public final class HomeManager: HomeManagable {
             log.info("Triggering scene '\(sceneName)' — completed in \(duration)")
         } catch {
             let duration = start.duration(to: .now)
-            log.critical("Failed to trigger scene '\(sceneName)' after \(duration)\n\(error)")
+            log.error("Failed to trigger scene '\(sceneName)' after \(duration)\n\(error)")
         }
     }
 
@@ -150,7 +150,6 @@ public final class HomeManager: HomeManagable {
                 }
             } catch {
                 self.log.critical("Failed to persist entity item \(error)")
-                assertionFailure()
             }
         }
     }
@@ -174,8 +173,7 @@ public final class HomeManager: HomeManagable {
             log.debug("Sending notification \(title): \(message) [id: \(id)]")
             try await notificationSender.sendNotification(title: title, message: message, id: id)
         } catch {
-            log.critical("Failed to send notification: \(error)")
-            assertionFailure()
+            log.warning("Failed to send notification: \(error)")
         }
     }
 
@@ -185,8 +183,7 @@ public final class HomeManager: HomeManagable {
             log.debug("Clearing window notification [id: \(id)]")
             try await notificationSender.clearNotification(id: id)
         } catch {
-            log.critical("Failed to clear window notification: \(error)")
-            assertionFailure()
+            log.warning("Failed to clear window notification: \(error)")
         }
     }
 

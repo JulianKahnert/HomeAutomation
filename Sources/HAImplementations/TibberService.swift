@@ -35,12 +35,25 @@ public actor TibberService: Log {
 
         if let priceCache,
             Calendar.current.isDate(priceCache.0, inSameDayAs: date) {
+            log.debug("Using cached Tibber prices from \(priceCache.0)")
             return priceCache.1
         }
 
-        let response = try await tibber.priceInfoToday()
+        log.info("Fetching Tibber prices (cache miss or expired)")
+        let start = ContinuousClock.now
+        let response: PriceInfoToday
+        do {
+            response = try await tibber.priceInfoToday()
+        } catch {
+            let duration = start.duration(to: .now)
+            log.error("Tibber API call failed after \(duration): \(error)")
+            throw error
+        }
+        let duration = start.duration(to: .now)
+        log.info("Tibber API responded in \(duration) with \(response.homes.count) home(s)")
+
         guard let home = response.homes.first else {
-            log.critical("Failed to get home")
+            log.error("Failed to get home - Tibber API returned empty homes array")
             return []
         }
 
@@ -57,6 +70,7 @@ public actor TibberService: Log {
             return TodayPrice(time: start...end, price: price.total)
         }
 
+        log.info("Fetched \(prices.count) price entries for today")
         priceCache = (date, prices)
         return prices
     }
@@ -81,11 +95,15 @@ public actor TibberService: Log {
     }
 
     public func sendNotification(title: String, message: String) async {
-        log.info("Sending notification \(title) \(message)")
+        log.info("Sending Tibber notification: \(title)")
+        let start = ContinuousClock.now
         do {
             _ = try await tibber.sendPushNotification(title: title, message: message)
+            let duration = start.duration(to: .now)
+            log.info("Tibber notification sent in \(duration)")
         } catch {
-            log.critical("Failed to send notification \(error.localizedDescription)")
+            let duration = start.duration(to: .now)
+            log.error("Failed to send Tibber notification after \(duration): \(error)")
         }
     }
 }

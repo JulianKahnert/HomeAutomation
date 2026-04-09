@@ -22,6 +22,9 @@ RUN swift package resolve
 # Copy entire repo into container
 COPY . .
 
+# Capture git commit hash for runtime logging
+RUN git rev-parse --short HEAD > /tmp/git-commit 2>/dev/null || echo "unknown" > /tmp/git-commit
+
 # Build the application, with optimizations, with static linking, and using jemalloc
 # N.B.: The static version of jemalloc is incompatible with the static Swift runtime.
 RUN swift build -c release \
@@ -74,6 +77,9 @@ WORKDIR /app
 
 # Copy built executable and any staged resources from builder
 COPY --from=build --chown=vapor:vapor /staging /app
+
+# Copy git commit hash for startup logging
+COPY --from=build --chown=vapor:vapor /tmp/git-commit /app/git-commit
 
 # Provide configuration needed by the built-in crash reporter and some sensible default behaviors.
 ENV SWIFT_BACKTRACE=enable=yes,sanitize=yes,threads=all,images=all,interactive=no,swift-backtrace=./swift-backtrace-static

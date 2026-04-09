@@ -6,7 +6,13 @@ import Vapor
 enum Entrypoint {
     static func main() async throws {
         var env = try Environment.detect()
-        try LoggingSystem.bootstrap(from: &env)
+
+        // Custom bootstrap: wraps each handler with CriticalNotifyingLogHandler
+        // so that CRITICAL log events trigger push notifications.
+        LoggingSystem.bootstrap { label in
+            let underlying = StreamLogHandler.standardOutput(label: label)
+            return CriticalNotifyingLogHandler(label: label, underlying: underlying)
+        }
 //        try LoggingSystem.bootstrap(from: &env) { level in
 //            return { label in
 //                var logger = StreamLogHandler.standardOutput(label: label)

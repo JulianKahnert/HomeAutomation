@@ -58,7 +58,7 @@ public struct MotionAtNight: Automatable {
             do {
                 return try await motionSensor.motionDetectedState(with: hm)
             } catch {
-                log.critical("Failed to get motion sensor data - \(error)")
+                log.warning("Failed to get motion sensor data - \(error)")
                 return false
             }
         }).contains { $0 }
@@ -67,7 +67,7 @@ public struct MotionAtNight: Automatable {
         do {
             illuminance = try await lightSensor.illuminanceState(with: hm)
         } catch {
-            log.critical("Failed to get illuminance state - \(error)")
+            log.warning("Failed to get illuminance state - \(error)")
         }
         guard let illuminance else { return false }
 
@@ -81,7 +81,7 @@ public struct MotionAtNight: Automatable {
             do {
                 return try await windowSensor.isContactOpen(with: hm)
             } catch {
-                log.critical("Failed to get contact sensor - \(error)")
+                log.warning("Failed to get contact sensor - \(error)")
                 return false
             }
         }).contains { $0 }

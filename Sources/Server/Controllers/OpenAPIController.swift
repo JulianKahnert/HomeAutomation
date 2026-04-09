@@ -90,7 +90,7 @@ struct OpenAPIController: APIProtocol {
 
         case .liveActivityUpdate:
             guard let activityType = token.activityType else {
-                request.logger.critical("Token of type liveActivityUpdate must contain activityType")
+                request.logger.error("Token of type liveActivityUpdate must contain activityType")
                 return .internalServerError
             }
 

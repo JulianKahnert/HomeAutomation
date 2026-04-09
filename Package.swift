@@ -13,6 +13,10 @@ let package = Package(
             targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "SharedDistributedCluster"]
         ),
         .library(
+            name: "HAShared",
+            targets: ["HAModels", "HAImplementations"]
+        ),
+        .library(
             name: "ControllerKit",
             targets: ["Controller"]
         ),

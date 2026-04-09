@@ -10,6 +10,7 @@ import HAApplicationLayer
 import HAImplementations
 import HAModels
 import Shared
+import SharedDistributedCluster
 import Vapor
 
 private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)

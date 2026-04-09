@@ -10,7 +10,11 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "HomeAutomationKit",
-            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared"]
+            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "SharedDistributedCluster"]
+        ),
+        .library(
+            name: "HAShared",
+            targets: ["HAModels", "HAImplementations"]
         ),
         .library(
             name: "ControllerKit",
@@ -60,6 +64,7 @@ let package = Package(
                 "HAApplicationLayer",
                 "HAImplementations",
                 "Shared",
+                "SharedDistributedCluster",
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentMySQLDriver", package: "fluent-mysql-driver"),
@@ -79,6 +84,12 @@ let package = Package(
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "LoggingOSLog", package: "swift-log-oslog", condition: .when(platforms: [.macOS, .iOS, .macCatalyst, .tvOS, .watchOS, .visionOS])),
+            ]
+        ),
+        .target(
+            name: "SharedDistributedCluster",
+            dependencies: [
+                "Shared",
                 .product(name: "DistributedCluster", package: "swift-distributed-actors"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ]
@@ -88,6 +99,7 @@ let package = Package(
             dependencies: [
                 "HAModels",
                 "Shared",
+                "SharedDistributedCluster",
                 .product(name: "DistributedCluster", package: "swift-distributed-actors"),
             ]
         ),

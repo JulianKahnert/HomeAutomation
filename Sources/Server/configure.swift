@@ -9,6 +9,7 @@ import HAImplementations
 import HAModels
 import Logging
 import Shared
+import SharedDistributedCluster
 import Vapor
 import VaporAPNS
 

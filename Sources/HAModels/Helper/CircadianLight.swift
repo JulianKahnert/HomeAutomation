@@ -16,10 +16,9 @@ private let dayRampHalfWidth: Double = 0.03
 ///
 /// The curve holds at `0` during the night, ramps up smoothly across civil
 /// dawn, stays at `1` while the sun is above the horizon, and ramps down
-/// across civil dusk. Anchoring the ramps to `sunrise`/`sunset` (instead of
-/// letting a nearly 2 h window bleed into the middle of the night, as the
-/// previous implementation did) prevents the motion-at-night automation from
-/// picking a substantially brighter target at 2 a.m. than at 4 a.m.
+/// across civil dusk. The ramps are anchored tightly around `sunrise` and
+/// `sunset` so deep night reliably reports `0` and the configured night-floor
+/// in callers such as ``MotionAtNight`` is what actually applies.
 ///
 /// Polar regions without a sunrise/sunset return `0` because `sunData` is
 /// `nil`; callers such as ``MotionAtNight`` clamp this to a configured floor.
@@ -51,13 +50,11 @@ public func getNormalizedBrightnessValue(sunData: SunData? = nil, current: Doubl
 /// Returns the circadian color-temperature target (`0` = warmest, `1` = coolest)
 /// for the given moment.
 ///
-/// The curve is anchored to the sun: warm before sunrise and after sunset
-/// (so lights do not stay cool well into a winter evening), smoothly ramping
-/// up from `sunrise` to the coolest point at `solarNoon`, and back down to
-/// warm at `sunset`. The previous implementation was symmetric around
-/// `solarNoon` only and ignored `sunrise`/`sunset`, producing cool light at
-/// 17:00 on a December evening and warm light at 04:00 in midsummer despite
-/// the sun already being up.
+/// The curve is anchored to the sun: warm before `sunrise` and after `sunset`,
+/// smoothly ramping up from `sunrise` to the coolest point at `solarNoon`, and
+/// back down to warm at `sunset`. Anchoring to `sunrise`/`sunset` (and not
+/// only `solarNoon`) keeps short winter evenings warm immediately after sunset
+/// instead of staying cool well into the night.
 public func getNormalizedColorTemperatureValue(sunData: SunData? = nil, current: Double? = nil) -> Float {
     guard let sunData = sunData ?? getSunData() else { return 0 }
     let current = current ?? Date().percentageOfDay()

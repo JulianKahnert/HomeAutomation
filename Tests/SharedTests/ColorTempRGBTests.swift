@@ -167,10 +167,9 @@ final class ColorTempRGBTests: XCTestCase {
         XCTAssertGreaterThan(rgb.green, 0.9, "Cool daylight should have a high green component")
     }
 
-    /// Guards the widened range introduced to match the native HomeKit
-    /// color-temperature path. A regression (e.g. reverting to 2000…4000K)
-    /// would make this assertion fail because `value = 1.0` would no longer
-    /// produce a bluish-white.
+    /// Guards that the cool end of the normalized range reaches true daylight
+    /// (low-saturation white), keeping the RGB path visually aligned with the
+    /// native HomeKit color-temperature characteristic.
     func testColorTemperatureNormalized_RangeReachesDaylight() {
         let cool = componentsForColorTemperature(normalized: 1.0)
 
@@ -184,7 +183,6 @@ final class ColorTempRGBTests: XCTestCase {
     /// between RGB and native bulbs when the same normalized input is used.
     func testColorTemperatureNormalized_MiredLinearMapping() {
         // mired at value = 0.5 is the midpoint of 154…500, i.e. 327 → ≈ 3058K.
-        // A kelvin-linear mapping (the previous implementation) would have produced ≈ 4250K.
         let midpoint = componentsForColorTemperature(normalized: 0.5)
         let expected = componentsForColorTemperature(temperatureInKelvin: 1_000_000 / 327)
 

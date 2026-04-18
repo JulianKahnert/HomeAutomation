@@ -19,8 +19,8 @@ struct CircadianTests {
                                                  solarMidnight: 0.0)
 
     /// Short winter day: sunrise 08:00, sunset 16:15 — approximates Oldenburg
-    /// on the shortest days of the year and is what previously produced the
-    /// "still cool after sunset" bug.
+    /// on the shortest days of the year, used to assert that the curves stay
+    /// warm immediately after a winter sunset.
     private static let winterSunData = SunData(sunrise: 8.0 / 24.0,
                                                sunset: 16.25 / 24.0,
                                                solarNoon: 12.125 / 24.0,
@@ -114,9 +114,9 @@ struct CircadianTests {
         #expect(atEvening == 0)
     }
 
-    /// Regression guard for the previous implementation which computed color
-    /// temperature purely from solar noon. On a short winter day the old
-    /// formula still reported ≈ 0.39 at 17:00 (well past a 16:15 sunset).
+    /// Asserts that 45 minutes past a winter sunset the curve has already
+    /// dropped to fully warm — color temperature must follow the actual
+    /// daylight window, not just the symmetry around solar noon.
     @Test("Color temperature drops to warm immediately after a winter sunset")
     func colorTemperatureWinterEveningIsWarm() {
         let sun = Self.winterSunData
@@ -208,9 +208,8 @@ struct CircadianTests {
         let sunData = getSunData(for: date)
         let percentage = getNormalizedBrightnessValue(sunData: sunData, current: date.percentageOfDay())
 
-        // Previously this returned ≈ 0.12 because the sine ramp started at
-        // midnight; the dawn window is now anchored tightly around sunrise,
-        // so 02:00 is firmly "night" and must report 0.
+        // 02:00 sits well before the dawn ramp window, so the curve must
+        // report `0` — the configured night-floor in callers takes over.
         #expect(percentage == 0)
     }
 }

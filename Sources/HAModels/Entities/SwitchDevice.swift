@@ -67,7 +67,7 @@ open class SwitchDevice: Codable, @unchecked Sendable, Validatable, Log {
         if let colorTemperatureId {
             await hm.perform(.setColorTemperature(colorTemperatureId, value))
         } else if let rgbId {
-            let rgb = componentsForColorTemperature(normalzied: value)
+            let rgb = componentsForColorTemperature(normalized: value)
             await hm.perform(.setRGB(rgbId, rgb: rgb))
         }
     }

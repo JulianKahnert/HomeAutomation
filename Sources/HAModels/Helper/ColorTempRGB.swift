@@ -26,9 +26,18 @@ public struct RGB: Sendable, Hashable, Codable, Equatable {
     }
 }
 
-public func componentsForColorTemperature(normalzied value: Float) -> RGB {
-    let range: ClosedRange<Float> = 2000...4000
-    let kelvin = (range.upperBound - range.lowerBound) * value + range.lowerBound
+/// Maps a normalized `0…1` value (`0` = warmest, `1` = coolest) to an RGB
+/// color along the blackbody curve.
+///
+/// The mapping is linear in **mired** (not Kelvin) across 154…500 mired,
+/// which corresponds to ≈ 6500K…2000K. This matches the scale used by the
+/// HomeKit native color-temperature characteristic, so a given normalized
+/// input produces visually similar results on both paths
+/// (see ``HomeKitAdapter/perform(_:)`` for the native scaling).
+public func componentsForColorTemperature(normalized value: Float) -> RGB {
+    let miredRange: ClosedRange<Float> = 154...500
+    let mired = miredRange.upperBound - (miredRange.upperBound - miredRange.lowerBound) * value
+    let kelvin = 1_000_000 / mired
 
     return componentsForColorTemperature(temperatureInKelvin: kelvin)
 }

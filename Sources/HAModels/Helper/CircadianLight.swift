@@ -7,18 +7,25 @@
 
 import Foundation
 
-/// Half-width of the sunrise/sunset cosine ramp, expressed as a fraction of a day.
-/// `0.03 ≈ 43 minutes`, which approximates civil twilight at the configured latitude
-/// and keeps the full-brightness window aligned with the actual daylight hours.
-private let dayRampHalfWidth: Double = 0.03
+/// Half-width (as a fraction of a day) of the dawn/dusk ramp used when civil
+/// twilight times are not available on the supplied ``SunData``. Approximates
+/// civil twilight at mid-latitudes (~43 min) so the curve stays close to the
+/// "with twilight" shape near 53°N.
+private let fallbackRampHalfWidth: Double = 0.03
 
 /// Returns the circadian brightness target (`0…1`) for the given moment.
 ///
-/// The curve holds at `0` during the night, ramps up smoothly across civil
-/// dawn, stays at `1` while the sun is above the horizon, and ramps down
-/// across civil dusk. The ramps are anchored tightly around `sunrise` and
-/// `sunset` so deep night reliably reports `0` and the configured night-floor
-/// in callers such as ``MotionAtNight`` is what actually applies.
+/// When civil twilight is available on the supplied ``SunData``, the curve
+/// holds at `0` until civil dawn, ramps up to `1` at sunrise, stays at `1`
+/// throughout the day, ramps back down to `0` at civil dusk, and stays at
+/// `0` for the rest of the night. Anchoring the ramp endpoints to actual
+/// astronomical events lets the curve stretch with summer twilights and
+/// contract with shorter winter ones automatically.
+///
+/// When civil twilight is not provided (e.g. high latitudes in summer where
+/// the sun never goes 6° below the horizon, or sun data constructed by hand
+/// without it), the curve falls back to a centered cosine ramp of
+/// ``fallbackRampHalfWidth`` around sunrise/sunset.
 ///
 /// Polar regions without a sunrise/sunset return `0` because `sunData` is
 /// `nil`; callers such as ``MotionAtNight`` clamp this to a configured floor.
@@ -26,22 +33,36 @@ public func getNormalizedBrightnessValue(sunData: SunData? = nil, current: Doubl
     guard let sunData = sunData ?? getSunData() else { return 0 }
     let current = current ?? Date().percentageOfDay()
 
-    let dawnStart = sunData.sunrise - dayRampHalfWidth
-    let dawnEnd = sunData.sunrise + dayRampHalfWidth
-    let duskStart = sunData.sunset - dayRampHalfWidth
-    let duskEnd = sunData.sunset + dayRampHalfWidth
+    let dawnStart: Double
+    let dawnEnd: Double
+    let duskStart: Double
+    let duskEnd: Double
+    if let civilDawn = sunData.civilDawn, let civilDusk = sunData.civilDusk {
+        dawnStart = civilDawn
+        dawnEnd = sunData.sunrise
+        duskStart = sunData.sunset
+        duskEnd = civilDusk
+    } else {
+        dawnStart = sunData.sunrise - fallbackRampHalfWidth
+        dawnEnd = sunData.sunrise + fallbackRampHalfWidth
+        duskStart = sunData.sunset - fallbackRampHalfWidth
+        duskEnd = sunData.sunset + fallbackRampHalfWidth
+    }
 
     let value: Double
     if current <= dawnStart || current >= duskEnd {
         value = 0
     } else if current >= dawnEnd && current <= duskStart {
         value = 1
-    } else if current < dawnEnd {
+    } else if current < dawnEnd, dawnEnd > dawnStart {
         let progress = (current - dawnStart) / (dawnEnd - dawnStart)
         value = (1 - cos(.pi * progress)) / 2
-    } else {
+    } else if duskEnd > duskStart {
         let progress = (current - duskStart) / (duskEnd - duskStart)
         value = (1 + cos(.pi * progress)) / 2
+    } else {
+        // Degenerate ramp window (zero width) — fall through to bright.
+        value = 1
     }
 
     return Float(value.clamped(to: 0...1))
@@ -91,7 +112,9 @@ public func getSunData(for date: Date = Date()) -> SunData? {
     return SunData(sunrise: sunrise.date.percentageOfDay(),
                    sunset: sunset.date.percentageOfDay(),
                    solarNoon: today.solarNoon.date.percentageOfDay(),
-                   solarMidnight: today.solarMidnight.date.percentageOfDay())
+                   solarMidnight: today.solarMidnight.date.percentageOfDay(),
+                   civilDawn: today.civilDawn?.date.percentageOfDay(),
+                   civilDusk: today.civilDusk?.date.percentageOfDay())
 }
 
 /// Data for the sun
@@ -99,18 +122,35 @@ public func getSunData(for date: Date = Date()) -> SunData? {
 /// All parameters are normalized to the current day with values between 0 and 1.
 /// E.g. sunrise = 0.25 means that the sun rises at 6:00 am.
 public struct SunData: Sendable {
-    public init(sunrise: Double, sunset: Double, solarNoon: Double, solarMidnight: Double) {
+    public init(sunrise: Double,
+                sunset: Double,
+                solarNoon: Double,
+                solarMidnight: Double,
+                civilDawn: Double? = nil,
+                civilDusk: Double? = nil) {
         for value in [sunrise, sunset, solarNoon, solarMidnight] {
             assert((0...1).contains(value), "Wrong value for sun data: \(value)")
+        }
+        for value in [civilDawn, civilDusk].compactMap({ $0 }) {
+            assert((0...1).contains(value), "Wrong twilight value for sun data: \(value)")
         }
         self.sunrise = sunrise.clamped(to: 0...1)
         self.sunset = sunset.clamped(to: 0...1)
         self.solarNoon = solarNoon.clamped(to: 0...1)
         self.solarMidnight = solarMidnight.clamped(to: 0...1)
+        self.civilDawn = civilDawn?.clamped(to: 0...1)
+        self.civilDusk = civilDusk?.clamped(to: 0...1)
     }
 
     public let sunrise: Double
     public let sunset: Double
     public let solarNoon: Double
     public let solarMidnight: Double
+
+    /// Civil dawn (sun 6° below the horizon, ascending). Optional because at
+    /// high latitudes in summer the sun never dips that far below the horizon.
+    public let civilDawn: Double?
+
+    /// Civil dusk (sun 6° below the horizon, descending). Same caveat as ``civilDawn``.
+    public let civilDusk: Double?
 }

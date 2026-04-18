@@ -150,20 +150,57 @@ final class ColorTempRGBTests: XCTestCase {
 
     // MARK: - Color Temperature Tests
 
-    func testColorTemperatureNormalized_WarmWhite() {
-        let rgb = componentsForColorTemperature(normalzied: 0.0) // 2000K - warm
+    func testColorTemperatureNormalized_Warm() {
+        let rgb = componentsForColorTemperature(normalized: 0.0) // 2000K (500 mired)
 
-        // Warm white should have more red than blue
-        XCTAssertGreaterThan(rgb.red, rgb.blue, "Warm white should have more red than blue")
-        XCTAssertGreaterThan(rgb.red, 0.9, "Warm white should have high red component")
+        XCTAssertGreaterThan(rgb.red, rgb.blue, "Warm light should have more red than blue")
+        XCTAssertGreaterThan(rgb.red, 0.9, "Warm light should have a high red component")
+        XCTAssertLessThan(rgb.blue, 0.2, "Warm light should have a very low blue component")
     }
 
-    func testColorTemperatureNormalized_CoolWhite() {
-        let rgb = componentsForColorTemperature(normalzied: 1.0) // 4000K - neutral/cool
+    func testColorTemperatureNormalized_Cool() {
+        let rgb = componentsForColorTemperature(normalized: 1.0) // ≈ 6494K (154 mired)
 
-        // At 4000K, still has high red but more blue than warm white
-        XCTAssertGreaterThan(rgb.red, 0.9, "4000K should still have high red")
-        XCTAssertGreaterThan(rgb.blue, 0.6, "4000K should have decent blue component")
+        // 6500K approximates daylight white: high red AND high blue.
+        XCTAssertGreaterThan(rgb.red, 0.9, "Cool daylight should still have a high red component")
+        XCTAssertGreaterThan(rgb.blue, 0.9, "Cool daylight should have a high blue component")
+        XCTAssertGreaterThan(rgb.green, 0.9, "Cool daylight should have a high green component")
+    }
+
+    /// Guards the widened range introduced to match the native HomeKit
+    /// color-temperature path. A regression (e.g. reverting to 2000…4000K)
+    /// would make this assertion fail because `value = 1.0` would no longer
+    /// produce a bluish-white.
+    func testColorTemperatureNormalized_RangeReachesDaylight() {
+        let cool = componentsForColorTemperature(normalized: 1.0)
+
+        // Saturation should be very low at true daylight — nearly neutral white.
+        let hsv = HAModels.hsv(from: cool)
+        XCTAssertLessThan(hsv.s, 0.15, "Cool end should produce near-neutral white, got saturation \(hsv.s)")
+    }
+
+    /// The normalized scale runs linearly in *mired*, matching the native
+    /// HomeKit color-temperature characteristic. This keeps visual parity
+    /// between RGB and native bulbs when the same normalized input is used.
+    func testColorTemperatureNormalized_MiredLinearMapping() {
+        // mired at value = 0.5 is the midpoint of 154…500, i.e. 327 → ≈ 3058K.
+        // A kelvin-linear mapping (the previous implementation) would have produced ≈ 4250K.
+        let midpoint = componentsForColorTemperature(normalized: 0.5)
+        let expected = componentsForColorTemperature(temperatureInKelvin: 1_000_000 / 327)
+
+        XCTAssertEqual(midpoint.red, expected.red, accuracy: 0.01)
+        XCTAssertEqual(midpoint.green, expected.green, accuracy: 0.01)
+        XCTAssertEqual(midpoint.blue, expected.blue, accuracy: 0.01)
+    }
+
+    func testColorTemperatureNormalized_MonotonicBlueIncrease() {
+        // Moving from warm (0) to cool (1), blue should increase monotonically.
+        let samples = stride(from: Float(0), through: Float(1), by: 0.1).map {
+            componentsForColorTemperature(normalized: $0).blue
+        }
+        for (prev, next) in zip(samples, samples.dropFirst()) {
+            XCTAssertLessThanOrEqual(prev, next + 0.0001, "Blue component must not decrease as color temperature rises")
+        }
     }
 
     func testColorTemperatureKelvin_2700K() {

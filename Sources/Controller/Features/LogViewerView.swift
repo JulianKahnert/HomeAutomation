@@ -29,7 +29,11 @@ struct LogViewerView: View {
     }
 
     private var exportAsText: String {
-        LogReader.exportText(for: filteredEntries)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return filteredEntries.reversed().map { entry in
+            "[\(formatter.string(from: entry.timestamp))] \(entry.level) \(entry.label): \(entry.message)"
+        }.joined(separator: "\n")
     }
 
     var body: some View {

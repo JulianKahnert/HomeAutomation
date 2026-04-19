@@ -9,6 +9,7 @@ import Dependencies
 import Fluent
 import HAModels
 import OpenAPIRuntime
+import Shared
 import Vapor
 
 struct OpenAPIController: APIProtocol {
@@ -279,6 +280,28 @@ struct OpenAPIController: APIProtocol {
         )
 
         return .ok(.init(body: .json(response)))
+    }
+
+    // MARK: - /logs
+
+    func getLogs(_ input: Operations.GetLogs.Input) async throws -> Operations.GetLogs.Output {
+        let startDate = input.query.startDate
+        let endDate = input.query.endDate ?? Date()
+        let limit = input.query.limit ?? 1000
+
+        let entries = await LogStore.shared.readEntries(from: startDate, to: endDate, maxEntries: limit)
+
+        let schemaItems = entries.map { entry in
+            Components.Schemas.LogEntry(
+                id: entry.id.uuidString,
+                timestamp: entry.timestamp,
+                level: entry.level,
+                label: entry.label,
+                message: entry.message
+            )
+        }
+
+        return .ok(.init(body: .json(schemaItems)))
     }
 
 }

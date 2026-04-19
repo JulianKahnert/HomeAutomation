@@ -128,8 +128,9 @@ public struct MotionAtNight: Automatable {
         await withTaskGroup(of: Void.self) { group in
             for light in lights {
                 group.addTask {
-                    // do not change the brightness, if it is currently turned off
-                    guard (try? await hm.getCurrentEntity(with: light.switchId).isDeviceOn ?? true) == true else { return }
+                    // do not change the brightness, if it is currently turned off or brightness control is not available
+                    guard (try? await hm.getCurrentEntity(with: light.switchId).isDeviceOn ?? true) == true,
+                          light.brightnessId != nil else { return }
                     await light.setBrightness(to: min(0.05, brightnessValue), with: hm)
                 }
             }

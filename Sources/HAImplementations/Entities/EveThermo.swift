@@ -8,7 +8,7 @@
 import Foundation
 import HAModels
 
-public final class EveThermo: HeatSwitchDevice, @unchecked Sendable {
+public final class EveThermo: HeatSwitchDevice {
     public convenience init(query: EntityId.Query) {
         self.init(heatSwitchId: EntityId(query: query, characteristic: .heating))
     }

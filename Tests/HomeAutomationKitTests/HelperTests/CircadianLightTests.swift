@@ -11,25 +11,28 @@ import Testing
 
 struct CircadianTests {
 
-    /// Symmetric, easy-to-reason-about sun data with civil twilight ≈ 36 min:
-    /// civil dawn 05:24, sunrise 06:00, solar noon 12:00, sunset 18:00, civil dusk 18:36.
+    /// Symmetric, easy-to-reason-about sun data: nautical dawn 04:42, sunrise
+    /// 06:00, solar noon 12:00, sunset 18:00, nautical dusk 19:18. Nautical
+    /// twilight is ≈ 78 min wide (matching mid-latitudes around the equinox).
     private static let standardSunData = SunData(sunrise: 0.25,
                                                  sunset: 0.75,
                                                  solarNoon: 0.5,
                                                  solarMidnight: 0.0,
-                                                 civilDawn: 0.225,
-                                                 civilDusk: 0.775)
+                                                 nauticalDawn: 0.196,
+                                                 nauticalDusk: 0.804)
 
-    /// Short winter day at Oldenburg: sunrise 08:00, sunset 16:15, civil
-    /// twilight ≈ 42 min on either side.
+    /// Short winter day at Oldenburg: sunrise 08:00, sunset 16:15,
+    /// nautical twilight ≈ 88 min on either side.
     private static let winterSunData = SunData(sunrise: 8.0 / 24.0,
                                                sunset: 16.25 / 24.0,
                                                solarNoon: 12.125 / 24.0,
                                                solarMidnight: 0.00,
-                                               civilDawn: (8.0 - 42.0 / 60.0) / 24.0,
-                                               civilDusk: (16.25 + 42.0 / 60.0) / 24.0)
+                                               nauticalDawn: (8.0 - 88.0 / 60.0) / 24.0,
+                                               nauticalDusk: (16.25 + 88.0 / 60.0) / 24.0)
 
-    /// Sun data without civil twilight info — exercises the fallback ramp.
+    /// Sun data without nautical twilight info — exercises the constant
+    /// fallback ramp used near the summer solstice when nautical dusk wraps
+    /// past midnight.
     private static let sunDataWithoutTwilight = SunData(sunrise: 0.25,
                                                         sunset: 0.75,
                                                         solarNoon: 0.5,
@@ -39,7 +42,7 @@ struct CircadianTests {
         (hour * 3600 + minute * 60) / 86_400
     }
 
-    // MARK: - Brightness curve (with civil twilight)
+    // MARK: - Brightness curve (nautical-twilight-anchored)
 
     @Test("Brightness at solar noon is full")
     func brightnessAtSolarNoon() {
@@ -48,41 +51,74 @@ struct CircadianTests {
         #expect(value == 1)
     }
 
-    @Test("Brightness at sunrise is full (dawn ramp ends here)")
+    @Test("Brightness at sunrise is 0.5 (midpoint of the dawn ramp)")
     func brightnessAtSunrise() {
+        // Cosine ramp is centred on sunrise, so the inflection point sits
+        // exactly there: lights are halfway between dark and full daylight.
         let value = getNormalizedBrightnessValue(sunData: Self.standardSunData,
                                                  current: Self.standardSunData.sunrise)
-        #expect(abs(value - 1.0) < 0.001)
+        #expect(abs(value - 0.5) < 0.001)
     }
 
-    @Test("Brightness at sunset is full (dusk ramp begins here)")
+    @Test("Brightness at sunset is 0.5 (midpoint of the dusk ramp)")
     func brightnessAtSunset() {
         let value = getNormalizedBrightnessValue(sunData: Self.standardSunData,
                                                  current: Self.standardSunData.sunset)
+        #expect(abs(value - 0.5) < 0.001)
+    }
+
+    @Test("Brightness at nautical dawn is zero (start of dawn ramp)")
+    func brightnessAtNauticalDawn() throws {
+        let nauticalDawn = try #require(Self.standardSunData.nauticalDawn)
+        let value = getNormalizedBrightnessValue(sunData: Self.standardSunData, current: nauticalDawn)
+        #expect(abs(value - 0.0) < 0.001)
+    }
+
+    @Test("Brightness at nautical dusk is zero (end of dusk ramp)")
+    func brightnessAtNauticalDusk() throws {
+        let nauticalDusk = try #require(Self.standardSunData.nauticalDusk)
+        let value = getNormalizedBrightnessValue(sunData: Self.standardSunData, current: nauticalDusk)
+        #expect(abs(value - 0.0) < 0.001)
+    }
+
+    @Test("Brightness reaches 1 one nautical-twilight after sunrise")
+    func brightnessAtPeakStart() throws {
+        let sun = Self.standardSunData
+        let nauticalDawn = try #require(sun.nauticalDawn)
+        let peakStart = sun.sunrise + (sun.sunrise - nauticalDawn)
+        let value = getNormalizedBrightnessValue(sunData: sun, current: peakStart)
         #expect(abs(value - 1.0) < 0.001)
     }
 
-    @Test("Brightness at civil dawn is zero (start of dawn ramp)")
-    func brightnessAtCivilDawn() throws {
-        let civilDawn = try #require(Self.standardSunData.civilDawn)
-        let value = getNormalizedBrightnessValue(sunData: Self.standardSunData, current: civilDawn)
-        #expect(abs(value - 0.0) < 0.001)
-    }
-
-    @Test("Brightness at civil dusk is zero (end of dusk ramp)")
-    func brightnessAtCivilDusk() throws {
-        let civilDusk = try #require(Self.standardSunData.civilDusk)
-        let value = getNormalizedBrightnessValue(sunData: Self.standardSunData, current: civilDusk)
-        #expect(abs(value - 0.0) < 0.001)
-    }
-
-    @Test("Brightness at the midpoint of civil dawn → sunrise is 0.5")
-    func brightnessAtDawnMidpoint() throws {
+    @Test("Brightness leaves 1 one nautical-twilight before sunset")
+    func brightnessAtPeakEnd() throws {
         let sun = Self.standardSunData
-        let civilDawn = try #require(sun.civilDawn)
-        let midpoint = (civilDawn + sun.sunrise) / 2
-        let value = getNormalizedBrightnessValue(sunData: sun, current: midpoint)
-        #expect(abs(value - 0.5) < 0.001)
+        let nauticalDusk = try #require(sun.nauticalDusk)
+        let peakEnd = sun.sunset - (nauticalDusk - sun.sunset)
+        let value = getNormalizedBrightnessValue(sunData: sun, current: peakEnd)
+        #expect(abs(value - 1.0) < 0.001)
+    }
+
+    @Test("Brightness is already dimming two minutes before sunset")
+    func brightnessJustBeforeSunset() {
+        // Real-world scenario: sunset 20:32, nautical dusk ≈ 78 min later
+        // (mid-April at 53°N). At 20:30 (two minutes before sunset) the
+        // dusk-ramp midpoint sits at sunset, so brightness must be a touch
+        // above 0.5 — well below 1.
+        let sunsetFraction = (20.0 + 32.0 / 60.0) / 24.0
+        let nautDuskFraction = sunsetFraction + (78.0 / 60.0) / 24.0
+        let nautDawnFraction = (5.0 + 8.0 / 60.0) / 24.0
+        let sunriseFraction = (6.0 + 26.0 / 60.0) / 24.0
+        let sun = SunData(sunrise: sunriseFraction,
+                          sunset: sunsetFraction,
+                          solarNoon: 13.5 / 24.0,
+                          solarMidnight: 1.5 / 24.0,
+                          nauticalDawn: nautDawnFraction,
+                          nauticalDusk: nautDuskFraction)
+        let twoMinutesBeforeSunset = (20.0 + 30.0 / 60.0) / 24.0
+        let value = getNormalizedBrightnessValue(sunData: sun, current: twoMinutesBeforeSunset)
+        #expect(value > 0.45 && value < 0.6,
+                "Expected ≈ 0.5 just before sunset, got \(value)")
     }
 
     @Test("Brightness deep in the night is zero")
@@ -97,20 +133,21 @@ struct CircadianTests {
 
     @Test("Brightness stays at zero after a winter sunset")
     func brightnessAfterWinterSunset() {
-        // 18:00 on a short December day is well past civil dusk (≈ 16:57) → must be 0.
+        // 18:00 on a short December day is well past nautical dusk (≈ 17:43) → 0.
         let value = getNormalizedBrightnessValue(sunData: Self.winterSunData,
                                                  current: fractionOfDay(hour: 18))
         #expect(value == 0)
     }
 
-    @Test("Brightness ramp is monotone non-decreasing across dawn")
+    @Test("Brightness ramp is monotone non-decreasing across the entire dawn ramp")
     func brightnessMonotoneAcrossDawn() throws {
         let sun = Self.standardSunData
-        let civilDawn = try #require(sun.civilDawn)
+        let nauticalDawn = try #require(sun.nauticalDawn)
+        let rampHalf = sun.sunrise - nauticalDawn
         let step = 0.002
-        var current = civilDawn - 0.01
+        var current = nauticalDawn - 0.01
         var previous = getNormalizedBrightnessValue(sunData: sun, current: current)
-        while current <= sun.sunrise + 0.01 {
+        while current <= sun.sunrise + rampHalf + 0.01 {
             let next = getNormalizedBrightnessValue(sunData: sun, current: current)
             #expect(next >= previous - 0.001)
             previous = next
@@ -118,14 +155,15 @@ struct CircadianTests {
         }
     }
 
-    @Test("Brightness ramp is monotone non-increasing across dusk")
+    @Test("Brightness ramp is monotone non-increasing across the entire dusk ramp")
     func brightnessMonotoneAcrossDusk() throws {
         let sun = Self.standardSunData
-        let civilDusk = try #require(sun.civilDusk)
+        let nauticalDusk = try #require(sun.nauticalDusk)
+        let rampHalf = nauticalDusk - sun.sunset
         let step = 0.002
-        var current = sun.sunset - 0.01
+        var current = sun.sunset - rampHalf - 0.01
         var previous = getNormalizedBrightnessValue(sunData: sun, current: current)
-        while current <= civilDusk + 0.01 {
+        while current <= nauticalDusk + 0.01 {
             let next = getNormalizedBrightnessValue(sunData: sun, current: current)
             #expect(next <= previous + 0.001)
             previous = next
@@ -133,12 +171,10 @@ struct CircadianTests {
         }
     }
 
-    // MARK: - Brightness curve fallback (no civil twilight provided)
+    // MARK: - Brightness curve fallback
 
-    @Test("Brightness falls back to a centered ramp when civil twilight is missing")
-    func brightnessFallbackCenteredOnSunrise() {
-        // Without civilDawn/civilDusk the ramp should still reach 1 in the middle of
-        // the day and 0 deep at night — the curve simply uses a constant half-width.
+    @Test("Constant fallback: brightness still reaches 1 at noon and 0 at night")
+    func brightnessConstantFallback() {
         let sun = Self.sunDataWithoutTwilight
         let atNoon = getNormalizedBrightnessValue(sunData: sun, current: sun.solarNoon)
         let atMidnight = getNormalizedBrightnessValue(sunData: sun, current: 0)

@@ -51,10 +51,13 @@ public struct SunSchedule {
     public var sunrise: SunPosition?
     public var sunset: SunPosition?
 
-    // Optional: at high latitudes the sun can stay within 6° of the horizon
-    // throughout the night, so civil twilight is not always defined.
-    public var civilDawn: SunPosition?
-    public var civilDusk: SunPosition?
+    // Optional: nautical twilight (sun 12° below horizon) is undefined whenever
+    // the sun stays brighter than that all night — common at mid-latitudes
+    // around the summer solstice. Even when defined, the times can wrap past
+    // midnight in summer; consumers should compare against `sunset`/`sunrise`
+    // before relying on them.
+    public var nauticalDawn: SunPosition?
+    public var nauticalDusk: SunPosition?
 }
 
 public class Sun {
@@ -64,10 +67,11 @@ public class Sun {
     /// radius (~16′). Used by `sunriseOrSet` for sunrise/sunset.
     private static let sunriseZenith: Double = 90.833
 
-    /// Zenith angle (in degrees) defining civil twilight: the sun is 6° below the
-    /// geometric horizon. Used to compute civil dawn (morning) and civil dusk
-    /// (evening), the practical limits of usable outdoor daylight.
-    private static let civilTwilightZenith: Double = 96.0
+    /// Zenith angle (in degrees) defining nautical twilight: the sun is 12° below
+    /// the geometric horizon. The "golden-hour boundary" — beyond this, only the
+    /// brightest celestial bodies remain visible. Used as the anchor for the
+    /// circadian brightness ramp; see ``getNormalizedBrightnessValue(sunData:current:)``.
+    private static let nauticalTwilightZenith: Double = 102.0
 
     /// Relation of a date to a sun event, compared at minute granularity.
     public enum SunElevation {
@@ -131,17 +135,17 @@ public class Sun {
             sunset = position(latitude: latitude, longitude: longitude, date: JT.startOfDay.addingTimeInterval(setMin * 60.0), calendar: calendar, timeZone: timeZone)
         }
 
-        var civilDawn: SunPosition?
-        if let dawnMin = sunriseOrSet(rise: true, zenithDegrees: civilTwilightZenith, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
-            civilDawn = position(latitude: latitude, longitude: longitude, date: JT.startOfDay.addingTimeInterval(dawnMin * 60.0), calendar: calendar, timeZone: timeZone)
+        var nauticalDawn: SunPosition?
+        if let dawnMin = sunriseOrSet(rise: true, zenithDegrees: nauticalTwilightZenith, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
+            nauticalDawn = position(latitude: latitude, longitude: longitude, date: JT.startOfDay.addingTimeInterval(dawnMin * 60.0), calendar: calendar, timeZone: timeZone)
         }
 
-        var civilDusk: SunPosition?
-        if let duskMin = sunriseOrSet(rise: false, zenithDegrees: civilTwilightZenith, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
-            civilDusk = position(latitude: latitude, longitude: longitude, date: JT.startOfDay.addingTimeInterval(duskMin * 60.0), calendar: calendar, timeZone: timeZone)
+        var nauticalDusk: SunPosition?
+        if let duskMin = sunriseOrSet(rise: false, zenithDegrees: nauticalTwilightZenith, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
+            nauticalDusk = position(latitude: latitude, longitude: longitude, date: JT.startOfDay.addingTimeInterval(duskMin * 60.0), calendar: calendar, timeZone: timeZone)
         }
 
-        return SunSchedule(position: currentPosition, startOfDay: startOfDay, endOfDay: endOfDay, solarNoon: solarNoon, solarMidnight: solarMidnight, sunrise: sunrise, sunset: sunset, civilDawn: civilDawn, civilDusk: civilDusk)
+        return SunSchedule(position: currentPosition, startOfDay: startOfDay, endOfDay: endOfDay, solarNoon: solarNoon, solarMidnight: solarMidnight, sunrise: sunrise, sunset: sunset, nauticalDawn: nauticalDawn, nauticalDusk: nauticalDusk)
     }
 
     public static func position(latitude: Double, longitude: Double, date: Date?) -> SunPosition? {

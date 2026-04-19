@@ -113,83 +113,67 @@ struct SunComparisonTests {
         #expect(Sun.sunsetElevation(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == .below)
     }
 
-    // MARK: - Civil twilight (sun at zenith 96°, i.e. 6° below the horizon)
+    // MARK: - Nautical twilight (sun at zenith 102°, i.e. 12° below the horizon)
     //
     // Reference values for Oldenburg (53.14°N, 8.21°E) come from standard
     // astronomical tables (NOAA Solar Calculator algorithm, which is what
     // `Sun.swift` implements). Tolerances are ±5 min to absorb rounding and
     // small algorithmic differences while still failing on regressions.
-
-    private func civilTwilightComponents(year: Int, month: Int, day: Int, isDawn: Bool) throws -> (hour: Int, minute: Int) {
-        var calendar = Calendar.current
-        calendar.timeZone = timeZone
-        let refDate = try date(year: year, month: month, day: day, hour: 12, minute: 0)
-        let schedule = try #require(Sun.schedule(latitude: latitude, longitude: longitude, date: refDate, calendar: calendar, timeZone: timeZone))
-        let position = try #require(isDawn ? schedule.civilDawn : schedule.civilDusk)
-        return (calendar.component(.hour, from: position.date), calendar.component(.minute, from: position.date))
-    }
+    // Nautical twilight is undefined at mid-latitudes around the summer
+    // solstice — the sun never dips 12° below the horizon there.
 
     private func minutesSinceMidnight(_ components: (hour: Int, minute: Int)) -> Int {
         components.hour * 60 + components.minute
     }
 
-    @Test("Spring equinox civil dawn at Oldenburg is ≈ 05:56 CET")
-    func civilDawnAtSpringEquinox() throws {
-        let actual = try civilTwilightComponents(year: 2026, month: 3, day: 20, isDawn: true)
-        let expected = 5 * 60 + 56
-        #expect(abs(minutesSinceMidnight(actual) - expected) <= 5,
-                "Civil dawn was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 05:56 CET")
+    private func nauticalTwilightComponents(year: Int, month: Int, day: Int, isDawn: Bool) throws -> (hour: Int, minute: Int) {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        let refDate = try date(year: year, month: month, day: day, hour: 12, minute: 0)
+        let schedule = try #require(Sun.schedule(latitude: latitude, longitude: longitude, date: refDate, calendar: calendar, timeZone: timeZone))
+        let position = try #require(isDawn ? schedule.nauticalDawn : schedule.nauticalDusk)
+        return (calendar.component(.hour, from: position.date), calendar.component(.minute, from: position.date))
     }
 
-    @Test("Spring equinox civil dusk at Oldenburg is ≈ 19:17 CET")
-    func civilDuskAtSpringEquinox() throws {
-        let actual = try civilTwilightComponents(year: 2026, month: 3, day: 20, isDawn: false)
-        let expected = 19 * 60 + 17
+    @Test("Spring equinox nautical dawn at Oldenburg is ≈ 05:14 CET")
+    func nauticalDawnAtSpringEquinox() throws {
+        let actual = try nauticalTwilightComponents(year: 2026, month: 3, day: 20, isDawn: true)
+        let expected = 5 * 60 + 14
         #expect(abs(minutesSinceMidnight(actual) - expected) <= 5,
-                "Civil dusk was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 19:17 CET")
+                "Nautical dawn was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 05:14 CET")
     }
 
-    @Test("Summer solstice civil dawn at Oldenburg is ≈ 04:08 CEST")
-    func civilDawnAtSummerSolstice() throws {
-        let actual = try civilTwilightComponents(year: 2026, month: 6, day: 21, isDawn: true)
-        let expected = 4 * 60 + 8
+    @Test("Spring equinox nautical dusk at Oldenburg is ≈ 19:59 CET")
+    func nauticalDuskAtSpringEquinox() throws {
+        let actual = try nauticalTwilightComponents(year: 2026, month: 3, day: 20, isDawn: false)
+        let expected = 19 * 60 + 59
         #expect(abs(minutesSinceMidnight(actual) - expected) <= 5,
-                "Civil dawn was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 04:08 CEST")
+                "Nautical dusk was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 19:59 CET")
     }
 
-    @Test("Summer solstice civil dusk at Oldenburg is ≈ 22:47 CEST")
-    func civilDuskAtSummerSolstice() throws {
-        let actual = try civilTwilightComponents(year: 2026, month: 6, day: 21, isDawn: false)
-        let expected = 22 * 60 + 47
+    @Test("Winter solstice nautical dawn at Oldenburg is ≈ 07:06 CET")
+    func nauticalDawnAtWinterSolstice() throws {
+        let actual = try nauticalTwilightComponents(year: 2026, month: 12, day: 21, isDawn: true)
+        let expected = 7 * 60 + 6
         #expect(abs(minutesSinceMidnight(actual) - expected) <= 5,
-                "Civil dusk was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 22:47 CEST")
+                "Nautical dawn was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 07:06 CET")
     }
 
-    @Test("Winter solstice civil dawn at Oldenburg is ≈ 07:53 CET")
-    func civilDawnAtWinterSolstice() throws {
-        let actual = try civilTwilightComponents(year: 2026, month: 12, day: 21, isDawn: true)
-        let expected = 7 * 60 + 53
+    @Test("Winter solstice nautical dusk at Oldenburg is ≈ 17:39 CET")
+    func nauticalDuskAtWinterSolstice() throws {
+        let actual = try nauticalTwilightComponents(year: 2026, month: 12, day: 21, isDawn: false)
+        let expected = 17 * 60 + 39
         #expect(abs(minutesSinceMidnight(actual) - expected) <= 5,
-                "Civil dawn was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 07:53 CET")
+                "Nautical dusk was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 17:39 CET")
     }
 
-    @Test("Winter solstice civil dusk at Oldenburg is ≈ 16:52 CET")
-    func civilDuskAtWinterSolstice() throws {
-        let actual = try civilTwilightComponents(year: 2026, month: 12, day: 21, isDawn: false)
-        let expected = 16 * 60 + 52
-        #expect(abs(minutesSinceMidnight(actual) - expected) <= 5,
-                "Civil dusk was \(actual.hour):\(String(format: "%02d", actual.minute)), expected ≈ 16:52 CET")
-    }
-
-    @Test("Civil twilight duration matches astronomy at 53°N",
+    @Test("Nautical twilight duration matches astronomy at 53°N",
           arguments: [
-            // (month, day, expected duration in minutes ±2 min tolerance)
-            (3, 20, 35),  // equinox: ≈ 34.6 min
-            (6, 21, 52),  // summer solstice: ≈ 52.3 min
-            (9, 22, 35),  // autumn equinox: ≈ 34.6 min
-            (12, 21, 42)  // winter solstice: ≈ 42.6 min
+            // (month, day, expected duration in minutes ±3 min tolerance)
+            (3, 20, 76),  // equinox: ≈ 75.7 min
+            (12, 21, 88)  // winter solstice: ≈ 87.9 min
           ])
-    func civilTwilightDuration(month: Int, day: Int, expectedMinutes: Int) throws {
+    func nauticalTwilightDuration(month: Int, day: Int, expectedMinutes: Int) throws {
         var calendar = Calendar.current
         calendar.timeZone = timeZone
         let refDate = try date(year: 2026, month: month, day: day, hour: 12, minute: 0)
@@ -197,11 +181,11 @@ struct SunComparisonTests {
 
         let sunrise = try #require(schedule.sunrise)
         let sunset = try #require(schedule.sunset)
-        let civilDawn = try #require(schedule.civilDawn)
-        let civilDusk = try #require(schedule.civilDusk)
+        let nauticalDawn = try #require(schedule.nauticalDawn)
+        let nauticalDusk = try #require(schedule.nauticalDusk)
 
-        let dawnDurationMin = sunrise.date.timeIntervalSince(civilDawn.date) / 60
-        let duskDurationMin = civilDusk.date.timeIntervalSince(sunset.date) / 60
+        let dawnDurationMin = sunrise.date.timeIntervalSince(nauticalDawn.date) / 60
+        let duskDurationMin = nauticalDusk.date.timeIntervalSince(sunset.date) / 60
 
         #expect(abs(dawnDurationMin - Double(expectedMinutes)) <= 3,
                 "Dawn duration \(dawnDurationMin) min differs from expected \(expectedMinutes) ±3 min")
@@ -209,29 +193,23 @@ struct SunComparisonTests {
                 "Dusk duration \(duskDurationMin) min differs from expected \(expectedMinutes) ±3 min")
     }
 
-    @Test("Civil dawn always precedes sunrise across the year")
-    func civilDawnAlwaysBeforeSunrise() throws {
-        var calendar = Calendar.current
-        calendar.timeZone = timeZone
-        for month in [1, 3, 5, 7, 9, 11] {
-            let refDate = try date(year: 2026, month: month, day: 15, hour: 12, minute: 0)
-            let schedule = try #require(Sun.schedule(latitude: latitude, longitude: longitude, date: refDate, calendar: calendar, timeZone: timeZone))
-            let sunrise = try #require(schedule.sunrise)
-            let civilDawn = try #require(schedule.civilDawn)
-            #expect(civilDawn.date < sunrise.date, "Civil dawn must precede sunrise (month \(month))")
-        }
-    }
+    /// At 53°N the sun reaches a minimum elevation of about −13.5° around the
+    /// summer solstice — only just below the −12° nautical-twilight threshold.
+    /// `Sun.schedule` therefore reports a "dusk" time wrapped past midnight.
+    /// `getSunData(for:)` is responsible for filtering those wrap-arounds out
+    /// so the brightness curve falls back to civil twilight.
+    @Test("Summer solstice: nautical dusk wrap is rejected by getSunData")
+    func nauticalDuskWrapAtSummerSolsticeIsFiltered() throws {
+        let summerDate = try date(year: 2026, month: 6, day: 21, hour: 12, minute: 0)
+        let sunData = try #require(getSunData(for: summerDate))
 
-    @Test("Civil dusk always follows sunset across the year")
-    func civilDuskAlwaysAfterSunset() throws {
-        var calendar = Calendar.current
-        calendar.timeZone = timeZone
-        for month in [1, 3, 5, 7, 9, 11] {
-            let refDate = try date(year: 2026, month: month, day: 15, hour: 12, minute: 0)
-            let schedule = try #require(Sun.schedule(latitude: latitude, longitude: longitude, date: refDate, calendar: calendar, timeZone: timeZone))
-            let sunset = try #require(schedule.sunset)
-            let civilDusk = try #require(schedule.civilDusk)
-            #expect(civilDusk.date > sunset.date, "Civil dusk must follow sunset (month \(month))")
+        // Either nil (filtered) or — in the unlikely case the algorithm
+        // returns it on the right side of midnight — strictly after sunset.
+        if let nauticalDusk = sunData.nauticalDusk {
+            #expect(nauticalDusk > sunData.sunset, "Nautical dusk \(nauticalDusk) must be after sunset \(sunData.sunset)")
+        }
+        if let nauticalDawn = sunData.nauticalDawn {
+            #expect(nauticalDawn < sunData.sunrise, "Nautical dawn \(nauticalDawn) must be before sunrise \(sunData.sunrise)")
         }
     }
 }

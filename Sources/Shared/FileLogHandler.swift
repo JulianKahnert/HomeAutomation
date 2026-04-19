@@ -1,127 +1,64 @@
 //
-//  Logging.swift
-//  FlowKit Adapter
-//
-//  Created by Julian Kahnert on 25.02.25.
+//  FileLogHandler.swift
+//  Shared
 //
 // Source: git@github.com:crspybits/swift-log-file.git
 
 import Foundation
 import Logging
 
-extension FileLogHandler {
-    actor FileHandlerOutputStream {
-        private let url: URL
-        private var nextRotationDate: Date
-        private var fileHandle: FileHandle
+/// Writes structured ``LogEntry`` JSON lines to a ``LogStore``.
+public struct FileLogHandler: LogHandler {
+    private let store: LogStore
+    private let label: String
 
-        init(basePath url: URL) {
-            self.url = url
-            self.fileHandle = Self.getNewFileHandle(basePath: url)
-            self.nextRotationDate = Calendar.current.nextDate(after: Date(),
-                                                              matching: DateComponents(hour: 0, minute: 0, second: 0),
-                                                              matchingPolicy: .nextTime)!
-        }
-
-        func write(_ string: String) {
-            if Date() > nextRotationDate {
-                self.fileHandle = Self.getNewFileHandle(basePath: url)
-                self.nextRotationDate = Calendar.current.nextDate(after: Date(),
-                                                                  matching: DateComponents(hour: 0, minute: 0, second: 0),
-                                                                  matchingPolicy: .nextTime)!
-            }
-
-            if let data = string.data(using: .utf8) {
-                fileHandle.write(data)
-            }
-        }
-
-        private static func getNewFileHandle(basePath: URL) -> FileHandle {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            formatter.timeZone = .current
-            let date = Date()
-            // format date to "path/to/2024-10-29.txt"
-            let url = basePath.appendingPathComponent(formatter.string(from: date)).appendingPathExtension("txt")
-
-            if !FileManager.default.fileExists(atPath: url.path) {
-                guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: nil) else {
-                    fatalError("Failed to create log file at \(url.path)")
-                }
-            }
-
-            do {
-                let fileHandle = try FileHandle(forWritingTo: url)
-                fileHandle.seekToEndOfFile()
-                return fileHandle
-            } catch {
-                fatalError("Failed to open log file at \(url.path): \(error)")
-            }
-        }
-    }
-}
-
-/// `FileLogHandler` is a simple implementation of `LogHandler` for directing
-/// `Logger` output to a local file. Appends log output to this file, even across constructor calls.
-struct FileLogHandler: LogHandler {
-    private let stream: FileHandlerOutputStream
-    private var label: String
-
-    var logLevel: Logger.Level = .info
+    public var logLevel: Logger.Level = .info
 
     private var prettyMetadata: String?
-    var metadata = Logger.Metadata() {
+    public var metadata = Logger.Metadata() {
         didSet {
             self.prettyMetadata = self.prettify(self.metadata)
         }
     }
 
-    subscript(metadataKey metadataKey: String) -> Logger.Metadata.Value? {
-        get {
-            return self.metadata[metadataKey]
-        }
-        set {
-            self.metadata[metadataKey] = newValue
-        }
+    public subscript(metadataKey metadataKey: String) -> Logger.Metadata.Value? {
+        get { metadata[metadataKey] }
+        set { metadata[metadataKey] = newValue }
     }
 
-    init(label: String, stream: FileHandlerOutputStream) {
+    public init(label: String, store: LogStore = .shared) {
         self.label = label
-        self.stream = stream
+        self.store = store
     }
 
     private static let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = .sortedKeys
-        return encoder
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .iso8601
+        e.outputFormatting = .sortedKeys
+        return e
     }()
 
-    func log(event: LogEvent) {
-        let prettyMetadata = event.metadata?.isEmpty ?? true
-        ? self.prettyMetadata
-        : self.prettify(self.metadata.merging(event.metadata!, uniquingKeysWith: { _, new in new }))
-
-        let fullMessage = prettyMetadata.map { "\($0) " } ?? ""
+    public func log(event: LogEvent) {
+        let mergedMetadata = event.metadata.map {
+            self.metadata.merging($0) { _, new in new }
+        }
+        let pretty = mergedMetadata.flatMap { prettify($0) } ?? prettyMetadata
+        let fullMessage = pretty.map { "\($0) " } ?? ""
         let entry = LogEntry(
             timestamp: Date(),
             level: "\(event.level)",
-            label: self.label,
+            label: label,
             message: "\(fullMessage)\(event.message)"
         )
-
         guard let data = try? Self.encoder.encode(entry),
-              var jsonLine = String(data: data, encoding: .utf8) else {
-            return
-        }
+              var jsonLine = String(data: data, encoding: .utf8) else { return }
         jsonLine.append("\n")
-
         Task {
-            await stream.write(jsonLine)
+            await store.write(jsonLine)
         }
     }
 
     private func prettify(_ metadata: Logger.Metadata) -> String? {
-        return !metadata.isEmpty ? metadata.map { "\($0)=\($1)" }.joined(separator: " ") : nil
+        metadata.isEmpty ? nil : metadata.map { "\($0)=\($1)" }.joined(separator: " ")
     }
 }

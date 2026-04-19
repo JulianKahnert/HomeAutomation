@@ -242,7 +242,8 @@ public func configure(_ app: Application) async throws {
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
-        DatabaseCleanupJob(homeManager: app.homeManager)
+        DatabaseCleanupJob(homeManager: app.homeManager),
+        LogCleanupJob()
     ]
 
     Task.detached {

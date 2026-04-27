@@ -32,7 +32,7 @@ let package = Package(
         // 🐬 Fluent driver for MySQL.
         .package(url: "https://github.com/vapor/fluent-mysql-driver.git", exact: "4.8.0"),
         // open api generator
-        .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.11.1"),
+        .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.12.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", exact: "1.0.1"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", exact: "1.12.0"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.11.0"),

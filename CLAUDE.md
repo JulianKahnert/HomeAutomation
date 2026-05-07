@@ -168,15 +168,7 @@ Before committing changes that affect iOS apps:
    cd Apps/FlowKitController && xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -sdk iphonesimulator -configuration Debug build
    ```
 
-4. **All builds must pass before committing** — `swift build` AND every affected `xcodebuild` invocation. A failing iOS build is a blocker, not "unrelated"; if `xcodebuild` errors with macro fingerprint validation or related Swift Package Manager security warnings, run the workaround in step 5 below and re-build until it succeeds.
-
-5. **If `xcodebuild` fails with macro fingerprint / package plugin trust errors** (e.g. `Package validation failed`, `IDESkipPackagePluginFingerprintValidatation`, refused macros from `swift-dependencies`, `swift-composable-architecture`, `swift-case-paths`, `swift-perception`, `swift-openapi-generator`):
-
-   ```bash
-   cd Apps/FlowKitAdapter/ci_scripts && ./ci_post_clone.sh
-   ```
-
-   The script regenerates `macros.json` from the current `Package.resolved` fingerprints, copies it into `~/Library/org.swift.swiftpm/security/`, and disables the Xcode fingerprint check. The same approach works for `Apps/FlowKitController/ci_scripts/` if it exists. After running the script, re-run the failing `xcodebuild` command — it must then succeed before you commit.
+4. Ensure all builds pass before committing
 
 ## Project Structure
 
@@ -426,15 +418,3 @@ Additional workflows: `docker-branches.yaml` (branch image builds), `docker-tag.
 **Cause**: Xcode projects have separate build configuration from SPM
 
 **Solution**: Ensure all dependencies are properly linked in Xcode project settings
-
-### `xcodebuild` fails with macro fingerprint / package plugin trust errors
-
-**Cause**: Xcode validates the fingerprint of every Swift macro and package plugin against `~/Library/org.swift.swiftpm/security/macros.json`. After dependency updates (or on a fresh clone) the local fingerprints no longer match what `Package.resolved` references, so Xcode refuses to load the macros and the build fails before compilation.
-
-**Solution**: Use the helper script that ships with the repo — it rebuilds `macros.json` from the current `Package.resolved` and disables the fingerprint check:
-
-```bash
-cd Apps/FlowKitAdapter/ci_scripts && ./ci_post_clone.sh
-```
-
-This is the same script Xcode Cloud runs after cloning. Re-run `xcodebuild` afterwards; the build must then succeed before any commit. **Do not skip the iOS build assuming the failure is "environmental" — if the workaround does not fix it, treat it as a real bug to investigate.**

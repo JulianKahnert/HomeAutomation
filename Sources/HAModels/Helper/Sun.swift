@@ -50,28 +50,9 @@ public struct SunSchedule {
     // Optional: some days in some locations never have a sunrise and/or sunset
     public var sunrise: SunPosition?
     public var sunset: SunPosition?
-
-    // Optional: nautical twilight (sun 12° below horizon) is undefined whenever
-    // the sun stays brighter than that all night — common at mid-latitudes
-    // around the summer solstice. Even when defined, the times can wrap past
-    // midnight in summer; consumers should compare against `sunset`/`sunrise`
-    // before relying on them.
-    public var nauticalDawn: SunPosition?
-    public var nauticalDusk: SunPosition?
 }
 
 public class Sun {
-
-    /// Zenith angle (in degrees) at which the geometric centre of the sun crosses
-    /// the horizon, including atmospheric refraction (~34′) and the sun's apparent
-    /// radius (~16′). Used by `sunriseOrSet` for sunrise/sunset.
-    private static let sunriseZenith: Double = 90.833
-
-    /// Zenith angle (in degrees) defining nautical twilight: the sun is 12° below
-    /// the geometric horizon. The "golden-hour boundary" — beyond this, only the
-    /// brightest celestial bodies remain visible. Used as the anchor for the
-    /// circadian brightness ramp; see ``getNormalizedBrightnessValue(sunData:current:)``.
-    private static let nauticalTwilightZenith: Double = 102.0
 
     /// Relation of a date to a sun event, compared at minute granularity.
     public enum SunElevation {
@@ -126,26 +107,16 @@ public class Sun {
         else { return nil }
 
         var sunrise: SunPosition?
-        if let riseMin = sunriseOrSet(rise: true, zenithDegrees: sunriseZenith, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
+        if let riseMin = sunriseOrSet(rise: true, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
             sunrise = position(latitude: latitude, longitude: longitude, date: JT.startOfDay.addingTimeInterval(riseMin * 60.0), calendar: calendar, timeZone: timeZone)
         }
 
         var sunset: SunPosition?
-        if let setMin = sunriseOrSet(rise: false, zenithDegrees: sunriseZenith, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
+        if let setMin = sunriseOrSet(rise: false, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
             sunset = position(latitude: latitude, longitude: longitude, date: JT.startOfDay.addingTimeInterval(setMin * 60.0), calendar: calendar, timeZone: timeZone)
         }
 
-        var nauticalDawn: SunPosition?
-        if let dawnMin = sunriseOrSet(rise: true, zenithDegrees: nauticalTwilightZenith, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
-            nauticalDawn = position(latitude: latitude, longitude: longitude, date: JT.startOfDay.addingTimeInterval(dawnMin * 60.0), calendar: calendar, timeZone: timeZone)
-        }
-
-        var nauticalDusk: SunPosition?
-        if let duskMin = sunriseOrSet(rise: false, zenithDegrees: nauticalTwilightZenith, JD: JT.julianDay, latitude: latitude, longitude: longitude, timezoneOffset: JT.timezoneOffset) {
-            nauticalDusk = position(latitude: latitude, longitude: longitude, date: JT.startOfDay.addingTimeInterval(duskMin * 60.0), calendar: calendar, timeZone: timeZone)
-        }
-
-        return SunSchedule(position: currentPosition, startOfDay: startOfDay, endOfDay: endOfDay, solarNoon: solarNoon, solarMidnight: solarMidnight, sunrise: sunrise, sunset: sunset, nauticalDawn: nauticalDawn, nauticalDusk: nauticalDusk)
+        return SunSchedule(position: currentPosition, startOfDay: startOfDay, endOfDay: endOfDay, solarNoon: solarNoon, solarMidnight: solarMidnight, sunrise: sunrise, sunset: sunset)
     }
 
     public static func position(latitude: Double, longitude: Double, date: Date?) -> SunPosition? {
@@ -239,26 +210,26 @@ public class Sun {
         return SunPosition(date: date, azimuth: azimuth, elevation: elevation)
     }
 
-    private static func hourAngleAtZenith(_ zenithDegrees: Double, latitude: Double, declination: Double) -> Double {
+    private static func hourAngleSunrise(latitude: Double, declination: Double) -> Double {
         let latRad = degreesToRadians(latitude)
         let sdRad = degreesToRadians(declination)
-        return acos(cos(degreesToRadians(zenithDegrees)) / (cos(latRad) * cos(sdRad)) - tan(latRad) * tan(sdRad))
+        return acos(cos(degreesToRadians(90.833)) / (cos(latRad) * cos(sdRad)) - tan(latRad) * tan(sdRad))
     }
 
-    private static func sunriseOrSetUTC(rise: Bool, zenithDegrees: Double, JD: Double, latitude: Double, longitude: Double) -> Double {
+    private static func sunriseOrSetUTC(rise: Bool, JD: Double, latitude: Double, longitude: Double) -> Double {
         let t = julianCent(julianDay: JD)
         let eqTime = equationOfTime(T: t)
         let solarDec = sunDeclination(T: t)
-        var hourAngle = hourAngleAtZenith(zenithDegrees, latitude: latitude, declination: solarDec)
+        var hourAngle = hourAngleSunrise(latitude: latitude, declination: solarDec)
         if !rise { hourAngle = -hourAngle }
         let delta = longitude + radiansToDegrees(hourAngle)
         return 720 - (4.0 * delta) - eqTime // in minutes
     }
 
-    private static func sunriseOrSet(rise: Bool, zenithDegrees: Double, JD: Double, latitude: Double, longitude: Double, timezoneOffset: Double) -> Double? {
-        let timeUTC = sunriseOrSetUTC(rise: rise, zenithDegrees: zenithDegrees, JD: JD, latitude: latitude, longitude: longitude)
-        let newTimeUTC = sunriseOrSetUTC(rise: rise, zenithDegrees: zenithDegrees, JD: JD + timeUTC / 1440.0, latitude: latitude, longitude: longitude)
-        if newTimeUTC.isNaN { return nil } // event does not occur on this day at this latitude
+    private static func sunriseOrSet(rise: Bool, JD: Double, latitude: Double, longitude: Double, timezoneOffset: Double) -> Double? {
+        let timeUTC = sunriseOrSetUTC(rise: rise, JD: JD, latitude: latitude, longitude: longitude)
+        let newTimeUTC = sunriseOrSetUTC(rise: rise, JD: JD + timeUTC / 1440.0, latitude: latitude, longitude: longitude)
+        if newTimeUTC.isNaN { return nil } // no sunrise/set on this day in this location (like North/South Pole)
 
         let timezone = timezoneOffset / 3600.0
         var timeLocal = newTimeUTC + (timezone * 60.0)

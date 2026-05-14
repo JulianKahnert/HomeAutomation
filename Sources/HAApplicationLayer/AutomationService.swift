@@ -22,7 +22,7 @@ public actor AutomationService {
     public func trigger(with event: HomeEvent) async {
         let automations = await getAutomations()
 
-        await withTaskGroup(of: Void.self) { group in
+        await withDiscardingTaskGroup { group in
             for automation in automations where automation.isActive {
                 group.addTask {
                     do {
@@ -31,8 +31,7 @@ public actor AutomationService {
                         }
 
                         self.log.info("Running automation \(automation.name)")
-                        let task = Task { [weak self] in
-                            guard let self else { return }
+                        let task = Task {
                             do {
                                 try await automation.execute(using: self.homeManager)
                             } catch is CancellationError {

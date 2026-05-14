@@ -16,20 +16,19 @@ struct HomeEventProcessingJob: Job, Log {
     let homeManager: any HomeManagable
 
     func run() async {
-        // This is where you would send the email
-        for await event in homeEventsStream {
-            log.debug("trigger automation with \(event.description)")
+        await withDiscardingTaskGroup { group in
+            for await event in homeEventsStream {
+                log.debug("trigger automation with \(event.description)")
+                group.addTask {
+                    // add item to history
+                    if case .change(let item) = event {
+                        await self.homeManager.addEntityHistory(item)
+                    }
 
-            // add item to history
-            switch event {
-            case .change(let item):
-                await homeManager.addEntityHistory(item)
-            case .time, .sunset, .sunrise:
-                break
+                    // perform automation
+                    await self.automationService.trigger(with: event)
+                }
             }
-
-            // perform automation
-            await automationService.trigger(with: event)
         }
     }
 }

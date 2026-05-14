@@ -20,9 +20,12 @@ struct HomeEventProcessingJob: Job, Log {
             for await event in homeEventsStream {
                 log.debug("trigger automation with \(event.description)")
                 group.addTask {
+                    // add item to history
                     if case .change(let item) = event {
                         await self.homeManager.addEntityHistory(item)
                     }
+
+                    // perform automation
                     await self.automationService.trigger(with: event)
                 }
             }

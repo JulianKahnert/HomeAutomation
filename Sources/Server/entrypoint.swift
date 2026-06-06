@@ -1,5 +1,6 @@
 import HAModels
 import Logging
+import Shared
 import Vapor
 
 @main
@@ -10,8 +11,9 @@ enum Entrypoint {
         // Custom bootstrap: wraps each handler with CriticalNotifyingLogHandler
         // so that CRITICAL log events trigger push notifications.
         LoggingSystem.bootstrap { label in
-            let underlying = StreamLogHandler.standardOutput(label: label)
-            return CriticalNotifyingLogHandler(label: label, underlying: underlying)
+            let stream = CriticalNotifyingLogHandler(label: label, underlying: StreamLogHandler.standardOutput(label: label))
+            let file = FileLogHandler(label: label)
+            return MultiplexLogHandler([stream, file])
         }
 //        try LoggingSystem.bootstrap(from: &env) { level in
 //            return { label in

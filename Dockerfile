@@ -72,6 +72,9 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
 # Create a vapor user and group with /app as its home directory
 RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app vapor
 
+# Create log directory (bind mount or named volume should be attached here for persistence)
+RUN mkdir -p /app/logs && chown vapor:vapor /app/logs
+
 # Switch to the new home directory
 WORKDIR /app
 
@@ -83,6 +86,7 @@ COPY --from=build --chown=vapor:vapor /tmp/git-commit /app/git-commit
 
 # Provide configuration needed by the built-in crash reporter and some sensible default behaviors.
 ENV SWIFT_BACKTRACE=enable=yes,sanitize=yes,threads=all,images=all,interactive=no,swift-backtrace=./swift-backtrace-static
+ENV LOG_DIRECTORY=/app/logs
 
 # Ensure all further commands run as the vapor user
 USER vapor:vapor

@@ -77,10 +77,10 @@ public actor CustomActorSystem {
         currentConnectionStatus
     }
 
-    /// A fresh stream of connection status changes. The stream is seeded with the *current* value
-    /// (so late subscribers never miss the latest state — unlike a plain broadcast), followed by
-    /// live updates.
-    public var connectionStatus: AsyncStream<ConnectionStatus> {
+    /// Creates a fresh stream of connection status changes, seeded with the *current* value (so late
+    /// subscribers never miss the latest state — unlike a plain broadcast) followed by live updates.
+    /// Each call registers a new subscriber, so call it once per consumer.
+    public func makeConnectionStatusStream() -> AsyncStream<ConnectionStatus> {
         let (stream, continuation) = AsyncStream.makeStream(
             of: ConnectionStatus.self,
             bufferingPolicy: .bufferingNewest(1)
@@ -176,13 +176,26 @@ public actor CustomActorSystem {
         return .error
     }
 
-    /// Derives the connection status for `selfNode` from a full membership, considering only peers
-    /// (members other than self) and their reachability.
-    public static func connectionStatus(for membership: Cluster.Membership, selfNode: Cluster.Node) -> ConnectionStatus {
+    /// Derives the peer connection status for `selfNode` from a full membership, considering only
+    /// peers (members other than self) and their reachability.
+    public static func peerStatus(in membership: Cluster.Membership, selfNode: Cluster.Node) -> ConnectionStatus {
         let peers = membership.members(atLeast: .joining)
             .filter { $0.node != selfNode }
             .map { (status: $0.status, reachability: $0.reachability) }
         return decide(peers: peers)
+    }
+
+    /// Whether the local node has been moved to `.down`/`.removed` (e.g. evicted by the leader after a
+    /// partition). This is terminal for the current node UID — the only recovery is a process restart
+    /// (a fresh UID). `.leaving` is intentionally *not* treated as down (graceful, never self-initiated
+    /// here). A `nil` status (self not yet in the membership) is not down.
+    static func isLocalNodeDown(selfStatus: Cluster.MemberStatus?) -> Bool {
+        guard let selfStatus else { return false }
+        return selfStatus >= .down
+    }
+
+    static func isLocalNodeDown(in membership: Cluster.Membership, selfNode: Cluster.Node) -> Bool {
+        isLocalNodeDown(selfStatus: membership.member(selfNode)?.status)
     }
 
     private func startStatusTask() {
@@ -195,7 +208,13 @@ public actor CustomActorSystem {
             for await event in events {
                 Self.log.debug("Cluster event: \(event)")
                 _ = try? membership.apply(event: event)
-                let status = Self.connectionStatus(for: membership, selfNode: selfNode)
+
+                // Terminal: our own node was evicted by the leader — restart for a clean rejoin.
+                if Self.isLocalNodeDown(in: membership, selfNode: selfNode) {
+                    await self.recoverFromLocalNodeDown()
+                }
+
+                let status = Self.peerStatus(in: membership, selfNode: selfNode)
                 await self.handleStatus(status)
             }
         }
@@ -240,6 +259,15 @@ public actor CustomActorSystem {
         subscribers[id] = nil
     }
 
+    /// Called when the local node was downed/removed by the leader. Terminal for this UID, so we
+    /// hand off to `onDown` immediately (no grace) — the adapter restarts via launchctl with a fresh
+    /// UID. The server passes `onDown == nil` and is unaffected (it is the leader and never downs itself).
+    private func recoverFromLocalNodeDown() {
+        guard let onDown else { return }
+        Self.log.critical("Local node was downed/removed by the cluster leader — restarting for a clean rejoin.")
+        onDown()
+    }
+
     // MARK: - Reconnection (adapter)
 
     private func tryReconnectIfNeededInBackground() {
@@ -253,7 +281,14 @@ public actor CustomActorSystem {
                 do {
                     let snapshot = await self.actorSystem.cluster.membershipSnapshot
                     let selfNode = self.actorSystem.cluster.node
-                    let status = Self.connectionStatus(for: snapshot, selfNode: selfNode)
+
+                    // Poll-based fallback (in case the membership event never arrives): if our own node
+                    // was evicted, restart rather than lingering as a zombie that believes it's connected.
+                    if Self.isLocalNodeDown(in: snapshot, selfNode: selfNode) {
+                        await self.recoverFromLocalNodeDown()
+                    }
+
+                    let status = Self.peerStatus(in: snapshot, selfNode: selfNode)
 
                     if status != .up {
                         // Evict any stale server node lingering on the target endpoint (a previous

@@ -23,14 +23,31 @@ func routes(_ app: Application) throws {
         guard let sql = req.db as? any SQLDatabase else {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
-        try await sql.raw("SELECT 1").run()
+        let system = req.application.customActorSystem
 
-        let connectionStatus = await req.application.customActorSystem.latestConnectionStatus
-        guard connectionStatus == .up else {
-            throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(String(describing: connectionStatus))")
+        // Race the health checks against a hard timeout so the Docker healthcheck always gets a
+        // fast, definitive answer (503 peer-not-up / 504 timeout) instead of hanging.
+        return try await withThrowingTaskGroup(of: HTTPStatus.self) { group in
+            group.addTask {
+                try await sql.raw("SELECT 1").run()
+
+                let connectionStatus = await system.latestConnectionStatus
+                guard connectionStatus == .up else {
+                    throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(String(describing: connectionStatus))")
+                }
+                return .ok
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(5))
+                throw Abort(.gatewayTimeout, reason: "Health check timed out")
+            }
+
+            defer { group.cancelAll() }
+            guard let result = try await group.next() else {
+                throw Abort(.internalServerError)
+            }
+            return result
         }
-
-        return .ok
     }
 
     authenticatedRoutes.get("config") { req in

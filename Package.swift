@@ -185,6 +185,13 @@ let package = Package(
                 "HAModels"
             ],
             path: "Tests/ServerTests"
+        ),
+        .testTarget(
+            name: "SharedDistributedClusterTests",
+            dependencies: [
+                "SharedDistributedCluster",
+                .product(name: "DistributedCluster", package: "swift-distributed-actors"),
+            ]
         )
     ]
 )

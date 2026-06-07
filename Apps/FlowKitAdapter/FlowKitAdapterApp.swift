@@ -6,6 +6,7 @@
 //
 
 import Adapter
+import Foundation
 import HAImplementations
 import HAModels
 import Shared
@@ -46,15 +47,34 @@ struct FlowKitAdapter: App, Log {
                 // do not start run loop when running in preview canvas
                 guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
 
+                // Tear down a previously-created system first (e.g. serverAddress changed) so its
+                // cluster node, background tasks and bound port are released before creating a new one.
+                await teardownActorSystem()
+
                 try? await Task.sleep(for: .seconds(1))
                 await initializeActorSystem()
             }
         }
     }
 
+    private func teardownActorSystem() async {
+        statusObservationTask?.cancel()
+        statusObservationTask = nil
+        entityObservationTask?.cancel()
+        entityObservationTask = nil
+        if let actorSystem {
+            await actorSystem.shutdown()
+            self.actorSystem = nil
+        }
+    }
+
     private func initializeActorSystem() async {
-        // Initialize with configured server address
-        let system = await CustomActorSystem(role: .homeKitAdapter(serverAddress: serverAddress))
+        // Initialize with configured server address.
+        // onDown: a lost connection that does not recover within the grace period restarts the app
+        // (launchctl KeepAlive) with a fresh node UID → clean re-handshake with the server.
+        let system = await CustomActorSystem(role: .homeKitAdapter(serverAddress: serverAddress), onDown: {
+            exit(1)
+        })
         self.actorSystem = system
 
         let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(

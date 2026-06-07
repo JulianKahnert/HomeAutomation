@@ -16,19 +16,19 @@ struct HomeEventProcessingJob: Job, Log {
     let homeManager: any HomeManagable
 
     func run() async {
-        await withDiscardingTaskGroup { group in
-            for await event in homeEventsStream {
-                log.debug("trigger automation with \(event.description)")
-                group.addTask {
-                    // add item to history
-                    if case .change(let item) = event {
-                        await self.homeManager.addEntityHistory(item)
-                    }
+        // Serial processing preserves event ordering (history writes and automation triggering).
+        // `trigger(with:)` returns quickly — long-running `execute()` runs in the background inside
+        // AutomationService — so a slow automation does not stall the loop.
+        for await event in homeEventsStream {
+            log.debug("trigger automation with \(event.description)")
 
-                    // perform automation
-                    await self.automationService.trigger(with: event)
-                }
+            // add item to history
+            if case .change(let item) = event {
+                await homeManager.addEntityHistory(item)
             }
+
+            // perform automation
+            await automationService.trigger(with: event)
         }
     }
 }

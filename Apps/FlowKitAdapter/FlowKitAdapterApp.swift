@@ -90,7 +90,7 @@ struct FlowKitAdapter: App, Log {
 
         statusObservationTask?.cancel()
         statusObservationTask = Task {
-            for await status in await system.connectionStatus {
+            for await status in await system.makeConnectionStatusStream() {
                 connectionStatus = status
             }
         }

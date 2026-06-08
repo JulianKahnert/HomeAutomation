@@ -32,10 +32,10 @@ let package = Package(
         // 🐬 Fluent driver for MySQL.
         .package(url: "https://github.com/vapor/fluent-mysql-driver.git", exact: "4.8.0"),
         // open api generator
-        .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.12.1"),
+        .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.12.2"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", exact: "1.0.1"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", exact: "1.12.0"),
-        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.11.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", exact: "1.13.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.12.0"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.0"),
         // TCA and related
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture",
@@ -47,13 +47,13 @@ let package = Package(
         .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.8.0"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", exact: "5.0.0"),
-        .package(url: "https://github.com/apple/swift-log.git", exact: "1.12.0"),
+        .package(url: "https://github.com/apple/swift-log.git", exact: "1.12.1"),
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "fix/linux-foundation-networking"),
         .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
-        .package(url: "https://github.com/apple/swift-async-algorithms", exact: "1.1.3"),
+        .package(url: "https://github.com/apple/swift-async-algorithms", exact: "1.1.4"),
         .package(url: "https://github.com/swift-server-community/APNSwift", exact: "6.5.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.7.1")
+        .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2")
     ],
     targets: [
         .executableTarget(

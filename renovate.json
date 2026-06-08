@@ -9,6 +9,12 @@
     {
       "matchManagers": ["swift"],
       "rangeStrategy": "bump"
+    },
+    {
+      "description": "Hold apple/swift-log below 1.13: its source-breaking MetadataValue string-interpolation change breaks swift-cluster-membership (transitive via swift-distributed-actors). Remove once distributed-actors/cluster-membership builds against swift-log 1.13.",
+      "matchManagers": ["swift"],
+      "matchPackageNames": ["apple/swift-log", "https://github.com/apple/swift-log.git"],
+      "allowedVersions": "<1.13.0"
     }
   ]
 }

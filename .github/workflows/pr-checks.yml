@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - develop
+  # Allow the renovate-package-resolved workflow to dispatch these checks after
+  # it commits a regenerated Package.resolved (that commit is pushed with
+  # GITHUB_TOKEN and therefore cannot trigger pull_request runs itself).
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

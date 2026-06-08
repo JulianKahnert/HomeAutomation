@@ -10,6 +10,7 @@ jobs:
     runs-on: macos-26
     permissions:
       contents: write
+      actions: write
 
     steps:
       - name: Checkout repository
@@ -44,3 +45,13 @@ jobs:
           git add Package.resolved "Apps/FlowKitAdapter/FlowKit Adapter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "Apps/FlowKitController/FlowKit Controller.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
           git commit -m "Package.resolved updated"
           git push
+
+      - name: Trigger PR checks
+        # The commit pushed above uses GITHUB_TOKEN, which GitHub deliberately
+        # prevents from triggering further workflow runs. Without this the PR
+        # checks never run against the regenerated Package.resolved. Dispatch
+        # them explicitly (workflow_dispatch is exempt from that restriction).
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run pr-checks.yml --ref "${{ github.ref_name }}"

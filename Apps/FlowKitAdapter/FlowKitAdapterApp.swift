@@ -17,6 +17,8 @@ import SwiftUI
 
 @main
 struct FlowKitApp {
+    private static let log = Logger(label: "FlowKitAdapter")
+
     /// Entrypoint of the app
     static func main() {
 
@@ -33,7 +35,6 @@ struct FlowKitApp {
     /// installed out-of-band from the server Docker image, so without this there is no way to tell
     /// from the logs which code (e.g. which cluster fix) the deployed `.app` actually contains.
     private static func logStartupProvenance() {
-        let log = Logger(label: "FlowKitAdapter")
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "?"
         let build = info?["CFBundleVersion"] as? String ?? "?"
@@ -43,7 +44,7 @@ struct FlowKitApp {
                   let date = attrs[.modificationDate] as? Date else { return "unknown" }
             return ISO8601DateFormatter().string(from: date)
         }()
-        log.info("FlowKit Adapter starting — version \(version) (build \(build)), binary built \(buildDate)")
+        Self.log.info("FlowKit Adapter starting — version \(version) (build \(build)), binary built \(buildDate)")
     }
 }
 

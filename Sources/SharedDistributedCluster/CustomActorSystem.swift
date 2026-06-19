@@ -63,6 +63,13 @@ public actor CustomActorSystem {
     private var reconnectionTask: Task<Void, Never>?
     private var statusTask: Task<Void, Never>?
     private var graceTask: Task<Void, Never>?
+    private var heartbeatTask: Task<Void, Never>?
+
+    /// When this system was created — used to report uptime in diagnostics.
+    private let bootDate = Date()
+    /// When a reachable peer was last observed `.up` — used to report how long the cluster has been
+    /// wedged. `nil` until the first `.up` is ever seen.
+    private var lastUpDate: Date?
 
     /// The most recent connection status, or nil if no cluster event has been processed yet.
     private var currentConnectionStatus: ConnectionStatus?
@@ -107,11 +114,17 @@ public actor CustomActorSystem {
         self.systemRole = role
         self.onDown = onDown
 
-        let settings = Self.makeClusterSettings(role: role)
+        let settings = Self.makeClusterSettings(role: role, logLevel: Self.resolvedClusterLogLevel)
         actorSystem = await ClusterSystem(role.name, settings: settings)
+
+        Self.log.info("Cluster node started: role=\(role.name) node=\(actorSystem.cluster.node) clusterLogLevel=\(settings.logging.logLevel)")
 
         // Derive connection status from cluster events (membership + reachability).
         startStatusTask()
+
+        // Periodic heartbeat so a wedged / never-up cluster is visible in the logs even when no
+        // cluster events are firing.
+        startHeartbeatTask()
 
         // Only the adapter actively (re)connects to the server.
         if case .homeKitAdapter = role {
@@ -135,7 +148,7 @@ public actor CustomActorSystem {
     ///   recovery is handled explicitly (server stays alive as leader, adapter reconnects/restarts).
     /// - Parameters:
     ///   - host/port: optional bind overrides (used by tests to avoid the fixed production ports).
-    public static func makeClusterSettings(role: SystemRole, host: String? = nil, port: Int? = nil) -> ClusterSystemSettings {
+    public static func makeClusterSettings(role: SystemRole, host: String? = nil, port: Int? = nil, logLevel: Logger.Level = .warning) -> ClusterSystemSettings {
         var settings = ClusterSystemSettings(name: role.name, host: host ?? role.host, port: port ?? role.port)
 
         switch role {
@@ -155,8 +168,19 @@ public actor CustomActorSystem {
 
         settings.onDownAction = .none
         settings.remoteCall.defaultTimeout = .seconds(15)
-        settings.logging.logLevel = .warning
+        settings.logging.logLevel = logLevel
         return settings
+    }
+
+    /// Resolves the cluster library's log level from the `CLUSTER_LOG_LEVEL` env var (e.g. `debug`,
+    /// `trace`) so SWIM / handshake internals can be turned on for a reproduction without a rebuild.
+    /// Defaults to `.warning` so normal operation stays quiet.
+    static var resolvedClusterLogLevel: Logger.Level {
+        if let raw = ProcessInfo.processInfo.environment["CLUSTER_LOG_LEVEL"],
+           let level = Logger.Level(rawValue: raw.lowercased()) {
+            return level
+        }
+        return .warning
     }
 
     // MARK: - Connection status derivation
@@ -206,7 +230,13 @@ public actor CustomActorSystem {
             let selfNode = self.actorSystem.cluster.node
             var membership = Cluster.Membership.empty
             for await event in events {
-                Self.log.debug("Cluster event: \(event)")
+                switch event {
+                case .snapshot:
+                    Self.log.debug("Cluster event: \(event)")
+                default:
+                    // membershipChange / reachabilityChange / leadershipChange — always worth seeing.
+                    Self.log.info("Cluster event: \(event)")
+                }
                 _ = try? membership.apply(event: event)
 
                 // Terminal: our own node was evicted by the leader — restart for a clean rejoin.
@@ -215,16 +245,21 @@ public actor CustomActorSystem {
                 }
 
                 let status = Self.peerStatus(in: membership, selfNode: selfNode)
-                await self.handleStatus(status)
+                let summary = Self.membershipSummary(membership, selfNode: selfNode)
+                await self.handleStatus(status, membershipSummary: summary)
             }
         }
     }
 
-    private func handleStatus(_ status: ConnectionStatus) {
+    private func handleStatus(_ status: ConnectionStatus, membershipSummary summary: String? = nil) {
         let changed = status != currentConnectionStatus
         currentConnectionStatus = status
+        if status == .up {
+            lastUpDate = Date()
+        }
         if changed {
-            Self.log.info("Connection status: \(status)")
+            let suffix = summary.map { " members=[\($0)]" } ?? ""
+            Self.log.info("Connection status: \(status)\(suffix)")
             for continuation in subscribers.values {
                 continuation.yield(status)
             }
@@ -266,6 +301,61 @@ public actor CustomActorSystem {
         guard let onDown else { return }
         Self.log.critical("Local node was downed/removed by the cluster leader — restarting for a clean rejoin.")
         onDown()
+    }
+
+    // MARK: - Observability
+
+    /// Renders a compact one-line summary of all members (status/reachability), marking the local node
+    /// with `*`. Pure so it can be used both inside the event loop and from the heartbeat/diagnostics.
+    static func membershipSummary(_ membership: Cluster.Membership, selfNode: Cluster.Node) -> String {
+        let members = membership.members(atLeast: .joining)
+        guard !members.isEmpty else { return "<empty>" }
+        return members.map { member in
+            let selfMark = member.node == selfNode ? "*" : ""
+            return "\(member.node.endpoint.host):\(member.node.endpoint.port)\(selfMark)=\(member.status)/\(member.reachability)"
+        }.joined(separator: ", ")
+    }
+
+    private var lastUpAgeDescription: String {
+        guard let lastUpDate else { return "never" }
+        return "\(Int(Date().timeIntervalSince(lastUpDate)))s-ago"
+    }
+
+    /// A human-readable snapshot of the current connection state — peer status, how long since the
+    /// peer was last `.up`, uptime, and the full membership. Used in `/health` 503 responses and the
+    /// heartbeat log so a wedge is fully diagnosable from a single line. `nonisolated` so the
+    /// non-`Sendable` `Cluster.Membership` stays within this context and never crosses into the actor's
+    /// isolation domain (mirrors how the reconnect loop reads the snapshot).
+    nonisolated public func connectionDiagnostics() async -> String {
+        let snapshot = await actorSystem.cluster.membershipSnapshot
+        let selfNode = actorSystem.cluster.node
+        let status = Self.peerStatus(in: snapshot, selfNode: selfNode)
+        let members = Self.membershipSummary(snapshot, selfNode: selfNode)
+        let lastUp = await lastUpAgeDescription
+        return "status=\(status) lastUp=\(lastUp) uptime=\(Int(Date().timeIntervalSince(bootDate)))s members=[\(members)]"
+    }
+
+    /// Logs the connection state every 30s. While `.up` it stays at `.debug` (quiet in production);
+    /// while not up it logs at `.warning` with the full membership, so a wedge leaves an obvious,
+    /// timestamped trail even when no cluster events are firing. Runs for both roles.
+    private func startHeartbeatTask() {
+        heartbeatTask?.cancel()
+        heartbeatTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard let self else { return }
+                await self.logHeartbeat()
+            }
+        }
+    }
+
+    private func logHeartbeat() async {
+        let diagnostics = await connectionDiagnostics()
+        if currentConnectionStatus == .up {
+            Self.log.debug("Cluster heartbeat: role=\(systemRole.name) \(diagnostics)")
+        } else {
+            Self.log.warning("Cluster heartbeat (not up): role=\(systemRole.name) \(diagnostics)")
+        }
     }
 
     // MARK: - Reconnection (adapter)
@@ -327,9 +417,11 @@ public actor CustomActorSystem {
         reconnectionTask?.cancel()
         statusTask?.cancel()
         graceTask?.cancel()
+        heartbeatTask?.cancel()
         reconnectionTask = nil
         statusTask = nil
         graceTask = nil
+        heartbeatTask = nil
         for continuation in subscribers.values {
             continuation.finish()
         }

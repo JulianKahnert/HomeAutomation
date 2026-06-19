@@ -197,7 +197,9 @@ public func configure(_ app: Application) async throws {
     // single reachable member it self-elects, so it can promote a (re)joining adapter to .up and
     // down dead adapter nodes. It therefore recovers from adapter restarts on its own and must
     // NEVER terminate — hence no onDown handler. Recovery on the adapter side is its own restart.
-    let actorSystem = await CustomActorSystem(role: .server)
+    // Cluster verbosity follows the app's configured level (driven by the LOG_LEVEL env), so it is
+    // set once in docker-compose.
+    let actorSystem = await CustomActorSystem(role: .server, logLevel: app.logger.logLevel)
     app.customActorSystem = actorSystem
     let eventReceiver = await actorSystem.makeLocalActor(actorId: .homeEventReceiver) { system in
         HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: system)

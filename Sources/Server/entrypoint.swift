@@ -7,19 +7,16 @@ enum Entrypoint {
     static func main() async throws {
         var env = try Environment.detect()
 
-        // Custom bootstrap: wraps each handler with CriticalNotifyingLogHandler
-        // so that CRITICAL log events trigger push notifications.
-        LoggingSystem.bootstrap { label in
-            let underlying = StreamLogHandler.standardOutput(label: label)
-            return CriticalNotifyingLogHandler(label: label, underlying: underlying)
+        // Read the level from the `LOG_LEVEL` env (and `--log` flag) so it can be set once in
+        // docker-compose, and wrap each handler with CriticalNotifyingLogHandler so CRITICAL log
+        // events trigger push notifications.
+        try LoggingSystem.bootstrap(from: &env) { level in
+            { label in
+                var underlying = StreamLogHandler.standardOutput(label: label)
+                underlying.logLevel = level
+                return CriticalNotifyingLogHandler(label: label, underlying: underlying)
+            }
         }
-//        try LoggingSystem.bootstrap(from: &env) { level in
-//            return { label in
-//                var logger = StreamLogHandler.standardOutput(label: label)
-//                logger.logLevel = level
-//                return TimestampLogHandler(underlying: logger)
-//            }
-//        }
 
         let app = try await Application.make(env)
 

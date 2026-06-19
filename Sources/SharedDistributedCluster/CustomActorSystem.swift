@@ -110,11 +110,14 @@ public actor CustomActorSystem {
     ///     Used by the **adapter** to `exit(1)` so launchctl restarts it with a fresh node UID.
     ///     The **server** passes `nil` — it never terminates; it stays alive and heals as the
     ///     cluster leader.
-    public init(role: SystemRole, onDown: (@Sendable () -> Void)? = nil) async {
+    ///   - logLevel: Log level for the underlying `swift-distributed-actors` system. The server
+    ///     passes its configured level (driven by the `LOG_LEVEL` env) so cluster verbosity is set
+    ///     once in docker-compose.
+    public init(role: SystemRole, onDown: (@Sendable () -> Void)? = nil, logLevel: Logger.Level = .info) async {
         self.systemRole = role
         self.onDown = onDown
 
-        let settings = Self.makeClusterSettings(role: role)
+        let settings = Self.makeClusterSettings(role: role, logLevel: logLevel)
         actorSystem = await ClusterSystem(role.name, settings: settings)
 
         Self.log.info("Cluster node started: role=\(role.name) node=\(actorSystem.cluster.node)")
@@ -148,7 +151,7 @@ public actor CustomActorSystem {
     ///   recovery is handled explicitly (server stays alive as leader, adapter reconnects/restarts).
     /// - Parameters:
     ///   - host/port: optional bind overrides (used by tests to avoid the fixed production ports).
-    public static func makeClusterSettings(role: SystemRole, host: String? = nil, port: Int? = nil) -> ClusterSystemSettings {
+    public static func makeClusterSettings(role: SystemRole, host: String? = nil, port: Int? = nil, logLevel: Logger.Level = .info) -> ClusterSystemSettings {
         var settings = ClusterSystemSettings(name: role.name, host: host ?? role.host, port: port ?? role.port)
 
         switch role {
@@ -168,8 +171,7 @@ public actor CustomActorSystem {
 
         settings.onDownAction = .none
         settings.remoteCall.defaultTimeout = .seconds(15)
-        // Verbose cluster logging while we diagnose the recurring wedge; lower once it's understood.
-        settings.logging.logLevel = .debug
+        settings.logging.logLevel = logLevel
         return settings
     }
 
@@ -320,14 +322,14 @@ public actor CustomActorSystem {
         return "status=\(status) lastUp=\(lastUp) uptime=\(Int(Date().timeIntervalSince(bootDate)))s members=[\(members)]"
     }
 
-    /// Logs the connection state every 30s. While `.up` it stays at `.debug` (quiet in production);
+    /// Logs the connection state once a minute. While `.up` it stays at `.debug` (quiet in production);
     /// while not up it logs at `.warning` with the full membership, so a wedge leaves an obvious,
     /// timestamped trail even when no cluster events are firing. Runs for both roles.
     private func startHeartbeatTask() {
         heartbeatTask?.cancel()
         heartbeatTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(60))
                 guard let self else { return }
                 await self.logHeartbeat()
             }

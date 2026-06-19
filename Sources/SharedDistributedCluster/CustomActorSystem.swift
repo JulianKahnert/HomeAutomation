@@ -114,10 +114,10 @@ public actor CustomActorSystem {
         self.systemRole = role
         self.onDown = onDown
 
-        let settings = Self.makeClusterSettings(role: role, logLevel: Self.resolvedClusterLogLevel)
+        let settings = Self.makeClusterSettings(role: role)
         actorSystem = await ClusterSystem(role.name, settings: settings)
 
-        Self.log.info("Cluster node started: role=\(role.name) node=\(actorSystem.cluster.node) clusterLogLevel=\(settings.logging.logLevel)")
+        Self.log.info("Cluster node started: role=\(role.name) node=\(actorSystem.cluster.node)")
 
         // Derive connection status from cluster events (membership + reachability).
         startStatusTask()
@@ -148,7 +148,7 @@ public actor CustomActorSystem {
     ///   recovery is handled explicitly (server stays alive as leader, adapter reconnects/restarts).
     /// - Parameters:
     ///   - host/port: optional bind overrides (used by tests to avoid the fixed production ports).
-    public static func makeClusterSettings(role: SystemRole, host: String? = nil, port: Int? = nil, logLevel: Logger.Level = .warning) -> ClusterSystemSettings {
+    public static func makeClusterSettings(role: SystemRole, host: String? = nil, port: Int? = nil) -> ClusterSystemSettings {
         var settings = ClusterSystemSettings(name: role.name, host: host ?? role.host, port: port ?? role.port)
 
         switch role {
@@ -168,19 +168,9 @@ public actor CustomActorSystem {
 
         settings.onDownAction = .none
         settings.remoteCall.defaultTimeout = .seconds(15)
-        settings.logging.logLevel = logLevel
+        // Verbose cluster logging while we diagnose the recurring wedge; lower once it's understood.
+        settings.logging.logLevel = .debug
         return settings
-    }
-
-    /// Resolves the cluster library's log level from the `CLUSTER_LOG_LEVEL` env var (e.g. `debug`,
-    /// `trace`) so SWIM / handshake internals can be turned on for a reproduction without a rebuild.
-    /// Defaults to `.warning` so normal operation stays quiet.
-    static var resolvedClusterLogLevel: Logger.Level {
-        if let raw = ProcessInfo.processInfo.environment["CLUSTER_LOG_LEVEL"],
-           let level = Logger.Level(rawValue: raw.lowercased()) {
-            return level
-        }
-        return .warning
     }
 
     // MARK: - Connection status derivation
@@ -316,11 +306,6 @@ public actor CustomActorSystem {
         }.joined(separator: ", ")
     }
 
-    private var lastUpAgeDescription: String {
-        guard let lastUpDate else { return "never" }
-        return "\(Int(Date().timeIntervalSince(lastUpDate)))s-ago"
-    }
-
     /// A human-readable snapshot of the current connection state — peer status, how long since the
     /// peer was last `.up`, uptime, and the full membership. Used in `/health` 503 responses and the
     /// heartbeat log so a wedge is fully diagnosable from a single line. `nonisolated` so the
@@ -331,7 +316,7 @@ public actor CustomActorSystem {
         let selfNode = actorSystem.cluster.node
         let status = Self.peerStatus(in: snapshot, selfNode: selfNode)
         let members = Self.membershipSummary(snapshot, selfNode: selfNode)
-        let lastUp = await lastUpAgeDescription
+        let lastUp = await lastUpDate.map { "\(Int(Date().timeIntervalSince($0)))s-ago" } ?? "never"
         return "status=\(status) lastUp=\(lastUp) uptime=\(Int(Date().timeIntervalSince(bootDate)))s members=[\(members)]"
     }
 

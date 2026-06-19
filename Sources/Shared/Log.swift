@@ -53,16 +53,18 @@ public func initLogging(withFileLogging: Bool, logLevel: Logger.Level) {
     }
 }
 
-/// Directory the `FileLogHandler` writes its daily log files to.
+/// Directory the `FileLogHandler` writes its daily log files to — a `logs` subfolder so the log
+/// files don't clutter the app's Documents directory.
 private func logFileDirectory() -> URL {
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS) || os(visionOS)
-    return URL.documentsDirectory
+    let base = URL.documentsDirectory
     #else
-    // Linux fallback: use temporary directory for logs
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("logs")
+    // Linux fallback: use the temporary directory.
+    let base = FileManager.default.temporaryDirectory
+    #endif
+    let dir = base.appendingPathComponent("logs")
     try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     return dir
-    #endif
 }
 
 /// Deletes daily log files (`*.txt`) older than `days` so they don't accumulate on disk

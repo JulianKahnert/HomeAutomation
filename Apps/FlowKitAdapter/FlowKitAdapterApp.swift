@@ -9,6 +9,7 @@ import Adapter
 import Foundation
 import HAImplementations
 import HAModels
+import Logging
 import Shared
 import SwiftUI
 
@@ -16,14 +17,34 @@ import SwiftUI
 
 @main
 struct FlowKitApp {
+    private static let log = Logger(label: "FlowKitAdapter")
+
     /// Entrypoint of the app
     static func main() {
 
         // we use this workaround to initialize the logging system before anything else is constructed
         initLogging(withFileLogging: true, logLevel: .debug)
 
+        logStartupProvenance()
+
         // start the app
         FlowKitAdapter.main()
+    }
+
+    /// Logs the running build's version and binary build date at startup. The adapter is built and
+    /// installed out-of-band from the server Docker image, so without this there is no way to tell
+    /// from the logs which code (e.g. which cluster fix) the deployed `.app` actually contains.
+    private static func logStartupProvenance() {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        let buildDate: String = {
+            guard let url = Bundle.main.executableURL,
+                  let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let date = attrs[.modificationDate] as? Date else { return "unknown" }
+            return ISO8601DateFormatter().string(from: date)
+        }()
+        Self.log.info("FlowKit Adapter starting — version \(version) (build \(build)), binary built \(buildDate)")
     }
 }
 

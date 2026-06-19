@@ -33,7 +33,8 @@ func routes(_ app: Application) throws {
 
                 let connectionStatus = await system.latestConnectionStatus
                 guard connectionStatus == .up else {
-                    throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(String(describing: connectionStatus))")
+                    let diagnostics = await system.connectionDiagnostics()
+                    throw Abort(.serviceUnavailable, reason: "Adapter connection \(diagnostics)")
                 }
                 return .ok
             }

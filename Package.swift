@@ -39,12 +39,12 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.0"),
         // TCA and related
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture",
-                 exact: "1.25.5",
+                 exact: "1.26.0",
                  traits: [
                     "ComposableArchitecture2Deprecations",
                     "ComposableArchitecture2DeprecationOverloads"
                  ]),
-        .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.8.0"),
+        .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.9.0"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", exact: "5.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.12.1"),

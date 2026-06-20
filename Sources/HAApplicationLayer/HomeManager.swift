@@ -117,6 +117,11 @@ public final class HomeManager: HomeManagable {
     }
 
     public func trigger(scene sceneName: String) async {
+        // No explicit cache reset here: executing a scene changes the affected devices, and those
+        // per-characteristic changes echo back through the adapter into `addEntityHistory`, where
+        // `invalidateContradictedCommands(for:)` resets any cached command they contradict. This is
+        // the same path that handles scenes activated from outside the server, so both are covered
+        // uniformly without the server needing to know a scene's entity membership.
         log.info("Triggering scene '\(sceneName)' — starting distributed actor call")
         let start = ContinuousClock.now
         do {
@@ -132,6 +137,18 @@ public final class HomeManager: HomeManagable {
     public func addEntityHistory(_ item: EntityStorageItem) async {
         log.debug("Adding entity item to storage \(item.entityId)")
         await entityCache.insert(item, forKey: item.entityId)
+
+        // A freshly observed state can reveal that the device drifted away from what the server last
+        // commanded — e.g. a scene activated outside the server (HomeKit only surfaces scenes as the
+        // per-characteristic changes they produce, which arrive here), or a manual change. Reset any
+        // cached command this state contradicts so the automation engine — which re-evaluates this
+        // same event right after — is allowed to re-issue it. A state that confirms the command (the
+        // command's own echo) is not contradicted, so deduplication is preserved and no command loop
+        // occurs. Done synchronously here so the cache is already reset before the automation runs.
+        let invalidatedActions = await actionLogManager.invalidateContradictedCommands(for: item)
+        if !invalidatedActions.isEmpty {
+            log.info("Invalidated \(invalidatedActions.count) cached command(s) for \(item.entityId) due to state drift: \(invalidatedActions)")
+        }
 
         // Persist item in the background to avoid blocking automation execution
         Task.detached(priority: .background) {

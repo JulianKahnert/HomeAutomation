@@ -9,16 +9,24 @@ import Foundation
 import HAModels
 import Shared
 
+/// Identifies a cached command: one entry per `(entity, action kind)`. Typed instead of the former
+/// `"<entityId>-<actionName>"` string so the key cannot collide and carries its `entityId` for
+/// per-entity lookups during `invalidateContradictedCommands(for:)`.
+private struct CommandCacheKey: Hashable, Sendable {
+    let entityId: EntityId
+    let actionName: String
+
+    init(_ action: HomeManagableAction) {
+        self.entityId = action.entityId
+        self.actionName = action.actionName
+    }
+}
+
 public actor ActionLogManager {
     public static let maxEntries = 1000
 
     private var actions: [ActionLogItem] = []
-    private let commandCache: Cache<String, HomeManagableAction>
-    /// Maps an entity to the set of cache keys (`"<entityId>-<actionName>"`) currently cached for it.
-    /// `NSCache` cannot enumerate its keys, so this index lets us find an entity's cached commands
-    /// when a state change arrives. It self-heals: keys whose cache entry has expired are pruned
-    /// the next time the entity is visited in `invalidateContradictedCommands(for:)`.
-    private var keysByEntity: [EntityId: Set<String>] = [:]
+    private let commandCache: Cache<CommandCacheKey, HomeManagableAction>
 
     public init(dateProvider: @escaping @Sendable () -> Date = Date.init) {
         self.commandCache = Cache(dateProvider: dateProvider, entryLifetime: .minutes(2))
@@ -28,7 +36,7 @@ public actor ActionLogManager {
     /// - Parameter action: The action to log
     /// - Returns: true if this was a duplicate action (cache hit), false if it's a new action that should be executed
     public func log(action: HomeManagableAction) async -> Bool {
-        let cacheKey = "\(action.entityId)-\(action.actionName)"
+        let cacheKey = CommandCacheKey(action)
 
         // Check if action is in cache
         let hasCacheHit: Bool
@@ -43,7 +51,6 @@ public actor ActionLogManager {
         // If not a cache hit, mark command as executed
         if !hasCacheHit {
             await commandCache.insert(action, forKey: cacheKey)
-            keysByEntity[action.entityId, default: []].insert(cacheKey)
         }
 
         // Log the action
@@ -75,28 +82,14 @@ public actor ActionLogManager {
     /// - Returns: The actions that were invalidated (for logging / observability).
     @discardableResult
     public func invalidateContradictedCommands(for item: EntityStorageItem) async -> [HomeManagableAction] {
-        guard let keys = keysByEntity[item.entityId], !keys.isEmpty else { return [] }
-
         var invalidatedActions: [HomeManagableAction] = []
-        var deadKeys: Set<String> = []
 
-        for key in keys {
-            guard let cachedAction = await commandCache.value(forKey: key) else {
-                // The cache entry expired or was evicted — drop the stale index entry.
-                deadKeys.insert(key)
-                continue
-            }
+        // The cache prunes its own key index on expiry/eviction (a missing entry just yields `nil`).
+        for key in await commandCache.keys where key.entityId == item.entityId {
+            guard let cachedAction = await commandCache.value(forKey: key) else { continue }
             if cachedAction.isContradicted(by: item) {
                 await commandCache.removeValue(forKey: key)
-                deadKeys.insert(key)
                 invalidatedActions.append(cachedAction)
-            }
-        }
-
-        if !deadKeys.isEmpty {
-            keysByEntity[item.entityId]?.subtract(deadKeys)
-            if keysByEntity[item.entityId]?.isEmpty == true {
-                keysByEntity[item.entityId] = nil
             }
         }
 

@@ -13,10 +13,20 @@ public actor Cache<Key: Hashable & Sendable, Value: Sendable> {
     private let wrapped = NSCache<WrappedKey, Entry>()
     private let dateProvider: @Sendable () -> Date
     private let entryLifetime: TimeInterval?
+    /// Tracks the currently-live keys so callers can enumerate them — `NSCache` cannot.
+    /// The article uses an `NSCacheDelegate` (`KeyTracker`) for this; under Swift 6 strict
+    /// concurrency that delegate callback would mutate the set off the actor (data race), so we
+    /// instead keep an actor-isolated set maintained in `insert`/`removeValue` and pruned lazily in
+    /// `value(forKey:)` (covers both expiry and memory-pressure eviction by `NSCache`).
+    private var trackedKeys: Set<Key> = []
+
+    /// Snapshot of the keys currently held by the cache (best-effort: a key whose entry `NSCache`
+    /// evicted under memory pressure is pruned the next time it is looked up via `value(forKey:)`).
+    public var keys: Set<Key> { trackedKeys }
 
     /// Convenience initializer that accepts Duration
     public init(dateProvider: @escaping @Sendable () -> Date = Date.init,
-         entryLifetime: Duration? = nil) {
+                entryLifetime: Duration? = nil) {
         self.dateProvider = dateProvider
         self.entryLifetime = entryLifetime?.timeInterval
     }
@@ -30,10 +40,13 @@ public actor Cache<Key: Hashable & Sendable, Value: Sendable> {
             entry = Entry(key: key, value: value, expirationDate: nil)
         }
         wrapped.setObject(entry, forKey: WrappedKey(key))
+        trackedKeys.insert(key)
     }
 
     public func value(forKey key: Key) -> Value? {
         guard let entry = wrapped.object(forKey: WrappedKey(key)) else {
+            // Entry is gone (e.g. evicted by NSCache under memory pressure) — keep the index tight.
+            trackedKeys.remove(key)
             return nil
         }
 
@@ -52,6 +65,7 @@ public actor Cache<Key: Hashable & Sendable, Value: Sendable> {
 
     public func removeValue(forKey key: Key) {
         wrapped.removeObject(forKey: WrappedKey(key))
+        trackedKeys.remove(key)
     }
 
     public subscript(key: Key) -> Value? {

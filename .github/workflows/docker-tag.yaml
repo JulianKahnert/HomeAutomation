@@ -25,8 +25,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           TAG="${GITHUB_REF#refs/tags/}"
-          PREV_TAG=$(git tag --sort=-v:refname | grep -A1 "^$TAG$" | tail -1)
+          # `|| true`: a missing previous tag is a valid outcome here, not an error.
+          PREV_TAG=$(git tag --sort=-v:refname | grep -A1 "^$TAG$" | tail -1 || true)
 
           if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$TAG" ]; then
             NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \

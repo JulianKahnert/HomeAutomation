@@ -24,6 +24,7 @@ jobs:
 
       - name: Resolve package dependencies for iOS apps
         run: |
+          set -euo pipefail
           cd "Apps/FlowKitAdapter" && xcodebuild -project "FlowKit Adapter.xcodeproj" -scheme "FlowKit Adapter" -resolvePackageDependencies
           cd ../..
           cd "Apps/FlowKitController" && xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -resolvePackageDependencies
@@ -31,6 +32,7 @@ jobs:
       - name: Check for changes in Package.resolved
         id: changes
         run: |
+          set -euo pipefail
           if git diff --quiet Package.resolved "Apps/FlowKitAdapter/FlowKit Adapter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "Apps/FlowKitController/FlowKit Controller.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
@@ -40,6 +42,7 @@ jobs:
       - name: Commit Package.resolved changes
         if: steps.changes.outputs.changed == 'true'
         run: |
+          set -euo pipefail
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add Package.resolved "Apps/FlowKitAdapter/FlowKit Adapter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "Apps/FlowKitController/FlowKit Controller.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"

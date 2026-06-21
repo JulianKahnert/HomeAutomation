@@ -55,6 +55,7 @@ jobs:
       - name: Check Package.resolved is up to date for ${{ matrix.app.name }}
         working-directory: ${{ matrix.app.path }}
         run: |
+          set -euo pipefail
           # Resolve dependencies to update Package.resolved
           xcodebuild \
             -project "${{ matrix.app.project }}" \
@@ -76,6 +77,7 @@ jobs:
       - name: Build ${{ matrix.app.name }}
         working-directory: ${{ matrix.app.path }}
         run: |
+          set -euo pipefail
           xcodebuild \
             -project "${{ matrix.app.project }}" \
             -scheme "${{ matrix.app.scheme }}" \
@@ -83,7 +85,7 @@ jobs:
             -configuration Debug \
             -derivedDataPath .build \
             clean build \
-            | xcpretty || true
+            | xcbeautify
 
   docker:
     name: Docker Build

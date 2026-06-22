@@ -11,6 +11,7 @@ import HAImplementations
 import HAModels
 import Logging
 import Shared
+import SharedDistributedCluster
 import SwiftUI
 
 @MainActor var commandReceiver: HomeKitCommandReceiver!

@@ -74,6 +74,16 @@ jobs:
             exit 1
           fi
 
+      - name: Trust package plugins & macros for ${{ matrix.app.name }}
+        # GitHub Actions does not run the Xcode Cloud ci_scripts, so reuse the existing
+        # ci_post_clone.sh here. It writes ~/Library/org.swift.swiftpm/security/macros.json
+        # and sets IDESkipPackagePluginFingerprintValidatation so the OpenAPIGenerator
+        # build-tool plugin and the TCA / swift-dependencies macros are trusted non-
+        # interactively. Without this the FlowKitController build fails on CI with
+        # "Validate plug-in 'OpenAPIGenerator'".
+        working-directory: ${{ matrix.app.path }}/ci_scripts
+        run: ./ci_post_clone.sh
+
       - name: Build ${{ matrix.app.name }}
         working-directory: ${{ matrix.app.path }}
         run: |

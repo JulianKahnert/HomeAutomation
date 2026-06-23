@@ -88,12 +88,17 @@ jobs:
         working-directory: ${{ matrix.app.path }}
         run: |
           set -euo pipefail
+          # SWIFT_ENABLE_EXPLICIT_MODULES=NO: work around an Xcode 26 regression where
+          # explicit modules + the downloaded swift-syntax macro prebuilt break macro
+          # dependency resolution (FlowKitController: "unable to resolve module
+          # dependency: 'SwiftSyntax'" while building PerceptionMacros).
           xcodebuild \
             -project "${{ matrix.app.project }}" \
             -scheme "${{ matrix.app.scheme }}" \
             -sdk iphonesimulator \
             -configuration Debug \
             -derivedDataPath .build \
+            SWIFT_ENABLE_EXPLICIT_MODULES=NO \
             clean build \
             | xcbeautify
 

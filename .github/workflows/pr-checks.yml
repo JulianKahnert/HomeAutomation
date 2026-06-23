@@ -88,10 +88,13 @@ jobs:
         working-directory: ${{ matrix.app.path }}
         run: |
           set -euo pipefail
-          # SWIFT_ENABLE_EXPLICIT_MODULES=NO: work around an Xcode 26 regression where
-          # explicit modules + the downloaded swift-syntax macro prebuilt break macro
-          # dependency resolution (FlowKitController: "unable to resolve module
-          # dependency: 'SwiftSyntax'" while building PerceptionMacros).
+          # Build swift-syntax from source instead of the downloaded macro prebuilt: on
+          # Xcode 26 the prebuilt only ships macOS slices, so building macros (e.g.
+          # PerceptionMacros, via TCA) for the iOS simulator fails with "could not find
+          # module 'SwiftSyntax' for target arm64-apple-ios-simulator".
+          defaults write com.apple.dt.Xcode IDEPackageEnablePrebuilts -bool NO
+          # SWIFT_ENABLE_EXPLICIT_MODULES=NO: belt-and-suspenders for the related Xcode 26
+          # explicit-modules dependency-resolution regression.
           xcodebuild \
             -project "${{ matrix.app.project }}" \
             -scheme "${{ matrix.app.scheme }}" \

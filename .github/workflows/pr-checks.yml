@@ -88,11 +88,6 @@ jobs:
         working-directory: ${{ matrix.app.path }}
         run: |
           set -euo pipefail
-          # Build swift-syntax from source instead of the downloaded macro prebuilt: on
-          # Xcode 26 the prebuilt only ships macOS slices, so building macros (e.g.
-          # PerceptionMacros, via TCA) for the iOS simulator fails with "could not find
-          # module 'SwiftSyntax' for target arm64-apple-ios-simulator".
-          defaults write com.apple.dt.Xcode IDEPackageEnablePrebuilts -bool NO
           # Use -destination, not -sdk iphonesimulator: -sdk forces *every* target onto the
           # simulator SDK, including the OpenAPIGenerator build-tool plugin's host executable
           # and its _OpenAPIGeneratorCore dependency — which then trips its guard

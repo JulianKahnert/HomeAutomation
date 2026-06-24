@@ -93,15 +93,12 @@ jobs:
           # PerceptionMacros, via TCA) for the iOS simulator fails with "could not find
           # module 'SwiftSyntax' for target arm64-apple-ios-simulator".
           defaults write com.apple.dt.Xcode IDEPackageEnablePrebuilts -bool NO
-          # SWIFT_ENABLE_EXPLICIT_MODULES=NO: belt-and-suspenders for the related Xcode 26
-          # explicit-modules dependency-resolution regression.
           xcodebuild \
             -project "${{ matrix.app.project }}" \
             -scheme "${{ matrix.app.scheme }}" \
             -sdk iphonesimulator \
             -configuration Debug \
             -derivedDataPath .build \
-            SWIFT_ENABLE_EXPLICIT_MODULES=NO \
             clean build \
             | xcbeautify
 

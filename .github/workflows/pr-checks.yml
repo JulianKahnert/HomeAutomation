@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - develop
+  # Allow the renovate-package-resolved workflow to dispatch these checks after
+  # it commits a regenerated Package.resolved (that commit is pushed with
+  # GITHUB_TOKEN and therefore cannot trigger pull_request runs itself).
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -17,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Build Swift Package
         run: swift build
@@ -43,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -51,6 +55,7 @@ jobs:
       - name: Check Package.resolved is up to date for ${{ matrix.app.name }}
         working-directory: ${{ matrix.app.path }}
         run: |
+          set -euo pipefail
           # Resolve dependencies to update Package.resolved
           xcodebuild \
             -project "${{ matrix.app.project }}" \
@@ -69,17 +74,33 @@ jobs:
             exit 1
           fi
 
+      - name: Trust package plugins & macros for ${{ matrix.app.name }}
+        # GitHub Actions does not run the Xcode Cloud ci_scripts, so reuse the existing
+        # ci_post_clone.sh here. It writes ~/Library/org.swift.swiftpm/security/macros.json
+        # and sets IDESkipPackagePluginFingerprintValidatation so the OpenAPIGenerator
+        # build-tool plugin and the TCA / swift-dependencies macros are trusted non-
+        # interactively. Without this the FlowKitController build fails on CI with
+        # "Validate plug-in 'OpenAPIGenerator'".
+        working-directory: ${{ matrix.app.path }}/ci_scripts
+        run: ./ci_post_clone.sh
+
       - name: Build ${{ matrix.app.name }}
         working-directory: ${{ matrix.app.path }}
         run: |
+          set -euo pipefail
+          # Use -destination, not -sdk iphonesimulator: -sdk forces *every* target onto the
+          # simulator SDK, including the OpenAPIGenerator build-tool plugin's host executable
+          # and its _OpenAPIGeneratorCore dependency — which then trips its guard
+          # ("_OpenAPIGeneratorCore is only to be used by swift-openapi-generator itself").
+          # A destination lets plugin host tools build for macOS and the app for the simulator.
           xcodebuild \
             -project "${{ matrix.app.project }}" \
             -scheme "${{ matrix.app.scheme }}" \
-            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
             -derivedDataPath .build \
             clean build \
-            | xcpretty || true
+            | xcbeautify
 
   docker:
     name: Docker Build
@@ -87,7 +108,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4

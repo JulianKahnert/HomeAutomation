@@ -6,23 +6,46 @@
 //
 
 import Adapter
+import Foundation
 import HAImplementations
 import HAModels
+import Logging
 import Shared
+import SharedDistributedCluster
 import SwiftUI
 
 @MainActor var commandReceiver: HomeKitCommandReceiver!
 
 @main
 struct FlowKitApp {
+    private static let log = Logger(label: "FlowKitAdapter")
+
     /// Entrypoint of the app
     static func main() {
 
         // we use this workaround to initialize the logging system before anything else is constructed
         initLogging(withFileLogging: true, logLevel: .debug)
 
+        logStartupProvenance()
+
         // start the app
         FlowKitAdapter.main()
+    }
+
+    /// Logs the running build's version and binary build date at startup. The adapter is built and
+    /// installed out-of-band from the server Docker image, so without this there is no way to tell
+    /// from the logs which code (e.g. which cluster fix) the deployed `.app` actually contains.
+    private static func logStartupProvenance() {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        let buildDate: String = {
+            guard let url = Bundle.main.executableURL,
+                  let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let date = attrs[.modificationDate] as? Date else { return "unknown" }
+            return ISO8601DateFormatter().string(from: date)
+        }()
+        Self.log.info("FlowKit Adapter starting — version \(version) (build \(build)), binary built \(buildDate)")
     }
 }
 
@@ -46,15 +69,34 @@ struct FlowKitAdapter: App, Log {
                 // do not start run loop when running in preview canvas
                 guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
 
+                // Tear down a previously-created system first (e.g. serverAddress changed) so its
+                // cluster node, background tasks and bound port are released before creating a new one.
+                await teardownActorSystem()
+
                 try? await Task.sleep(for: .seconds(1))
                 await initializeActorSystem()
             }
         }
     }
 
+    private func teardownActorSystem() async {
+        statusObservationTask?.cancel()
+        statusObservationTask = nil
+        entityObservationTask?.cancel()
+        entityObservationTask = nil
+        if let actorSystem {
+            await actorSystem.shutdown()
+            self.actorSystem = nil
+        }
+    }
+
     private func initializeActorSystem() async {
-        // Initialize with configured server address
-        let system = await CustomActorSystem(role: .homeKitAdapter(serverAddress: serverAddress))
+        // Initialize with configured server address.
+        // onDown: a lost connection that does not recover within the grace period restarts the app
+        // (launchctl KeepAlive) with a fresh node UID → clean re-handshake with the server.
+        let system = await CustomActorSystem(role: .homeKitAdapter(serverAddress: serverAddress), onDown: {
+            exit(1)
+        })
         self.actorSystem = system
 
         let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(
@@ -70,7 +112,7 @@ struct FlowKitAdapter: App, Log {
 
         statusObservationTask?.cancel()
         statusObservationTask = Task {
-            for await status in await system.connectionStatus {
+            for await status in await system.makeConnectionStatusStream() {
                 connectionStatus = status
             }
         }

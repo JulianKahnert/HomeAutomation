@@ -20,7 +20,8 @@ struct ActionLogManagerTests {
         let manager = ActionLogManager()
         let action = HomeManagableAction.turnOn(switchId)
 
-        #expect(await manager.log(action: action) == false) // first call: miss → cached
+        #expect(await manager.log(action: action) == false) // first call: miss → execute
+        await manager.markExecuted(action) // execution succeeded → now deduped
 
         let echo = EntityStorageItem(entityId: switchId, isDeviceOn: true)
         let invalidated = await manager.invalidateContradictedCommands(for: echo)
@@ -35,6 +36,7 @@ struct ActionLogManagerTests {
         let action = HomeManagableAction.turnOn(switchId)
 
         #expect(await manager.log(action: action) == false)
+        await manager.markExecuted(action)
 
         let drift = EntityStorageItem(entityId: switchId, isDeviceOn: false)
         let invalidated = await manager.invalidateContradictedCommands(for: drift)
@@ -49,6 +51,7 @@ struct ActionLogManagerTests {
         let action = HomeManagableAction.setBrightness(brightnessId, 0.5)
 
         #expect(await manager.log(action: action) == false)
+        await manager.markExecuted(action)
 
         // echo of the commanded value (50%) confirms → kept
         let echo = EntityStorageItem(entityId: brightnessId, brightness: 50)
@@ -75,7 +78,9 @@ struct ActionLogManagerTests {
         let brightnessAction = HomeManagableAction.setBrightness(switchId, 0.5)
 
         #expect(await manager.log(action: onAction) == false)
+        await manager.markExecuted(onAction)
         #expect(await manager.log(action: brightnessAction) == false)
+        await manager.markExecuted(brightnessAction)
 
         // Only the power state drifted (off); brightness is unknown in this update.
         let drift = EntityStorageItem(entityId: switchId, isDeviceOn: false)
@@ -97,6 +102,7 @@ struct ActionLogManagerTests {
         let action = HomeManagableAction.turnOn(switchId)
 
         #expect(await manager.log(action: action) == false)
+        await manager.markExecuted(action)
 
         // Advance past the 2-minute TTL so the cache entry expires.
         holder.currentDate = holder.currentDate.addingTimeInterval(121)
@@ -107,5 +113,21 @@ struct ActionLogManagerTests {
 
         // Dedup is gone (expired) → the command is a fresh miss again.
         #expect(await manager.log(action: action) == false)
+    }
+
+    @Test("A failed action is not deduped — the retry is executed (#190 Finding 3)")
+    func failedActionIsRetryable() async {
+        let manager = ActionLogManager()
+        let action = HomeManagableAction.turnOn(switchId)
+
+        // First attempt: cache miss → would be executed, but execution FAILS → never marked.
+        #expect(await manager.log(action: action) == false)
+
+        // Retry (failedActions loop, 5s later): must be a cache miss again, not a duplicate.
+        #expect(await manager.log(action: action) == false)
+
+        // Only after a successful execution does deduplication apply.
+        await manager.markExecuted(action)
+        #expect(await manager.log(action: action) == true)
     }
 }

@@ -71,9 +71,12 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         let filteredCharacteristics = characteristics.filter({ $0.entityId == action.entityId })
         guard filteredCharacteristics.count == 1,
               let characteristic = filteredCharacteristics.first else {
-            log.error("Failed to get characteristic")
+            // Throw instead of silently returning: the server must see this as a failure so its
+            // failedActions retry loop re-attempts the command once HomeKit has recovered (e.g.
+            // during the empty-homes window right after an HMHomeManager reset).
+            log.error("perform(_:) — could not resolve characteristic for \(action.entityId) (matches: \(filteredCharacteristics.count))")
             assertionFailure()
-            return
+            throw OptionalError.notFound
         }
         log.info("Perform action [\(action)] on [\(characteristic)]")
 
@@ -89,8 +92,9 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             assert((0.0...1.0).contains(value), "Value (\(value) out of bounds")
             guard let minimumValue = characteristic.metadata?.minimumValue,
                   let maximumValue = characteristic.metadata?.maximumValue else {
+                log.error("perform(_:) — missing metadata for brightness on \(action.entityId)")
                 assertionFailure()
-                return
+                throw OptionalError.notFound
             }
             let adjustedValue = Float(truncating: minimumValue) + value * (Float(truncating: maximumValue) - Float(truncating: minimumValue))
             newValue = NSNumber(value: Int64(adjustedValue))
@@ -99,8 +103,9 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             assert((0.0...1.0).contains(value), "Value (\(value) out of bounds")
             guard let minimumValue = characteristic.metadata?.minimumValue,
                   let maximumValue = characteristic.metadata?.maximumValue else {
+                log.error("perform(_:) — missing metadata for color temperature on \(action.entityId)")
                 assertionFailure()
-                return
+                throw OptionalError.notFound
             }
 
             let adjustedValue = Float(truncating: minimumValue) + (1 - value) * (Float(truncating: maximumValue) - Float(truncating: minimumValue))
@@ -120,7 +125,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             guard let home = characteristic.service?.accessory?.home else {
                 log.error("Failed to get home for characteristic")
                 assertionFailure()
-                return
+                throw OptionalError.notFound
             }
 
             // create scene if not exists
@@ -130,7 +135,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             guard let scene = home.actionSets.first(where: { $0.name == sceneName }) else {
                 log.error("Could not find scene named \(sceneName)")
                 assertionFailure()
-                return
+                throw OptionalError.notFound
             }
 
             // add action if not exists
@@ -176,6 +181,16 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             log.error("Failed to trigger scene '\(sceneName)': \(error)")
             throw error
         }
+    }
+
+    /// Re-reads and re-yields the state of every subscribed characteristic into the entity stream.
+    /// Called on every reconnect (connection status transition to `.up`) so the server is
+    /// resynchronized with HomeKit reality after a disconnect — without this, events dropped while
+    /// the connection was down would leave the server acting on stale state until the next organic
+    /// change or the 6-hourly HMHomeManager reset.
+    public func pushFullState() async {
+        log.info("pushFullState() — re-yielding all subscribed characteristics after reconnect")
+        await homeKitHomeManager.updateEntities()
     }
 
     /// Attention: This call might take a while so be carefull with it

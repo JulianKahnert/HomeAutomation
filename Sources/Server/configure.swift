@@ -195,11 +195,15 @@ public func configure(_ app: Application) async throws {
 
     // The server is the cluster's sole leader (see CustomActorSystem.makeClusterSettings): with a
     // single reachable member it self-elects, so it can promote a (re)joining adapter to .up and
-    // down dead adapter nodes. It therefore recovers from adapter restarts on its own and must
-    // NEVER terminate — hence no onDown handler. Recovery on the adapter side is its own restart.
+    // down dead adapter nodes. It therefore recovers from adapter restarts on its own and passes
+    // no onDown handler (an absent adapter must never terminate the server).
+    // onStuckExit is the gated backstop against the convergence wedge (#190 Finding 1): it fires
+    // only when a peer is VISIBLE but the cluster stays below .up despite the watchdog's forced
+    // downing — then a non-zero exit lets Docker's `restart: unless-stopped` restart the container
+    // with a fresh node UID (Docker does not act on an unhealthy container by itself).
     // Cluster verbosity follows the app's configured level (driven by the LOG_LEVEL env), so it is
     // set once in docker-compose.
-    let actorSystem = await CustomActorSystem(role: .server, logLevel: app.logger.logLevel)
+    let actorSystem = await CustomActorSystem(role: .server, onStuckExit: { exit(1) }, logLevel: app.logger.logLevel)
     app.customActorSystem = actorSystem
     let eventReceiver = await actorSystem.makeLocalActor(actorId: .homeEventReceiver) { system in
         HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: system)

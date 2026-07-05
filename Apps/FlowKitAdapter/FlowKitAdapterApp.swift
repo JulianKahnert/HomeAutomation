@@ -112,8 +112,20 @@ struct FlowKitAdapter: App, Log {
 
         statusObservationTask?.cancel()
         statusObservationTask = Task {
+            var previousStatus: ConnectionStatus?
             for await status in await system.makeConnectionStatusStream() {
                 connectionStatus = status
+
+                // Resync on every transition INTO .up (including the first): re-yield the full
+                // HomeKit state so the server recovers from events dropped while disconnected.
+                // Fire-and-forget so a slow full-home read never stalls status updates.
+                if status.isReconnect(from: previousStatus) {
+                    Self.log.info("Connection is up (was: \(previousStatus.map(String.init(describing:)) ?? "none")) — pushing full state snapshot")
+                    Task {
+                        await adapter.pushFullState()
+                    }
+                }
+                previousStatus = status
             }
         }
 

@@ -103,8 +103,7 @@ public final class HomeManager: HomeManagable {
         do {
             try await getAdapter().get(with: log).perform(action)
 
-            // Mark as executed only AFTER success: a failed action must remain a cache miss so
-            // the 5s failedActions retry below is not skipped as a duplicate (#190 Finding 3).
+            // Only after success — a failed action must stay a cache miss so its retry runs.
             await actionLogManager.markExecuted(action)
         } catch {
             let entityId = action.entityId

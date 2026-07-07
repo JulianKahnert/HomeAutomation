@@ -71,9 +71,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         let filteredCharacteristics = characteristics.filter({ $0.entityId == action.entityId })
         guard filteredCharacteristics.count == 1,
               let characteristic = filteredCharacteristics.first else {
-            // Throw instead of silently returning: the server must see this as a failure so its
-            // failedActions retry loop re-attempts the command once HomeKit has recovered (e.g.
-            // during the empty-homes window right after an HMHomeManager reset).
+            // Throw so the server's failedActions retry loop re-attempts the command.
             log.error("perform(_:) — could not resolve characteristic for \(action.entityId) (matches: \(filteredCharacteristics.count))")
             assertionFailure()
             throw OptionalError.notFound
@@ -184,10 +182,8 @@ public final class HomeKitAdapter: HomeKitAdapterable {
     }
 
     /// Re-reads and re-yields the state of every subscribed characteristic into the entity stream.
-    /// Called on every reconnect (connection status transition to `.up`) so the server is
-    /// resynchronized with HomeKit reality after a disconnect — without this, events dropped while
-    /// the connection was down would leave the server acting on stale state until the next organic
-    /// change or the 6-hourly HMHomeManager reset.
+    /// Called on every reconnect so the server recovers from events dropped while disconnected —
+    /// otherwise it acts on stale state until the next organic change or 6-hourly rescan.
     public func pushFullState() async {
         log.info("pushFullState() — re-yielding all subscribed characteristics after reconnect")
         await homeKitHomeManager.updateEntities()

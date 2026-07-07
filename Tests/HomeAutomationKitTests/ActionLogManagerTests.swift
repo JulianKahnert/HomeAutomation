@@ -21,7 +21,7 @@ struct ActionLogManagerTests {
         let action = HomeManagableAction.turnOn(switchId)
 
         #expect(await manager.log(action: action) == false) // first call: miss → execute
-        await manager.markExecuted(action) // execution succeeded → now deduped
+        await manager.markExecuted(action)
 
         let echo = EntityStorageItem(entityId: switchId, isDeviceOn: true)
         let invalidated = await manager.invalidateContradictedCommands(for: echo)
@@ -115,15 +115,13 @@ struct ActionLogManagerTests {
         #expect(await manager.log(action: action) == false)
     }
 
-    @Test("A failed action is not deduped — the retry is executed (#190 Finding 3)")
+    @Test("A failed action is not deduped — the retry is executed")
     func failedActionIsRetryable() async {
         let manager = ActionLogManager()
         let action = HomeManagableAction.turnOn(switchId)
 
-        // First attempt: cache miss → would be executed, but execution FAILS → never marked.
+        // Execution fails → never marked, so the retry must be a cache miss again.
         #expect(await manager.log(action: action) == false)
-
-        // Retry (failedActions loop, 5s later): must be a cache miss again, not a duplicate.
         #expect(await manager.log(action: action) == false)
 
         // Only after a successful execution does deduplication apply.

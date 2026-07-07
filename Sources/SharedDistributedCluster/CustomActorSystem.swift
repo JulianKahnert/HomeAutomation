@@ -23,8 +23,7 @@ public enum ConnectionStatus: Sendable, Equatable {
     case error
 
     /// Whether this status update is a transition INTO `.up` — from any not-up state, or from no
-    /// prior status at all. This is the moment a full state resync is due: events dropped while
-    /// disconnected are otherwise lost until the next organic change (#190 Findings 6/7).
+    /// prior status at all (so the first `.up` counts too).
     public func isReconnect(from previous: ConnectionStatus?) -> Bool {
         self == .up && previous != .up
     }
@@ -76,22 +75,19 @@ public actor CustomActorSystem {
 
     // MARK: - Watchdog / recovery tuning
 
-    /// How often the stuck-non-up watchdog re-evaluates the cluster state.
     private static let watchdogInterval: Duration = .seconds(30)
-    /// How long the cluster may stay below `.up` before the watchdog force-downs peer members.
-    /// A healthy join completes in seconds; minutes below `.up` with a visible peer means the
-    /// convergence deadlock (a stale member blocking gossip convergence, see #190 Finding 1).
+    /// How long the cluster may stay below `.up` before the watchdog force-downs peer members —
+    /// a healthy join completes in seconds.
     static let watchdogEvictionAfter: TimeInterval = 180
     /// Self-exit backstop threshold when this process had been `.up` before (warm wedge).
     static let watchdogSelfExitAfterWarm: TimeInterval = 600
-    /// Self-exit backstop threshold when this process never reached `.up` — much longer than the
-    /// warm threshold so a misconfigured peer cannot drive the container into a tight boot loop.
+    /// Self-exit backstop threshold on a never-up boot — longer, so a misconfigured peer cannot
+    /// drive the container into a tight boot loop.
     static let watchdogSelfExitAfterCold: TimeInterval = 1200
     /// Adapter grace period after a lost connection (peer had been `.up` in this process).
     static let graceAfterConnectionLoss: Duration = .seconds(60)
-    /// Adapter grace period when the peer never came up in this process. Long enough to survive a
-    /// slow server boot and to configure the app interactively, but bounded so a never-up wedge
-    /// boot still self-heals via restart (fresh node UID) instead of hanging forever.
+    /// Adapter grace period on a never-up boot — long enough to survive a slow server boot,
+    /// bounded so a wedged boot still self-heals via restart instead of hanging forever.
     static let graceOnNeverUpBoot: Duration = .seconds(300)
 
     /// When this system was created — used to report uptime in diagnostics.
@@ -99,11 +95,10 @@ public actor CustomActorSystem {
     /// When a reachable peer was last observed `.up` — used to report how long the cluster has been
     /// wedged. `nil` until the first `.up` is ever seen.
     private var lastUpDate: Date?
-    /// Since when the connection has been continuously below `.up`. Reset to `nil` on every `.up`.
-    /// `nil` while up; treated as `bootDate` before the first event arrives.
+    /// Since when the connection has been continuously below `.up`. `nil` while up; treated as
+    /// `bootDate` before the first event arrives.
     private var notUpSince: Date?
-    /// When the watchdog last force-downed members — re-arms only after another full
-    /// `watchdogEvictionAfter`, so a legitimately (re)joining fresh peer gets time to come up.
+    /// When the watchdog last force-downed members.
     private var lastWatchdogEvictionAt: Date?
 
     /// The most recent connection status, or nil if no cluster event has been processed yet.
@@ -141,16 +136,13 @@ public actor CustomActorSystem {
     /// - Parameters:
     ///   - role: The system role (server or adapter)
     ///   - onDown: Optional closure called when the connection to the peer is lost and does not
-    ///     recover within a grace period. Used by the **adapter** to `exit(1)` so launchctl
-    ///     restarts it with a fresh node UID. The grace period is short (60s) after a previous
-    ///     `.up`, and longer (5min) on a never-up boot — but it always arms, so a boot into a
-    ///     wedged cluster also self-heals via restart. The **server** passes `nil` — it stays
-    ///     alive and heals as the cluster leader.
-    ///   - onStuckExit: Optional closure called by the stuck-non-up watchdog as a last-resort
-    ///     backstop: a peer is visible but the cluster has stayed below `.up` far beyond the
-    ///     eviction phase. Used by the **server** to `exit(1)` so Docker's
-    ///     `restart: unless-stopped` restarts the container with a fresh node UID. Gated on a
-    ///     visible peer — a merely absent adapter never triggers it.
+    ///     recover within a grace period (see `gracePeriod(everConnected:)`). Used by the
+    ///     **adapter** to `exit(1)` so launchctl restarts it with a fresh node UID. The **server**
+    ///     passes `nil` — it stays alive and heals as the cluster leader.
+    ///   - onStuckExit: Optional closure called by the watchdog when a peer is visible but the
+    ///     cluster has stayed below `.up` far beyond the eviction phase. Used by the **server** to
+    ///     `exit(1)` so Docker's `restart: unless-stopped` restarts the container with a fresh
+    ///     node UID. Gated on a visible peer — a merely absent adapter never triggers it.
     ///   - logLevel: Log level for the underlying `swift-distributed-actors` system. The server
     ///     passes its configured level (driven by the `LOG_LEVEL` env) so cluster verbosity is set
     ///     once in docker-compose.
@@ -171,9 +163,7 @@ public actor CustomActorSystem {
         // cluster events are firing.
         startHeartbeatTask()
 
-        // SWIM-independent recovery from the convergence deadlock (#190 Finding 1). Runs for both
-        // roles: SWIM stays silent in the real wedge (the new process on the same host:port answers
-        // probes for the dead old UID), so no `.down` ever happens without this.
+        // SWIM-independent recovery from the convergence deadlock, see runWatchdogCheck().
         startWatchdogTask()
 
         // Only the adapter actively (re)connects to the server.
@@ -309,7 +299,7 @@ public actor CustomActorSystem {
         }
 
         // Recovery is opt-in via `onDown` (adapter only). The server passes nil and never terminates
-        // via this path (its backstop is the peer-gated watchdog self-exit).
+        // via this path.
         guard let onDown else { return }
 
         if status == .up {
@@ -318,9 +308,9 @@ public actor CustomActorSystem {
             return
         }
 
-        // Peer not up: start a single grace timer (if one isn't already pending). It also arms on a
-        // never-up boot — with a longer period — so a boot into a down server or a wedged cluster
-        // recovers by restart (fresh node UID) instead of hanging in `.joining` forever.
+        // Peer not up: start a single grace timer (if one isn't already pending). It also arms on
+        // a never-up boot, so a boot into a wedged cluster recovers by restart instead of hanging
+        // in `.joining` forever.
         guard graceTask == nil else { return }
         let gracePeriod = Self.gracePeriod(everConnected: everConnected)
         graceTask = Task { [weak self] in
@@ -339,29 +329,24 @@ public actor CustomActorSystem {
         subscribers[id] = nil
     }
 
-    // MARK: - Stuck-non-up watchdog (#190 Finding 1)
+    // MARK: - Stuck-non-up watchdog
 
     /// The adapter grace period before `onDown` fires: short after a lost connection, longer on a
-    /// never-up boot. Pure so it can be unit-tested.
+    /// never-up boot.
     static func gracePeriod(everConnected: Bool) -> Duration {
         everConnected ? graceAfterConnectionLoss : graceOnNeverUpBoot
     }
 
-    /// Whether the watchdog should force-down a member. Every peer (non-self) that is not already
-    /// at least `.down` is a candidate — **regardless of reachability**: in the verified wedge the
-    /// stale dead-UID member stays REACHABLE (the new process on the same host:port answers its
-    /// SWIM probes), which is exactly why the reachability-based downing never fires. Pure so it
-    /// can be unit-tested.
+    /// Every peer that is not already at least `.down` is a candidate — **regardless of
+    /// reachability**: the stale dead-UID wedge member stays reachable (the new process on the
+    /// same host:port answers its SWIM probes), so reachability-based downing never fires.
     static func isWatchdogEvictionCandidate(status: Cluster.MemberStatus, isSelf: Bool) -> Bool {
         !isSelf && status < .down
     }
 
-    /// What one watchdog tick should do. Pure value so the complete escalation ladder is
-    /// unit-testable as timeline scenarios, without a running cluster.
+    /// What one watchdog tick should do. Pure value so the escalation ladder is unit-testable.
     struct WatchdogDecision: Equatable, Sendable {
-        /// Force `cluster.down(member:)` on the current eviction candidates.
         var shouldEvictPeers = false
-        /// Escalate to the self-exit backstop (fresh process = fresh node UID).
         var shouldSelfExit = false
 
         static let noop = WatchdogDecision()
@@ -369,14 +354,12 @@ public actor CustomActorSystem {
 
     /// Decision function for one watchdog tick — the single place holding the escalation rules:
     ///
-    /// - Nothing happens while `.up`, or while no peer is visible (an absent peer — adapter
-    ///   switched off, server not yet deployed — is a legitimate long-lived state; only a peer
-    ///   that is *present but stuck* below `.up` indicates the convergence wedge).
+    /// - Nothing happens while `.up`, or while no peer is visible (an absent peer is a legitimate
+    ///   long-lived state; only a peer that is *present but stuck* indicates the wedge).
     /// - **Evict** once the cluster has been below `.up` for `watchdogEvictionAfter`, re-arming
     ///   only after another full window so a freshly rejoining peer gets time to come up.
-    /// - **Self-exit** (backstop, wired on the server) after `watchdogSelfExitAfterWarm` when this
-    ///   process had been `.up` before, or after the much longer `watchdogSelfExitAfterCold` on a
-    ///   never-up boot (avoids tight boot loops on misconfiguration).
+    /// - **Self-exit** after `watchdogSelfExitAfterWarm` when this process had been `.up` before,
+    ///   or after the longer `watchdogSelfExitAfterCold` on a never-up boot.
     static func watchdogDecision(
         connectionStatus: ConnectionStatus?,
         now: Date,
@@ -407,19 +390,6 @@ public actor CustomActorSystem {
         }
     }
 
-    /// SWIM-independent recovery from a cluster that is stuck below `.up` (the convergence
-    /// deadlock: one stale member with a current-looking seen-table blocks ALL `.joining → .up`
-    /// promotions, and SWIM never reports it because the live process on the same host:port
-    /// answers its probes). Two escalation phases:
-    ///
-    /// 1. After `watchdogEvictionAfter` below `.up`: force `cluster.down(member:)` on every peer —
-    ///    manual downing is leader-independent and removes the stale member from the convergence
-    ///    set. A downed live peer recovers on its own (the adapter rejoins with a fresh UID via
-    ///    `recoverFromLocalNodeDown`; the server stays and re-admits the rejoining adapter).
-    /// 2. As backstop (`onStuckExit`, server only): if a peer is visible but the cluster is still
-    ///    not `.up` long after phase 1, exit the process so the container restart policy provides
-    ///    a fresh node UID. Without this, `/health` stays 503 forever — Docker's
-    ///    `restart: unless-stopped` does not act on an unhealthy container.
     /// Reads the actor state at one point in time and applies the pure decision function.
     /// Returns the stuck duration alongside for logging.
     private func evaluateWatchdog(hasPeers: Bool, now: Date) -> (decision: WatchdogDecision, stuckDuration: TimeInterval) {
@@ -435,9 +405,14 @@ public actor CustomActorSystem {
         return (decision, now.timeIntervalSince(notUpSince ?? bootDate))
     }
 
+    /// SWIM-independent recovery from a cluster stuck below `.up` (the convergence deadlock: one
+    /// stale member blocks all `.joining → .up` promotions, and SWIM never reports it because the
+    /// live process on the same host:port answers its probes). Escalation: force-down all peers
+    /// first — manual downing is leader-independent; a downed live peer rejoins on its own — then
+    /// `onStuckExit` as backstop. All rules live in the pure `watchdogDecision`.
+    ///
     /// `nonisolated` so the non-`Sendable` `Cluster.Membership` snapshot never crosses into the
-    /// actor's isolation domain (mirrors `connectionDiagnostics()` and the reconnect loop). All
-    /// escalation *rules* live in the pure `watchdogDecision` — this only observes and applies.
+    /// actor's isolation domain (mirrors `connectionDiagnostics()` and the reconnect loop).
     nonisolated private func runWatchdogCheck() async {
         let snapshot = await actorSystem.cluster.membershipSnapshot
         let selfNode = actorSystem.cluster.node

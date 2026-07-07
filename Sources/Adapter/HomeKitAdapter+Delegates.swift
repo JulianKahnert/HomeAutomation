@@ -80,9 +80,7 @@ extension HomeKitAdapter {
             var subscriptionErrors = 0
             for characteristic in allCharacteristics.sorted() {
                 guard let accessory = characteristic.service?.accessory else {
-                    // Transient nil back-reference (KVC-based, see HomeKit-Extensions.swift) must
-                    // not crash the whole adapter — skip this characteristic; the next rescan
-                    // picks it up again.
+                    // Transient nil back-reference — skip; the next rescan picks it up again.
                     log.error("updateEntities() — skipping characteristic without accessory back-reference: \(characteristic)")
                     continue
                 }

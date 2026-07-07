@@ -2,9 +2,7 @@
 //  WatchdogTests.swift
 //  HomeAutomationKit
 //
-//  Unit tests for the stuck-non-up watchdog (#190 Finding 1). All escalation rules live in the
-//  pure `watchdogDecision` function, so the complete ladder — boot → wedge → evict → re-arm →
-//  self-exit — is testable as timeline scenarios without a running cluster.
+//  Unit tests for the stuck-non-up watchdog escalation rules (pure `watchdogDecision`).
 //
 
 import DistributedCluster
@@ -97,16 +95,12 @@ struct WatchdogTests {
 
     @Test("The verified wedge scenario end-to-end: evict first, self-exit as backstop")
     func wedgeEscalationLadder() {
-        // Server restarts into a wedge: stale reachable .joining adapter member visible,
-        // never .up in this process.
         let evictAt = CustomActorSystem.watchdogEvictionAfter
         let exitAt = CustomActorSystem.watchdogSelfExitAfterCold
 
-        // Phase 1: eviction fires long before the self-exit backstop.
         let phase1 = decision(after: evictAt)
         #expect(phase1 == .init(shouldEvictPeers: true, shouldSelfExit: false))
 
-        // Phase 2: if eviction did not heal the cluster, the backstop eventually fires.
         let phase2 = decision(after: exitAt, lastEvictionAt: exitAt - 10)
         #expect(phase2.shouldSelfExit == true)
     }
@@ -115,9 +109,6 @@ struct WatchdogTests {
 
     @Test("The wedge member — reachable and stuck .joining — IS an eviction candidate")
     func reachableJoiningIsCandidate() {
-        // This is the exact member the 2026-06-19 wedge left behind: a dead old UID that stays
-        // REACHABLE (the new process on the same host:port answers its SWIM probes) and .joining —
-        // which is why any reachability-based downing can never catch it.
         #expect(CustomActorSystem.isWatchdogEvictionCandidate(status: .joining, isSelf: false))
     }
 
@@ -144,8 +135,7 @@ struct WatchdogTests {
     }
 }
 
-/// Tests for the reconnect-transition helper driving the adapter's full-state resync
-/// (#190 Findings 6/7).
+/// Tests for the reconnect-transition helper driving the adapter's full-state resync.
 struct ReconnectTransitionTests {
 
     @Test("First .up (no prior status) is a reconnect — covers the boot-time push race")

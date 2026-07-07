@@ -34,10 +34,7 @@ public actor ActionLogManager {
 
     /// Log an action and check if it was a duplicate (cache hit).
     ///
-    /// This only *checks* the dedup cache — it does NOT mark the command as executed. Call
-    /// ``markExecuted(_:)`` after the action actually succeeded. Marking before execution would
-    /// turn every retry of a failed action into a guaranteed cache hit, silently skipping it
-    /// (#190 Finding 3).
+    /// This only *checks* the dedup cache — call ``markExecuted(_:)`` after the action succeeded.
     /// - Parameter action: The action to log
     /// - Returns: true if this was a duplicate action (cache hit), false if it's a new action that should be executed
     public func log(action: HomeManagableAction) async -> Bool {
@@ -71,8 +68,7 @@ public actor ActionLogManager {
     }
 
     /// Mark an action as successfully executed so identical follow-up commands are deduplicated.
-    /// Only call this AFTER the action succeeded — a failed action must stay a cache miss so the
-    /// failed-action retry loop (and any automation re-issue) is not skipped as a duplicate.
+    /// Only call this after success — a failed action must stay a cache miss so its retry runs.
     public func markExecuted(_ action: HomeManagableAction) async {
         await commandCache.insert(action, forKey: CommandCacheKey(action))
     }

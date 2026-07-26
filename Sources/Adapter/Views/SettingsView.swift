@@ -7,18 +7,18 @@
 
 #if canImport(SwiftUI)
 import Shared
-import SharedDistributedCluster
+import StarActorSystem
 import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var serverAddress: CustomActorSystem.Address
+    @Binding var serverAddress: ServerAddress
 
     @State private var host = "localhost"
     @State private var port = 8888
 
-    var newServerAddress: CustomActorSystem.Address {
-        CustomActorSystem.Address(host: host, port: port)
+    var newServerAddress: ServerAddress {
+        ServerAddress(host: host, port: port)
     }
 
     var body: some View {
@@ -45,6 +45,6 @@ struct SettingsView: View {
 }
 
 #Preview {
-    SettingsView(serverAddress: .constant(.init(host: "localhost", port: 8888)))
+    SettingsView(serverAddress: .constant(.init(host: "localhost", port: 8080)))
 }
 #endif

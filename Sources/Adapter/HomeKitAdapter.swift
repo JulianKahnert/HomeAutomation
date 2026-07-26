@@ -17,7 +17,6 @@ public protocol HomeKitAdapterable: EntityValidator, Sendable {
 }
 
 #if canImport(HomeKit)
-import DistributedCluster
 import Foundation
 import HAModels
 import HomeKit

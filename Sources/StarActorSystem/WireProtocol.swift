@@ -12,7 +12,11 @@
 import Foundation
 
 /// A single transport connection the actor system sends frames over.
-public protocol WireConnection: Sendable {
+///
+/// Class-constrained so the system can identity-check (`===`) which connection
+/// a frame or lifecycle event belongs to — stale connections must never affect
+/// the current one.
+public protocol WireConnection: AnyObject, Sendable {
     func send(_ data: Data) async throws
     func close() async
 }

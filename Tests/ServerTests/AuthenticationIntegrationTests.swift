@@ -9,6 +9,7 @@
 @testable import HAImplementations
 @testable import HAModels
 @testable import Server
+import StarActorSystem
 import XCTVapor
 
 final class AuthenticationIntegrationTests: XCTestCase {
@@ -27,6 +28,9 @@ final class AuthenticationIntegrationTests: XCTestCase {
         // Mock homeAutomationConfigService for testing
         let mockLocation = Location(latitude: 52.52, longitude: 13.405)
         app.homeAutomationConfigService = HomeAutomationConfigService(location: mockLocation, automations: [])
+
+        // The WebSocket route registration needs an actor system present
+        app.starActorSystem = StarActorSystem(name: "server-tests")
 
         // Register routes (this applies the authentication middleware)
         try routes(app)
@@ -157,6 +161,7 @@ final class AuthenticationIntegrationTests: XCTestCase {
         let testApp = try await Application.make(.testing)
         testApp.authToken = "any-token"
         testApp.authDisabled = true
+        testApp.starActorSystem = StarActorSystem(name: "server-tests")
         try routes(testApp)
 
         // Should work without token when auth is disabled

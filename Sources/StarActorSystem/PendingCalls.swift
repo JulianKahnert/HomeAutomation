@@ -25,6 +25,9 @@ actor PendingCalls {
     }
 
     /// Await the reply for a call previously registered via `begin`.
+    ///
+    /// Cancellation-aware: cancelling the waiting task settles the call with a
+    /// `CancellationError` (still exactly-once via `settle`).
     func wait(for id: UUID, timeout: Duration) async throws -> ReplyEnvelope {
         if let result = earlyResults.removeValue(forKey: id) {
             open.remove(id)
@@ -33,13 +36,24 @@ actor PendingCalls {
         guard open.contains(id) else {
             throw StarRemoteCallError(message: "remote call \(id) was never registered")
         }
-        return try await withCheckedThrowingContinuation { continuation in
-            continuations[id] = continuation
-            timeoutTasks[id] = Task {
-                try? await Task.sleep(for: timeout)
-                guard !Task.isCancelled else { return }
-                self.settle(id, with: .failure(StarRemoteCallError(message: "remote call timed out after \(timeout)")))
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                // A settle (e.g. from the cancellation handler) may have raced in
+                // between the check above and this closure — resolve immediately.
+                if let result = earlyResults.removeValue(forKey: id) {
+                    open.remove(id)
+                    continuation.resume(with: result)
+                    return
+                }
+                continuations[id] = continuation
+                timeoutTasks[id] = Task {
+                    try? await Task.sleep(for: timeout)
+                    guard !Task.isCancelled else { return }
+                    self.settle(id, with: .failure(StarRemoteCallError(message: "remote call timed out after \(timeout)")))
+                }
             }
+        } onCancel: {
+            Task { await self.settle(id, with: .failure(CancellationError())) }
         }
     }
 

@@ -41,6 +41,7 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
     private var helloReceived = false
     private var status: ConnectionStatus = .connecting
     private var statusSubscribers: [UUID: AsyncStream<ConnectionStatus>.Continuation] = [:]
+    private var handshakeSubscribers: [UUID: AsyncStream<Void>.Continuation] = [:]
 
     public init(name: String, remoteCallTimeout: Duration = .seconds(30), logger: Logger? = nil) {
         self.name = name
@@ -115,7 +116,9 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
     }
 
     private func performRemoteCall(recipient: StarActorID, target: RemoteCallTarget, arguments: [Data]) async throws -> ReplyEnvelope {
-        guard let connection = lock.withLock({ self.connection }) else {
+        // Fail fast unless the hello handshake completed — a socket that is
+        // attached but not `.up` is not usable for calls yet.
+        guard let connection = lock.withLock({ status == .up ? self.connection : nil }) else {
             throw StarRemoteCallError(message: "not connected")
         }
         let envelope = RemoteCallEnvelope(callID: UUID(), recipient: recipient, target: target.identifier, arguments: arguments)
@@ -160,23 +163,36 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
         setStatus(.connecting)
     }
 
-    /// The socket closed: fail all pending calls; status becomes `.error`
+    /// The given socket closed: fail all pending calls; status becomes `.error`
     /// (or stays `.connecting` if the connection never reached `.up`).
-    public func detach() async {
-        let wasUp: Bool = lock.withLock {
+    ///
+    /// No-op unless `connection` is the current one — a stale (replaced)
+    /// connection's close must never tear down its successor.
+    public func detach(_ connection: any WireConnection) async {
+        let wasUp: Bool? = lock.withLock {
+            guard self.connection === connection else { return nil }
             let wasUp = status == .up
-            connection = nil
+            self.connection = nil
             helloSent = false
             helloReceived = false
             return wasUp
+        }
+        guard let wasUp else {
+            logger.debug("ignoring detach of a stale connection")
+            return
         }
         await pendingCalls.failAll(StarRemoteCallError(message: "connection closed"))
         logger.info("connection detached", metadata: ["wasUp": "\(wasUp)"])
         setStatus(wasUp ? .error : .connecting)
     }
 
-    /// Handle one inbound frame.
-    public func receive(_ data: Data) async {
+    /// Handle one inbound frame. Frames from a connection that is not the
+    /// current one (stale, already replaced) are ignored.
+    public func receive(_ data: Data, from connection: any WireConnection) async {
+        guard lock.withLock({ self.connection === connection }) else {
+            logger.debug("ignoring frame from a stale connection")
+            return
+        }
         let envelope: WireEnvelope
         do {
             envelope = try JSONDecoder().decode(WireEnvelope.self, from: data)
@@ -186,7 +202,7 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
         }
         switch envelope {
         case .hello(let hello):
-            await handleHello(hello)
+            await handleHello(hello, from: connection)
         case .call(let call):
             logger.debug("inbound call", metadata: [
                 "callID": "\(call.callID)",
@@ -230,6 +246,24 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
         return stream
     }
 
+    /// A stream that fires once per completed hello handshake, i.e. per
+    /// transition to `.up` (including the very first one). Unbounded buffering,
+    /// so rapid connection replacements can never be missed — unlike the
+    /// newest-value-only status stream, which is meant for UI display.
+    public func makeHandshakeCompletedStream() -> AsyncStream<Void> {
+        let (stream, continuation) = AsyncStream.makeStream(
+            of: Void.self,
+            bufferingPolicy: .unbounded
+        )
+        let id = UUID()
+        lock.withLock { handshakeSubscribers[id] = continuation }
+        continuation.onTermination = { [weak self] _ in
+            guard let self else { return }
+            self.lock.withLock { _ = self.handshakeSubscribers.removeValue(forKey: id) }
+        }
+        return stream
+    }
+
     // MARK: - Hello handshake
 
     /// Send our hello frame over the current connection. Used by client
@@ -244,18 +278,20 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
         }
     }
 
-    private func handleHello(_ hello: Hello) async {
+    private func handleHello(_ hello: Hello, from connection: any WireConnection) async {
         guard hello.protocolVersion == Self.protocolVersion else {
             logger.error("protocol version mismatch: peer=\(hello.protocolVersion) local=\(Self.protocolVersion) — closing connection")
-            let connection: (any WireConnection)? = lock.withLock {
-                let connection = self.connection
+            let stillCurrent: Bool = lock.withLock {
+                guard self.connection === connection else { return false }
                 self.connection = nil
                 self.helloSent = false
                 self.helloReceived = false
-                return connection
+                return true
             }
-            await connection?.close()
-            await pendingCalls.failAll(StarRemoteCallError(message: "protocol version mismatch"))
+            await connection.close()
+            if stillCurrent {
+                await pendingCalls.failAll(StarRemoteCallError(message: "protocol version mismatch"))
+            }
             return
         }
         let shouldReply: Bool = lock.withLock {
@@ -266,8 +302,10 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
             // Server side: the client's transport sent the first hello; we answer.
             await sendHello()
         }
-        let attached = lock.withLock { connection != nil }
-        if attached {
+        // Mark `.up` only for the connection the hello arrived on — it may have
+        // been replaced while we were replying.
+        let stillCurrent = lock.withLock { self.connection === connection }
+        if stillCurrent {
             logger.info("hello handshake completed")
             setStatus(.up)
         }
@@ -327,15 +365,18 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
     // MARK: - Status
 
     private func setStatus(_ newStatus: ConnectionStatus) {
-        let subscribers: [AsyncStream<ConnectionStatus>.Continuation]? = lock.withLock {
+        let subscribers: (status: [AsyncStream<ConnectionStatus>.Continuation], handshake: [AsyncStream<Void>.Continuation])? = lock.withLock {
             guard status != newStatus else { return nil }
             status = newStatus
-            return Array(statusSubscribers.values)
+            return (Array(statusSubscribers.values), newStatus == .up ? Array(handshakeSubscribers.values) : [])
         }
         guard let subscribers else { return }
         logger.info("connection status changed", metadata: ["status": "\(newStatus.rawValue)"])
-        for subscriber in subscribers {
+        for subscriber in subscribers.status {
             subscriber.yield(newStatus)
+        }
+        for subscriber in subscribers.handshake {
+            subscriber.yield(())
         }
     }
 }

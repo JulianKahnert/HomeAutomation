@@ -8,6 +8,7 @@
 import Distributed
 import Foundation
 @testable import StarActorSystem
+import Testing
 
 /// In-memory `WireConnection` delivering frames directly into the peer system.
 /// Records all sent frames so tests can assert on the wire content.
@@ -43,18 +44,63 @@ final class InMemoryWireConnection: WireConnection, @unchecked Sendable {
 
     /// Cross-wire two systems, attach both connections, and complete the hello
     /// handshake (system A acts as the "client" and sends the first hello).
+    ///
+    /// A frame system A sends over `aToB` arrives at system B on B's own
+    /// connection (`bToA`) — mirroring how a real socket is one connection
+    /// object per side.
     @discardableResult
     static func makePair(_ systemA: StarActorSystem, _ systemB: StarActorSystem) async -> (InMemoryWireConnection, InMemoryWireConnection) {
+        final class Peer: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _connection: InMemoryWireConnection?
+            var connection: InMemoryWireConnection? {
+                get { lock.withLock { _connection } }
+                set { lock.withLock { _connection = newValue } }
+            }
+        }
+        let bSide = Peer()
         let aToB = InMemoryWireConnection { [weak systemB] data in
-            await systemB?.receive(data)
+            guard let receivingConnection = bSide.connection else { return }
+            await systemB?.receive(data, from: receivingConnection)
         }
         let bToA = InMemoryWireConnection { [weak systemA] data in
-            await systemA?.receive(data)
+            await systemA?.receive(data, from: aToB)
         }
+        bSide.connection = bToA
         await systemA.attach(aToB)
         await systemB.attach(bToA)
         await systemA.sendHello()
         return (aToB, bToA)
+    }
+}
+
+// MARK: - Helpers
+
+extension StarActorSystem {
+    /// Attach `connection` and complete the hello handshake by injecting a
+    /// peer hello on it, so the system reaches `.up` (remote calls require it).
+    func attachUp(_ connection: InMemoryWireConnection) async throws {
+        await attach(connection)
+        let hello = try JSONEncoder().encode(WireEnvelope.hello(Hello(protocolVersion: StarActorSystem.protocolVersion)))
+        await receive(hello, from: connection)
+    }
+}
+
+extension InMemoryWireConnection {
+    /// Polls `sentFrames` until a `.call` frame appears (deterministic
+    /// replacement for fixed sleeps in tests).
+    func waitForCallFrame(timeout: Duration = .seconds(5)) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            let hasCall = sentFrames.contains { data in
+                guard let envelope = try? JSONDecoder().decode(WireEnvelope.self, from: data),
+                      case .call = envelope else { return false }
+                return true
+            }
+            if hasCall { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        Issue.record("no .call frame was sent within \(timeout)")
     }
 }
 

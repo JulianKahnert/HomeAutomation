@@ -20,8 +20,13 @@ public final class URLSessionWebSocketTransport: @unchecked Sendable {
     private let system: StarActorSystem
     private let logger = Logger(label: "StarActorSystem.URLSessionWebSocketTransport")
 
+    /// How long a connection may stay attached without completing the hello
+    /// handshake before it is torn down and retried (guards against a lost hello).
+    static let handshakeTimeout: Duration = .seconds(10)
+
     private let lock = NSLock()
     private var loopTask: Task<Void, Never>?
+    private var socketTask: URLSessionWebSocketTask?
 
     public init(url: URL, bearerToken: String?, system: StarActorSystem) {
         self.url = url
@@ -41,12 +46,17 @@ public final class URLSessionWebSocketTransport: @unchecked Sendable {
 
     /// Stop the reconnect loop and tear down any live connection.
     public func stop() {
-        let task: Task<Void, Never>? = lock.withLock {
+        let (task, socket): (Task<Void, Never>?, URLSessionWebSocketTask?) = lock.withLock {
             let task = loopTask
             loopTask = nil
-            return task
+            let socket = socketTask
+            socketTask = nil
+            return (task, socket)
         }
         task?.cancel()
+        // Cancel the live socket directly so a receive() blocked in the loop
+        // fails immediately instead of lingering until the next frame/ping.
+        socket?.cancel(with: .goingAway, reason: nil)
     }
 
     // MARK: - Reconnect loop
@@ -60,7 +70,8 @@ public final class URLSessionWebSocketTransport: @unchecked Sendable {
             logger.info("reconnecting in \(backoff)")
             try? await Task.sleep(for: backoff)
         }
-        await system.detach()
+        // Each runSingleConnection() detaches its own connection before
+        // returning, so there is nothing left to clean up here.
     }
 
     /// Runs one connection until it fails or the task is cancelled.
@@ -74,11 +85,37 @@ public final class URLSessionWebSocketTransport: @unchecked Sendable {
         let socketTask = session.webSocketTask(with: request)
         socketTask.maximumMessageSize = 4 << 20
         socketTask.resume()
+        lock.withLock { self.socketTask = socketTask }
         logger.info("connecting", metadata: ["url": "\(url)"])
 
         let connection = URLSessionWireConnection(task: socketTask)
+        // Subscribe before attach so the `.up` transition cannot be missed.
+        let statusStream = system.makeConnectionStatusStream()
         await system.attach(connection)
         await system.sendHello()
+
+        // Handshake watchdog: if the hello reply is lost (e.g. dropped by the
+        // server in a registration gap), the connection would sit attached-but-
+        // never-up forever. Race the `.up` transition against a timeout; on
+        // timeout, cancel the socket so the normal backoff/retry path runs.
+        let handshakeTask = Task { [logger] in
+            let reachedUp = await withTaskGroup(of: Bool.self) { group in
+                group.addTask {
+                    for await status in statusStream where status == .up { return true }
+                    return false
+                }
+                group.addTask {
+                    try? await Task.sleep(for: Self.handshakeTimeout)
+                    return false
+                }
+                let first = await group.next() ?? false
+                group.cancelAll()
+                return first
+            }
+            guard !reachedUp, !Task.isCancelled else { return }
+            logger.error("hello handshake not completed within \(Self.handshakeTimeout) — tearing down connection for retry")
+            socketTask.cancel(with: .goingAway, reason: nil)
+        }
 
         // Keepalive: a failed ping cancels the socket, which makes receive() throw below.
         let pingTask = Task { [logger] in
@@ -102,22 +139,33 @@ public final class URLSessionWebSocketTransport: @unchecked Sendable {
                 let message = try await socketTask.receive()
                 switch message {
                 case .data(let data):
-                    await system.receive(data)
+                    await system.receive(data, from: connection)
                 case .string(let string):
-                    await system.receive(Data(string.utf8))
+                    await system.receive(Data(string.utf8), from: connection)
                 @unknown default:
                     logger.error("unknown WebSocket message type")
                 }
             }
         } catch {
-            logger.error("connection failed: \(error)")
+            if let httpResponse = socketTask.response as? HTTPURLResponse,
+               httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                logger.error("authentication failed — check the server auth token (HTTP \(httpResponse.statusCode))")
+            } else if socketTask.closeCode == .policyViolation {
+                logger.error("authentication failed — check the server auth token (close code: policyViolation)")
+            } else {
+                logger.error("connection failed: \(error)")
+            }
         }
 
+        handshakeTask.cancel()
         pingTask.cancel()
         let reachedUp = system.isConnected
         socketTask.cancel(with: .goingAway, reason: nil)
         session.invalidateAndCancel()
-        await system.detach()
+        lock.withLock {
+            if self.socketTask === socketTask { self.socketTask = nil }
+        }
+        await system.detach(connection)
         return reachedUp
     }
 }

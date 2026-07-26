@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Logging
 
 /// The adapter's persisted server endpoint.
 ///
@@ -25,6 +26,7 @@ public struct ServerAddress: Codable, Equatable, CustomStringConvertible, Sendab
 
 extension ServerAddress: RawRepresentable {
     private static let separator = "###"
+    private static let logger = Logger(label: "StarActorSystem.ServerAddress")
     public var rawValue: String {
         "\(host)\(Self.separator)\(port)"
     }
@@ -35,9 +37,16 @@ extension ServerAddress: RawRepresentable {
         guard parts.count == 2,
               let rawHost = parts.first,
               let rawPort = parts.last,
-              let port = Int(rawPort) else {
+              var port = Int(rawPort) else {
             assertionFailure("Failed to parse address \(rawValue)")
             return nil
+        }
+
+        // Migration: 8888 was the old DistributedCluster port, which no longer
+        // exists — the WebSocket transport lives on the HTTP port 8080.
+        if port == 8888 {
+            Self.logger.notice("migrating stored server address from old cluster port 8888 to 8080")
+            port = 8080
         }
 
         self.init(host: String(rawHost), port: port)

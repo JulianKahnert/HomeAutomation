@@ -56,6 +56,7 @@ struct FlowKitAdapter: App, Log {
     @State private var commandReceiver: HomeKitCommandReceiver?
     @State private var connectionStatus: ConnectionStatus = .connecting
     @State private var statusObservationTask: Task<Void, Never>?
+    @State private var handshakeObservationTask: Task<Void, Never>?
     @State private var entityObservationTask: Task<Void, Never>?
 
     var body: some Scene {
@@ -81,6 +82,8 @@ struct FlowKitAdapter: App, Log {
     private func teardownActorSystem() {
         statusObservationTask?.cancel()
         statusObservationTask = nil
+        handshakeObservationTask?.cancel()
+        handshakeObservationTask = nil
         entityObservationTask?.cancel()
         entityObservationTask = nil
         transport?.stop()
@@ -133,20 +136,23 @@ struct FlowKitAdapter: App, Log {
         self.transport = transport
         self.commandReceiver = receiver
 
-        // Feed the UI status indicator and push the full HomeKit state on every
-        // transition into `.up` (including the very first connect) so the server
-        // never misses events that happened while the link was down.
+        // Feed the UI status indicator. UI only — the resync trigger below uses
+        // the dedicated handshake stream, because this stream buffers only the
+        // newest value and could swallow a rapid down/up transition.
         statusObservationTask = Task {
-            var previousStatus: ConnectionStatus?
             for await status in system.makeConnectionStatusStream() {
                 connectionStatus = status
-                if status.isReconnect(from: previousStatus) {
-                    Self.log.info("connection is up (previous: \(previousStatus?.rawValue ?? "none")) — pushing full state")
-                    Task {
-                        await homeKitAdapter.pushFullState()
-                    }
-                }
-                previousStatus = status
+            }
+        }
+
+        // Push the full HomeKit state on every completed handshake (including
+        // the very first connect) so the server never misses events that
+        // happened while the link was down. Unbounded buffering — no completed
+        // handshake can ever be missed.
+        handshakeObservationTask = Task {
+            for await _ in system.makeHandshakeCompletedStream() {
+                Self.log.info("handshake completed — pushing full state")
+                await homeKitAdapter.pushFullState()
             }
         }
 

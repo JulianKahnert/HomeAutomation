@@ -8,14 +8,17 @@
 //  The adapter connects to `/adapter/v1` (authenticated); frames are pumped
 //  into the actor system, which handles hello handshake, calls and replies.
 
-import NIOConcurrencyHelpers
 import StarActorSystem
 import Vapor
 
 /// `WireConnection` wrapper around Vapor's `WebSocket`. Frames are sent as
 /// binary (matching the URLSession client transport, which sends `.data`).
-private struct VaporWireConnection: WireConnection {
+private final class VaporWireConnection: WireConnection {
     let webSocket: WebSocket
+
+    init(webSocket: WebSocket) {
+        self.webSocket = webSocket
+    }
 
     func send(_ data: Data) async throws {
         try await webSocket.send([UInt8](data))
@@ -28,32 +31,24 @@ private struct VaporWireConnection: WireConnection {
 
 /// Registers the adapter WebSocket route on the given (authenticated) route group.
 func registerAdapterWebSocket(on routes: some RoutesBuilder, system: StarActorSystem) {
-    // Tracks the latest attached socket so a replaced (stale) socket's onClose
-    // does not detach the connection that superseded it (latest-connection-wins).
-    let currentSocket = NIOLockedValueBox<WebSocket?>(nil)
-
     routes.webSocket("adapter", "v1", maxFrameSize: WebSocketMaxFrameSize(integerLiteral: 4 << 20)) { _, webSocket async in
         webSocket.pingInterval = .seconds(15)
-        currentSocket.withLockedValue { $0 = webSocket }
+        let connection = VaporWireConnection(webSocket: webSocket)
 
-        // Attach before registering the frame handlers so the client's hello
-        // (its first frame) always finds a connection to reply on.
-        await system.attach(VaporWireConnection(webSocket: webSocket))
-
+        // Register the frame handlers BEFORE attaching so the client's hello
+        // (its first frame) can never fall into an unhandled gap. The actor
+        // system identity-checks the connection, so stale sockets' frames and
+        // closes cannot affect a newer connection.
         webSocket.onBinary { _, buffer in
-            await system.receive(Data(buffer.readableBytesView))
+            await system.receive(Data(buffer.readableBytesView), from: connection)
         }
         webSocket.onText { _, text in
-            await system.receive(Data(text.utf8))
+            await system.receive(Data(text.utf8), from: connection)
         }
         webSocket.onClose.whenComplete { _ in
-            let isCurrent = currentSocket.withLockedValue { current in
-                guard current === webSocket else { return false }
-                current = nil
-                return true
-            }
-            guard isCurrent else { return }
-            Task { await system.detach() }
+            Task { await system.detach(connection) }
         }
+
+        await system.attach(connection)
     }
 }

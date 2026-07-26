@@ -185,6 +185,8 @@ let package = Package(
             name: "StarActorSystemTests",
             dependencies: [
                 "StarActorSystem",
+                // needed for the golden thunk-ID test of the receiver actors in module Adapter
+                "Adapter",
                 .product(name: "Logging", package: "swift-log")
             ]
         ),

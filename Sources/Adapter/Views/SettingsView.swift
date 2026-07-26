@@ -13,9 +13,11 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var serverAddress: ServerAddress
+    @AppStorage("ServerAuthToken") private var serverAuthToken = ""
 
     @State private var host = "localhost"
-    @State private var port = 8888
+    @State private var port = 8080
+    @State private var token = ""
 
     var newServerAddress: ServerAddress {
         ServerAddress(host: host, port: port)
@@ -31,12 +33,23 @@ struct SettingsView: View {
             } footer: {
                 Text("Websocket endpoint: \(newServerAddress.description)")
             }
+            Section {
+                SecureField("Auth Token", text: $token)
+            } header: {
+                Text("Authentication")
+            } footer: {
+                Text("Bearer token used when connecting to the server. Leave empty if authentication is disabled.")
+            }
+        }
+        .onAppear {
+            token = serverAuthToken
         }
         .navigationTitle("Settings")
         .toolbar {
             ToolbarItem {
                 Button("Save") {
                     serverAddress = newServerAddress
+                    serverAuthToken = token
                     dismiss()
                 }
             }

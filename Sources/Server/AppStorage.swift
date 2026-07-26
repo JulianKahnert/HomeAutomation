@@ -10,7 +10,7 @@ import HAApplicationLayer
 import HAImplementations
 import HAModels
 import Shared
-import SharedDistributedCluster
+import StarActorSystem
 import Vapor
 
 private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
@@ -46,16 +46,16 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          }
      }
 
-     private struct CustomActorSystemKey: StorageKey {
-         typealias Value = CustomActorSystem
+     private struct StarActorSystemKey: StorageKey {
+         typealias Value = StarActorSystem
      }
 
-     var customActorSystem: CustomActorSystem {
+     var starActorSystem: StarActorSystem {
          get {
-             self.storage[CustomActorSystemKey.self]!
+             self.storage[StarActorSystemKey.self]!
          }
          set {
-             self.storage[CustomActorSystemKey.self] = newValue
+             self.storage[StarActorSystemKey.self] = newValue
          }
      }
 

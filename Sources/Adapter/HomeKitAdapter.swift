@@ -17,7 +17,6 @@ public protocol HomeKitAdapterable: EntityValidator, Sendable {
 }
 
 #if canImport(HomeKit)
-import DistributedCluster
 import Foundation
 import HAModels
 import HomeKit
@@ -30,6 +29,16 @@ public final class HomeKitAdapter: HomeKitAdapterable {
 
     public init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
         self.homeKitHomeManager = HomeKitHomeManager(entityStream: entityStream, entityStreamContinuation: entityStreamContinuation)
+    }
+
+    /// Re-yields the full current entity state onto the entity stream.
+    ///
+    /// Used after a (re)connect to the server so it never misses state changes
+    /// that happened while the link was down. Reuses the existing full-refresh
+    /// path (`updateEntities()`), which also re-checks characteristic subscriptions.
+    public func pushFullState() async {
+        log.info("pushFullState() — re-yielding full entity state after (re)connect")
+        await homeKitHomeManager.updateEntities()
     }
 
     public func getAllEntitiesLive() async -> [EntityStorageItem] {

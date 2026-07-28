@@ -95,15 +95,10 @@ extension HomeKitAdapter {
                         subscriptionChanges += 1
                     }
                 } catch {
+                    // This path runs on every reconnect resync, so it must never
+                    // assert/crash — transient HomeKit errors are expected here.
                     subscriptionErrors += 1
                     log.error("Failed to enable notification on accessory \(accessory.name) - error \(error)")
-
-                    #if DEBUG
-                    // do not jump to the assertion when there error is:
-                    // Error Domain=HMErrorDomain Code=80 "Missing entitlement for API." UserInfo={NSLocalizedFailureReason=Handler does not support background access, NSLocalizedDescription=Missing entitlement for API.
-                    guard (error as? HMError)?.code != HMError.Code.missingEntitlement else { continue }
-                    #endif
-                    assertionFailure()
                 }
             }
 

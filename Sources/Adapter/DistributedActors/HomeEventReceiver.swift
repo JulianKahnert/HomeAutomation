@@ -6,16 +6,10 @@
 //
 
 import Distributed
-import DistributedCluster
 import HAModels
 import Logging
 import Shared
-
-public extension DistributedReception.Key {
-    static var homeEventReceiver: DistributedReception.Key<HomeEventReceiver> {
-        "homeEventReceiver"
-    }
-}
+import StarActorSystem
 
 /// Receiver of HomeKitEvents
 ///
@@ -23,7 +17,7 @@ public extension DistributedReception.Key {
 public distributed actor HomeEventReceiver {
     private let log = Logger(label: "HomeEventReceiver")
 
-    public typealias ActorSystem = ClusterSystem
+    public typealias ActorSystem = StarActorSystem
 
     private var continuation: AsyncStream<HomeEvent>.Continuation
 

@@ -3,16 +3,16 @@
 ## Architecture Overview
 
 ```
-┌──────────────┐   distributed actors   ┌──────────────┐   REST/OpenAPI   ┌──────────────┐
-│   Adapter    │◄──────(port 8888)─────►│    Server     │◄───(port 8080)──►│  Controller  │
-│  (HomeKit)   │                        │   (Vapor)     │                  │  (iOS app)   │
+┌──────────────┐  WebSocket (StarActor  ┌──────────────┐   REST/OpenAPI   ┌──────────────┐
+│   Adapter    │◄──System, port 8080)──►│    Server     │◄───(port 8080)──►│  Controller  │
+│  (HomeKit)   │     /adapter/v1        │   (Vapor)     │                  │  (iOS app)   │
 └──────┬───────┘                        └──────┬────────┘                  └──────────────┘
        │                                       │
    HomeKit API                            MySQL + APNS
 ```
 
 - **Server** — Vapor app (runs as Docker container, Swift 6.2, Ubuntu Noble, jemalloc). HTTP API (OpenAPI), MySQL persistence, database migrations, scheduled jobs, APNS push notifications, automations engine. Configured via [HomeAutomation-config-template](https://github.com/JulianKahnert/HomeAutomation-config-template).
-- **Adapter** (FlowKit Adapter / HomeKitAdapterApp) — Bridges HomeKit entities to the Server via `swift-distributed-actors` on port 8888. No business logic; reads HomeKit characteristics and forwards state.
+- **Adapter** (FlowKit Adapter / HomeKitAdapterApp) — Bridges HomeKit entities to the Server via the in-repo `StarActorSystem` (distributed actors over an authenticated WebSocket, `/adapter/v1` on port 8080; see docs/adr-001). No business logic; reads HomeKit characteristics and forwards state.
 - **Controller** (FlowKit Controller) — iOS app using TCA (The Composable Architecture). Activates/deactivates automations, shows switched devices, entity state history charts, window Live Activities. Communicates with Server via generated OpenAPI client.
 
 ## Build Commands
@@ -54,7 +54,7 @@ docker-compose up -d
 ```
 
 This starts:
-- **app** - HomeAutomation server (ports 8080, 8888)
+- **app** - HomeAutomation server (port 8080)
 - **db** - MySQL 9 database (port 3306)
 - **migrate** - Database migration service (manual activation)
 
@@ -142,8 +142,7 @@ AUTH_TOKEN=your-secure-token-here
 
 - Authentication is **enabled by default** (secure by default)
 - Server **crashes on startup** if `AUTH_TOKEN` is missing (fail-safe)
-- All endpoints on port 8080 require authentication
-- Port 8888 (distributed actor system) is NOT affected
+- All endpoints on port 8080 require authentication, including the adapter WebSocket (`/adapter/v1`)
 
 ## Pre-Commit Checklist
 

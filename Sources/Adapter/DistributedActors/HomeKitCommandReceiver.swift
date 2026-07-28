@@ -6,23 +6,17 @@
 //
 
 import Distributed
-import DistributedCluster
 import HAModels
 import Logging
 import Shared
-
-public extension DistributedReception.Key {
-    static var homeKitCommandReceiver: DistributedReception.Key<HomeKitCommandReceiver> {
-        "homeKitCommandReceiver"
-    }
-}
+import StarActorSystem
 
 /// Receiver of HomeKit commands
 ///
 /// This should be instantiated on the HomeKitAdapter.
 // public distributed actor HomeKitCommandReceiver: EntityAdapterable {  // this crashes the 6.0.3 swift compiler on linux so we moved it to an extension
 public distributed actor HomeKitCommandReceiver {
-    public typealias ActorSystem = ClusterSystem
+    public typealias ActorSystem = StarActorSystem
     private let log = Logger(label: "HomeKitCommandReceiver")
     private let adapter: any HomeKitAdapterable
 

@@ -19,11 +19,14 @@ func routes(_ app: Application) throws {
         "It works!"
     }
 
+    // Adapter WebSocket transport for the StarActorSystem (see docs/adr-001)
+    registerAdapterWebSocket(on: authenticatedRoutes, system: app.starActorSystem)
+
     authenticatedRoutes.get("health") { req async throws -> HTTPStatus in
         guard let sql = req.db as? any SQLDatabase else {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
-        let system = req.application.customActorSystem
+        let system = req.application.starActorSystem
 
         // Race the health checks against a hard timeout so the Docker healthcheck always gets a
         // fast, definitive answer (503 peer-not-up / 504 timeout) instead of hanging.
@@ -31,10 +34,9 @@ func routes(_ app: Application) throws {
             group.addTask {
                 try await sql.raw("SELECT 1").run()
 
-                let connectionStatus = await system.latestConnectionStatus
+                let connectionStatus = system.latestConnectionStatus
                 guard connectionStatus == .up else {
-                    let diagnostics = await system.connectionDiagnostics()
-                    throw Abort(.serviceUnavailable, reason: "Adapter connection \(diagnostics)")
+                    throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(connectionStatus.rawValue)")
                 }
                 return .ok
             }

@@ -10,7 +10,7 @@ import HAModels
 import SwiftUI
 
 struct EntitiesListView: View {
-    @Binding var entities: [EntityStorageItem]
+    let entities: [EntityStorageItem]
     @Binding var showSettings: Bool
 
     var body: some View {
@@ -43,7 +43,7 @@ struct EntitiesListView: View {
 
 #Preview {
     EntitiesListView(
-        entities: .constant([]),
+        entities: [],
         showSettings: .constant(false)
     )
 }

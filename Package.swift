@@ -10,7 +10,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "HomeAutomationKit",
-            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "SharedDistributedCluster"]
+            targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "StarActorSystem"]
         ),
         .library(
             name: "HAShared",
@@ -50,8 +50,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.12.1"),
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "fix/linux-foundation-networking"),
-        .package(url: "https://github.com/apple/swift-distributed-actors", revision: "0041f6a"),
-        .package(url: "https://github.com/apple/swift-async-algorithms", exact: "1.1.4"),
         .package(url: "https://github.com/swift-server-community/APNSwift", exact: "6.5.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2")
     ],
@@ -64,7 +62,7 @@ let package = Package(
                 "HAApplicationLayer",
                 "HAImplementations",
                 "Shared",
-                "SharedDistributedCluster",
+                "StarActorSystem",
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentMySQLDriver", package: "fluent-mysql-driver"),
@@ -87,11 +85,9 @@ let package = Package(
             ]
         ),
         .target(
-            name: "SharedDistributedCluster",
+            name: "StarActorSystem",
             dependencies: [
-                "Shared",
-                .product(name: "DistributedCluster", package: "swift-distributed-actors"),
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                .product(name: "Logging", package: "swift-log")
             ]
         ),
         .target(
@@ -99,8 +95,7 @@ let package = Package(
             dependencies: [
                 "HAModels",
                 "Shared",
-                "SharedDistributedCluster",
-                .product(name: "DistributedCluster", package: "swift-distributed-actors"),
+                "StarActorSystem",
             ]
         ),
         .target(
@@ -187,11 +182,13 @@ let package = Package(
             path: "Tests/ServerTests"
         ),
         .testTarget(
-            name: "SharedDistributedClusterTests",
+            name: "StarActorSystemTests",
             dependencies: [
-                "SharedDistributedCluster",
-                .product(name: "DistributedCluster", package: "swift-distributed-actors"),
+                "StarActorSystem",
+                // needed for the golden thunk-ID test of the receiver actors in module Adapter
+                "Adapter",
+                .product(name: "Logging", package: "swift-log")
             ]
-        )
+        ),
     ]
 )

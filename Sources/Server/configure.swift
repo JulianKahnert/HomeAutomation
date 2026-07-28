@@ -9,7 +9,7 @@ import HAImplementations
 import HAModels
 import Logging
 import Shared
-import SharedDistributedCluster
+import StarActorSystem
 import Vapor
 import VaporAPNS
 
@@ -193,19 +193,18 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - actor system setup
 
-    // The server is the cluster's sole leader (see CustomActorSystem.makeClusterSettings): with a
-    // single reachable member it self-elects, so it can promote a (re)joining adapter to .up and
-    // down dead adapter nodes. It therefore recovers from adapter restarts on its own and must
-    // NEVER terminate — hence no onDown handler. Recovery on the adapter side is its own restart.
-    // Cluster verbosity follows the app's configured level (driven by the LOG_LEVEL env), so it is
-    // set once in docker-compose.
-    let actorSystem = await CustomActorSystem(role: .server, logLevel: app.logger.logLevel)
-    app.customActorSystem = actorSystem
-    let eventReceiver = await actorSystem.makeLocalActor(actorId: .homeEventReceiver) { system in
-        HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: system)
+    // Star topology (see docs/adr-001): the server is the hub; the adapter connects to it via an
+    // authenticated WebSocket (/adapter/v1 on port 8080). Reconnects are handled entirely by the
+    // adapter's transport loop — the server just accepts the latest connection and never terminates.
+    let actorSystem = StarActorSystem(name: "server", logger: app.logger)
+    app.starActorSystem = actorSystem
+    let eventReceiver = actorSystem.makeActor(id: .homeEventReceiver) {
+        HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: actorSystem)
     }
-    await actorSystem.checkIn(actorId: .homeEventReceiver, eventReceiver)
     app.homeEventReceiver = eventReceiver
+
+    // Resolve the adapter proxy once; HomeManager only gets it while the connection is up.
+    let adapterProxy = try HomeKitCommandReceiver.resolve(id: .homeKitCommandReceiver, using: actorSystem)
 
     // MARK: - home automation setup
 
@@ -219,7 +218,7 @@ public func configure(_ app: Application) async throws {
 
     let actionLogManager = ActionLogManager()
     let homeManager = await HomeManager(getAdapter: {
-        await actorSystem.lookup(.homeKitCommandReceiver)
+        actorSystem.isConnected ? adapterProxy : nil
     },
                                         storageRepo: app.entityStorageDbRepository,
                                         notificationSender: notificationSender,
@@ -260,5 +259,5 @@ public func configure(_ app: Application) async throws {
     // register routes
     try routes(app)
 
-    app.logger.notice("CustomActorSystem server running on \(actorSystem.endpointDescription)")
+    app.logger.notice("StarActorSystem server ready, waiting for adapter on /adapter/v1")
 }

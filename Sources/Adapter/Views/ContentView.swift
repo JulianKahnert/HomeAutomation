@@ -12,20 +12,20 @@ import StarActorSystem
 import SwiftUI
 
 public struct ContentView: View {
-    @Binding var entities: [EntityStorageItem]
-    @Binding var connectionStatus: ConnectionStatus
+    let entities: [EntityStorageItem]
+    let connectionStatus: ConnectionStatus
     @State private var showSettings = false
     @AppStorage("ActorSystemServerAddress") private var serverAddress = ServerAddress(host: "localhost", port: 8080)
 
-    public init(entities: Binding<[EntityStorageItem]>, connectionStatus: Binding<ConnectionStatus>) {
-        self._entities = entities
-        self._connectionStatus = connectionStatus
+    public init(entities: [EntityStorageItem], connectionStatus: ConnectionStatus) {
+        self.entities = entities
+        self.connectionStatus = connectionStatus
     }
 
     public var body: some View {
         NavigationStack {
             EntitiesListView(
-                entities: $entities,
+                entities: entities,
                 showSettings: $showSettings
             )
             .navigationTitle(serverAddress.description)
@@ -67,6 +67,6 @@ struct ConnectionStatusView: View {
 }
 
 #Preview {
-    ContentView(entities: .constant([]), connectionStatus: .constant(.connecting))
+    ContentView(entities: [], connectionStatus: .connecting)
 }
 #endif

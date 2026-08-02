@@ -9,6 +9,12 @@
     {
       "matchManagers": ["swift"],
       "rangeStrategy": "bump"
+    },
+    {
+      "description": "Hold APNSwift below 7.0: vapor/apns 5.0.0 declares apnswift 6.1.0..<7.0.0, so a 7.x bump makes dependency resolution fail. Remove once vapor/apns ships a release that accepts apnswift 7.",
+      "matchManagers": ["swift"],
+      "matchPackageNames": ["swift-server-community/APNSwift", "https://github.com/swift-server-community/APNSwift"],
+      "allowedVersions": "<7.0.0"
     }
   ]
 }

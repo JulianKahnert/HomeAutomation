@@ -9,6 +9,7 @@
 import HAModels
 import HomeKit
 import Logging
+import Shared
 
 extension HomeKitAdapter {
     final class HomeKitHomeManager: NSObject, @unchecked Sendable {
@@ -24,12 +25,21 @@ extension HomeKitAdapter {
         let entityStream: AsyncStream<EntityStorageItem>
         private let entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation
 
+        /// The only path that runs `updateEntities()`. A single reachability flap makes HomeKit fire
+        /// a burst of delegate callbacks, and each one would otherwise start a full rescan that
+        /// re-yields every entity; the debouncer collapses the burst and keeps rescans from
+        /// overlapping. Assigned before the delegates so no callback can find it missing.
+        private var entityUpdateDebouncer: AsyncDebouncer!
+
         init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
             self.entityStream = entityStream
             self.entityStreamContinuation = entityStreamContinuation
 
             manager = HMHomeManager()
             super.init()
+            entityUpdateDebouncer = AsyncDebouncer(delay: .seconds(5)) { [weak self] in
+                await self?.updateEntities()
+            }
             manager.delegate = self
 
             // the connection to HomeKit seems to breake after x hours (e.g. no delegates will be called anymore), we try to reset the connection to avoid interruptions
@@ -63,7 +73,18 @@ extension HomeKitAdapter {
             }
         }
 
-        func updateEntities() async {
+        /// Request a full entity refresh after the debounce delay.
+        func scheduleEntityUpdate() async {
+            await entityUpdateDebouncer.schedule()
+        }
+
+        /// Request a full entity refresh without waiting for the debounce delay — a reconnect resync
+        /// must not be deferred or coalesced away — but still serialized against a running refresh.
+        func updateEntitiesNow() async {
+            await entityUpdateDebouncer.runNow()
+        }
+
+        private func updateEntities() async {
             let start = ContinuousClock.now
             let homes = await homesPublisher.get()
 
@@ -80,7 +101,10 @@ extension HomeKitAdapter {
             var subscriptionErrors = 0
             for characteristic in allCharacteristics.sorted() {
                 guard let accessory = characteristic.service?.accessory else {
-                    fatalError("Could not set delegate on accessory")
+                    // The back-reference can be transiently nil while HomeKit re-builds its object
+                    // graph; the next rescan picks the characteristic up again.
+                    log.error("Could not set delegate on accessory of characteristic \(characteristic.uniqueIdentifier.uuidString)")
+                    continue
                 }
 
                 accessory.delegate = self
@@ -131,12 +155,11 @@ extension HomeKitAdapter {
                 home.delegate = self
             }
 
+            // `homesPublisher` stays immediate: `getAllEntitiesLive()` and `perform(_:)` read the
+            // homes through it, and its first value unblocks callers that are already waiting.
             Task {
-                let start = ContinuousClock.now
                 await homesPublisher.send(homes)
-                await updateEntities()
-                let duration = start.duration(to: .now)
-                log.info("update(homes:) — completed in \(duration)")
+                await scheduleEntityUpdate()
             }
         }
 

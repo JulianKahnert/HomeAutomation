@@ -35,10 +35,11 @@ public final class HomeKitAdapter: HomeKitAdapterable {
     ///
     /// Used after a (re)connect to the server so it never misses state changes
     /// that happened while the link was down. Reuses the existing full-refresh
-    /// path (`updateEntities()`), which also re-checks characteristic subscriptions.
+    /// path, which also re-checks characteristic subscriptions — undelayed, but
+    /// serialized against a refresh that is already running.
     public func pushFullState() async {
         log.info("pushFullState() — re-yielding full entity state after (re)connect")
-        await homeKitHomeManager.updateEntities()
+        await homeKitHomeManager.updateEntitiesNow()
     }
 
     public func getAllEntitiesLive() async -> [EntityStorageItem] {
@@ -80,9 +81,11 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         let filteredCharacteristics = characteristics.filter({ $0.entityId == action.entityId })
         guard filteredCharacteristics.count == 1,
               let characteristic = filteredCharacteristics.first else {
-            log.error("Failed to get characteristic")
-            assertionFailure()
-            return
+            // Must throw, not return: a silent success would let the server mark the command as
+            // executed and dedup every retry of it. Reachable whenever the homes list is
+            // transiently empty (e.g. during the 6h HMHomeManager reset).
+            log.error("Failed to get characteristic for \(action.entityId)")
+            throw OptionalError.notFound
         }
         log.info("Perform action [\(action)] on [\(characteristic)]")
 
@@ -98,8 +101,8 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             assert((0.0...1.0).contains(value), "Value (\(value) out of bounds")
             guard let minimumValue = characteristic.metadata?.minimumValue,
                   let maximumValue = characteristic.metadata?.maximumValue else {
-                assertionFailure()
-                return
+                log.error("Failed to get brightness bounds of \(action.entityId)")
+                throw OptionalError.notFound
             }
             let adjustedValue = Float(truncating: minimumValue) + value * (Float(truncating: maximumValue) - Float(truncating: minimumValue))
             newValue = NSNumber(value: Int64(adjustedValue))
@@ -108,8 +111,8 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             assert((0.0...1.0).contains(value), "Value (\(value) out of bounds")
             guard let minimumValue = characteristic.metadata?.minimumValue,
                   let maximumValue = characteristic.metadata?.maximumValue else {
-                assertionFailure()
-                return
+                log.error("Failed to get color temperature bounds of \(action.entityId)")
+                throw OptionalError.notFound
             }
 
             let adjustedValue = Float(truncating: minimumValue) + (1 - value) * (Float(truncating: maximumValue) - Float(truncating: minimumValue))
@@ -128,8 +131,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         case .addEntityToScene(_, sceneName: let sceneName, let action):
             guard let home = characteristic.service?.accessory?.home else {
                 log.error("Failed to get home for characteristic")
-                assertionFailure()
-                return
+                throw OptionalError.notFound
             }
 
             // create scene if not exists
@@ -138,8 +140,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             }
             guard let scene = home.actionSets.first(where: { $0.name == sceneName }) else {
                 log.error("Could not find scene named \(sceneName)")
-                assertionFailure()
-                return
+                throw OptionalError.notFound
             }
 
             // add action if not exists

@@ -21,7 +21,10 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem
     func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
-    func addEntityHistory(_ item: EntityStorageItem) async
+    /// - Returns: Whether the item carries new information, i.e. differs in value — not just in
+    ///   timestamp — from the last known state of that entity.
+    @discardableResult
+    func addEntityHistory(_ item: EntityStorageItem) async -> Bool
 
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async

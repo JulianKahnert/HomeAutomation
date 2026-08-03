@@ -24,7 +24,10 @@ struct HomeEventProcessingJob: Job, Log {
 
             // add item to history
             if case .change(let item) = event {
-                await homeManager.addEntityHistory(item)
+                // A value-identical replay carries no new information: the adapter re-yields its
+                // full entity state on every rescan (reconnect resync, reachability flap), and
+                // triggering on those would supersede running automations for nothing.
+                guard await homeManager.addEntityHistory(item) else { continue }
             }
 
             // perform automation

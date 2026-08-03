@@ -33,6 +33,11 @@ public actor ActionLogManager {
     }
 
     /// Log an action and check if it was a duplicate (cache hit)
+    ///
+    /// Logging alone does not deduplicate the action: only `markExecuted(_:)` does. A command that
+    /// never reached the device (cancelled, adapter error) must stay a cache miss so the next
+    /// attempt is allowed through.
+    ///
     /// - Parameter action: The action to log
     /// - Returns: true if this was a duplicate action (cache hit), false if it's a new action that should be executed
     public func log(action: HomeManagableAction) async -> Bool {
@@ -46,11 +51,6 @@ public actor ActionLogManager {
             hasCacheHit = (cachedAction == action)
         } else {
             hasCacheHit = false
-        }
-
-        // If not a cache hit, mark command as executed
-        if !hasCacheHit {
-            await commandCache.insert(action, forKey: cacheKey)
         }
 
         // Log the action
@@ -68,6 +68,16 @@ public actor ActionLogManager {
         }
 
         return hasCacheHit
+    }
+
+    /// Mark an action as executed so identical follow-up commands are deduplicated for the cache's
+    /// lifetime.
+    ///
+    /// Must only be called once the command actually reached the device — see `log(action:)`.
+    ///
+    /// - Parameter action: The action that was successfully performed.
+    public func markExecuted(_ action: HomeManagableAction) async {
+        await commandCache.insert(action, forKey: CommandCacheKey(action))
     }
 
     /// Reset cached commands for `item.entityId` that the freshly observed device state contradicts.

@@ -12,6 +12,9 @@ import Shared
 
 @HomeManagerActor
 public final class HomeManager: HomeManagable {
+    /// Number of times a command is sent to the adapter before it is dropped.
+    nonisolated private static let maxAttempts = 3
+
     private let log = Logger(label: "HomeManager")
     private let windowManager: WindowManager
     private let actionLogManager: ActionLogManager
@@ -21,9 +24,15 @@ public final class HomeManager: HomeManagable {
     private let storageRepo: StorageRepository
     private let notificationSender: NotificationSender
     private let entityCache = Cache<EntityId, EntityStorageItem>(entryLifetime: .hours(2))
-    private var failedActions: [EntityId: HomeManagableAction] = [:]
+    /// One retry slot per entity: a newer failed action replaces an older queued one, so the newest
+    /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
+    /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
+    /// replaying both would be contradictory.
+    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int)] = [:]
 
-    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, notificationSender: NotificationSender, location: Location, actionLogManager: ActionLogManager) {
+    /// - Parameter retryTicks: Cadence at which queued failed actions are retried. Pass a stream to
+    ///   drive the retries deterministically; the default is a 5s timer.
+    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, notificationSender: NotificationSender, location: Location, actionLogManager: ActionLogManager, retryTicks: AsyncStream<Void>? = nil) {
         self.windowManager = WindowManager(notificationSender: notificationSender)
         self.actionLogManager = actionLogManager
         self.getAdapter = getAdapter
@@ -41,16 +50,29 @@ public final class HomeManager: HomeManagable {
 //            }
 //        }
 
+        let ticks = retryTicks ?? Self.timerRetryTicks()
         Task.detached(priority: .low) {
-            for await _ in Timer.publish(every: .seconds(5)) {
-                let actions = await self.popAllFailedActions()
-                for action in actions {
-                    self.log.debug("Performing failed action again: \(action)")
-                    // skip adding this action again after a failed run
-                    await self.perform(action, addToFaliedActions: false)
+            for await _ in ticks {
+                let queued = await self.popAllFailedActions()
+                for (action, attempt) in queued {
+                    self.log.debug("Performing failed action again: \(action) [attempt \(attempt + 1)/\(Self.maxAttempts)]")
+                    await self.perform(action, attempt: attempt)
                 }
             }
         }
+    }
+
+    /// Production retry cadence: a tick every 5s (the shared timer aligns its first tick to the next
+    /// minute boundary).
+    private static func timerRetryTicks() -> AsyncStream<Void> {
+        let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        Task.detached(priority: .low) {
+            for await _ in Timer.publish(every: .seconds(5)) {
+                continuation.yield(())
+            }
+            continuation.finish()
+        }
+        return stream
     }
 
     public func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
@@ -84,11 +106,18 @@ public final class HomeManager: HomeManagable {
     public func perform(_ action: HomeManagableAction) async {
         // Round values to prevent excessive HomeKit updates
         let roundedAction = action.rounded()
-        // add errors to failed action in this first run from external source
-        await perform(roundedAction, addToFaliedActions: true)
+        await perform(roundedAction, attempt: 0)
     }
 
-    private func perform(_ action: HomeManagableAction, addToFaliedActions: Bool) async {
+    private func perform(_ action: HomeManagableAction, attempt: Int) async {
+        // Cancellation is honoured at command boundaries only: a superseded automation run must not
+        // start further commands, but a command that already started always runs to completion (see
+        // the shield below). Checked before logging so a skipped command produces no log entry.
+        guard !Task.isCancelled else {
+            log.debug("Skipping action of a cancelled run: [\(action)]")
+            return
+        }
+
         // Log action and check if it's a duplicate (cache hit)
         let hasCacheHit = await actionLogManager.log(action: action)
 
@@ -101,17 +130,30 @@ public final class HomeManager: HomeManagable {
         log.debug("Executing action: [\(action)]")
 
         do {
-            try await getAdapter().get(with: log).perform(action)
+            let adapter = try await getAdapter().get(with: log)
+
+            // Shield the in-flight command from the caller's cancellation: an unstructured task
+            // inherits priority, task locals and actor isolation but not cancellation, so a
+            // cancelled run can no longer abort the remote call mid-flight and leave a device half
+            // configured. The remote call brings its own timeout, so this cannot hang forever.
+            let command = Task { try await adapter.perform(action) }
+            try await command.value
+
+            // Only a command that reached the device may deduplicate its successors.
+            await actionLogManager.markExecuted(action)
         } catch {
             let entityId = action.entityId
 
             if let entity = try? await getCurrentEntity(with: entityId) {
                 log.error("(\(entityId)) entity \(entity)")
             }
-            log.error("(\(entityId)) Failed to perform action [\(action), addToFaliedActions: \(addToFaliedActions)]\n\(error)")
+            log.error("(\(entityId)) Failed to perform action [\(action), attempt: \(attempt + 1)/\(Self.maxAttempts)]\n\(error)")
 
-            if addToFaliedActions {
-                failedActions[entityId] = action
+            let nextAttempt = attempt + 1
+            if nextAttempt < Self.maxAttempts {
+                failedActions[entityId] = (action, nextAttempt)
+            } else {
+                log.critical("Giving up on action [\(action)] after \(Self.maxAttempts) attempts")
             }
         }
     }
@@ -220,9 +262,9 @@ public final class HomeManager: HomeManagable {
         await actionLogManager.clear()
     }
 
-    private func popAllFailedActions() -> [HomeManagableAction] {
-        let actions = Array(failedActions.values)
+    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int)] {
+        let queued = Array(failedActions.values)
         failedActions.removeAll()
-        return actions
+        return queued
     }
 }

@@ -215,4 +215,30 @@ struct HomeManagerTests {
 
         #expect(await probe.performedActions == [.turnOn(switchId), .turnOff(switchId), .turnOff(switchId)])
     }
+
+    // MARK: - entity history
+
+    @Test("An unknown entity always counts as a change")
+    func unknownEntityCountsAsChange() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)))
+    }
+
+    @Test("A replay that only differs in timestamp is not a change")
+    func replayIsNotAChange() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+        let timestamp = Date()
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: timestamp, isDeviceOn: true)))
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: timestamp.addingTimeInterval(30), isDeviceOn: true)) == false)
+    }
+
+    @Test("A new value is a change")
+    func newValueIsAChange() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)))
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: false)))
+    }
 }

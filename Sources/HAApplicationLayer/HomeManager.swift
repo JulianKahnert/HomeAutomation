@@ -176,8 +176,21 @@ public final class HomeManager: HomeManagable {
         }
     }
 
-    public func addEntityHistory(_ item: EntityStorageItem) async {
+    @discardableResult
+    public func addEntityHistory(_ item: EntityStorageItem) async -> Bool {
         log.debug("Adding entity item to storage \(item.entityId)")
+
+        // `EntityStorageItem` is Equatable including its timestamp, so align it before comparing —
+        // only the values decide whether this is new information. An unknown entity counts as a
+        // change so nothing is ever swallowed on the first sighting.
+        let didChange: Bool
+        if var knownItem = await entityCache.value(forKey: item.entityId) {
+            knownItem.timestamp = item.timestamp
+            didChange = knownItem != item
+        } else {
+            didChange = true
+        }
+
         await entityCache.insert(item, forKey: item.entityId)
 
         // A freshly observed state can reveal that the device drifted away from what the server last
@@ -187,6 +200,12 @@ public final class HomeManager: HomeManagable {
         // same event right after — is allowed to re-issue it. A state that confirms the command (the
         // command's own echo) is not contradicted, so deduplication is preserved and no command loop
         // occurs. Done synchronously here so the cache is already reset before the automation runs.
+        //
+        // Invariant this relies on: no `.change`-triggered automation commands its own trigger
+        // entity. Today that holds (MotionAtNight triggers on motion/contact and commands lights,
+        // WindowOpen commands nothing). An automation that violated it would not get its command
+        // re-issued after the drift was healed, because the `didChange` gate above stops a
+        // value-identical replay from triggering the automation again.
         let invalidatedActions = await actionLogManager.invalidateContradictedCommands(for: item)
         if !invalidatedActions.isEmpty {
             log.info("Invalidated \(invalidatedActions.count) cached command(s) for \(item.entityId) due to state drift: \(invalidatedActions)")
@@ -211,6 +230,8 @@ public final class HomeManager: HomeManagable {
                 self.log.critical("Failed to persist entity item \(error)")
             }
         }
+
+        return didChange
     }
 
     public func maintenance() async throws {

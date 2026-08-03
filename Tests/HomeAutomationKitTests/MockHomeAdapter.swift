@@ -120,8 +120,18 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return storageItems
     }
 
-    func addEntityHistory(_ item: EntityStorageItem) async {
+    @discardableResult
+    func addEntityHistory(_ item: EntityStorageItem) async -> Bool {
+        let didChange: Bool
+        if var knownItem = storageItems.last(where: { $0.entityId == item.entityId }) {
+            knownItem.timestamp = item.timestamp
+            didChange = knownItem != item
+        } else {
+            didChange = true
+        }
+
         storageItems.append(item)
+        return didChange
     }
 
     func maintenance() async throws {

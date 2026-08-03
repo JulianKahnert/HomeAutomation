@@ -11,12 +11,6 @@
       "rangeStrategy": "bump"
     },
     {
-      "description": "Hold apple/swift-log below 1.13: its source-breaking MetadataValue string-interpolation change breaks swift-cluster-membership (transitive via swift-distributed-actors). Remove once distributed-actors/cluster-membership builds against swift-log 1.13.",
-      "matchManagers": ["swift"],
-      "matchPackageNames": ["apple/swift-log", "https://github.com/apple/swift-log.git"],
-      "allowedVersions": "<1.13.0"
-    },
-    {
       "description": "Hold APNSwift below 7.0: vapor/apns 5.0.0 declares apnswift 6.1.0..<7.0.0, so a 7.x bump makes dependency resolution fail. Remove once vapor/apns ships a release that accepts apnswift 7.",
       "matchManagers": ["swift"],
       "matchPackageNames": ["swift-server-community/APNSwift", "https://github.com/swift-server-community/APNSwift"],

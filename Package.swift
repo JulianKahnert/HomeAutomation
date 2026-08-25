@@ -26,7 +26,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.0"),
+        .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.1"),
         // 🗄 An ORM for SQL and NoSQL databases.
         .package(url: "https://github.com/vapor/fluent.git", exact: "4.13.0"),
         // 🐬 Fluent driver for MySQL.

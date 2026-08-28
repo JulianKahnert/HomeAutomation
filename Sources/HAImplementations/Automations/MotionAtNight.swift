@@ -29,7 +29,13 @@ public struct MotionAtNight: Automatable {
 
     public let lights: [SwitchDevice]
     public var triggerEntityIds: Set<EntityId> {
-        Set(motionSensors.map(\.motionSensorId) + windowContacts.map(\.contactSensorId) + [lightSensor.lightSensorId!])
+        var ids = Set(motionSensors.map(\.motionSensorId) + windowContacts.map(\.contactSensorId))
+        // `GenericMotionSensor` and `UnifiCamera` construct themselves with `lightSensorId: nil`;
+        // a config using one of them as `lightSensor` would force-unwrap-trap here otherwise.
+        if let lightSensorId = lightSensor.lightSensorId {
+            ids.insert(lightSensorId)
+        }
+        return ids
     }
 
     public init(_ name: String, noMotionWait: Duration? = nil, dimWait: Duration? = nil, colorTemperatureDelay: Duration? = nil, motionSensors: [MotionSensorDevice], lightSensor: MotionSensorDevice, lights: [SwitchDevice], windowContacts: [ContactSensorDevice] = [], minBrightness: Float, maxBrightness: Float = 1, maxTemperature: Float = 1) {
@@ -76,15 +82,32 @@ public struct MotionAtNight: Automatable {
         return shouldTrigger
     }
 
+    /// Window contacts only matter after dark — a lit room with an open window draws insects,
+    /// which is not a concern in daylight. Respected unless the sun position is unavailable, so
+    /// an unknown sun state never silently switches insect protection off.
+    func shouldRespectWindowContacts(at date: Date, location: Location) -> Bool {
+        guard let isSunBelowHorizon = Sun.isSunBelowHorizon(for: date, latitude: location.latitude, longitude: location.longitude) else {
+            log.warning("Failed to determine sun position - respecting window contacts")
+            return true
+        }
+        return isSunBelowHorizon
+    }
+
     public func execute(using hm: HomeManagable) async throws {
-        let isWindowOpen = await windowContacts.asyncMap({ windowSensor in
-            do {
-                return try await windowSensor.isContactOpen(with: hm)
-            } catch {
-                log.warning("Failed to get contact sensor - \(error)")
-                return false
-            }
-        }).contains { $0 }
+        let location = await hm.getLocation()
+        let isWindowOpen: Bool
+        if shouldRespectWindowContacts(at: Date(), location: location) {
+            isWindowOpen = await windowContacts.asyncMap({ windowSensor in
+                do {
+                    return try await windowSensor.isContactOpen(with: hm)
+                } catch {
+                    log.warning("Failed to get contact sensor - \(error)")
+                    return false
+                }
+            }).contains { $0 }
+        } else {
+            isWindowOpen = false
+        }
 
         let colorTemperatureValue = getNormalizedColorTemperatureValue().scale(to: 0.1...maxTemperature)
         let brightnessValue = getNormalizedBrightnessValue().scale(to: minBrightness...maxBrightness)

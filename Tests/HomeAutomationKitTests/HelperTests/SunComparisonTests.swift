@@ -112,4 +112,54 @@ struct SunComparisonTests {
         let testDate = try date(year: 2026, month: 3, day: 20, hour: 22, minute: 0)
         #expect(Sun.sunsetElevation(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == .below)
     }
+
+    // MARK: - isSunBelowHorizon
+
+    private func sunsetComponents(year: Int, month: Int, day: Int) throws -> (hour: Int, minute: Int) {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        let refDate = try date(year: year, month: month, day: day, hour: 12, minute: 0)
+        let schedule = try #require(Sun.schedule(latitude: latitude, longitude: longitude, date: refDate, calendar: calendar, timeZone: timeZone))
+        let sunset = try #require(schedule.sunset)
+        return (calendar.component(.hour, from: sunset.date), calendar.component(.minute, from: sunset.date))
+    }
+
+    @Test("After midnight, before sunrise returns true - the case a sunset-only check gets wrong")
+    func afterMidnightBeforeSunriseIsBelowHorizon() throws {
+        let testDate = try date(year: 2026, month: 3, day: 20, hour: 2, minute: 0)
+        #expect(Sun.isSunBelowHorizon(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == true)
+    }
+
+    @Test("One minute before sunrise returns true")
+    func oneMinuteBeforeSunriseIsBelowHorizon() throws {
+        let (h, m) = try sunriseComponents(year: 2026, month: 3, day: 20)
+        let testDate = try date(year: 2026, month: 3, day: 20, hour: h, minute: m - 1)
+        #expect(Sun.isSunBelowHorizon(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == true)
+    }
+
+    @Test("One minute after sunrise returns false")
+    func oneMinuteAfterSunriseIsBelowHorizon() throws {
+        let (h, m) = try sunriseComponents(year: 2026, month: 3, day: 20)
+        let testDate = try date(year: 2026, month: 3, day: 20, hour: h, minute: m + 1)
+        #expect(Sun.isSunBelowHorizon(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == false)
+    }
+
+    @Test("Noon returns false")
+    func noonIsBelowHorizon() throws {
+        let testDate = try date(year: 2026, month: 3, day: 20, hour: 12, minute: 0)
+        #expect(Sun.isSunBelowHorizon(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == false)
+    }
+
+    @Test("One minute after sunset returns true")
+    func oneMinuteAfterSunsetIsBelowHorizon() throws {
+        let (h, m) = try sunsetComponents(year: 2026, month: 3, day: 20)
+        let testDate = try date(year: 2026, month: 3, day: 20, hour: h, minute: m + 1)
+        #expect(Sun.isSunBelowHorizon(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == true)
+    }
+
+    @Test("Late evening returns true")
+    func lateEveningIsBelowHorizon() throws {
+        let testDate = try date(year: 2026, month: 3, day: 20, hour: 23, minute: 30)
+        #expect(Sun.isSunBelowHorizon(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == true)
+    }
 }

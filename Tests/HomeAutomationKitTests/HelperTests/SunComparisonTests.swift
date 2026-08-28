@@ -132,15 +132,15 @@ struct SunComparisonTests {
 
     @Test("One minute before sunrise returns true")
     func oneMinuteBeforeSunriseIsBelowHorizon() throws {
-        let (h, m) = try sunriseComponents(year: 2026, month: 3, day: 20)
-        let testDate = try date(year: 2026, month: 3, day: 20, hour: h, minute: m - 1)
+        let (hour, minute) = try sunriseComponents(year: 2026, month: 3, day: 20)
+        let testDate = try date(year: 2026, month: 3, day: 20, hour: hour, minute: minute - 1)
         #expect(Sun.isSunBelowHorizon(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == true)
     }
 
     @Test("One minute after sunrise returns false")
     func oneMinuteAfterSunriseIsBelowHorizon() throws {
-        let (h, m) = try sunriseComponents(year: 2026, month: 3, day: 20)
-        let testDate = try date(year: 2026, month: 3, day: 20, hour: h, minute: m + 1)
+        let (hour, minute) = try sunriseComponents(year: 2026, month: 3, day: 20)
+        let testDate = try date(year: 2026, month: 3, day: 20, hour: hour, minute: minute + 1)
         #expect(Sun.isSunBelowHorizon(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == false)
     }
 
@@ -152,8 +152,8 @@ struct SunComparisonTests {
 
     @Test("One minute after sunset returns true")
     func oneMinuteAfterSunsetIsBelowHorizon() throws {
-        let (h, m) = try sunsetComponents(year: 2026, month: 3, day: 20)
-        let testDate = try date(year: 2026, month: 3, day: 20, hour: h, minute: m + 1)
+        let (hour, minute) = try sunsetComponents(year: 2026, month: 3, day: 20)
+        let testDate = try date(year: 2026, month: 3, day: 20, hour: hour, minute: minute + 1)
         #expect(Sun.isSunBelowHorizon(for: testDate, latitude: latitude, longitude: longitude, timeZone: timeZone) == true)
     }
 

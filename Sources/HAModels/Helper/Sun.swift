@@ -90,6 +90,8 @@ public class Sun {
 
     /// Answers "is it dark outside right now" for the given date, unlike `sunriseElevation` /
     /// `sunsetElevation`, which answer "where is this date relative to today's sunrise / sunset".
+    /// Returns `nil` only when the solar calculation fails; polar day/night is answered from the
+    /// current elevation instead of `nil`.
     public static func isSunBelowHorizon(for date: Date, latitude: Double, longitude: Double, timeZone: TimeZone = .current) -> Bool? {
         var calendar = Calendar.current
         calendar.timeZone = timeZone

@@ -88,6 +88,26 @@ public class Sun {
         }
     }
 
+    /// Answers "is it dark outside right now" for the given date, unlike `sunriseElevation` /
+    /// `sunsetElevation`, which answer "where is this date relative to today's sunrise / sunset".
+    /// Returns `nil` only when the solar calculation fails; polar day/night is answered from the
+    /// current elevation instead of `nil`.
+    public static func isSunBelowHorizon(for date: Date, latitude: Double, longitude: Double, timeZone: TimeZone = .current) -> Bool? {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        guard let schedule = Self.schedule(latitude: latitude, longitude: longitude, date: date, calendar: calendar, timeZone: timeZone) else { return nil }
+
+        // Polar day/polar night has no sunrise or sunset that day; fall back to the current
+        // elevation so the answer stays defined everywhere on earth instead of nil.
+        guard let sunrise = schedule.sunrise, let sunset = schedule.sunset else {
+            return schedule.position.elevation <= 0
+        }
+
+        let isBeforeSunrise = calendar.compare(date, to: sunrise.date, toGranularity: .minute) == .orderedAscending
+        let isAfterSunset = calendar.compare(date, to: sunset.date, toGranularity: .minute) == .orderedDescending
+        return isBeforeSunrise || isAfterSunset
+    }
+
     public static func schedule(latitude: Double, longitude: Double, date: Date?) -> SunSchedule? {
         return schedule(latitude: latitude, longitude: longitude, date: date, calendar: nil, timeZone: nil)
     }

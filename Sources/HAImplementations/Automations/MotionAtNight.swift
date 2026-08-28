@@ -30,8 +30,6 @@ public struct MotionAtNight: Automatable {
     public let lights: [SwitchDevice]
     public var triggerEntityIds: Set<EntityId> {
         var ids = Set(motionSensors.map(\.motionSensorId) + windowContacts.map(\.contactSensorId))
-        // `GenericMotionSensor` and `UnifiCamera` construct themselves with `lightSensorId: nil`;
-        // a config using one of them as `lightSensor` would force-unwrap-trap here otherwise.
         if let lightSensorId = lightSensor.lightSensorId {
             ids.insert(lightSensorId)
         }

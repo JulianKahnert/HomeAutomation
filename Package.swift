@@ -34,17 +34,17 @@ let package = Package(
         // open api generator
         .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.13.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", exact: "1.1.0"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", exact: "1.17.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", exact: "1.17.1"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.12.0"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.1"),
         // TCA and related
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture",
-                 exact: "1.26.1",
+                 exact: "1.26.2",
                  traits: [
                     "ComposableArchitecture2Deprecations",
                     "ComposableArchitecture2DeprecationOverloads"
                  ]),
-        .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.9.1"),
+        .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.10.0"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", exact: "5.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.15.0"),

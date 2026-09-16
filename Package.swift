@@ -44,7 +44,7 @@ let package = Package(
                     "ComposableArchitecture2Deprecations",
                     "ComposableArchitecture2DeprecationOverloads"
                  ]),
-        .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.10.0"),
+        .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.10.1"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", exact: "5.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.15.0"),

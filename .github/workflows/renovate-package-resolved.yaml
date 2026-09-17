@@ -7,7 +7,9 @@ on:
 
 jobs:
   update-package-resolved:
-    runs-on: macos-26
+    # Must match the Xcode that Xcode Cloud archives with, otherwise the committed
+    # Package.resolved is missing pins and every Xcode Cloud run fails resolution.
+    runs-on: xcode-27
     permissions:
       contents: write
       actions: write

@@ -26,16 +26,16 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.1"),
+        .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.2"),
         // 🗄 An ORM for SQL and NoSQL databases.
         .package(url: "https://github.com/vapor/fluent.git", exact: "4.13.0"),
         // 🐬 Fluent driver for MySQL.
         .package(url: "https://github.com/vapor/fluent-mysql-driver.git", exact: "4.8.0"),
         // open api generator
-        .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.13.0"),
-        .package(url: "https://github.com/swift-server/swift-openapi-vapor", exact: "1.1.0"),
+        .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.13.1"),
+        .package(url: "https://github.com/swift-server/swift-openapi-vapor", exact: "1.2.0"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", exact: "1.17.1"),
-        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.12.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.12.1"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.1"),
         // TCA and related
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture",
@@ -47,7 +47,7 @@ let package = Package(
         .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.10.1"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", exact: "5.0.0"),
-        .package(url: "https://github.com/apple/swift-log.git", exact: "1.15.0"),
+        .package(url: "https://github.com/apple/swift-log.git", exact: "1.15.1"),
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "fix/linux-foundation-networking"),
         // Capped at 6.x: vapor/apns 5.0.0 requires apnswift 6.1.0..<7.0.0.

@@ -18,6 +18,10 @@ jobs:
   swift-package:
     name: Swift Package Build & Test
     runs-on: macos-26
+    # The dispatched run (see renovate-package-resolved.yaml) has no head_ref and
+    # still runs; a pull_request run on a renovate branch would only fail on the
+    # stale Package.resolved that dispatch is about to fix.
+    if: ${{ !startsWith(github.head_ref, 'renovate/') }}
 
     steps:
       - name: Checkout repository
@@ -35,6 +39,8 @@ jobs:
     # whose resolver pins swift-issue-reporting separately from xctest-dynamic-overlay.
     # macos-26 tops out at Xcode 26.6 and would rewrite Package.resolved without it.
     runs-on: xcode-27
+    # See swift-package above: skip the redundant pull_request run on a renovate/** push.
+    if: ${{ !startsWith(github.head_ref, 'renovate/') }}
     strategy:
       fail-fast: false
       matrix:
@@ -113,6 +119,8 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
+    # See swift-package above: skip the redundant pull_request run on a renovate/** push.
+    if: ${{ !startsWith(github.head_ref, 'renovate/') }}
 
     steps:
       - name: Checkout repository

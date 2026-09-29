@@ -1,6 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", "group:all"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "Europe/Berlin",
+  "rebaseWhen": "conflicted",
   "swift": {
     "enabled": true,
     "updateLockFiles": false

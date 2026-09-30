@@ -56,7 +56,9 @@ jobs:
         # prevents from triggering further workflow runs. Without this the PR
         # checks never run against the regenerated Package.resolved. Dispatch
         # them explicitly (workflow_dispatch is exempt from that restriction).
-        if: steps.changes.outputs.changed == 'true'
+        # Runs even when Package.resolved did not change: pr-checks.yml now
+        # skips its own pull_request run on renovate/** branches, so without
+        # this dispatch such a PR would get no checks at all.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh workflow run pr-checks.yml --ref "${{ github.ref_name }}"

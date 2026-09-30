@@ -1,5 +1,5 @@
 {
-  "originHash" : "630f01a866ffc9a221b175c271713ffc1ab5a44f0dcfeb2cafe427a1cb224298",
+  "originHash" : "0bc716f53e2da135ff9a4d7401eb194f8e00fde2ab28816cf4e1010892837bce",
   "pins" : [
     {
       "identity" : "apns",
@@ -312,8 +312,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "3ffafb9722d5d918c614feb496c8789a3b59d222",
-        "version" : "1.15.0"
+        "revision" : "9c6fb14227f55d8f711ce3847dc2f419fb0ecacb",
+        "version" : "1.15.1"
       }
     },
     {
@@ -402,8 +402,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-generator",
       "state" : {
-        "revision" : "af9a2a1f5dcfb00a278d4bb29c6d75080932e99e",
-        "version" : "1.13.0"
+        "revision" : "39d49cf22abab58a07f02bb76808b5d2839b294a",
+        "version" : "1.13.1"
       }
     },
     {
@@ -411,8 +411,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-runtime",
       "state" : {
-        "revision" : "3d3a8457661daf7fb260ceeb9f0e24e5204ba5fb",
-        "version" : "1.12.0"
+        "revision" : "9e53df53e043b53046a371b31aaf0a1e26eef946",
+        "version" : "1.12.1"
       }
     },
     {
@@ -429,8 +429,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swift-server/swift-openapi-vapor",
       "state" : {
-        "revision" : "307560c9a94ba69dc4eb43b1e00534bc86aed440",
-        "version" : "1.1.0"
+        "revision" : "109ba8c03cbffb1b78cd74ea3dbbc0d91f476d82",
+        "version" : "1.2.0"
       }
     },
     {
@@ -501,8 +501,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "6f8091db7f159f966e028fbbc928cdcfa8597d59",
-        "version" : "4.122.1"
+        "revision" : "33e61d0a02a9ddc9f025f8398a0dc24774f6cbe1",
+        "version" : "4.122.2"
       }
     },
     {

@@ -173,7 +173,7 @@ struct AutomationsView: View {
     private func automationRow(_ automation: AutomationInfo) -> some View {
         HStack {
             Text(automation.name)
-                .foregroundStyle(automation.isRunning ? Color.green : Color.primary)
+                .foregroundStyle(automation.isRunning ? Color.accentColor : Color.primary)
             Spacer()
             if !automation.isActive {
                 Image(systemName: "x.circle")

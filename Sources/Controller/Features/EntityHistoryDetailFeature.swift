@@ -254,13 +254,13 @@ struct EntityHistoryDetailView: View {
                         x: .value("Time", item.timestamp),
                         y: .value("Value", value)
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.accentColor)
 
                     PointMark(
                         x: .value("Time", item.timestamp),
                         y: .value("Value", value)
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.accentColor)
                 }
             }
         }

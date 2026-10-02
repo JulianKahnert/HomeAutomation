@@ -94,7 +94,7 @@ struct AutomationDetailView: View {
                     Text("Is Running")
                     Spacer()
                     Image(systemName: "circle.fill")
-                        .foregroundStyle(store.automation.isRunning ? Color.green : Color.gray.opacity(0.3))
+                        .foregroundStyle(store.automation.isRunning ? Color.accentColor : Color.gray.opacity(0.3))
                 }
             }
 

@@ -183,7 +183,7 @@ struct AutomationsView: View {
                 }
             }
             .navigationTitle("Automations")
-            .navigationDestination(item: $store.scope(state: \.selectedAutomation, action: \.selectedAutomation)) { automationStore in
+            .navigationDestination(item: $store.scope(\.$selectedAutomation, action: \.selectedAutomation)) { automationStore in
                 AutomationDetailView(store: automationStore)
                     .navigationTitle(automationStore.automation.name)
             }

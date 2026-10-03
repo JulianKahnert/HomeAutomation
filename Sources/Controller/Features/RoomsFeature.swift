@@ -23,6 +23,7 @@ struct RoomsFeature: Sendable {
         var searchText = ""
         var selectedEntityId: String?
         @Presents var selectedEntityDetail: EntityHistoryDetailFeature.State?
+        @Presents var room: RoomFeature.State?
         @Presents var alert: AlertState<Action.Alert>?
 
         var filteredEntities: [EntityInfo] {
@@ -52,6 +53,8 @@ struct RoomsFeature: Sendable {
         case entitiesResponse(Result<[EntityInfo], Error>)
         case binding(BindingAction<State>)
         case selectedEntityDetail(PresentationAction<EntityHistoryDetailFeature.Action>)
+        case room(PresentationAction<RoomFeature.Action>)
+        case roomTapped(String)
         case alert(PresentationAction<Alert>)
 
         enum Alert: Sendable {
@@ -116,7 +119,11 @@ struct RoomsFeature: Sendable {
                 }
                 return .none
 
-            case .selectedEntityDetail:
+            case .selectedEntityDetail, .room:
+                return .none
+
+            case let .roomTapped(placeId):
+                state.room = RoomFeature.State(placeId: placeId, entities: state.entities.filter { $0.entityId.placeId == placeId })
                 return .none
 
             case .alert:
@@ -125,6 +132,9 @@ struct RoomsFeature: Sendable {
         }
         .ifLet(\.$selectedEntityDetail, action: \.selectedEntityDetail) {
             EntityHistoryDetailFeature()
+        }
+        .ifLet(\.$room, action: \.room) {
+            RoomFeature()
         }
         .ifLet(\.$alert, action: \.alert)
     }
@@ -138,10 +148,13 @@ struct RoomsView: View {
             contentView
                 .navigationTitle("Rooms")
                 .navigationDestination(
-                    item: $store.scope(state: \.selectedEntityDetail, action: \.selectedEntityDetail)
+                    item: $store.scope(\.$selectedEntityDetail, action: \.selectedEntityDetail)
                 ) { detailStore in
                     EntityHistoryDetailView(store: detailStore)
                         .navigationTitle(detailStore.entity.displayName)
+                }
+                .navigationDestination(item: $store.scope(\.$room, action: \.room)) { roomStore in
+                    RoomView(store: roomStore)
                 }
                 .sensoryFeedback(.selection, trigger: store.selectedEntityId)
                 .refreshable {
@@ -155,7 +168,7 @@ struct RoomsView: View {
                         ProgressView()
                     }
                 }
-                .alert($store.scope(state: \.alert, action: \.alert))
+                .alert($store.scope(\.$alert, action: \.alert))
         }
     }
 
@@ -171,10 +184,19 @@ struct RoomsView: View {
             } else {
                 List(selection: $store.selectedEntityId) {
                     ForEach(store.rooms, id: \.placeId) { room in
-                        Section(room.placeId) {
+                        Section {
                             ForEach(room.entities) { entity in
                                 entityRow(entity)
                                     .tag(entity.id)
+                            }
+                        } header: {
+                            Button {
+                                store.send(.roomTapped(room.placeId))
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(room.placeId)
+                                    Image(systemName: "chevron.right")
+                                }
                             }
                         }
                     }

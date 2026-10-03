@@ -13,6 +13,15 @@ import Sharing
 import SwiftUI
 
 @Reducer
+enum SettingsPath {
+    case commandLog(ActionsFeature)
+    case logs(LogViewerFeature)
+}
+
+extension SettingsPath.State: Equatable, Sendable {}
+extension SettingsPath.Action: Sendable {}
+
+@Reducer
 struct SettingsFeature: Sendable {
 
     private static let logger = Logger(label: "SettingsFeature")
@@ -37,9 +46,7 @@ struct SettingsFeature: Sendable {
         var isPushAuthorized: Bool = false
         var deviceToken: Data?
 
-        // Diagnostics
-        @Presents var commandLog: ActionsFeature.State?
-        @Presents var logViewer: LogViewerFeature.State?
+        var path = StackState<SettingsPath.State>()
     }
 
     // MARK: - Action
@@ -55,10 +62,7 @@ struct SettingsFeature: Sendable {
         case windowStatesResponse(Result<[WindowContentState.WindowState], Error>)
         case requestPushAuthorization
         case dismissError
-        case showCommandLog
-        case commandLog(PresentationAction<ActionsFeature.Action>)
-        case showLogViewer
-        case logViewer(PresentationAction<LogViewerFeature.Action>)
+        case path(StackActionOf<SettingsPath>)
         case binding(BindingAction<State>)
     }
 
@@ -174,30 +178,14 @@ struct SettingsFeature: Sendable {
                 state.error = nil
                 return .none
 
-            case .showCommandLog:
-                state.commandLog = ActionsFeature.State()
-                return .none
-
-            case .commandLog:
-                return .none
-
-            case .showLogViewer:
-                state.logViewer = LogViewerFeature.State()
-                return .none
-
-            case .logViewer:
+            case .path:
                 return .none
 
             case .binding:
                 return .none
             }
         }
-        .ifLet(\.$commandLog, action: \.commandLog) {
-            ActionsFeature()
-        }
-        .ifLet(\.$logViewer, action: \.logViewer) {
-            LogViewerFeature()
-        }
+        .forEach(\.path, action: \.path)
     }
 }
 
@@ -205,7 +193,7 @@ struct SettingsView: View {
     @Bindable var store: StoreOf<SettingsFeature>
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $store.scope(\.path, action: \.path)) {
             Form {
                 Section {
                     serverConfigSection
@@ -225,48 +213,28 @@ struct SettingsView: View {
                 }
                 #endif
 
-                Section {
-                    diagnosticsButton("Command Log", systemImage: "list.bullet.clipboard") {
-                        store.send(.showCommandLog)
+                Section("Diagnostics") {
+                    NavigationLink(state: SettingsPath.State.commandLog(ActionsFeature.State())) {
+                        Label("Command Log", systemImage: "list.bullet.clipboard")
                     }
-                    diagnosticsButton("App Logs", systemImage: "doc.text.magnifyingglass") {
-                        store.send(.showLogViewer)
+                    NavigationLink(state: SettingsPath.State.logs(LogViewerFeature.State())) {
+                        Label("App Logs", systemImage: "doc.text.magnifyingglass")
                     }
-                } header: {
-                    Text("Diagnostics")
                 }
             }
             .navigationTitle("Settings")
-            .navigationDestination(item: $store.scope(state: \.commandLog, action: \.commandLog)) { commandLogStore in
-                ActionsView(store: commandLogStore)
-            }
-            .navigationDestination(
-                item: $store.scope(state: \.logViewer, action: \.logViewer)
-            ) { logStore in
-                LogViewerFeatureView(store: logStore)
-            }
             .refreshable {
                 store.send(.refreshWindowStates)
             }
             .onAppear {
                 store.send(.onAppear)
             }
-        }
-    }
-
-    private func diagnosticsButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Label {
-                    Text(title)
-                } icon: {
-                    Image(systemName: systemImage)
-                        .foregroundStyle(.tint)
-                }
-                .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(.secondary)
+        } destination: { pathStore in
+            switch pathStore.case {
+            case let .commandLog(commandLogStore):
+                ActionsView(store: commandLogStore)
+            case let .logs(logStore):
+                LogViewerFeatureView(store: logStore)
             }
         }
     }
@@ -287,7 +255,7 @@ struct SettingsView: View {
 
             Text(store.serverURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
 
         if store.isEditingServerURL {

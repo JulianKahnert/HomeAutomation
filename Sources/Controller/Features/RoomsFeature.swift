@@ -2,7 +2,7 @@
 //  RoomsFeature.swift
 //  ControllerFeatures
 //
-//  Entities grouped by room
+//  Rooms with recorded device history
 //
 
 import ComposableArchitecture
@@ -10,6 +10,15 @@ import Foundation
 import HAModels
 import Sharing
 import SwiftUI
+
+@Reducer
+enum RoomsPath {
+    case room(RoomFeature)
+    case entity(EntityHistoryDetailFeature)
+}
+
+extension RoomsPath.State: Equatable, Sendable {}
+extension RoomsPath.Action: Sendable {}
 
 @Reducer
 struct RoomsFeature: Sendable {
@@ -21,25 +30,17 @@ struct RoomsFeature: Sendable {
         var entities: [EntityInfo] = []
         var isLoading = false
         var searchText = ""
-        var selectedEntityId: String?
-        @Presents var selectedEntityDetail: EntityHistoryDetailFeature.State?
-        @Presents var room: RoomFeature.State?
+        var path = StackState<RoomsPath.State>()
         @Presents var alert: AlertState<Action.Alert>?
 
-        var filteredEntities: [EntityInfo] {
-            guard !searchText.isEmpty else {
-                return entities
-            }
-
-            let searchLowercased = searchText.localizedLowercase
-            return entities.filter { entity in
-                entity.displayName.localizedLowercase.contains(searchLowercased) ||
-                entity.formattedCharacteristicDisplayName.localizedLowercase.contains(searchLowercased)
-            }
-        }
-
+        /// Rooms whose name or devices match the search, each with all of its devices.
         var rooms: [(placeId: String, entities: [EntityInfo])] {
-            Dictionary(grouping: filteredEntities, by: \.entityId.placeId)
+            Dictionary(grouping: entities, by: \.entityId.placeId)
+                .filter { placeId, entities in
+                    searchText.isEmpty
+                        || placeId.localizedStandardContains(searchText)
+                        || entities.contains { $0.entityId.name.localizedStandardContains(searchText) }
+                }
                 .sorted { $0.key < $1.key }
                 .map { ($0.key, $0.value) }
         }
@@ -52,9 +53,7 @@ struct RoomsFeature: Sendable {
         case refresh
         case entitiesResponse(Result<[EntityInfo], Error>)
         case binding(BindingAction<State>)
-        case selectedEntityDetail(PresentationAction<EntityHistoryDetailFeature.Action>)
-        case room(PresentationAction<RoomFeature.Action>)
-        case roomTapped(String)
+        case path(StackActionOf<RoomsPath>)
         case alert(PresentationAction<Alert>)
 
         enum Alert: Sendable {
@@ -72,15 +71,6 @@ struct RoomsFeature: Sendable {
         BindingReducer()
         Reduce { state, action in
             switch action {
-            case .binding(\.selectedEntityId):
-                if let selectedEntityId = state.selectedEntityId,
-                   let entity = state.entities.first(where: { $0.id == selectedEntityId }) {
-                    state.selectedEntityDetail = .init(entity: entity)
-                } else {
-                    state.selectedEntityDetail = nil
-                }
-                return .none
-
             case .binding:
                 return .none
 
@@ -119,23 +109,14 @@ struct RoomsFeature: Sendable {
                 }
                 return .none
 
-            case .selectedEntityDetail, .room:
-                return .none
-
-            case let .roomTapped(placeId):
-                state.room = RoomFeature.State(placeId: placeId, entities: state.entities.filter { $0.entityId.placeId == placeId })
+            case .path:
                 return .none
 
             case .alert:
                 return .none
             }
         }
-        .ifLet(\.$selectedEntityDetail, action: \.selectedEntityDetail) {
-            EntityHistoryDetailFeature()
-        }
-        .ifLet(\.$room, action: \.room) {
-            RoomFeature()
-        }
+        .forEach(\.path, action: \.path)
         .ifLet(\.$alert, action: \.alert)
     }
 }
@@ -144,82 +125,45 @@ struct RoomsView: View {
     @Bindable var store: StoreOf<RoomsFeature>
 
     var body: some View {
-        NavigationStack {
-            contentView
-                .navigationTitle("Rooms")
-                .navigationDestination(
-                    item: $store.scope(\.$selectedEntityDetail, action: \.selectedEntityDetail)
-                ) { detailStore in
-                    EntityHistoryDetailView(store: detailStore)
-                        .navigationTitle(detailStore.entity.displayName)
-                }
-                .navigationDestination(item: $store.scope(\.$room, action: \.room)) { roomStore in
-                    RoomView(store: roomStore)
-                }
-                .sensoryFeedback(.selection, trigger: store.selectedEntityId)
-                .refreshable {
-                    store.send(.refresh)
-                }
-                .onAppear {
-                    store.send(.onAppear)
-                }
-                .overlay {
-                    if store.isLoading && store.entities.isEmpty {
-                        ProgressView()
-                    }
-                }
-                .alert($store.scope(\.$alert, action: \.alert))
-        }
-    }
-
-    @ViewBuilder
-    private var contentView: some View {
-        Group {
-            if store.entities.isEmpty && !store.isLoading {
-                ContentUnavailableView(
-                    "No Entities",
-                    systemImage: "square.grid.2x2",
-                    description: Text("Devices with recorded history appear here.")
-                )
-            } else {
-                List(selection: $store.selectedEntityId) {
-                    ForEach(store.rooms, id: \.placeId) { room in
-                        Section {
-                            ForEach(room.entities) { entity in
-                                entityRow(entity)
-                                    .tag(entity.id)
-                            }
-                        } header: {
-                            Button {
-                                store.send(.roomTapped(room.placeId))
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text(room.placeId)
-                                    Image(systemName: "chevron.right")
-                                }
-                            }
+        NavigationStack(path: $store.scope(\.path, action: \.path)) {
+            List {
+                ForEach(store.rooms, id: \.placeId) { room in
+                    NavigationLink(state: RoomsPath.State.room(RoomFeature.State(placeId: room.placeId, entities: room.entities))) {
+                        LabeledContent(room.placeId) {
+                            // `Text` takes a LocalizedStringKey, which is what parses the inflect markup.
+                            Text("^[\(room.entities.count) device](inflect: true)")
                         }
                     }
                 }
-                .searchable(
-                    text: $store.searchText,
-                    prompt: "Search devices..."
-                )
             }
-        }
-    }
-
-    @ViewBuilder
-    private func entityRow(_ entity: EntityInfo) -> some View {
-        Label {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entity.entityId.name)
-                Text(entity.formattedCharacteristicDisplayName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            .searchable(text: $store.searchText, prompt: "Search rooms and devices")
+            .navigationTitle("Rooms")
+            .refreshable {
+                store.send(.refresh)
             }
-        } icon: {
-            Image(systemName: entity.entityId.characteristicType.systemImage)
+            .onAppear {
+                store.send(.onAppear)
+            }
+            .overlay {
+                if store.isLoading && store.entities.isEmpty {
+                    ProgressView()
+                } else if store.entities.isEmpty {
+                    ContentUnavailableView(
+                        "No Rooms",
+                        systemImage: "square.grid.2x2",
+                        description: Text("Rooms with recorded device history appear here.")
+                    )
+                }
+            }
+            .alert($store.scope(\.$alert, action: \.alert))
+        } destination: { pathStore in
+            switch pathStore.case {
+            case let .room(roomStore):
+                RoomView(store: roomStore)
+            case let .entity(entityStore):
+                EntityHistoryDetailView(store: entityStore)
+                    .navigationTitle(entityStore.entity.displayName)
+            }
         }
     }
 }

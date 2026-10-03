@@ -98,19 +98,19 @@ struct AppFeature: Sendable {
     var body: some ReducerOf<Self> {
         BindingReducer()
 
-        Scope(state: \.overview, action: \.overview) {
+        Scope(\.overview, action: \.overview) {
             OverviewFeature()
         }
 
-        Scope(state: \.automations, action: \.automations) {
+        Scope(\.automations, action: \.automations) {
             AutomationsFeature()
         }
 
-        Scope(state: \.rooms, action: \.rooms) {
+        Scope(\.rooms, action: \.rooms) {
             RoomsFeature()
         }
 
-        Scope(state: \.settings, action: \.settings) {
+        Scope(\.settings, action: \.settings) {
             SettingsFeature()
         }
 
@@ -122,7 +122,7 @@ struct AppFeature: Sendable {
 
             case let .overview(.delegate(.openAutomation(name))):
                 state.selectedTab = .automations
-                return .send(.automations(.binding(.set(\.selectedAutomationIndex, name))))
+                return .send(.automations(.openAutomation(name)))
 
             case .overview:
                 return .none
@@ -236,7 +236,7 @@ struct AppView: View {
                 value: AppFeature.Tab.overview
             ) {
                 OverviewView(
-                    store: store.scope(state: \.overview, action: \.overview),
+                    store: store.scope(\.overview, action: \.overview),
                     openWindows: store.settings.windowContentState?.windowStates ?? []
                 )
             }
@@ -248,10 +248,7 @@ struct AppView: View {
                 value: AppFeature.Tab.automations
             ) {
                 AutomationsView(
-                    store: store.scope(
-                        state: \.automations,
-                        action: \.automations
-                    )
+                    store: store.scope(\.automations, action: \.automations)
                 )
             }
 
@@ -260,7 +257,7 @@ struct AppView: View {
                 systemImage: AppFeature.Tab.rooms.systemImage,
                 value: AppFeature.Tab.rooms
             ) {
-                RoomsView(store: store.scope(state: \.rooms, action: \.rooms))
+                RoomsView(store: store.scope(\.rooms, action: \.rooms))
             }
 
             Tab(
@@ -269,10 +266,7 @@ struct AppView: View {
                 value: AppFeature.Tab.settings
             ) {
                 SettingsView(
-                    store: store.scope(
-                        state: \.settings,
-                        action: \.settings
-                    )
+                    store: store.scope(\.settings, action: \.settings)
                 )
             }
         }

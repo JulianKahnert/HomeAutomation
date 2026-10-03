@@ -69,9 +69,12 @@ struct OverviewFeatureTests {
         #expect(store.state.isHealthy == true)
     }
 
-    @Test("a run's Open Automation button switches to its tab")
+    @Test("a run's Open Automation button switches to its tab and opens the details")
     func openAutomationFromRun() async {
         var state = AppFeature.State()
+        state.automations.$automations.withLock {
+            $0 = [AutomationInfo(name: "Night Light", isActive: true, isRunning: false, type: "MotionAtNight")]
+        }
         state.overview.path.append(.run(RunDetailFeature.State(run: run(.completed))))
         let store = TestStore(initialState: state) {
             AppFeature()
@@ -80,8 +83,8 @@ struct OverviewFeatureTests {
 
         await store.send(\.overview.path[id: 0].run.openAutomationButtonTapped)
         await store.receive(\.overview.delegate)
-        await store.receive(\.automations.binding)
+        await store.receive(\.automations.openAutomation)
         #expect(store.state.selectedTab == .automations)
-        #expect(store.state.automations.selectedAutomationIndex == "Night Light")
+        #expect(store.state.automations.path.first?.details?.automation.name == "Night Light")
     }
 }

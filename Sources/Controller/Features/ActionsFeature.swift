@@ -173,14 +173,6 @@ struct ActionsView: View {
 
     var body: some View {
         List {
-            Picker("Filter", selection: $store.filter) {
-                ForEach(ActionsFeature.Filter.allCases, id: \.self) { filter in
-                    Text(filter.rawValue).tag(filter)
-                }
-            }
-            .pickerStyle(.segmented)
-            .listRowBackground(Color.clear)
-
             ForEach(store.filteredActions) { item in
                 ActionRow(item: item)
             }
@@ -192,6 +184,14 @@ struct ActionsView: View {
         .navigationTitle("Command Log")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                FilterMenu(selection: $store.filter, isActive: store.filter != .all) {
+                    ForEach(ActionsFeature.Filter.allCases, id: \.self) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
+                }
+            }
+
+            ToolbarItem(placement: .secondaryAction) {
                 Button {
                     store.send(.refresh)
                 } label: {
@@ -237,7 +237,7 @@ struct ActionsView: View {
                 )
             }
         }
-        .alert($store.scope(state: \.alert, action: \.alert))
+        .alert($store.scope(\.$alert, action: \.alert))
     }
 }
 

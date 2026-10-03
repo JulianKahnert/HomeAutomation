@@ -14,12 +14,6 @@ import SwiftUI
 @Reducer
 struct AutomationDetails: Sendable {
 
-    @Reducer
-    enum Destination {
-        case entity(EntityHistoryDetailFeature)
-        case run(RunDetailFeature)
-    }
-
     // MARK: - State
 
     @ObservableState
@@ -29,7 +23,6 @@ struct AutomationDetails: Sendable {
         var error: String?
         /// Last 24 hours, newest first.
         var runs: [AutomationRun] = []
-        @Presents var destination: Destination.State?
         /// Entity histories of the debug chart, only loaded for `MotionAtNight`.
         var histories: [EntityHistory] = []
         var end = Date()
@@ -40,11 +33,8 @@ struct AutomationDetails: Sendable {
     }
 
     enum Action: Sendable {
-        case destination(PresentationAction<Destination.Action>)
-        case entityTapped(EntityId)
         case historiesResponse(Result<[EntityHistory], Error>)
         case locationResponse(Result<Location, Error>)
-        case runTapped(AutomationRun)
         case runsResponse(Result<[AutomationRun], Error>)
         case task
         case stopAutomation
@@ -59,17 +49,6 @@ struct AutomationDetails: Sendable {
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case .destination(.presented(.run(.delegate(.openAutomation)))):
-                state.destination = nil
-                return .none
-
-            case .destination:
-                return .none
-
-            case let .entityTapped(entityId):
-                state.destination = .entity(EntityHistoryDetailFeature.State(entity: EntityInfo(entityId: entityId)))
-                return .none
-
             case let .historiesResponse(.success(histories)):
                 state.histories = histories
                 return .none
@@ -80,10 +59,6 @@ struct AutomationDetails: Sendable {
 
             case let .historiesResponse(.failure(error)), let .locationResponse(.failure(error)):
                 state.error = "Failed to load chart data: \(error.localizedDescription)"
-                return .none
-
-            case let .runTapped(run):
-                state.destination = .run(RunDetailFeature.State(run: run))
                 return .none
 
             case let .runsResponse(.success(runs)):
@@ -150,7 +125,6 @@ struct AutomationDetails: Sendable {
                 return .none
             }
         }
-        .ifLet(\.$destination, action: \.destination)
     }
 
     /// One room-history request per room the automation's devices are in.
@@ -170,9 +144,6 @@ struct AutomationDetails: Sendable {
     }
 }
 
-extension AutomationDetails.Destination.State: Equatable, Sendable {}
-extension AutomationDetails.Destination.Action: Sendable {}
-
 struct AutomationDetailView: View {
     @Bindable var store: StoreOf<AutomationDetails>
 
@@ -190,7 +161,6 @@ struct AutomationDetailView: View {
                     Button("Stop", role: .destructive) {
                         store.send(.stopAutomation)
                     }
-                    .foregroundStyle(.red)
                     .disabled(store.isLoading)
                 }
             } footer: {
@@ -203,9 +173,7 @@ struct AutomationDetailView: View {
             if !store.automation.entities.isEmpty {
                 Section("Devices") {
                     ForEach(store.automation.entities, id: \.self) { entityId in
-                        Button {
-                            store.send(.entityTapped(entityId))
-                        } label: {
+                        NavigationLink(state: AutomationsPath.State.entity(EntityHistoryDetailFeature.State(entity: EntityInfo(entityId: entityId)))) {
                             LabeledContent(entityId.name, value: entityId.characteristicType.displayName)
                         }
                     }
@@ -214,19 +182,19 @@ struct AutomationDetailView: View {
 
             Section {
                 ForEach(store.runs) { run in
-                    Button {
-                        store.send(.runTapped(run))
-                    } label: {
+                    NavigationLink(state: AutomationsPath.State.run(RunDetailFeature.State(run: run))) {
                         RunRow(run: run, showsAutomationName: false)
                     }
                 }
             } header: {
-                Text("Runs · 24 h")
+                Text("Runs")
             } footer: {
                 if !store.automation.recordsRuns {
                     Text("Runs are not recorded for this automation.")
                 } else if store.runs.isEmpty {
                     Text("No runs in the last 24 hours.")
+                } else {
+                    Text("Last 24 hours.")
                 }
             }
 
@@ -234,15 +202,7 @@ struct AutomationDetailView: View {
                 motionAtNightSection
             }
         }
-        .buttonStyle(.plain)
         .task { await store.send(.task).finish() }
-        .navigationDestination(item: $store.scope(\.$destination, action: \.destination).entity) { entityStore in
-            EntityHistoryDetailView(store: entityStore)
-                .navigationTitle(entityStore.entity.displayName)
-        }
-        .navigationDestination(item: $store.scope(\.$destination, action: \.destination).run) { runStore in
-            RunDetailView(store: runStore)
-        }
     }
 }
 
@@ -278,26 +238,28 @@ extension AutomationDetailView {
                 bands: nights
             )
         } header: {
-            Text("Why did it trigger? · 24 h")
+            Text("Trigger Conditions")
         } footer: {
-            Text("Grey: sun below the horizon. Motion below the threshold turns the lights on.")
+            Text("Last 24 hours. Grey: sun below the horizon. Motion below the threshold turns the lights on.")
         }
     }
 }
 
 #Preview {
-    AutomationDetailView(
-        store: Store(
-            initialState: AutomationDetails.State(
-                automation: Shared(value: AutomationInfo(
-                    name: "Test Automation",
-                    isActive: true,
-                    isRunning: true,
-                    type: "MotionAtNight"
-                ))
-            )
-        ) {
-            AutomationDetails()
-        }
-    )
+    NavigationStack {
+        AutomationDetailView(
+            store: Store(
+                initialState: AutomationDetails.State(
+                    automation: Shared(value: AutomationInfo(
+                        name: "Test Automation",
+                        isActive: true,
+                        isRunning: true,
+                        type: "MotionAtNight"
+                    ))
+                )
+            ) {
+                AutomationDetails()
+            }
+        )
+    }
 }

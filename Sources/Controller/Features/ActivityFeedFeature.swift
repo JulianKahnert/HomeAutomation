@@ -54,7 +54,6 @@ struct ActivityFeedFeature: Sendable {
 
     enum Action: BindableAction, Sendable {
         case binding(BindingAction<State>)
-        case runTapped(AutomationRun)
     }
 
     var body: some ReducerOf<Self> {
@@ -67,31 +66,27 @@ struct ActivityFeedView: View {
 
     var body: some View {
         List {
-            Picker("Filter", selection: $store.filter) {
-                ForEach(ActivityFeedFeature.Filter.allCases, id: \.self) { filter in
-                    Text(filter.rawValue).tag(filter)
-                }
-            }
-            .pickerStyle(.segmented)
-            .listRowBackground(Color.clear)
-
-            Section {
-                ForEach(store.entries) { entry in
-                    switch entry {
-                    case let .run(run):
-                        Button {
-                            store.send(.runTapped(run))
-                        } label: {
-                            RunRow(run: run)
-                        }
-                        .buttonStyle(.plain)
-                    case let .command(item):
-                        ActionRow(item: item)
+            ForEach(store.entries) { entry in
+                switch entry {
+                case let .run(run):
+                    NavigationLink(state: OverviewPath.State.run(RunDetailFeature.State(run: run))) {
+                        RunRow(run: run)
                     }
+                case let .command(item):
+                    ActionRow(item: item)
                 }
             }
         }
         .navigationTitle("Activity")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                FilterMenu(selection: $store.filter, isActive: store.filter != .all) {
+                    ForEach(ActivityFeedFeature.Filter.allCases, id: \.self) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
+                }
+            }
+        }
     }
 }
 

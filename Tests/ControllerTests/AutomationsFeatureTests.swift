@@ -22,7 +22,7 @@ struct AutomationsFeatureTests {
 
     @Test("status grouping splits active and inactive, running first")
     func groupsByStatus() {
-        var state = AutomationsFeature.State()
+        let state = AutomationsFeature.State()
         state.$automations.withLock { $0 = automations }
         state.$grouping.withLock { $0 = .status }
 
@@ -32,7 +32,7 @@ struct AutomationsFeatureTests {
 
     @Test("type grouping uses the type label")
     func groupsByType() {
-        var state = AutomationsFeature.State()
+        let state = AutomationsFeature.State()
         state.$automations.withLock { $0 = automations }
         state.$grouping.withLock { $0 = .type }
 
@@ -53,8 +53,47 @@ struct AutomationsFeatureTests {
         }
         await store.receive(\.setActiveResponse) {
             $0.$automations.withLock { $0[id: "Evening"]?.isActive = true }
-            $0.error = "Failed to change Evening: \(ActivateError().localizedDescription)"
+            $0.alert = AlertState {
+                TextState("Error")
+            } actions: {
+                ButtonState(action: .dismissError) {
+                    TextState("OK")
+                }
+            } message: {
+                TextState("Failed to change Evening: \(ActivateError().localizedDescription)")
+            }
         }
+    }
+}
+
+@Suite("RoomsFeature")
+struct RoomsFeatureTests {
+    private let entities = [
+        EntityInfo.preview(placeId: "Kitchen", name: "Ceiling"),
+        EntityInfo.preview(placeId: "Kitchen", name: "Window", type: .contactSensor),
+        EntityInfo.preview(placeId: "Bath", name: "Mirror")
+    ]
+
+    @Test("rooms are listed alphabetically with all their devices")
+    func roomsGroupDevices() {
+        var state = RoomsFeature.State()
+        state.entities = entities
+
+        #expect(state.rooms.map(\.placeId) == ["Bath", "Kitchen"])
+        #expect(state.rooms[1].entities.map(\.entityId.name) == ["Ceiling", "Window"])
+    }
+
+    @Test("search matches room names and device names, keeping the whole room")
+    func searchKeepsWholeRoom() {
+        var state = RoomsFeature.State()
+        state.entities = entities
+
+        state.searchText = "window"
+        #expect(state.rooms.map(\.placeId) == ["Kitchen"])
+        #expect(state.rooms[0].entities.count == 2)
+
+        state.searchText = "bath"
+        #expect(state.rooms.map(\.placeId) == ["Bath"])
     }
 }
 

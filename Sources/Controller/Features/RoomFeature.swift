@@ -28,7 +28,6 @@ struct RoomFeature: Sendable {
         var histories: [EntityHistory] = []
         var timeRange: TimeRange = .day
         var weekHistories: [EntityHistory] = []
-        @Presents var entityDetail: EntityHistoryDetailFeature.State?
 
         var start: Date { end.addingTimeInterval(-timeRange.rawValue) }
     }
@@ -36,8 +35,6 @@ struct RoomFeature: Sendable {
     enum Action: BindableAction, Sendable {
         case automationsResponse(Result<[AutomationInfo], Error>)
         case binding(BindingAction<State>)
-        case entityDetail(PresentationAction<EntityHistoryDetailFeature.Action>)
-        case entityTapped(EntityInfo)
         case historyResponse(Result<[EntityHistory], Error>)
         case task
         case weekHistoryResponse(Result<[EntityHistory], Error>)
@@ -69,11 +66,7 @@ struct RoomFeature: Sendable {
             case .binding(\.timeRange):
                 return loadHistory(&state)
 
-            case .binding, .entityDetail:
-                return .none
-
-            case let .entityTapped(entity):
-                state.entityDetail = EntityHistoryDetailFeature.State(entity: entity)
+            case .binding:
                 return .none
 
             case .task:
@@ -89,9 +82,6 @@ struct RoomFeature: Sendable {
                     }
                 )
             }
-        }
-        .ifLet(\.$entityDetail, action: \.entityDetail) {
-            EntityHistoryDetailFeature()
         }
     }
 
@@ -178,22 +168,13 @@ struct RoomView: View {
 
             Section("Devices") {
                 ForEach(store.entities) { entity in
-                    Button {
-                        store.send(.entityTapped(entity))
-                    } label: {
+                    NavigationLink(state: RoomsPath.State.entity(EntityHistoryDetailFeature.State(entity: entity))) {
                         Label {
-                            VStack(alignment: .leading) {
-                                Text(entity.entityId.name)
-                                Text(entity.formattedCharacteristicDisplayName)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
+                            Text(entity.entityId.name)
+                            Text(entity.formattedCharacteristicDisplayName)
                         } icon: {
                             Image(systemName: entity.entityId.characteristicType.systemImage)
-                                .foregroundStyle(.tint)
                         }
-                        // A button would tint the whole row; only the icon carries the accent.
-                        .foregroundStyle(.primary)
                     }
                 }
             }
@@ -208,10 +189,6 @@ struct RoomView: View {
         }
         .navigationTitle(store.placeId)
         .task { await store.send(.task).finish() }
-        .navigationDestination(item: $store.scope(\.$entityDetail, action: \.entityDetail)) { detailStore in
-            EntityHistoryDetailView(store: detailStore)
-                .navigationTitle(detailStore.entity.displayName)
-        }
     }
 }
 

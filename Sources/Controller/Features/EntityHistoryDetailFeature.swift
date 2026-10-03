@@ -22,7 +22,6 @@ struct EntityHistoryDetailFeature: Sendable {
         var historyItems: [EntityHistoryItem] = []
         var isLoading = false
         var timeRange: TimeRange = .hour
-        var nextCursor: Date?
         @Presents var alert: AlertState<Action.Alert>?
 
         var chartData: [EntityHistoryItem] {
@@ -63,7 +62,6 @@ struct EntityHistoryDetailFeature: Sendable {
     enum Action: Sendable, BindableAction {
         case onAppear
         case refresh
-        case loadNextPage
         case historyResponse(Result<EntityHistoryResponse, Error>)
         case timeRangeChanged(TimeRange)
         case binding(BindingAction<State>)
@@ -77,6 +75,8 @@ struct EntityHistoryDetailFeature: Sendable {
     // MARK: - Dependencies
 
     @Dependency(\.serverClient) var serverClient
+
+    private enum CancelID { case history }
 
     // MARK: - Body
 
@@ -93,48 +93,30 @@ struct EntityHistoryDetailFeature: Sendable {
                 state.isLoading = true
                 state.alert = nil
                 state.historyItems = []
-                state.nextCursor = nil
 
                 let entityId = state.entity.entityId
                 let dateRange = state.dateRange
 
+                // All pages in one effect: it is cancelled as a whole when the screen is popped or
+                // the range changes, so no late page reaches a removed element or a new range.
                 return .run { send in
-                    await send(.historyResponse(
-                        Result {
-                            try await serverClient.getEntityHistory(
-                                entityId,
-                                dateRange.start,
-                                dateRange.end,
-                                nil,
-                                1000,
-                                true
-                            )
-                        }
-                    ))
+                    var cursor: Date?
+                    repeat {
+                        let response = try await serverClient.getEntityHistory(
+                            entityId,
+                            dateRange.start,
+                            dateRange.end,
+                            cursor,
+                            1000,
+                            cursor == nil
+                        )
+                        await send(.historyResponse(.success(response)))
+                        cursor = response.nextCursor
+                    } while cursor != nil
+                } catch: { error, send in
+                    await send(.historyResponse(.failure(error)))
                 }
-
-            case .loadNextPage:
-                guard let cursor = state.nextCursor else {
-                    return .none
-                }
-
-                let entityId = state.entity.entityId
-                let dateRange = state.dateRange
-
-                return .run { send in
-                    await send(.historyResponse(
-                        Result {
-                            try await serverClient.getEntityHistory(
-                                entityId,
-                                dateRange.start,
-                                dateRange.end,
-                                cursor,
-                                1000,
-                                false
-                            )
-                        }
-                    ))
-                }
+                .cancellable(id: CancelID.history, cancelInFlight: true)
 
             case let .historyResponse(.success(response)):
                 state.isLoading = false
@@ -145,15 +127,6 @@ struct EntityHistoryDetailFeature: Sendable {
                 }
                 state.historyItems.append(contentsOf: newItems)
                 state.historyItems.sort { $0.timestamp > $1.timestamp }
-
-                state.nextCursor = response.nextCursor
-
-                // Automatically load next page if there's more data
-                if response.nextCursor != nil {
-                    return .run { send in
-                        await send(.loadNextPage)
-                    }
-                }
                 return .none
 
             case let .historyResponse(.failure(error)):
@@ -206,13 +179,10 @@ struct EntityHistoryDetailView: View {
                     chartView
                 } else if store.isLoading {
                     ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 300)
+                        .frame(maxWidth: .infinity)
                 } else {
-                    ContentUnavailableView(
-                        "No Data",
-                        systemImage: "chart.line.uptrend.xyaxis",
-                        description: Text("No history data available for this time range")
-                    )
+                    Text("No history in this time range.")
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -301,27 +271,19 @@ struct EntityHistoryDetailView: View {
         }
     }
 
-    @ViewBuilder
     private func historyRow(_ item: EntityHistoryItem) -> some View {
-        HStack {
-            // Color indicator (if color data available)
-            if let color = item.color {
-                Circle()
-                    .fill(color)
-                    .frame(width: 24, height: 24)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                    )
+        LabeledContent {
+            Text(item.timestamp, format: .dateTime.day().month().hour().minute())
+        } label: {
+            HStack {
+                if let color = item.color {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 24, height: 24)
+                        .overlay(Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 1))
+                }
+                Text(item.valueDescription)
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.timestamp.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            Text(item.valueDescription)
         }
     }
 }

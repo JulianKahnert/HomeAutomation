@@ -59,8 +59,6 @@ struct OverviewFeature: Sendable {
         case path(StackActionOf<OverviewPath>)
         case refresh
         case refreshResponse(Result<Snapshot, Error>)
-        case runTapped(AutomationRun)
-        case showAllTapped
         case stopButtonTapped(String)
         case task
 
@@ -77,10 +75,6 @@ struct OverviewFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .delegate:
-                return .none
-
-            case let .path(.element(_, .feed(.runTapped(run)))):
-                state.path.append(.run(RunDetailFeature.State(run: run)))
                 return .none
 
             case let .path(.element(_, .run(.delegate(.openAutomation(name))))):
@@ -119,15 +113,7 @@ struct OverviewFeature: Sendable {
 
             case let .refreshResponse(.failure(error)):
                 state.isHealthy = nil
-                state.error = "Server unreachable: \(error.localizedDescription)"
-                return .none
-
-            case let .runTapped(run):
-                state.path.append(.run(RunDetailFeature.State(run: run)))
-                return .none
-
-            case .showAllTapped:
-                state.path.append(.feed(ActivityFeedFeature.State(runs: state.recentRuns, actions: state.recentActions)))
+                state.error = error.localizedDescription
                 return .none
 
             case let .stopButtonTapped(name):
@@ -157,10 +143,14 @@ struct OverviewView: View {
     let openWindows: [WindowContentState.WindowState]
 
     var body: some View {
-        NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
+        NavigationStack(path: $store.scope(\.path, action: \.path)) {
             List {
                 Section {
                     statusRow
+                } footer: {
+                    if let error = store.error {
+                        Text(error)
+                    }
                 }
 
                 if !openWindows.isEmpty {
@@ -198,31 +188,27 @@ struct OverviewView: View {
                     }
                 }
 
-                Section {
+                Section("Recent Runs") {
                     ForEach(store.recentRuns.prefix(5)) { run in
-                        Button {
-                            store.send(.runTapped(run))
-                        } label: {
+                        NavigationLink(state: OverviewPath.State.run(RunDetailFeature.State(run: run))) {
                             RunRow(run: run)
                         }
-                        .buttonStyle(.plain)
                     }
-                } header: {
-                    HStack {
-                        Text("Recent Runs")
-                        Spacer()
-                        Button("Show All") {
-                            store.send(.showAllTapped)
-                        }
-                        .font(.footnote)
-                    }
+                    NavigationLink(
+                        "Show All",
+                        state: OverviewPath.State.feed(ActivityFeedFeature.State(runs: store.recentRuns, actions: store.recentActions))
+                    )
                 }
 
                 if !store.hints.isEmpty {
                     Section("Notices") {
                         ForEach(store.hints, id: \.self) { hint in
-                            Label(hint, systemImage: "exclamationmark.triangle")
-                                .foregroundStyle(.red)
+                            Label {
+                                Text(hint)
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .foregroundStyle(.red)
+                            }
                         }
                     }
                 }
@@ -244,14 +230,14 @@ struct OverviewView: View {
         HStack {
             Image(systemName: "circle.fill")
                 .foregroundStyle(store.isHealthy == true ? Color.green : Color.red)
-            if let error = store.error {
-                Text(error)
+            if store.error != nil {
+                Text("Server unreachable")
             } else {
                 Text(store.isHealthy == false ? "Adapter disconnected" : "Adapter connected")
             }
             Spacer()
             if let lastUpdated = store.lastUpdated {
-                Text(lastUpdated, style: .relative)
+                Text("Updated \(Text(lastUpdated, style: .relative)) ago")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

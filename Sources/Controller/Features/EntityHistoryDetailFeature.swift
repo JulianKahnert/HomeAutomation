@@ -350,8 +350,6 @@ struct EntityHistoryDetailView: View {
             }
             Spacer()
             Text(item.valueDescription)
-                .font(.body)
-                .bold()
         }
     }
 }

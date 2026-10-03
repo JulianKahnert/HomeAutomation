@@ -276,7 +276,6 @@ struct AppView: View {
                 )
             }
         }
-        .tabViewStyle(.sidebarAdaptable)
         .onSceneChange { oldPhase, newPhase in
             store.send(.scenePhaseChanged(old: oldPhase, new: newPhase))
         }

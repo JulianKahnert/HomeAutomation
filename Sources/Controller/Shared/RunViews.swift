@@ -58,6 +58,8 @@ struct RunRow: View {
             Spacer()
             StatusLabel(outcome: run.outcome)
         }
+        // Without this the separator starts at the status label, the row's last text.
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }
 
@@ -68,7 +70,6 @@ struct ActionRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.detailDescription)
-                    .font(.body.monospaced())
                 Text("\(item.entityId.name) (\(item.entityId.placeId))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -81,5 +82,6 @@ struct ActionRow: View {
                 StatusLabel(status: status)
             }
         }
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }

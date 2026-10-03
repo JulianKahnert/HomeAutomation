@@ -167,7 +167,9 @@ struct OverviewView: View {
                     Section("Open Windows") {
                         ForEach(openWindows, id: \.name) { window in
                             ProgressView(timerInterval: window.opened...window.end, countsDown: false) {
-                                Text(window.name)
+                                LabeledContent(window.name, value: "Limit \(Int(window.maxOpenDuration / 60)) min")
+                            } currentValueLabel: {
+                                Text("Open for \(Text(window.opened, style: .relative))")
                             }
                             .tint(Date() <= window.end ? Color.accentColor : Color.red)
                         }

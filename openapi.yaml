@@ -321,6 +321,13 @@ paths:
             minimum: 1
             maximum: 1000
             default: 100
+        - name: includePrevious
+          in: query
+          description: Append the last state before startDate as the oldest item (only on the last page)
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: A success response with entity history data.
@@ -330,6 +337,49 @@ paths:
                 $ref: "#/components/schemas/EntityHistoryResponse"
         "400":
           description: Bad request - invalid parameters.
+
+  /entities/history/room:
+    get:
+      summary: Get the history of a room
+      description: Retrieve the history of all entities in one place, at most 1000 items per entity, newest first.
+      operationId: getRoomHistory
+      parameters:
+        - name: placeId
+          in: query
+          description: The place identifier of the room
+          required: true
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          description: ISO 8601 timestamp for the start of the time range (inclusive)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          description: ISO 8601 timestamp for the end of the time range (exclusive)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: includePrevious
+          in: query
+          description: Append the last state before startDate as the oldest item of each entity
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: The history of every entity in the room.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EntityHistory"
 
 components:
   schemas:
@@ -522,6 +572,19 @@ components:
       required:
         - placeId
         - name
+
+    EntityHistory:
+      type: object
+      properties:
+        entityId:
+          $ref: "#/components/schemas/EntityId"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityHistoryItem"
+      required:
+        - entityId
+        - items
 
     EntityHistoryItem:
       type: object

@@ -257,39 +257,15 @@ struct OpenAPIController: APIProtocol {
         let cursor = input.query.cursor
         let limit = input.query.limit ?? 100
 
-        // Query history from repository
         let historyItems = try await request.application.entityStorageDbRepository.getHistory(
             for: entityId,
             startDate: startDate,
             endDate: endDate,
             cursor: cursor,
-            limit: limit
+            limit: limit,
+            includePrevious: input.query.includePrevious ?? false
         )
-
-        // Map to OpenAPI schema types
-        let schemaItems = historyItems.map { item in
-            Components.Schemas.EntityHistoryItem(
-                timestamp: item.timestamp,
-                motionDetected: item.motionDetected,
-                illuminanceInLux: item.illuminance?.value,
-                isDeviceOn: item.isDeviceOn,
-                brightness: item.brightness,
-                colorTemperature: item.colorTemperature,
-                colorRed: item.color?.red,
-                colorGreen: item.color?.green,
-                colorBlue: item.color?.blue,
-                isContactOpen: item.isContactOpen,
-                isDoorLocked: item.isDoorLocked,
-                stateOfCharge: item.stateOfCharge,
-                isHeaterActive: item.isHeaterActive,
-                temperatureInC: item.temperatureInC?.value,
-                relativeHumidity: item.relativeHumidity,
-                carbonDioxideSensorId: item.carbonDioxideSensorId,
-                pmDensity: item.pmDensity,
-                airQuality: item.airQuality,
-                valveOpen: item.valveOpen
-            )
-        }
+        let schemaItems = historyItems.map(Components.Schemas.EntityHistoryItem.init)
 
         // Calculate next cursor (timestamp of last item, or nil if no more data)
         let nextCursor = schemaItems.last?.timestamp
@@ -300,6 +276,18 @@ struct OpenAPIController: APIProtocol {
         )
 
         return .ok(.init(body: .json(response)))
+    }
+
+    func getRoomHistory(_ input: Operations.GetRoomHistory.Input) async throws -> Operations.GetRoomHistory.Output {
+        let histories = try await request.application.entityStorageDbRepository.getRoomHistory(placeId: input.query.placeId,
+                                                                                               startDate: input.query.startDate,
+                                                                                               endDate: input.query.endDate,
+                                                                                               includePrevious: input.query.includePrevious ?? false)
+        let body = histories.map { history in
+            Components.Schemas.EntityHistory(entityId: .init(history.entityId),
+                                             items: history.items.map(Components.Schemas.EntityHistoryItem.init))
+        }
+        return .ok(.init(body: .json(body)))
     }
 
 }
@@ -324,5 +312,29 @@ extension Components.Schemas.AutomationRun {
                                  summary: run.trigger.summary),
                   outcome: .init(rawValue: run.outcome.rawValue) ?? .failed,
                   errorDescription: run.errorDescription)
+    }
+}
+
+extension Components.Schemas.EntityHistoryItem {
+    init(_ item: EntityStorageItem) {
+        self.init(timestamp: item.timestamp,
+                  motionDetected: item.motionDetected,
+                  illuminanceInLux: item.illuminance?.value,
+                  isDeviceOn: item.isDeviceOn,
+                  brightness: item.brightness,
+                  colorTemperature: item.colorTemperature,
+                  colorRed: item.color?.red,
+                  colorGreen: item.color?.green,
+                  colorBlue: item.color?.blue,
+                  isContactOpen: item.isContactOpen,
+                  isDoorLocked: item.isDoorLocked,
+                  stateOfCharge: item.stateOfCharge,
+                  isHeaterActive: item.isHeaterActive,
+                  temperatureInC: item.temperatureInC?.value,
+                  relativeHumidity: item.relativeHumidity,
+                  carbonDioxideSensorId: item.carbonDioxideSensorId,
+                  pmDensity: item.pmDensity,
+                  airQuality: item.airQuality,
+                  valveOpen: item.valveOpen)
     }
 }

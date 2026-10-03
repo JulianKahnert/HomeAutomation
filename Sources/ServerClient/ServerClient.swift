@@ -143,7 +143,8 @@ public struct ServerClient {
         startDate: Date? = nil,
         endDate: Date? = nil,
         cursor: Date? = nil,
-        limit: Int = 100
+        limit: Int = 100,
+        includePrevious: Bool = false
     ) async throws -> EntityHistoryResponse {
         let query = Operations.GetEntityHistory.Input.Query(
             placeId: entityId.placeId,
@@ -153,40 +154,29 @@ public struct ServerClient {
             startDate: startDate,
             endDate: endDate,
             cursor: cursor,
-            limit: limit
+            limit: limit,
+            includePrevious: includePrevious
         )
 
         let response = try await client.getEntityHistory(query: query)
         let historyResponse = try response.ok.body.json
 
-        let items = historyResponse.items.compactMap { item -> EntityHistoryItem? in
-            EntityHistoryItem(
-                timestamp: item.timestamp,
-                motionDetected: item.motionDetected,
-                illuminanceInLux: item.illuminanceInLux,
-                isDeviceOn: item.isDeviceOn,
-                brightness: item.brightness,
-                colorTemperature: item.colorTemperature,
-                colorRed: item.colorRed,
-                colorGreen: item.colorGreen,
-                colorBlue: item.colorBlue,
-                isContactOpen: item.isContactOpen,
-                isDoorLocked: item.isDoorLocked,
-                stateOfCharge: item.stateOfCharge,
-                isHeaterActive: item.isHeaterActive,
-                temperatureInC: item.temperatureInC,
-                relativeHumidity: item.relativeHumidity,
-                carbonDioxideSensorId: item.carbonDioxideSensorId,
-                pmDensity: item.pmDensity,
-                airQuality: item.airQuality,
-                valveOpen: item.valveOpen
-            )
-        }
-
         return EntityHistoryResponse(
-            items: items,
+            items: historyResponse.items.map(EntityHistoryItem.init),
             nextCursor: historyResponse.nextCursor
         )
+    }
+
+    /// History of every entity in `placeId`, newest first; entities of unknown characteristic types are skipped.
+    public func getRoomHistory(placeId: String, startDate: Date? = nil, endDate: Date? = nil, includePrevious: Bool = false) async throws -> [EntityHistory] {
+        let response = try await client.getRoomHistory(query: .init(placeId: placeId,
+                                                                    startDate: startDate,
+                                                                    endDate: endDate,
+                                                                    includePrevious: includePrevious))
+        return try response.ok.body.json.compactMap { history in
+            guard let entityId = EntityId(history.entityId) else { return nil }
+            return EntityHistory(entityId: entityId, items: history.items.map(EntityHistoryItem.init))
+        }
     }
 }
 
@@ -230,5 +220,29 @@ extension AutomationRun {
                   trigger: AutomationTrigger(kind: kind, entityId: run.trigger.entityId.flatMap(EntityId.init), summary: run.trigger.summary),
                   outcome: outcome,
                   errorDescription: run.errorDescription)
+    }
+}
+
+extension EntityHistoryItem {
+    init(_ item: Components.Schemas.EntityHistoryItem) {
+        self.init(timestamp: item.timestamp,
+                  motionDetected: item.motionDetected,
+                  illuminanceInLux: item.illuminanceInLux,
+                  isDeviceOn: item.isDeviceOn,
+                  brightness: item.brightness,
+                  colorTemperature: item.colorTemperature,
+                  colorRed: item.colorRed,
+                  colorGreen: item.colorGreen,
+                  colorBlue: item.colorBlue,
+                  isContactOpen: item.isContactOpen,
+                  isDoorLocked: item.isDoorLocked,
+                  stateOfCharge: item.stateOfCharge,
+                  isHeaterActive: item.isHeaterActive,
+                  temperatureInC: item.temperatureInC,
+                  relativeHumidity: item.relativeHumidity,
+                  carbonDioxideSensorId: item.carbonDioxideSensorId,
+                  pmDensity: item.pmDensity,
+                  airQuality: item.airQuality,
+                  valveOpen: item.valveOpen)
     }
 }

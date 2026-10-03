@@ -154,6 +154,18 @@ extension EntityHistoryItem {
     }
 }
 
+/// The history of one entity, as returned per entity of a room.
+public struct EntityHistory: Sendable, Equatable {
+    public let entityId: EntityId
+    /// Newest first.
+    public let items: [EntityHistoryItem]
+
+    public init(entityId: EntityId, items: [EntityHistoryItem]) {
+        self.entityId = entityId
+        self.items = items
+    }
+}
+
 /// Response wrapper for paginated entity history
 public struct EntityHistoryResponse: Sendable, Codable, Equatable {
     public let items: [EntityHistoryItem]

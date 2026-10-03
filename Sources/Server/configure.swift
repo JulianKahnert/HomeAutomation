@@ -112,6 +112,8 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateEntityStorageDbItem())
     app.migrations.add(DeviceTokenItem())
     app.migrations.add(AddSensorFields())
+    app.migrations.add(CreateConfigItem())
+    app.migrations.add(CreateAutomationRun())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -208,7 +210,7 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - home automation setup
 
-    app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
+    app.homeAutomationConfigService = await HomeAutomationConfigService.load(from: app.db)
     let notificationSender = PushNotifcationService(database: app.db,
                                                     apnsClient: apnsClient,
                                                     notificationTopic: notificationTopic)
@@ -225,7 +227,10 @@ public func configure(_ app: Application) async throws {
                                         location: app.homeAutomationConfigService.location,
                                         actionLogManager: actionLogManager)
     app.homeManager = homeManager
+    // Runs still marked `running` belong to a previous server process that died mid-run.
+    try await app.automationRunRepository.markRunningAsInterrupted()
     let automationService = try AutomationService(using: homeManager,
+                                                  runs: app.automationRunRepository,
                                                   getAutomations: {
         await app.homeAutomationConfigService.automations
     })
@@ -240,7 +245,7 @@ public func configure(_ app: Application) async throws {
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
-        DatabaseCleanupJob(homeManager: app.homeManager)
+        DatabaseCleanupJob(homeManager: app.homeManager, automationRuns: app.automationRunRepository)
     ]
 
     Task.detached {

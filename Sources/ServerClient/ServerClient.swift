@@ -11,6 +11,8 @@ import OpenAPIURLSession
 
 public struct ServerClient {
     private let client: Client
+    private let url: URL
+    private let session: URLSession
 
     public init(url: URL, authToken: String? = nil) {
         // Create URLSession with authentication header if token is provided
@@ -25,6 +27,8 @@ public struct ServerClient {
             session = URLSession.shared
         }
 
+        self.url = url
+        self.session = session
         self.client = Client(
             serverURL: url,
             transport: URLSessionTransport(configuration: .init(session: session))
@@ -35,10 +39,41 @@ public struct ServerClient {
         let response = try await client.getAutomations()
         return try response.ok.body.json
             .map { automation in
-                AutomationInfo(name: automation.name,
-                               isActive: automation.isActive,
-                               isRunning: automation.isRunning)
+                try AutomationInfo(name: automation.name,
+                                   isActive: automation.isActive,
+                                   isRunning: automation.isRunning,
+                                   type: automation._type,
+                                   recordsRuns: automation.recordsRuns ?? true,
+                                   lastRun: automation.lastRun.map(AutomationRun.init),
+                                   entities: (automation.entities ?? []).compactMap(EntityId.init))
             }
+    }
+
+    /// `true` when the server and its adapter connection are up. `GET /health` is not part of the
+    /// OpenAPI spec because the Docker healthcheck owns it, so this calls it directly.
+    public func isHealthy() async throws -> Bool {
+        let (_, response) = try await session.data(from: url.appending(path: "health"))
+        return (response as? HTTPURLResponse)?.statusCode == 200
+    }
+
+    /// The server's location from `GET /config`, which is not part of the OpenAPI spec because its
+    /// automations are polymorphic JSON; only `location` is decoded.
+    public func getLocation() async throws -> Location {
+        struct Config: Decodable { let location: Location }
+        let (data, response) = try await session.data(from: url.appending(path: "config"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return try JSONDecoder().decode(Config.self, from: data).location
+    }
+
+    public func getRuns(automation name: String, startDate: Date? = nil, endDate: Date? = nil, limit: Int? = nil) async throws -> [AutomationRun] {
+        let response = try await client.getAutomationRuns(path: .init(name: name),
+                                                          query: .init(startDate: startDate, endDate: endDate, limit: limit))
+        return try response.ok.body.json.map(AutomationRun.init)
+    }
+
+    public func getRecentRuns(since date: Date, limit: Int? = nil) async throws -> [AutomationRun] {
+        let response = try await client.getRecentRuns(query: .init(since: date, limit: limit))
+        return try response.ok.body.json.map(AutomationRun.init)
     }
 
     public func activate(automation name: String) async throws {
@@ -77,8 +112,8 @@ public struct ServerClient {
             }
     }
 
-    public func getActions(limit: Int? = nil) async throws -> [ActionLogItem] {
-        let response = try await client.getActions(query: .init(limit: limit))
+    public func getActions(limit: Int? = nil, runId: UUID? = nil) async throws -> [ActionLogItem] {
+        let response = try await client.getActions(query: .init(limit: limit, runId: runId?.uuidString))
         return try response.ok.body.json.compactMap { item -> ActionLogItem? in
             guard let id = UUID(uuidString: item.id),
                   let characteristic = CharacteristicsType(rawValue: item.entityId.characteristicType) else {
@@ -95,7 +130,9 @@ public struct ServerClient {
                                  entityId: entityId,
                                  actionName: item.actionName,
                                  detailDescription: item.detailDescription,
-                                 hasCacheHit: item.hasCacheHit)
+                                 hasCacheHit: item.hasCacheHit,
+                                 runId: item.runId.flatMap(UUID.init(uuidString:)),
+                                 status: item.status.flatMap { ActionLogItem.Status(rawValue: $0.rawValue) })
         }
     }
 
@@ -126,7 +163,8 @@ public struct ServerClient {
         startDate: Date? = nil,
         endDate: Date? = nil,
         cursor: Date? = nil,
-        limit: Int = 100
+        limit: Int = 100,
+        includePrevious: Bool = false
     ) async throws -> EntityHistoryResponse {
         let query = Operations.GetEntityHistory.Input.Query(
             placeId: entityId.placeId,
@@ -136,40 +174,29 @@ public struct ServerClient {
             startDate: startDate,
             endDate: endDate,
             cursor: cursor,
-            limit: limit
+            limit: limit,
+            includePrevious: includePrevious
         )
 
         let response = try await client.getEntityHistory(query: query)
         let historyResponse = try response.ok.body.json
 
-        let items = historyResponse.items.compactMap { item -> EntityHistoryItem? in
-            EntityHistoryItem(
-                timestamp: item.timestamp,
-                motionDetected: item.motionDetected,
-                illuminanceInLux: item.illuminanceInLux,
-                isDeviceOn: item.isDeviceOn,
-                brightness: item.brightness,
-                colorTemperature: item.colorTemperature,
-                colorRed: item.colorRed,
-                colorGreen: item.colorGreen,
-                colorBlue: item.colorBlue,
-                isContactOpen: item.isContactOpen,
-                isDoorLocked: item.isDoorLocked,
-                stateOfCharge: item.stateOfCharge,
-                isHeaterActive: item.isHeaterActive,
-                temperatureInC: item.temperatureInC,
-                relativeHumidity: item.relativeHumidity,
-                carbonDioxideSensorId: item.carbonDioxideSensorId,
-                pmDensity: item.pmDensity,
-                airQuality: item.airQuality,
-                valveOpen: item.valveOpen
-            )
-        }
-
         return EntityHistoryResponse(
-            items: items,
+            items: historyResponse.items.map(EntityHistoryItem.init),
             nextCursor: historyResponse.nextCursor
         )
+    }
+
+    /// History of every entity in `placeId`, newest first; entities of unknown characteristic types are skipped.
+    public func getRoomHistory(placeId: String, startDate: Date? = nil, endDate: Date? = nil, includePrevious: Bool = false) async throws -> [EntityHistory] {
+        let response = try await client.getRoomHistory(query: .init(placeId: placeId,
+                                                                    startDate: startDate,
+                                                                    endDate: endDate,
+                                                                    includePrevious: includePrevious))
+        return try response.ok.body.json.compactMap { history in
+            guard let entityId = EntityId(history.entityId) else { return nil }
+            return EntityHistory(entityId: entityId, items: history.items.map(EntityHistoryItem.init))
+        }
     }
 }
 
@@ -183,5 +210,59 @@ extension Components.Schemas.PushDevice.TokenTypePayload {
         case .liveActivityUpdate:
             return .liveActivityUpdate
         }
+    }
+}
+
+struct InvalidResponseError: Error {
+    let reason: String
+}
+
+extension EntityId {
+    /// `nil` for a characteristic type this client does not know yet.
+    init?(_ entityId: Components.Schemas.EntityId) {
+        guard let characteristic = CharacteristicsType(rawValue: entityId.characteristicType) else { return nil }
+        let characteristicsName = entityId.characteristicsName?.isEmpty == false ? entityId.characteristicsName : nil
+        self.init(placeId: entityId.placeId, name: entityId.name, characteristicsName: characteristicsName, characteristic: characteristic)
+    }
+}
+
+extension AutomationRun {
+    init(_ run: Components.Schemas.AutomationRun) throws {
+        guard let id = UUID(uuidString: run.id),
+              let kind = AutomationTrigger.Kind(rawValue: run.trigger.kind.rawValue),
+              let outcome = Outcome(rawValue: run.outcome.rawValue) else {
+            throw InvalidResponseError(reason: "Invalid automation run \(run.id)")
+        }
+        self.init(id: id,
+                  automationName: run.automationName,
+                  startedAt: run.startedAt,
+                  endedAt: run.endedAt,
+                  trigger: AutomationTrigger(kind: kind, entityId: run.trigger.entityId.flatMap(EntityId.init), summary: run.trigger.summary),
+                  outcome: outcome,
+                  errorDescription: run.errorDescription)
+    }
+}
+
+extension EntityHistoryItem {
+    init(_ item: Components.Schemas.EntityHistoryItem) {
+        self.init(timestamp: item.timestamp,
+                  motionDetected: item.motionDetected,
+                  illuminanceInLux: item.illuminanceInLux,
+                  isDeviceOn: item.isDeviceOn,
+                  brightness: item.brightness,
+                  colorTemperature: item.colorTemperature,
+                  colorRed: item.colorRed,
+                  colorGreen: item.colorGreen,
+                  colorBlue: item.colorBlue,
+                  isContactOpen: item.isContactOpen,
+                  isDoorLocked: item.isDoorLocked,
+                  stateOfCharge: item.stateOfCharge,
+                  isHeaterActive: item.isHeaterActive,
+                  temperatureInC: item.temperatureInC,
+                  relativeHumidity: item.relativeHumidity,
+                  carbonDioxideSensorId: item.carbonDioxideSensorId,
+                  pmDensity: item.pmDensity,
+                  airQuality: item.airQuality,
+                  valveOpen: item.valveOpen)
     }
 }

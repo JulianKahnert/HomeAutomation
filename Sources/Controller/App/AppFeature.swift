@@ -24,10 +24,10 @@ struct AppFeature: Sendable {
 
     @ObservableState
     struct State: Equatable, Sendable {
-        var selectedTab: Tab = .automations
+        var selectedTab: Tab = .overview
+        var overview = OverviewFeature.State()
         var automations = AutomationsFeature.State()
-        var actions = ActionsFeature.State()
-        var history = HistoryFeature.State()
+        var rooms = RoomsFeature.State()
         var settings = SettingsFeature.State()
 
         var openWindowsCount: Int? {
@@ -38,25 +38,25 @@ struct AppFeature: Sendable {
     // MARK: - Tab
 
     enum Tab: Sendable, Equatable, CaseIterable {
+        case overview
         case automations
-        case actions
-        case history
+        case rooms
         case settings
 
         var title: String {
             switch self {
+            case .overview: return "Overview"
             case .automations: return "Automations"
-            case .actions: return "Actions"
-            case .history: return "History"
+            case .rooms: return "Rooms"
             case .settings: return "Settings"
             }
         }
 
         var systemImage: String {
             switch self {
+            case .overview: return "house"
             case .automations: return "lamp.floor"
-            case .actions: return "list.bullet.clipboard"
-            case .history: return "chart.line.uptrend.xyaxis"
+            case .rooms: return "square.grid.2x2"
             case .settings: return "gear"
             }
         }
@@ -66,9 +66,9 @@ struct AppFeature: Sendable {
 
     enum Action: Sendable, BindableAction {
         case selectedTabChanged(Tab)
+        case overview(OverviewFeature.Action)
         case automations(AutomationsFeature.Action)
-        case actions(ActionsFeature.Action)
-        case history(HistoryFeature.Action)
+        case rooms(RoomsFeature.Action)
         case settings(SettingsFeature.Action)
 
         // Live Activities & Push Notifications
@@ -82,6 +82,7 @@ struct AppFeature: Sendable {
 
         // Scene phase changes
         case scenePhaseChanged(old: ScenePhase, new: ScenePhase)
+        case refreshAll
 
         case binding(BindingAction<State>)
     }
@@ -97,19 +98,19 @@ struct AppFeature: Sendable {
     var body: some ReducerOf<Self> {
         BindingReducer()
 
-        Scope(state: \.automations, action: \.automations) {
+        Scope(\.overview, action: \.overview) {
+            OverviewFeature()
+        }
+
+        Scope(\.automations, action: \.automations) {
             AutomationsFeature()
         }
 
-        Scope(state: \.actions, action: \.actions) {
-            ActionsFeature()
+        Scope(\.rooms, action: \.rooms) {
+            RoomsFeature()
         }
 
-        Scope(state: \.history, action: \.history) {
-            HistoryFeature()
-        }
-
-        Scope(state: \.settings, action: \.settings) {
+        Scope(\.settings, action: \.settings) {
             SettingsFeature()
         }
 
@@ -119,13 +120,17 @@ struct AppFeature: Sendable {
                 state.selectedTab = tab
                 return .none
 
+            case let .overview(.delegate(.openAutomation(name))):
+                state.selectedTab = .automations
+                return .send(.automations(.openAutomation(name)))
+
+            case .overview:
+                return .none
+
             case .automations:
                 return .none
 
-            case .actions:
-                return .none
-
-            case .history:
+            case .rooms:
                 return .none
 
             case .settings:
@@ -201,11 +206,13 @@ struct AppFeature: Sendable {
                     return .none
                 }
 
-                // Refresh all tabs and start monitoring when app becomes active
+                return .send(.refreshAll)
+
+            case .refreshAll:
                 return .merge(
+                    .send(.overview(.refresh)),
                     .send(.automations(.refresh)),
-                    .send(.actions(.refresh)),
-                    .send(.history(.refresh)),
+                    .send(.rooms(.refresh)),
                     .send(.refreshWindowStates),
                     .send(.startMonitoringLiveActivities),
                     .send(.clearDeliveredNotifications)
@@ -224,42 +231,33 @@ struct AppView: View {
     var body: some View {
         TabView(selection: $store.selectedTab) {
             Tab(
+                AppFeature.Tab.overview.title,
+                systemImage: AppFeature.Tab.overview.systemImage,
+                value: AppFeature.Tab.overview
+            ) {
+                OverviewView(
+                    store: store.scope(\.overview, action: \.overview),
+                    openWindows: store.settings.windowContentState?.windowStates ?? []
+                )
+            }
+            .badge(store.openWindowsCount ?? 0)
+
+            Tab(
                 AppFeature.Tab.automations.title,
                 systemImage: AppFeature.Tab.automations.systemImage,
                 value: AppFeature.Tab.automations
             ) {
                 AutomationsView(
-                    store: store.scope(
-                        state: \.automations,
-                        action: \.automations
-                    )
+                    store: store.scope(\.automations, action: \.automations)
                 )
             }
 
             Tab(
-                AppFeature.Tab.actions.title,
-                systemImage: AppFeature.Tab.actions.systemImage,
-                value: AppFeature.Tab.actions
+                AppFeature.Tab.rooms.title,
+                systemImage: AppFeature.Tab.rooms.systemImage,
+                value: AppFeature.Tab.rooms
             ) {
-                ActionsView(
-                    store: store.scope(
-                        state: \.actions,
-                        action: \.actions
-                    )
-                )
-            }
-
-            Tab(
-                AppFeature.Tab.history.title,
-                systemImage: AppFeature.Tab.history.systemImage,
-                value: AppFeature.Tab.history
-            ) {
-                HistoryView(
-                    store: store.scope(
-                        state: \.history,
-                        action: \.history
-                    )
-                )
+                RoomsView(store: store.scope(\.rooms, action: \.rooms))
             }
 
             Tab(
@@ -268,15 +266,10 @@ struct AppView: View {
                 value: AppFeature.Tab.settings
             ) {
                 SettingsView(
-                    store: store.scope(
-                        state: \.settings,
-                        action: \.settings
-                    )
+                    store: store.scope(\.settings, action: \.settings)
                 )
             }
-            .badge(store.openWindowsCount ?? 0)
         }
-        .tabViewStyle(.sidebarAdaptable)
         .onSceneChange { oldPhase, newPhase in
             store.send(.scenePhaseChanged(old: oldPhase, new: newPhase))
         }

@@ -45,7 +45,7 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
         }
 
         if let endDate {
-            filtered = filtered.filter { $0.timestamp <= endDate }
+            filtered = filtered.filter { $0.timestamp < endDate }
         }
 
         if let cursor {

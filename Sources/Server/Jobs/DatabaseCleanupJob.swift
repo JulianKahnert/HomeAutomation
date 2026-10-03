@@ -13,9 +13,11 @@ import Shared
 
 struct DatabaseCleanupJob: Job, Log {
     private static let retentionDays = 90
+    private static let runRetentionDays = 30
     private static let cleanupInterval: Duration = .hours(24) // Run once per day
 
     let homeManager: any HomeManagable
+    let automationRuns: any AutomationRunRepository
 
     func run() async {
         log.info("Starting DatabaseCleanupJob - will run every 24 hours")
@@ -35,6 +37,7 @@ struct DatabaseCleanupJob: Job, Log {
             log.info("Running database cleanup - deleting entries older than \(Self.retentionDays) days (before \(cutoffDate))")
 
             try await homeManager.deleteStorageEntries(olderThan: cutoffDate)
+            try await automationRuns.deleteRuns(olderThan: Date().addingTimeInterval(-1 * Duration.days(Self.runRetentionDays).timeInterval))
 
             log.info("Database cleanup completed successfully")
         } catch {

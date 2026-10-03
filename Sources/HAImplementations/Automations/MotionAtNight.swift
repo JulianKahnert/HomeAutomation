@@ -9,9 +9,6 @@ import Foundation
 import HAModels
 
 public struct MotionAtNight: Automatable {
-    // threshold under which the automation should be triggered
-    private static let thresholdInLux = 60.0
-
     public var isActive = true
     public let name: String
     /// Time to wait after last motion detection before starting the dim/off sequence
@@ -75,9 +72,19 @@ public struct MotionAtNight: Automatable {
         }
         guard let illuminance else { return false }
 
-        let shouldTrigger = motionDetected && illuminance.converted(to: .lux).value < Self.thresholdInLux
+        let shouldTrigger = motionDetected && illuminance.converted(to: .lux).value < MotionAtNightConstants.thresholdInLux
         log.debug("Should trigger [\(shouldTrigger)] - [motion: \(motionDetected), \(illuminance)]")
         return shouldTrigger
+    }
+
+    public func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String? {
+        do {
+            let illuminance = try await lightSensor.illuminanceState(with: hm)
+            return "at \(Int(illuminance.converted(to: .lux).value.rounded())) lx"
+        } catch {
+            log.warning("Failed to get illuminance for the trigger summary - \(error)")
+            return nil
+        }
     }
 
     /// Window contacts only matter after dark — a lit room with an open window draws insects,

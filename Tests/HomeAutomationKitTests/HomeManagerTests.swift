@@ -140,7 +140,7 @@ struct HomeManagerTests {
         await run.value
 
         #expect(await probe.startedPerforms == 0)
-        #expect(await homeManager.getActionLog(limit: nil).isEmpty)
+        #expect(await homeManager.getActionLog(limit: nil, runId: nil).isEmpty)
     }
 
     @Test("Cancelling a run does not abort a command that already started")
@@ -179,6 +179,27 @@ struct HomeManagerTests {
 
         try? await Task.sleep(for: .milliseconds(200))
         #expect(await probe.startedPerforms == 3)
+    }
+
+    @Test("Retries keep the run id, and every failed attempt is logged as failed")
+    func retryKeepsRunIdAndLogsFailure() async {
+        let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
+        let probe = AdapterProbe(failure: .unreachable)
+        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks)
+        let runId = UUID()
+
+        await AutomationRunContext.$runId.withValue(runId) {
+            await homeManager.perform(.turnOn(switchId))
+        }
+        for _ in 0..<2 {
+            tickContinuation.yield(())
+        }
+        await probe.waitForPerforms(3)
+        try? await Task.sleep(for: .milliseconds(200))
+
+        let log = await homeManager.getActionLog(limit: nil, runId: runId)
+        #expect(log.count == 3)
+        #expect(log.allSatisfy { $0.status == .failed })
     }
 
     @Test("Failed commands for different characteristics of one device are retried independently")

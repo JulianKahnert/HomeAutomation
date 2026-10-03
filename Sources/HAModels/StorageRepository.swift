@@ -34,3 +34,27 @@ public protocol StorageRepository: Sendable {
     /// - Returns: Array of unique EntityIds
     func getAllEntityIds() async throws -> [EntityId]
 }
+
+extension StorageRepository {
+    /// Like `getHistory`, but with `includePrevious` the last state before `startDate` is appended as
+    /// the oldest item, so a state that began before the window is not lost. Only on the last page.
+    public func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int, includePrevious: Bool) async throws -> [EntityStorageItem] {
+        var items = try await getHistory(for: entityId, startDate: startDate, endDate: endDate, cursor: cursor, limit: limit)
+        guard includePrevious, let startDate, items.count < limit,
+              let previous = try await getHistory(for: entityId, startDate: nil, endDate: startDate, cursor: nil, limit: 1).first else {
+            return items
+        }
+        items.append(previous)
+        return items
+    }
+
+    /// History of every entity in `placeId`, at most 1000 items each, newest first.
+    public func getRoomHistory(placeId: String, startDate: Date?, endDate: Date?, includePrevious: Bool) async throws -> [(entityId: EntityId, items: [EntityStorageItem])] {
+        var result: [(entityId: EntityId, items: [EntityStorageItem])] = []
+        for entityId in try await getAllEntityIds() where entityId.placeId == placeId {
+            let items = try await getHistory(for: entityId, startDate: startDate, endDate: endDate, cursor: nil, limit: 1000, includePrevious: includePrevious)
+            result.append((entityId, items))
+        }
+        return result
+    }
+}

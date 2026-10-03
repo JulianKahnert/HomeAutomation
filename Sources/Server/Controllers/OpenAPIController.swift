@@ -18,13 +18,32 @@ struct OpenAPIController: APIProtocol {
 
     func getAutomations(_ input: Operations.GetAutomations.Input) async throws -> Operations.GetAutomations.Output {
         let automationNames = await request.application.automationService.getActiveAutomationNames()
+        let lastRuns = try await request.application.automationRunRepository.latestRunPerAutomation()
         let automations = await request.application.homeAutomationConfigService.automations
             .map { tmp in
                 Components.Schemas.Automation(name: tmp.name,
                                               isActive: tmp.isActive,
-                                              isRunning: automationNames.contains(tmp.name))
+                                              isRunning: automationNames.contains(tmp.name),
+                                              _type: String(describing: type(of: tmp)),
+                                              recordsRuns: tmp.recordsRuns,
+                                              lastRun: lastRuns[tmp.name].map(Components.Schemas.AutomationRun.init),
+                                              entities: tmp.involvedEntityIds.map(Components.Schemas.EntityId.init))
             }
         return .ok(.init(body: .json(automations)))
+    }
+
+    func getAutomationRuns(_ input: Operations.GetAutomationRuns.Input) async throws -> Operations.GetAutomationRuns.Output {
+        let runs = try await request.application.automationRunRepository.runs(for: input.path.name,
+                                                                              startDate: input.query.startDate,
+                                                                              endDate: input.query.endDate,
+                                                                              limit: input.query.limit ?? 100)
+        return .ok(.init(body: .json(runs.map(Components.Schemas.AutomationRun.init))))
+    }
+
+    func getRecentRuns(_ input: Operations.GetRecentRuns.Input) async throws -> Operations.GetRecentRuns.Output {
+        let runs = try await request.application.automationRunRepository.latestRuns(since: input.query.since,
+                                                                                    limit: input.query.limit ?? 100)
+        return .ok(.init(body: .json(runs.map(Components.Schemas.AutomationRun.init))))
     }
 
     func activateAutomation(_ input: Operations.ActivateAutomation.Input) async throws -> Operations.ActivateAutomation.Output {
@@ -33,7 +52,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: true)
+        try await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: true)
         return .ok
     }
 
@@ -43,7 +62,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: false)
+        try await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: false)
         return .ok
     }
 
@@ -131,23 +150,25 @@ struct OpenAPIController: APIProtocol {
     // MARK: - /actions
 
     func getActions(_ input: Operations.GetActions.Input) async throws -> Operations.GetActions.Output {
-        let limit = input.query.limit
+        var runId: UUID?
+        if let runIdString = input.query.runId {
+            guard let parsed = UUID(uuidString: runIdString) else {
+                throw Abort(.badRequest, reason: "Invalid runId: \(runIdString)")
+            }
+            runId = parsed
+        }
 
-        let actionItems = await request.application.homeManager.getActionLog(limit: limit)
+        let actionItems = await request.application.homeManager.getActionLog(limit: input.query.limit, runId: runId)
 
-        // Map to OpenAPI schema types
-        let schemaItems = actionItems.compactMap { item -> Components.Schemas.ActionLogItem? in
-            let entityId = Components.Schemas.EntityId(placeId: item.entityId.placeId,
-                                                       name: item.entityId.name,
-                                                       characteristicsName: item.entityId.characteristicsName ?? "",
-                                                       characteristicType: item.entityId.characteristicType.rawValue)
-
-            return Components.Schemas.ActionLogItem(id: item.id.uuidString,
-                                                    timestamp: item.timestamp,
-                                                    entityId: entityId,
-                                                    actionName: item.actionName,
-                                                    detailDescription: item.detailDescription,
-                                                    hasCacheHit: item.hasCacheHit)
+        let schemaItems = actionItems.map { item in
+            Components.Schemas.ActionLogItem(id: item.id.uuidString,
+                                             timestamp: item.timestamp,
+                                             entityId: .init(item.entityId),
+                                             actionName: item.actionName,
+                                             detailDescription: item.detailDescription,
+                                             hasCacheHit: item.hasCacheHit,
+                                             runId: item.runId?.uuidString,
+                                             status: item.status.flatMap { .init(rawValue: $0.rawValue) })
         }
 
         return .ok(.init(body: .json(schemaItems)))
@@ -236,39 +257,15 @@ struct OpenAPIController: APIProtocol {
         let cursor = input.query.cursor
         let limit = input.query.limit ?? 100
 
-        // Query history from repository
         let historyItems = try await request.application.entityStorageDbRepository.getHistory(
             for: entityId,
             startDate: startDate,
             endDate: endDate,
             cursor: cursor,
-            limit: limit
+            limit: limit,
+            includePrevious: input.query.includePrevious ?? false
         )
-
-        // Map to OpenAPI schema types
-        let schemaItems = historyItems.map { item in
-            Components.Schemas.EntityHistoryItem(
-                timestamp: item.timestamp,
-                motionDetected: item.motionDetected,
-                illuminanceInLux: item.illuminance?.value,
-                isDeviceOn: item.isDeviceOn,
-                brightness: item.brightness,
-                colorTemperature: item.colorTemperature,
-                colorRed: item.color?.red,
-                colorGreen: item.color?.green,
-                colorBlue: item.color?.blue,
-                isContactOpen: item.isContactOpen,
-                isDoorLocked: item.isDoorLocked,
-                stateOfCharge: item.stateOfCharge,
-                isHeaterActive: item.isHeaterActive,
-                temperatureInC: item.temperatureInC?.value,
-                relativeHumidity: item.relativeHumidity,
-                carbonDioxideSensorId: item.carbonDioxideSensorId,
-                pmDensity: item.pmDensity,
-                airQuality: item.airQuality,
-                valveOpen: item.valveOpen
-            )
-        }
+        let schemaItems = historyItems.map(Components.Schemas.EntityHistoryItem.init)
 
         // Calculate next cursor (timestamp of last item, or nil if no more data)
         let nextCursor = schemaItems.last?.timestamp
@@ -281,4 +278,63 @@ struct OpenAPIController: APIProtocol {
         return .ok(.init(body: .json(response)))
     }
 
+    func getRoomHistory(_ input: Operations.GetRoomHistory.Input) async throws -> Operations.GetRoomHistory.Output {
+        let histories = try await request.application.entityStorageDbRepository.getRoomHistory(placeId: input.query.placeId,
+                                                                                               startDate: input.query.startDate,
+                                                                                               endDate: input.query.endDate,
+                                                                                               includePrevious: input.query.includePrevious ?? false)
+        let body = histories.map { history in
+            Components.Schemas.EntityHistory(entityId: .init(history.entityId),
+                                             items: history.items.map(Components.Schemas.EntityHistoryItem.init))
+        }
+        return .ok(.init(body: .json(body)))
+    }
+
+}
+
+extension Components.Schemas.EntityId {
+    init(_ entityId: EntityId) {
+        self.init(placeId: entityId.placeId,
+                  name: entityId.name,
+                  characteristicsName: entityId.characteristicsName ?? "",
+                  characteristicType: entityId.characteristicType.rawValue)
+    }
+}
+
+extension Components.Schemas.AutomationRun {
+    init(_ run: AutomationRun) {
+        self.init(id: run.id.uuidString,
+                  automationName: run.automationName,
+                  startedAt: run.startedAt,
+                  endedAt: run.endedAt,
+                  trigger: .init(kind: .init(rawValue: run.trigger.kind.rawValue) ?? .entityChange,
+                                 entityId: run.trigger.entityId.map(Components.Schemas.EntityId.init),
+                                 summary: run.trigger.summary),
+                  outcome: .init(rawValue: run.outcome.rawValue) ?? .failed,
+                  errorDescription: run.errorDescription)
+    }
+}
+
+extension Components.Schemas.EntityHistoryItem {
+    init(_ item: EntityStorageItem) {
+        self.init(timestamp: item.timestamp,
+                  motionDetected: item.motionDetected,
+                  illuminanceInLux: item.illuminance?.value,
+                  isDeviceOn: item.isDeviceOn,
+                  brightness: item.brightness,
+                  colorTemperature: item.colorTemperature,
+                  colorRed: item.color?.red,
+                  colorGreen: item.color?.green,
+                  colorBlue: item.color?.blue,
+                  isContactOpen: item.isContactOpen,
+                  isDoorLocked: item.isDoorLocked,
+                  stateOfCharge: item.stateOfCharge,
+                  isHeaterActive: item.isHeaterActive,
+                  temperatureInC: item.temperatureInC?.value,
+                  relativeHumidity: item.relativeHumidity,
+                  carbonDioxideSensorId: item.carbonDioxideSensorId,
+                  pmDensity: item.pmDensity,
+                  airQuality: item.airQuality,
+                  valveOpen: item.valveOpen)
+    }
 }

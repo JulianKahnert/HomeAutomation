@@ -22,7 +22,6 @@ struct EntityHistoryDetailFeature: Sendable {
         var historyItems: [EntityHistoryItem] = []
         var isLoading = false
         var timeRange: TimeRange = .hour
-        var nextCursor: Date?
         @Presents var alert: AlertState<Action.Alert>?
 
         var chartData: [EntityHistoryItem] {
@@ -63,7 +62,6 @@ struct EntityHistoryDetailFeature: Sendable {
     enum Action: Sendable, BindableAction {
         case onAppear
         case refresh
-        case loadNextPage
         case historyResponse(Result<EntityHistoryResponse, Error>)
         case timeRangeChanged(TimeRange)
         case binding(BindingAction<State>)
@@ -77,6 +75,8 @@ struct EntityHistoryDetailFeature: Sendable {
     // MARK: - Dependencies
 
     @Dependency(\.serverClient) var serverClient
+
+    private enum CancelID { case history }
 
     // MARK: - Body
 
@@ -93,46 +93,30 @@ struct EntityHistoryDetailFeature: Sendable {
                 state.isLoading = true
                 state.alert = nil
                 state.historyItems = []
-                state.nextCursor = nil
 
                 let entityId = state.entity.entityId
                 let dateRange = state.dateRange
 
+                // All pages in one effect: it is cancelled as a whole when the screen is popped or
+                // the range changes, so no late page reaches a removed element or a new range.
                 return .run { send in
-                    await send(.historyResponse(
-                        Result {
-                            try await serverClient.getEntityHistory(
-                                entityId,
-                                dateRange.start,
-                                dateRange.end,
-                                nil,
-                                5000  // Higher limit for initial load
-                            )
-                        }
-                    ))
+                    var cursor: Date?
+                    repeat {
+                        let response = try await serverClient.getEntityHistory(
+                            entityId,
+                            dateRange.start,
+                            dateRange.end,
+                            cursor,
+                            1000,
+                            cursor == nil
+                        )
+                        await send(.historyResponse(.success(response)))
+                        cursor = response.nextCursor
+                    } while cursor != nil
+                } catch: { error, send in
+                    await send(.historyResponse(.failure(error)))
                 }
-
-            case .loadNextPage:
-                guard let cursor = state.nextCursor else {
-                    return .none
-                }
-
-                let entityId = state.entity.entityId
-                let dateRange = state.dateRange
-
-                return .run { send in
-                    await send(.historyResponse(
-                        Result {
-                            try await serverClient.getEntityHistory(
-                                entityId,
-                                dateRange.start,
-                                dateRange.end,
-                                cursor,
-                                1000
-                            )
-                        }
-                    ))
-                }
+                .cancellable(id: CancelID.history, cancelInFlight: true)
 
             case let .historyResponse(.success(response)):
                 state.isLoading = false
@@ -143,15 +127,6 @@ struct EntityHistoryDetailFeature: Sendable {
                 }
                 state.historyItems.append(contentsOf: newItems)
                 state.historyItems.sort { $0.timestamp > $1.timestamp }
-
-                state.nextCursor = response.nextCursor
-
-                // Automatically load next page if there's more data
-                if response.nextCursor != nil {
-                    return .run { send in
-                        await send(.loadNextPage)
-                    }
-                }
                 return .none
 
             case let .historyResponse(.failure(error)):
@@ -188,51 +163,42 @@ struct EntityHistoryDetailView: View {
     @Bindable var store: StoreOf<EntityHistoryDetailFeature>
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Time range picker
+        List {
+            Section {
                 Picker("Time Range", selection: $store.timeRange) {
                     ForEach(EntityHistoryDetailFeature.TimeRange.allCases, id: \.self) { range in
                         Text(range.displayName).tag(range)
                     }
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal)
                 .onChange(of: store.timeRange) { _, newValue in
                     store.send(.timeRangeChanged(newValue))
                 }
 
-                // Chart
                 if !store.chartData.isEmpty {
                     chartView
-                        .frame(height: 300)
-                        .padding(.horizontal)
                 } else if store.isLoading {
                     ProgressView()
-                        .frame(height: 300)
+                        .frame(maxWidth: .infinity)
                 } else {
-                    ContentUnavailableView(
-                        "No Data",
-                        systemImage: "chart.line.uptrend.xyaxis",
-                        description: Text("No history data available for this time range")
-                    )
-                    .frame(height: 300)
-                }
-
-                // History list
-                if !store.historyItems.isEmpty {
-                    VStack(spacing: 0) {
-                        ForEach(store.historyItems) { item in
-                            historyRow(item)
-                            Divider()
-                        }
-                    }
-                    .background(.secondary.opacity(0.1))
-                    .cornerRadius(8)
-                    .padding(.horizontal)
+                    Text("No history in this time range.")
+                        .foregroundStyle(.secondary)
                 }
             }
-            .padding(.vertical)
+
+            if store.timeRange == .week {
+                Section("Per Day") {
+                    dailyChart
+                }
+            }
+
+            if !store.historyItems.isEmpty {
+                Section("History") {
+                    ForEach(store.historyItems) { item in
+                        historyRow(item)
+                    }
+                }
+            }
         }
         .refreshable {
             store.send(.refresh)
@@ -240,68 +206,85 @@ struct EntityHistoryDetailView: View {
         .onAppear {
             store.send(.onAppear)
         }
-        .alert($store.scope(state: \.alert, action: \.alert))
+        .alert($store.scope(\.$alert, action: \.alert))
+    }
+
+    private var laneLabel: String {
+        switch store.entity.entityId.characteristicType {
+        case .contactSensor: "Open"
+        case .motionSensor: "Motion"
+        default: "On"
+        }
     }
 
     @ViewBuilder
     private var chartView: some View {
         let dateRange = store.state.dateRange
+        let range = dateRange.start...dateRange.end
+        let isBoolean = store.chartData.contains { $0.stateValue != nil }
+        let isLux = store.entity.entityId.characteristicType == .lightSensor
 
-        Chart {
-            ForEach(store.chartData) { item in
-                if let value = item.primaryValue {
-                    LineMark(
-                        x: .value("Time", item.timestamp),
-                        y: .value("Value", value)
-                    )
-                    .foregroundStyle(Color.accentColor)
-
-                    PointMark(
-                        x: .value("Time", item.timestamp),
-                        y: .value("Value", value)
-                    )
-                    .foregroundStyle(Color.accentColor)
-                }
-            }
-        }
-        .chartXScale(domain: dateRange.start...dateRange.end)
-        .chartXAxis {
-            AxisMarks(values: .automatic) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.hour().minute())
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading)
+        if isBoolean {
+            TimelineChart(
+                lanes: [.init(
+                    label: laneLabel,
+                    color: ChartPalette.color(for: store.entity.entityId.characteristicType),
+                    intervals: StateIntervals.intervals(items: store.chartData, isActive: \.stateValue, from: dateRange.start, to: dateRange.end)
+                )],
+                domain: range
+            )
+        } else {
+            ValueChart(
+                points: store.chartData.compactMap { item in item.primaryValue.map { (item.timestamp, $0) } },
+                domain: range,
+                color: ChartPalette.color(for: store.entity.entityId.characteristicType),
+                unit: store.entity.entityId.characteristicType == .lightSensor ? "lx" : "",
+                isLogarithmic: isLux,
+                height: 240
+            )
         }
     }
 
+    /// Per-day summaries of the 7-day range: on-duration for lamps, max and time-weighted mean for lux and CO₂.
     @ViewBuilder
-    private func historyRow(_ item: EntityHistoryItem) -> some View {
-        HStack {
-            // Color indicator (if color data available)
-            if let color = item.color {
-                Circle()
-                    .fill(color)
-                    .frame(width: 24, height: 24)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                    )
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.timestamp.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            Text(item.valueDescription)
-                .font(.body)
-                .bold()
+    private var dailyChart: some View {
+        let dateRange = store.state.dateRange
+        let type = store.entity.entityId.characteristicType
+        let days = DailyTotals.days(count: 7, endingAt: dateRange.end, calendar: .current)
+        if type == .switcher {
+            let intervals = StateIntervals.intervals(items: store.chartData, isActive: \.isDeviceOn, from: dateRange.start, to: dateRange.end)
+            DailyBarChart(
+                bars: DailyTotals.dailyTotals(intervals, days: days, calendar: .current).map { ($0.day, $0.duration / 3_600) },
+                color: ChartPalette.color(for: type),
+                unit: "h"
+            )
+        } else if type == .lightSensor || type == .carbonDioxideSensorId {
+            let samples = store.chartData.compactMap { item in item.primaryValue.map { (date: item.timestamp, value: $0) } }
+            let stats = DailyTotals.dailyStats(samples, days: days, end: dateRange.end, calendar: .current)
+            DailyBarChart(
+                bars: stats.map { ($0.day, $0.max) },
+                color: ChartPalette.color(for: type).opacity(0.6),
+                unit: type == .lightSensor ? "lx" : "ppm",
+                points: stats.map { ($0.day, $0.mean) },
+                barLabel: "Daily Max"
+            )
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
+    }
+
+    private func historyRow(_ item: EntityHistoryItem) -> some View {
+        LabeledContent {
+            Text(item.timestamp, format: .dateTime.day().month().hour().minute())
+        } label: {
+            HStack {
+                if let color = item.color {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 24, height: 24)
+                        .overlay(Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 1))
+                }
+                Text(item.valueDescription)
+            }
+        }
     }
 }
 

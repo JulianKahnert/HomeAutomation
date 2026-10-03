@@ -9,9 +9,6 @@ import Foundation
 import HAModels
 
 public struct MotionAtNight: Automatable {
-    /// Illuminance below which motion turns the lights on.
-    public static let thresholdInLux = 60.0
-
     public var isActive = true
     public let name: String
     /// Time to wait after last motion detection before starting the dim/off sequence
@@ -75,7 +72,7 @@ public struct MotionAtNight: Automatable {
         }
         guard let illuminance else { return false }
 
-        let shouldTrigger = motionDetected && illuminance.converted(to: .lux).value < Self.thresholdInLux
+        let shouldTrigger = motionDetected && illuminance.converted(to: .lux).value < MotionAtNightConstants.thresholdInLux
         log.debug("Should trigger [\(shouldTrigger)] - [motion: \(motionDetected), \(illuminance)]")
         return shouldTrigger
     }

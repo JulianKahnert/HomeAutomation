@@ -7,7 +7,6 @@
 
 import ComposableArchitecture
 import Foundation
-import HAImplementations
 import HAModels
 import Sharing
 import SwiftUI
@@ -274,7 +273,7 @@ extension AutomationDetailView {
                 color: ChartPalette.color(for: .lightSensor),
                 unit: "lx",
                 isLogarithmic: true,
-                threshold: (MotionAtNight.thresholdInLux, "Threshold \(Int(MotionAtNight.thresholdInLux)) lx"),
+                threshold: (MotionAtNightConstants.thresholdInLux, "Threshold \(Int(MotionAtNightConstants.thresholdInLux)) lx"),
                 bands: nights
             )
         } header: {

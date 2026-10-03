@@ -137,7 +137,6 @@ let package = Package(
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "Sharing", package: "swift-sharing"),
-                "HAImplementations",
                 "HAModels",
                 "Shared",
                 "ServerClient",

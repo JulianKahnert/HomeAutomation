@@ -33,7 +33,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: true)
+        try await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: true)
         return .ok
     }
 
@@ -43,7 +43,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: false)
+        try await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: false)
         return .ok
     }
 

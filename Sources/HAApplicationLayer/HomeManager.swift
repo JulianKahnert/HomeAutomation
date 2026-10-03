@@ -234,12 +234,6 @@ public final class HomeManager: HomeManagable {
         return didChange
     }
 
-    public func maintenance() async throws {
-        // delete storage entries older than 2 days
-        let date = Date().addingTimeInterval(-1 * 2 * 24 * 60 * 60)
-        try await storageRepo.deleteEntries(olderThan: date)
-    }
-
     public func deleteStorageEntries(olderThan date: Date) async throws {
         try await storageRepo.deleteEntries(olderThan: date)
     }

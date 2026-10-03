@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 14.02.25.
 //
 
+import Fluent
 import Foundation
 import HAImplementations
 import HAModels
@@ -12,50 +13,62 @@ import Logging
 import Shared
 
 actor HomeAutomationConfigService: Log {
-    static let url = URL(fileURLWithPath: "/tmp/HomeAutomation-config.json")
+    private static let defaultLocation = Location(latitude: 53.14194, longitude: 8.21292)
+    // TODO: remove the one-time import one release after the config moved into the database
+    private static let legacyFileURL = URL(fileURLWithPath: "/tmp/HomeAutomation-config.json")
+
     private(set) var location: Location
     private(set) var automations: [any Automatable]
+    private let persist: @Sendable (Data) async throws -> Void
 
-    init(location: Location, automations: [any Automatable]) {
+    init(location: Location, automations: [any Automatable], persist: @escaping @Sendable (Data) async throws -> Void) {
         self.location = location
         self.automations = automations
+        self.persist = persist
     }
 
-    func set(location: Location, automations: [any Automatable]) throws {
+    func set(location: Location, automations: [any Automatable]) async throws {
         self.location = location
         self.automations = automations
 
-        try save()
+        try await save()
     }
 
-    func setAutomationActive(with name: String, to value: Bool) {
-        let automations = self.automations.map { automation in
+    func setAutomationActive(with name: String, to value: Bool) async throws {
+        automations = automations.map { automation in
             var automation = automation
             if automation.name == name {
                 automation.isActive = value
             }
             return automation
         }
-        self.automations = automations
+        try await save()
     }
 
-    func save() throws {
-        let automations = automations.map(AnyAutomation.create(from:))
-        let configDto = ConfigDTO(location: location, automations: automations)
-        let data = try JSONEncoder().encode(configDto)
-        try data.write(to: Self.url)
+    func save() async throws {
+        let configDto = ConfigDTO(location: location, automations: automations.map(AnyAutomation.create(from:)))
+        try await persist(JSONEncoder().encode(configDto))
     }
 
-    static func loadOrDefault() -> Self {
+    static func load(from database: any Database) async -> Self {
+        let persist: @Sendable (Data) async throws -> Void = { try await ConfigItem.save(json: $0, on: database) }
         do {
-            let data = try Data(contentsOf: url)
+            var data = try await ConfigItem.loadJSON(on: database)
+            if data == nil, FileManager.default.fileExists(atPath: legacyFileURL.path) {
+                log.notice("Importing legacy config file into the database")
+                let legacyData = try Data(contentsOf: legacyFileURL)
+                try await persist(legacyData)
+                data = legacyData
+            }
+            guard let data else {
+                log.info("No config stored yet - falling back to default config")
+                return Self(location: defaultLocation, automations: [], persist: persist)
+            }
             let config = try JSONDecoder().decode(ConfigDTO.self, from: data)
-            let automations = config.automations.map(\.automation)
-            return Self(location: config.location, automations: automations)
+            return Self(location: config.location, automations: config.automations.map(\.automation), persist: persist)
         } catch {
-            log.error("Failed to parse config file - falling back to defaults: \(error)")
-            log.info("Falling back to default config: \(Location(latitude: 53.14194, longitude: 8.21292)) - automations: []")
-            return .init(location: Location(latitude: 53.14194, longitude: 8.21292), automations: [])
+            log.error("Failed to load config - falling back to default config: \(error)")
+            return Self(location: defaultLocation, automations: [], persist: persist)
         }
     }
 }

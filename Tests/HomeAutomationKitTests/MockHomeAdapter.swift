@@ -134,9 +134,6 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return didChange
     }
 
-    func maintenance() async throws {
-    }
-
     func deleteStorageEntries(olderThan date: Date) async throws {
     }
 

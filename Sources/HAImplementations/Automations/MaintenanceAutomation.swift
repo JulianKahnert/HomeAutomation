@@ -23,9 +23,7 @@ public struct MaintenanceAutomation: Automatable {
         return time.isEqual(event)
     }
 
-    public func execute(using hm: HomeManagable) async throws {
-        log.debug("Turning on devices")
-
-        try await hm.maintenance()
-    }
+    // Retention lives in the server's `DatabaseCleanupJob` only; the type stays so existing
+    // configs still decode.
+    public func execute(using hm: HomeManagable) async throws {}
 }

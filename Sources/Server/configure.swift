@@ -112,6 +112,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateEntityStorageDbItem())
     app.migrations.add(DeviceTokenItem())
     app.migrations.add(AddSensorFields())
+    app.migrations.add(CreateConfigItem())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -208,7 +209,7 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - home automation setup
 
-    app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
+    app.homeAutomationConfigService = await HomeAutomationConfigService.load(from: app.db)
     let notificationSender = PushNotifcationService(database: app.db,
                                                     apnsClient: apnsClient,
                                                     notificationTopic: notificationTopic)

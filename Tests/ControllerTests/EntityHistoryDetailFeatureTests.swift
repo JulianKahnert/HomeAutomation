@@ -42,4 +42,47 @@ struct EntityHistoryDetailFeatureTests {
             $0.historyItems = [first, second]
         }
     }
+
+    @Test("changing the time range reloads from scratch")
+    func timeRangeReloads() async {
+        let store = TestStore(initialState: EntityHistoryDetailFeature.State(entity: entity)) {
+            EntityHistoryDetailFeature()
+        }
+
+        await store.send(.timeRangeChanged(.week)) {
+            $0.timeRange = .week
+        }
+        await store.receive(\.refresh) {
+            $0.isLoading = true
+        }
+        await store.receive(\.historyResponse.success) {
+            $0.isLoading = false
+        }
+    }
+
+    @Test("a failed load shows an alert")
+    func failureShowsAlert() async {
+        struct LoadError: Error {}
+        let store = TestStore(initialState: EntityHistoryDetailFeature.State(entity: entity)) {
+            EntityHistoryDetailFeature()
+        } withDependencies: {
+            $0.serverClient.getEntityHistory = { _, _, _, _, _, _ in throw LoadError() }
+        }
+
+        await store.send(.refresh) {
+            $0.isLoading = true
+        }
+        await store.receive(\.historyResponse.failure) {
+            $0.isLoading = false
+            $0.alert = AlertState {
+                TextState("Error")
+            } actions: {
+                ButtonState(action: .dismissError) {
+                    TextState("OK")
+                }
+            } message: {
+                TextState("Failed to load history: \(LoadError().localizedDescription)")
+            }
+        }
+    }
 }

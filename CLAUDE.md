@@ -397,7 +397,7 @@ PR checks run on `main` and `develop` branches (`.github/workflows/pr-checks.yml
 - **iOS Apps Build** — Matrix build of FlowKitAdapter and FlowKitController (includes Package.resolved freshness check)
 - **Docker Build** — Builds the Server Docker image on Ubuntu
 
-Additional workflows: `docker-branches.yaml` (branch image builds), `docker-tag.yaml` (tagged releases), `renovate-package-resolved.yaml` (dependency updates).
+Additional workflows: `docker-publish.yaml` (amd64 + arm64 image for pushes to `develop`/`main` and for release tags, which also get a GitHub Release), `renovate-package-resolved.yaml` (dependency updates).
 
 ## Documentation
 

@@ -27,8 +27,7 @@ struct AppFeature: Sendable {
         var selectedTab: Tab = .overview
         var overview = OverviewFeature.State()
         var automations = AutomationsFeature.State()
-        var actions = ActionsFeature.State()
-        var history = HistoryFeature.State()
+        var rooms = RoomsFeature.State()
         var settings = SettingsFeature.State()
 
         var openWindowsCount: Int? {
@@ -41,16 +40,14 @@ struct AppFeature: Sendable {
     enum Tab: Sendable, Equatable, CaseIterable {
         case overview
         case automations
-        case actions
-        case history
+        case rooms
         case settings
 
         var title: String {
             switch self {
             case .overview: return "Overview"
             case .automations: return "Automations"
-            case .actions: return "Actions"
-            case .history: return "History"
+            case .rooms: return "Rooms"
             case .settings: return "Settings"
             }
         }
@@ -59,8 +56,7 @@ struct AppFeature: Sendable {
             switch self {
             case .overview: return "house"
             case .automations: return "lamp.floor"
-            case .actions: return "list.bullet.clipboard"
-            case .history: return "chart.line.uptrend.xyaxis"
+            case .rooms: return "square.grid.2x2"
             case .settings: return "gear"
             }
         }
@@ -72,8 +68,7 @@ struct AppFeature: Sendable {
         case selectedTabChanged(Tab)
         case overview(OverviewFeature.Action)
         case automations(AutomationsFeature.Action)
-        case actions(ActionsFeature.Action)
-        case history(HistoryFeature.Action)
+        case rooms(RoomsFeature.Action)
         case settings(SettingsFeature.Action)
 
         // Live Activities & Push Notifications
@@ -111,12 +106,8 @@ struct AppFeature: Sendable {
             AutomationsFeature()
         }
 
-        Scope(state: \.actions, action: \.actions) {
-            ActionsFeature()
-        }
-
-        Scope(state: \.history, action: \.history) {
-            HistoryFeature()
+        Scope(state: \.rooms, action: \.rooms) {
+            RoomsFeature()
         }
 
         Scope(state: \.settings, action: \.settings) {
@@ -139,10 +130,7 @@ struct AppFeature: Sendable {
             case .automations:
                 return .none
 
-            case .actions:
-                return .none
-
-            case .history:
+            case .rooms:
                 return .none
 
             case .settings:
@@ -224,8 +212,7 @@ struct AppFeature: Sendable {
                 return .merge(
                     .send(.overview(.refresh)),
                     .send(.automations(.refresh)),
-                    .send(.actions(.refresh)),
-                    .send(.history(.refresh)),
+                    .send(.rooms(.refresh)),
                     .send(.refreshWindowStates),
                     .send(.startMonitoringLiveActivities),
                     .send(.clearDeliveredNotifications)
@@ -269,29 +256,11 @@ struct AppView: View {
             }
 
             Tab(
-                AppFeature.Tab.actions.title,
-                systemImage: AppFeature.Tab.actions.systemImage,
-                value: AppFeature.Tab.actions
+                AppFeature.Tab.rooms.title,
+                systemImage: AppFeature.Tab.rooms.systemImage,
+                value: AppFeature.Tab.rooms
             ) {
-                ActionsView(
-                    store: store.scope(
-                        state: \.actions,
-                        action: \.actions
-                    )
-                )
-            }
-
-            Tab(
-                AppFeature.Tab.history.title,
-                systemImage: AppFeature.Tab.history.systemImage,
-                value: AppFeature.Tab.history
-            ) {
-                HistoryView(
-                    store: store.scope(
-                        state: \.history,
-                        action: \.history
-                    )
-                )
+                RoomsView(store: store.scope(state: \.rooms, action: \.rooms))
             }
 
             Tab(

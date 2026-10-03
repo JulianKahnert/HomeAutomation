@@ -1,8 +1,8 @@
 //
-//  HistoryFeature.swift
+//  RoomsFeature.swift
 //  ControllerFeatures
 //
-//  Feature for viewing entity history and charts
+//  Entities grouped by room
 //
 
 import ComposableArchitecture
@@ -12,7 +12,7 @@ import Sharing
 import SwiftUI
 
 @Reducer
-struct HistoryFeature: Sendable {
+struct RoomsFeature: Sendable {
 
     // MARK: - State
 
@@ -35,6 +35,12 @@ struct HistoryFeature: Sendable {
                 entity.displayName.localizedLowercase.contains(searchLowercased) ||
                 entity.formattedCharacteristicDisplayName.localizedLowercase.contains(searchLowercased)
             }
+        }
+
+        var rooms: [(placeId: String, entities: [EntityInfo])] {
+            Dictionary(grouping: filteredEntities, by: \.entityId.placeId)
+                .sorted { $0.key < $1.key }
+                .map { ($0.key, $0.value) }
         }
     }
 
@@ -94,7 +100,7 @@ struct HistoryFeature: Sendable {
 
             case let .entitiesResponse(.success(entities)):
                 state.isLoading = false
-                state.entities = entities.sorted { $0.displayName < $1.displayName }
+                state.entities = entities.sorted { $0.entityId.name < $1.entityId.name }
                 return .none
 
             case let .entitiesResponse(.failure(error)):
@@ -124,13 +130,13 @@ struct HistoryFeature: Sendable {
     }
 }
 
-struct HistoryView: View {
-    @Bindable var store: StoreOf<HistoryFeature>
+struct RoomsView: View {
+    @Bindable var store: StoreOf<RoomsFeature>
 
     var body: some View {
         NavigationStack {
             contentView
-                .navigationTitle("History")
+                .navigationTitle("Rooms")
                 .navigationDestination(
                     item: $store.scope(state: \.selectedEntityDetail, action: \.selectedEntityDetail)
                 ) { detailStore in
@@ -159,19 +165,23 @@ struct HistoryView: View {
             if store.entities.isEmpty && !store.isLoading {
                 ContentUnavailableView(
                     "No Entities",
-                    systemImage: "chart.line.uptrend.xyaxis",
-                    description: Text("Entity history will appear here.\n\nNote: Entity discovery is not yet implemented. You can manually navigate to entity details once entities are tracked.")
+                    systemImage: "square.grid.2x2",
+                    description: Text("Devices with recorded history appear here.")
                 )
             } else {
                 List(selection: $store.selectedEntityId) {
-                    ForEach(store.filteredEntities) { entity in
-                        entityRow(entity)
-                            .tag(entity.id)
+                    ForEach(store.rooms, id: \.placeId) { room in
+                        Section(room.placeId) {
+                            ForEach(room.entities) { entity in
+                                entityRow(entity)
+                                    .tag(entity.id)
+                            }
+                        }
                     }
                 }
                 .searchable(
                     text: $store.searchText,
-                    prompt: "Search entities..."
+                    prompt: "Search devices..."
                 )
             }
         }
@@ -179,20 +189,23 @@ struct HistoryView: View {
 
     @ViewBuilder
     private func entityRow(_ entity: EntityInfo) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(entity.displayName)
-                .font(.headline)
-            Text(entity.formattedCharacteristicDisplayName)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entity.entityId.name)
+                Text(entity.formattedCharacteristicDisplayName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: entity.entityId.characteristicType.systemImage)
         }
     }
 }
 
 #Preview {
-    HistoryView(
-        store: Store(initialState: HistoryFeature.State()) {
-            HistoryFeature()
+    RoomsView(
+        store: Store(initialState: RoomsFeature.State()) {
+            RoomsFeature()
         }
     )
 }

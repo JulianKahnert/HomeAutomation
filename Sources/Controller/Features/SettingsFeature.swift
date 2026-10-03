@@ -37,7 +37,8 @@ struct SettingsFeature: Sendable {
         var isPushAuthorized: Bool = false
         var deviceToken: Data?
 
-        // Log viewer
+        // Diagnostics
+        @Presents var commandLog: ActionsFeature.State?
         @Presents var logViewer: LogViewerFeature.State?
     }
 
@@ -54,6 +55,8 @@ struct SettingsFeature: Sendable {
         case windowStatesResponse(Result<[WindowContentState.WindowState], Error>)
         case requestPushAuthorization
         case dismissError
+        case showCommandLog
+        case commandLog(PresentationAction<ActionsFeature.Action>)
         case showLogViewer
         case logViewer(PresentationAction<LogViewerFeature.Action>)
         case binding(BindingAction<State>)
@@ -171,6 +174,13 @@ struct SettingsFeature: Sendable {
                 state.error = nil
                 return .none
 
+            case .showCommandLog:
+                state.commandLog = ActionsFeature.State()
+                return .none
+
+            case .commandLog:
+                return .none
+
             case .showLogViewer:
                 state.logViewer = LogViewerFeature.State()
                 return .none
@@ -181,6 +191,9 @@ struct SettingsFeature: Sendable {
             case .binding:
                 return .none
             }
+        }
+        .ifLet(\.$commandLog, action: \.commandLog) {
+            ActionsFeature()
         }
         .ifLet(\.$logViewer, action: \.logViewer) {
             LogViewerFeature()
@@ -210,32 +223,23 @@ struct SettingsView: View {
                 } footer: {
                     Text("Show window states in Dynamic Island and Lock Screen")
                 }
-
-                if let windowState = store.windowContentState {
-                    Section {
-                        windowStatesSection(windowState)
-                    } header: {
-                        Text("Window States")
-                    }
-                }
                 #endif
 
                 Section {
-                    Button {
+                    diagnosticsButton("Command Log", systemImage: "list.bullet.clipboard") {
+                        store.send(.showCommandLog)
+                    }
+                    diagnosticsButton("App Logs", systemImage: "doc.text.magnifyingglass") {
                         store.send(.showLogViewer)
-                    } label: {
-                        HStack {
-                            Label("View Logs", systemImage: "doc.text.magnifyingglass")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.secondary)
-                        }
                     }
                 } header: {
                     Text("Diagnostics")
                 }
             }
             .navigationTitle("Settings")
+            .navigationDestination(item: $store.scope(state: \.commandLog, action: \.commandLog)) { commandLogStore in
+                ActionsView(store: commandLogStore)
+            }
             .navigationDestination(
                 item: $store.scope(state: \.logViewer, action: \.logViewer)
             ) { logStore in
@@ -246,6 +250,17 @@ struct SettingsView: View {
             }
             .onAppear {
                 store.send(.onAppear)
+            }
+        }
+    }
+
+    private func diagnosticsButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Label(title, systemImage: systemImage)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -301,22 +316,6 @@ struct SettingsView: View {
             get: { store.liveActivitiesEnabled },
             set: { store.send(.toggleLiveActivities($0)) }
         ))
-    }
-
-    @ViewBuilder
-    private func windowStatesSection(_ windowState: WindowContentState) -> some View {
-        if windowState.windowStates.isEmpty {
-            Text("No open windows")
-                .foregroundColor(.secondary)
-        } else {
-            ForEach(windowState.windowStates, id: \.name) { window in
-                ProgressView(timerInterval: window.opened...window.end, countsDown: false) {
-                    Text(window.name)
-                }
-                .tint(Date() <= window.end ? Color.accentColor : Color.red)
-            }
-            .listRowSeparator(.hidden)
-        }
     }
     #endif
 }

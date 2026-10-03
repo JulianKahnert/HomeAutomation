@@ -2,7 +2,7 @@
 //  ActionsFeature.swift
 //  ControllerFeatures
 //
-//  Feature for viewing and managing action log
+//  Command log: every command the server sent, with its status
 //
 
 import ComposableArchitecture
@@ -16,22 +16,35 @@ struct ActionsFeature: Sendable {
 
     // MARK: - State
 
+    enum Filter: String, CaseIterable, Sendable {
+        case all = "All"
+        case fresh = "Fresh"
+        case cache = "Cache"
+        case failed = "Failed"
+
+        func matches(_ item: ActionLogItem) -> Bool {
+            switch self {
+            case .all: return true
+            case .fresh: return item.status == .executed || (item.status == nil && !item.hasCacheHit)
+            case .cache: return item.hasCacheHit
+            case .failed: return item.status == .failed
+            }
+        }
+    }
+
     @ObservableState
     struct State: Equatable, Sendable {
         let limit = 1000
+        var filter: Filter = .all
         var actions: [ActionLogItem] = []
         var isLoading = false
         @Presents var alert: AlertState<Action.Alert>?
         var searchText: String = ""
 
         var filteredActions: [ActionLogItem] {
-            guard !searchText.isEmpty else {
-                return actions
-            }
-
             let searchLowercased = searchText.localizedLowercase
             return actions.filter { item in
-                item.searchableText.contains(searchLowercased)
+                filter.matches(item) && (searchText.isEmpty || item.searchableText.contains(searchLowercased))
             }
         }
 
@@ -159,96 +172,81 @@ struct ActionsView: View {
     @Bindable var store: StoreOf<ActionsFeature>
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(store.filteredActions) { item in
-                    actionRow(item)
+        List {
+            Picker("Filter", selection: $store.filter) {
+                ForEach(ActionsFeature.Filter.allCases, id: \.self) { filter in
+                    Text(filter.rawValue).tag(filter)
                 }
             }
-            .searchable(
-                text: $store.searchText,
-                prompt: "Search actions..."
-            )
-            .navigationTitle("Actions")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        store.send(.refresh)
-                    } label: {
-                        Label("Reload", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(store.isLoading)
-                }
+            .pickerStyle(.segmented)
+            .listRowBackground(Color.clear)
 
-                ToolbarItem(placement: .secondaryAction) {
-                    ShareLink(
-                        item: store.exportAsText,
-                        preview: SharePreview(
-                            "HomeKit_Actions_\(Date().ISO8601Format()).txt",
-                            image: Image(systemName: "doc.text")
-                        )
-                    )
-                    .disabled(store.actions.isEmpty)
-                }
-
-                ToolbarItem(placement: .secondaryAction) {
-                    Button(role: .destructive) {
-                        store.send(.clearActions)
-                    } label: {
-                        Label("Clear All", systemImage: "trash")
-                    }
-                    .disabled(store.actions.isEmpty || store.isLoading)
-                }
+            ForEach(store.filteredActions) { item in
+                ActionRow(item: item)
             }
-            .refreshable {
-                store.send(.refresh)
-            }
-            .onAppear {
-                store.send(.onAppear)
-            }
-            .overlay {
-                if store.isLoading && store.actions.isEmpty {
-                    ProgressView()
-                } else if store.actions.isEmpty && !store.isLoading {
-                    ContentUnavailableView(
-                        "No Actions",
-                        systemImage: "list.bullet.clipboard",
-                        description: Text("Actions will appear here")
-                    )
-                }
-            }
-            .alert($store.scope(state: \.alert, action: \.alert))
         }
-    }
-
-    @ViewBuilder
-    private func actionRow(_ item: ActionLogItem) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Action name and entity
-            Text(item.displayName)
-                .font(.headline)
-
-            // Detailed action description with cache indicator
-            HStack(spacing: 4) {
-                Image(systemName: "internaldrive")
-                    .opacity(item.hasCacheHit ? 1 : 0)
-                Text(item.detailDescription)
-                    .font(.body)
+        .searchable(
+            text: $store.searchText,
+            prompt: "Search commands..."
+        )
+        .navigationTitle("Command Log")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    store.send(.refresh)
+                } label: {
+                    Label("Reload", systemImage: "arrow.clockwise")
+                }
+                .disabled(store.isLoading)
             }
-            .foregroundColor(item.hasCacheHit ? Color.yellow : nil)
 
-            // Timestamp
-            Text(item.timestamp.formatted(date: .numeric, time: .standard))
-                .font(.caption)
-                .foregroundColor(.secondary)
+            ToolbarItem(placement: .secondaryAction) {
+                ShareLink(
+                    item: store.exportAsText,
+                    preview: SharePreview(
+                        "HomeKit_Actions_\(Date().ISO8601Format()).txt",
+                        image: Image(systemName: "doc.text")
+                    )
+                )
+                .disabled(store.actions.isEmpty)
+            }
+
+            ToolbarItem(placement: .secondaryAction) {
+                Button(role: .destructive) {
+                    store.send(.clearActions)
+                } label: {
+                    Label("Clear All", systemImage: "trash")
+                }
+                .disabled(store.actions.isEmpty || store.isLoading)
+            }
         }
+        .refreshable {
+            store.send(.refresh)
+        }
+        .onAppear {
+            store.send(.onAppear)
+        }
+        .overlay {
+            if store.isLoading && store.actions.isEmpty {
+                ProgressView()
+            } else if store.actions.isEmpty && !store.isLoading {
+                ContentUnavailableView(
+                    "No Commands",
+                    systemImage: "list.bullet.clipboard",
+                    description: Text("Commands will appear here")
+                )
+            }
+        }
+        .alert($store.scope(state: \.alert, action: \.alert))
     }
 }
 
 #Preview {
-    ActionsView(
-        store: Store(initialState: ActionsFeature.State()) {
-            ActionsFeature()
-        }
-    )
+    NavigationStack {
+        ActionsView(
+            store: Store(initialState: ActionsFeature.State()) {
+                ActionsFeature()
+            }
+        )
+    }
 }

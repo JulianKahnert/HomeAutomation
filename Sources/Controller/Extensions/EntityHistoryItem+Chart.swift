@@ -32,6 +32,11 @@ extension EntityHistoryItem {
         return Double(rgb.hue)
     }
 
+    /// The on/open/detected state of boolean entities, `nil` for measurements.
+    var stateValue: Bool? {
+        isDeviceOn ?? motionDetected ?? isContactOpen ?? isDoorLocked ?? isHeaterActive ?? valveOpen
+    }
+
     /// Returns the primary value for this history item based on available data
     /// Used for chart visualization
     /// Priority order: numeric sensors > percentage sensors > boolean sensors > color (hue)

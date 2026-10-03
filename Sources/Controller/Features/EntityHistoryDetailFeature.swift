@@ -245,28 +245,57 @@ struct EntityHistoryDetailView: View {
         .alert($store.scope(state: \.alert, action: \.alert))
     }
 
+    /// On/off periods of a boolean entity, clipped to the chart's range.
+    private func activeIntervals(in range: ClosedRange<Date>) -> [DateInterval] {
+        let ascending = Array(store.chartData.reversed())
+        return ascending.indices.compactMap { index in
+            guard ascending[index].stateValue == true else { return nil }
+            let start = max(ascending[index].timestamp, range.lowerBound)
+            let end = index + 1 < ascending.count ? ascending[index + 1].timestamp : range.upperBound
+            return start < end ? DateInterval(start: start, end: end) : nil
+        }
+    }
+
     @ViewBuilder
     private var chartView: some View {
         let dateRange = store.state.dateRange
+        let range = dateRange.start...dateRange.end
+        let isBoolean = store.chartData.contains { $0.stateValue != nil }
+        let isLux = store.entity.entityId.characteristicType == .lightSensor
 
         Chart {
-            ForEach(store.chartData) { item in
-                if let value = item.primaryValue {
-                    LineMark(
-                        x: .value("Time", item.timestamp),
-                        y: .value("Value", value)
-                    )
-                    .foregroundStyle(Color.accentColor)
-
-                    PointMark(
-                        x: .value("Time", item.timestamp),
-                        y: .value("Value", value)
+            if isBoolean {
+                ForEach(activeIntervals(in: range), id: \.start) { interval in
+                    RectangleMark(
+                        xStart: .value("Start", interval.start),
+                        xEnd: .value("End", interval.end),
+                        y: .value("State", "On")
                     )
                     .foregroundStyle(Color.accentColor)
                 }
+            } else {
+                ForEach(store.chartData) { item in
+                    if let value = item.primaryValue {
+                        // The log scale cannot place 0 lx.
+                        let plotted = isLux ? max(value, 0.1) : value
+                        LineMark(
+                            x: .value("Time", item.timestamp),
+                            y: .value("Value", plotted)
+                        )
+                        .foregroundStyle(Color.accentColor)
+
+                        PointMark(
+                            x: .value("Time", item.timestamp),
+                            y: .value("Value", plotted)
+                        )
+                        .foregroundStyle(Color.accentColor)
+                    }
+                }
             }
         }
-        .chartXScale(domain: dateRange.start...dateRange.end)
+        .chartXScale(domain: range)
+        .chartYScale(type: isLux ? .log : .linear)
+        .chartPlotStyle { $0.clipped() }
         .chartXAxis {
             AxisMarks(values: .automatic) { _ in
                 AxisGridLine()

@@ -56,6 +56,7 @@ struct OverviewFeature: Sendable {
     }
 
     enum Action: Sendable {
+        case automationTapped(String)
         case delegate(Delegate)
         case path(StackActionOf<OverviewPath>)
         case refresh
@@ -75,6 +76,9 @@ struct OverviewFeature: Sendable {
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case let .automationTapped(name):
+                return .send(.delegate(.openAutomation(name)))
+
             case .delegate:
                 return .none
 
@@ -171,19 +175,25 @@ struct OverviewView: View {
                 if !running.isEmpty {
                     Section("Running") {
                         ForEach(running) { automation in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(automation.name)
-                                    Text(automation.lastRun?.trigger.summary ?? automation.triggerDescription)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+                            Button {
+                                store.send(.automationTapped(automation.name))
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(automation.name)
+                                        Text(automation.lastRun?.trigger.summary ?? automation.triggerDescription)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                    // A button would tint the whole row; the row opens the automation in its tab.
+                                    .foregroundStyle(.primary)
+                                    Spacer()
+                                    Button("Stop") {
+                                        store.send(.stopButtonTapped(automation.name))
+                                    }
+                                    .buttonStyle(.bordered)
                                 }
-                                Spacer()
-                                Button("Stop") {
-                                    store.send(.stopButtonTapped(automation.name))
-                                }
-                                .buttonStyle(.bordered)
                             }
                         }
                     }

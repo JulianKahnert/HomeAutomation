@@ -115,6 +115,24 @@ struct OverviewFeatureTests {
         #expect(store.state.isHealthy == true)
     }
 
+    @Test("tapping a running automation switches to its tab and opens the details")
+    func openAutomationFromRunningRow() async {
+        var state = AppFeature.State()
+        state.automations.$automations.withLock {
+            $0 = [AutomationInfo(name: "Night Light", isActive: true, isRunning: true, type: "MotionAtNight")]
+        }
+        let store = TestStore(initialState: state) {
+            AppFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(\.overview.automationTapped, "Night Light")
+        await store.receive(\.overview.delegate)
+        await store.receive(\.automations.openAutomation)
+        #expect(store.state.selectedTab == .automations)
+        #expect(store.state.automations.path.first?.details?.automation.name == "Night Light")
+    }
+
     @Test("a run's Open Automation button switches to its tab and opens the details")
     func openAutomationFromRun() async {
         var state = AppFeature.State()

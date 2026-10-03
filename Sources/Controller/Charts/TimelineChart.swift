@@ -12,6 +12,8 @@ struct TimelineChart: View {
         let label: String
         let color: Color
         let intervals: [DateInterval]
+        /// Legend entry; lanes without one keep the chart legend hidden.
+        var kind: String?
         var id: String { label }
     }
 
@@ -35,21 +37,32 @@ struct TimelineChart: View {
                         y: .value("Lane", lane.label),
                         height: .fixed(12)
                     )
-                    .foregroundStyle(lane.color)
+                    .foregroundStyle(by: .value("Kind", lane.kind ?? lane.label))
                     .clipShape(.rect(cornerRadius: 3))
                 }
             }
         }
         .chartXScale(domain: domain)
         .chartYScale(domain: lanes.map(\.label))
+        .chartForegroundStyleScale(domain: legendEntries.map(\.kind), range: legendEntries.map(\.color))
+        .chartLegend(lanes.contains { $0.kind != nil } ? .visible : .hidden)
         .chartPlotStyle { $0.clipped() }
         .chartXAxis {
-            AxisMarks { _ in
+            // .aligned keeps the last time label inside the plot instead of clipping it.
+            AxisMarks(preset: .aligned) { _ in
                 AxisGridLine()
-                AxisValueLabel(format: .dateTime.hour().minute())
+                AxisValueLabel(format: ChartPalette.axisFormat(for: domain))
             }
         }
-        .frame(height: CGFloat(lanes.count) * 30 + 30)
+        .frame(height: CGFloat(lanes.count) * 30 + (lanes.contains { $0.kind != nil } ? 54 : 30))
+    }
+
+    private var legendEntries: [(kind: String, color: Color)] {
+        var seen = Set<String>()
+        return lanes.compactMap { lane in
+            let kind = lane.kind ?? lane.label
+            return seen.insert(kind).inserted ? (kind, lane.color) : nil
+        }
     }
 }
 

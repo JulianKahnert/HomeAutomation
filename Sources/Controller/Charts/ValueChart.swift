@@ -16,6 +16,7 @@ struct ValueChart: View {
     var threshold: (value: Double, label: String)?
     var bands: [DateInterval] = []
     var bandColor = ChartPalette.night
+    var height: CGFloat = 180
 
     var body: some View {
         Chart {
@@ -35,7 +36,8 @@ struct ValueChart: View {
                 RuleMark(y: .value("Threshold", threshold.value))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     .foregroundStyle(.secondary)
-                    .annotation(position: .top, alignment: .trailing) {
+                    // Leading keeps the label over the night end of the curve instead of across the daylight peak.
+                    .annotation(position: .top, alignment: .leading) {
                         Text(threshold.label)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -47,12 +49,13 @@ struct ValueChart: View {
         .chartYAxisLabel(unit)
         .chartPlotStyle { $0.clipped() }
         .chartXAxis {
-            AxisMarks { _ in
+            // .aligned keeps the last time label inside the plot instead of clipping it.
+            AxisMarks(preset: .aligned) { _ in
                 AxisGridLine()
-                AxisValueLabel(format: .dateTime.hour().minute())
+                AxisValueLabel(format: ChartPalette.axisFormat(for: domain))
             }
         }
-        .frame(height: 180)
+        .frame(height: height)
     }
 }
 

@@ -203,25 +203,23 @@ struct AutomationsView: View {
     }
 
     private func automationRow(_ automation: AutomationInfo) -> some View {
-        HStack {
-            Image(systemName: automation.systemImage)
-                .frame(width: 28)
-                .foregroundStyle(Color.accentColor)
-            VStack(alignment: .leading, spacing: 2) {
+        Toggle(isOn: Binding(
+            get: { automation.isActive },
+            set: { store.send(.setActive(name: automation.name, $0)) }
+        )) {
+            Label {
                 Text(automation.name)
-                Text(automation.subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                Group {
+                    if automation.isRunning {
+                        Text("\(Text("Running").foregroundStyle(.green)) · \(automation.subtitle)")
+                    } else {
+                        Text(automation.subtitle)
+                    }
+                }
+                .lineLimit(1)
+            } icon: {
+                Image(systemName: automation.systemImage)
             }
-            Spacer()
-            StatusLabel(outcome: .running)
-                .opacity(automation.isRunning ? 1 : 0)
-            Toggle("Active", isOn: Binding(
-                get: { automation.isActive },
-                set: { store.send(.setActive(name: automation.name, $0)) }
-            ))
-            .labelsHidden()
         }
     }
 }

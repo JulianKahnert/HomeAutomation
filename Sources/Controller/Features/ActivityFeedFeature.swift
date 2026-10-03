@@ -75,17 +75,19 @@ struct ActivityFeedView: View {
             .pickerStyle(.segmented)
             .listRowBackground(Color.clear)
 
-            ForEach(store.entries) { entry in
-                switch entry {
-                case let .run(run):
-                    Button {
-                        store.send(.runTapped(run))
-                    } label: {
-                        RunRow(run: run)
+            Section {
+                ForEach(store.entries) { entry in
+                    switch entry {
+                    case let .run(run):
+                        Button {
+                            store.send(.runTapped(run))
+                        } label: {
+                            RunRow(run: run)
+                        }
+                        .buttonStyle(.plain)
+                    case let .command(item):
+                        ActionRow(item: item)
                     }
-                    .buttonStyle(.plain)
-                case let .command(item):
-                    ActionRow(item: item)
                 }
             }
         }

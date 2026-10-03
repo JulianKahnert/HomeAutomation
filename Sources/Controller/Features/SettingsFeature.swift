@@ -257,7 +257,13 @@ struct SettingsView: View {
     private func diagnosticsButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
-                Label(title, systemImage: systemImage)
+                Label {
+                    Text(title)
+                } icon: {
+                    Image(systemName: systemImage)
+                        .foregroundStyle(.tint)
+                }
+                .foregroundStyle(.primary)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .foregroundStyle(.secondary)

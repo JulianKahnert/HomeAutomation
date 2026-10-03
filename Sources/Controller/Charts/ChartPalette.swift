@@ -26,4 +26,11 @@ enum ChartPalette {
     }
 
     static let night = Color.gray.opacity(0.15)
+
+    /// Times for a day or less, weekdays beyond that; a week of "00:00" labels says nothing.
+    static func axisFormat(for domain: ClosedRange<Date>) -> Date.FormatStyle {
+        domain.upperBound.timeIntervalSince(domain.lowerBound) > 86_400 * 1.5
+            ? .dateTime.weekday(.abbreviated)
+            : .dateTime.hour().minute()
+    }
 }

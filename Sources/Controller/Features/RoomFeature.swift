@@ -119,7 +119,8 @@ struct RoomView: View {
                 TimelineChart.Lane(
                     label: history.entityId.name,
                     color: ChartPalette.color(for: history.entityId.characteristicType),
-                    intervals: StateIntervals.intervals(items: history.items, isActive: \.stateValue, from: store.start, to: store.end)
+                    intervals: StateIntervals.intervals(items: history.items, isActive: \.stateValue, from: store.start, to: store.end),
+                    kind: history.entityId.characteristicType.displayName
                 )
             }
     }
@@ -145,7 +146,6 @@ struct RoomView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     TimelineChart(lanes: lanes, domain: store.start...store.end)
-                    legend
                 }
             } header: {
                 Text("Timeline")
@@ -185,12 +185,15 @@ struct RoomView: View {
                             VStack(alignment: .leading) {
                                 Text(entity.entityId.name)
                                 Text(entity.formattedCharacteristicDisplayName)
-                                    .font(.caption)
+                                    .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                         } icon: {
                             Image(systemName: entity.entityId.characteristicType.systemImage)
+                                .foregroundStyle(.tint)
                         }
+                        // A button would tint the whole row; only the icon carries the accent.
+                        .foregroundStyle(.primary)
                     }
                 }
             }
@@ -208,19 +211,6 @@ struct RoomView: View {
         .navigationDestination(item: $store.scope(\.$entityDetail, action: \.entityDetail)) { detailStore in
             EntityHistoryDetailView(store: detailStore)
                 .navigationTitle(detailStore.entity.displayName)
-        }
-    }
-
-    private var legend: some View {
-        HStack(spacing: 16) {
-            ForEach(Self.laneTypes.filter { type in store.histories.contains { $0.entityId.characteristicType == type } }, id: \.self) { type in
-                Label {
-                    Text(type.displayName)
-                } icon: {
-                    Circle().fill(ChartPalette.color(for: type)).frame(width: 10, height: 10)
-                }
-                .font(.caption)
-            }
         }
     }
 }

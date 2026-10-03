@@ -14,6 +14,8 @@ struct StatusLabel: View {
 
     var body: some View {
         Label(text, systemImage: systemImage)
+            // Forms otherwise lay a label out like a row title, with a wide icon column.
+            .labelStyle(.titleAndIcon)
             .font(.caption)
             .foregroundStyle(color)
     }

@@ -179,7 +179,7 @@ struct AutomationDetailView: View {
     var body: some View {
         Form {
             Section {
-                Label(store.automation.typeLabel, systemImage: store.automation.systemImage)
+                LabeledContent("Type", value: store.automation.typeLabel)
                 LabeledContent("Trigger", value: store.automation.triggerDescription)
                 Toggle("Active", isOn: Binding(
                     get: { store.automation.isActive },
@@ -257,7 +257,8 @@ extension AutomationDetailView {
                 TimelineChart.Lane(
                     label: history.entityId.name,
                     color: ChartPalette.color(for: history.entityId.characteristicType),
-                    intervals: StateIntervals.intervals(items: history.items, isActive: \.stateValue, from: store.start, to: store.end)
+                    intervals: StateIntervals.intervals(items: history.items, isActive: \.stateValue, from: store.start, to: store.end),
+                    kind: history.entityId.characteristicType.displayName
                 )
             }
         let lux = store.histories

@@ -203,9 +203,7 @@ struct EntityHistoryDetailView: View {
                 }
 
                 if !store.chartData.isEmpty {
-                    // A single state lane needs far less height than a value chart.
                     chartView
-                        .frame(height: store.chartData.contains { $0.stateValue != nil } ? 100 : 300)
                 } else if store.isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 300)
@@ -266,7 +264,14 @@ struct EntityHistoryDetailView: View {
                 domain: range
             )
         } else {
-            lineChart(range: range, isLux: isLux)
+            ValueChart(
+                points: store.chartData.compactMap { item in item.primaryValue.map { (item.timestamp, $0) } },
+                domain: range,
+                color: ChartPalette.color(for: store.entity.entityId.characteristicType),
+                unit: store.entity.entityId.characteristicType == .lightSensor ? "lx" : "",
+                isLogarithmic: isLux,
+                height: 240
+            )
         }
     }
 
@@ -281,7 +286,7 @@ struct EntityHistoryDetailView: View {
             DailyBarChart(
                 bars: DailyTotals.dailyTotals(intervals, days: days, calendar: .current).map { ($0.day, $0.duration / 3_600) },
                 color: ChartPalette.color(for: type),
-                unit: "h on"
+                unit: "h"
             )
         } else if type == .lightSensor || type == .carbonDioxideSensorId {
             let samples = store.chartData.compactMap { item in item.primaryValue.map { (date: item.timestamp, value: $0) } }
@@ -289,43 +294,10 @@ struct EntityHistoryDetailView: View {
             DailyBarChart(
                 bars: stats.map { ($0.day, $0.max) },
                 color: ChartPalette.color(for: type).opacity(0.6),
-                unit: type == .lightSensor ? "lx (max, ● mean)" : "ppm (max, ● mean)",
-                points: stats.map { ($0.day, $0.mean) }
+                unit: type == .lightSensor ? "lx" : "ppm",
+                points: stats.map { ($0.day, $0.mean) },
+                barLabel: "Daily Max"
             )
-        }
-    }
-
-    private func lineChart(range: ClosedRange<Date>, isLux: Bool) -> some View {
-        Chart {
-            ForEach(store.chartData) { item in
-                if let value = item.primaryValue {
-                    // The log scale cannot place 0 lx.
-                    let plotted = isLux ? max(value, 0.1) : value
-                    LineMark(
-                        x: .value("Time", item.timestamp),
-                        y: .value("Value", plotted)
-                    )
-                    .foregroundStyle(Color.accentColor)
-
-                    PointMark(
-                        x: .value("Time", item.timestamp),
-                        y: .value("Value", plotted)
-                    )
-                    .foregroundStyle(Color.accentColor)
-                }
-            }
-        }
-        .chartXScale(domain: range)
-        .chartYScale(type: isLux ? .log : .linear)
-        .chartPlotStyle { $0.clipped() }
-        .chartXAxis {
-            AxisMarks(values: .automatic) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.hour().minute())
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading)
         }
     }
 

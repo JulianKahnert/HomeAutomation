@@ -37,19 +37,21 @@ public actor AutomationService {
                         }
 
                         self.log.info("Running automation \(automation.name)")
-                        let run = await self.startRun(of: automation, for: event)
+                        let runId = automation.recordsRuns ? UUID() : nil
                         let task = Task {
+                            // Persisted alongside `execute`: the database must never delay the first command.
+                            let recording = Task { await self.record(runId, of: automation, for: event) }
                             do {
-                                try await AutomationRunContext.$runId.withValue(run?.id) {
+                                try await AutomationRunContext.$runId.withValue(runId) {
                                     try await automation.execute(using: self.homeManager)
                                 }
-                                await self.finish(run, outcome: .completed)
+                                await self.finish(await recording.value, outcome: .completed)
                             } catch is CancellationError {
                                 let stopped = await self.consumeStopRequest(for: automation.name)
-                                await self.finish(run, outcome: stopped ? .stopped : .superseded)
+                                await self.finish(await recording.value, outcome: stopped ? .stopped : .superseded)
                             } catch {
                                 self.log.error("Automation failed with error - \(error)")
-                                await self.finish(run, outcome: .failed, error: String(describing: error))
+                                await self.finish(await recording.value, outcome: .failed, error: String(describing: error))
                             }
 
                             // cancel the current task after completion to get correct results of getActiveAutomationNames
@@ -95,27 +97,29 @@ public actor AutomationService {
         stopRequested.remove(name) != nil
     }
 
-    private func startRun(of automation: any Automatable, for event: HomeEvent) async -> AutomationRun? {
-        guard automation.recordsRuns else { return nil }
+    /// - Returns: `runId` once the run is stored, `nil` when nothing was (or could be) recorded.
+    private func record(_ runId: UUID?, of automation: any Automatable, for event: HomeEvent) async -> UUID? {
+        guard let runId else { return nil }
 
+        let startedAt = Date()
         var trigger = event.trigger
         if let detail = await automation.triggerSummary(for: event, using: homeManager) {
             trigger = trigger.appending(detail)
         }
-        let run = AutomationRun(automationName: automation.name, startedAt: Date(), trigger: trigger, outcome: .running)
+        let run = AutomationRun(id: runId, automationName: automation.name, startedAt: startedAt, trigger: trigger, outcome: .running)
         do {
             try await runs.add(run)
-            return run
+            return runId
         } catch {
             log.error("Failed to record automation run - \(error)")
             return nil
         }
     }
 
-    private func finish(_ run: AutomationRun?, outcome: AutomationRun.Outcome, error: String? = nil) async {
-        guard let run else { return }
+    private func finish(_ runId: UUID?, outcome: AutomationRun.Outcome, error: String? = nil) async {
+        guard let runId else { return }
         do {
-            try await runs.finish(run.id, outcome: outcome, endedAt: Date(), errorDescription: error)
+            try await runs.finish(runId, outcome: outcome, endedAt: Date(), errorDescription: error)
         } catch {
             log.error("Failed to finish automation run - \(error)")
         }

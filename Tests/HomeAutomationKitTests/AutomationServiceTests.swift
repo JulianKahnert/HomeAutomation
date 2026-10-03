@@ -115,6 +115,32 @@ struct AutomationServiceTests {
         #expect(run.trigger.summary == "Sunset · at 3 lx")
     }
 
+    /// The time from "motion detected" to the first command must not depend on the database.
+    @Test func executeStartsWhileTheRunIsStillBeingPersisted() async throws {
+        let (executed, continuation) = AsyncStream.makeStream(of: UUID?.self)
+        await repository.stallAdds()
+        let service = try makeService(TestAutomation(name: "a", mode: .complete, onExecute: { continuation.yield($0) }))
+
+        let trigger = Task { await service.trigger(with: .sunrise) }
+        let runId = await withTaskGroup(of: UUID?.self) { group in
+            group.addTask {
+                var iterator = executed.makeAsyncIterator()
+                return await iterator.next().flatMap { $0 }
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(2))
+                return nil
+            }
+            let first = await group.next()
+            group.cancelAll()
+            return first.flatMap { $0 }
+        }
+
+        #expect(runId != nil, "execute did not run while the insert was pending")
+        await repository.releaseAdds()
+        await trigger.value
+    }
+
     @Test func executeSeesTheRunIdAsTaskLocal() async throws {
         let (executed, continuation) = AsyncStream.makeStream(of: UUID?.self)
         let service = try makeService(TestAutomation(name: "a", mode: .complete, onExecute: { continuation.yield($0) }))

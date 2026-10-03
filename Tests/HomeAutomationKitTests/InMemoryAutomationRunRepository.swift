@@ -9,6 +9,7 @@ import HAModels
 actor InMemoryAutomationRunRepository: AutomationRunRepository {
     private(set) var runs: [UUID: AutomationRun] = [:]
     private let finished = AsyncStream.makeStream(of: AutomationRun.self)
+    private var addGate: (stream: AsyncStream<Void>, continuation: AsyncStream<Void>.Continuation)?
 
     /// Waits for the next run that `finish` is called for.
     func nextFinishedRun() async -> AutomationRun? {
@@ -16,7 +17,20 @@ actor InMemoryAutomationRunRepository: AutomationRunRepository {
         return await iterator.next()
     }
 
-    func add(_ run: AutomationRun) {
+    /// Makes `add` suspend until `releaseAdds()`, simulating a slow database.
+    func stallAdds() {
+        addGate = AsyncStream.makeStream(of: Void.self)
+    }
+
+    func releaseAdds() {
+        addGate?.continuation.finish()
+        addGate = nil
+    }
+
+    func add(_ run: AutomationRun) async {
+        if let gate = addGate {
+            for await _ in gate.stream {}
+        }
         runs[run.id] = run
     }
 

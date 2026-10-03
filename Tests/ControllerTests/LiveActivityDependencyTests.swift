@@ -23,11 +23,11 @@ struct LiveActivityDependencyTests {
             @Dependency(\.liveActivity) var liveActivity
 
             // Callback-based: testValue closure body is empty, returns immediately
-            var tokenCount = 0
+            let tokenCount = LockIsolated(0)
             await liveActivity.pushTokenUpdates { _ in
-                tokenCount += 1
+                tokenCount.withValue { $0 += 1 }
             }
-            #expect(tokenCount == 0)
+            #expect(tokenCount.value == 0)
 
             let hasActive = await liveActivity.hasActiveActivities()
             #expect(hasActive == false)
@@ -41,13 +41,13 @@ struct LiveActivityDependencyTests {
         } operation: {
             @Dependency(\.liveActivity) var liveActivity
 
-            var tokens: [PushToken] = []
+            let tokens = LockIsolated<[PushToken]>([])
             await liveActivity.pushTokenUpdates { token in
-                tokens.append(token)
+                tokens.withValue { $0.append(token) }
             }
-            #expect(tokens.count == 1)
-            #expect(tokens[0].deviceName == "preview")
-            #expect(tokens[0].tokenString == "1234")
+            #expect(tokens.value.count == 1)
+            #expect(tokens.value.first?.deviceName == "preview")
+            #expect(tokens.value.first?.tokenString == "1234")
 
             let hasActive = await liveActivity.hasActiveActivities()
             #expect(hasActive == true)

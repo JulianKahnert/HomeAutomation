@@ -16,6 +16,7 @@ public struct HealthCheck: Automatable {
     public let name: String
     public let url: URL
     public var triggerEntityIds = Set<EntityId>()
+    public var recordsRuns: Bool { false }
 
     public init(_ name: String, url: URL) {
         self.name = name

@@ -20,6 +20,10 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          EntityStorageDbRepository(database: db)
      }
 
+     var automationRunRepository: AutomationRunDbRepository {
+         AutomationRunDbRepository(database: db)
+     }
+
     private struct HomeEventsStreamKey: StorageKey {
         typealias Value = AsyncStream<HomeEvent>
     }

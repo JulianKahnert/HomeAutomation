@@ -28,7 +28,7 @@ public final class HomeManager: HomeManagable {
     /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
     /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
     /// replaying both would be contradictory.
-    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int)] = [:]
+    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int, runId: UUID?)] = [:]
 
     /// - Parameter retryTicks: Cadence at which queued failed actions are retried. Pass a stream to
     ///   drive the retries deterministically; the default is a 5s timer.
@@ -54,9 +54,9 @@ public final class HomeManager: HomeManagable {
         Task.detached(priority: .low) {
             for await _ in ticks {
                 let queued = await self.popAllFailedActions()
-                for (action, attempt) in queued {
+                for (action, attempt, runId) in queued {
                     self.log.debug("Performing failed action again: \(action) [attempt \(attempt + 1)/\(Self.maxAttempts)]")
-                    await self.perform(action, attempt: attempt)
+                    await self.perform(action, attempt: attempt, runId: runId)
                 }
             }
         }
@@ -106,10 +106,12 @@ public final class HomeManager: HomeManagable {
     public func perform(_ action: HomeManagableAction) async {
         // Round values to prevent excessive HomeKit updates
         let roundedAction = action.rounded()
-        await perform(roundedAction, attempt: 0)
+        await perform(roundedAction, attempt: 0, runId: AutomationRunContext.runId)
     }
 
-    private func perform(_ action: HomeManagableAction, attempt: Int) async {
+    /// - Parameter runId: Passed explicitly because the retry loop runs detached, without the
+    ///   `AutomationRunContext` task local of the original run.
+    private func perform(_ action: HomeManagableAction, attempt: Int, runId: UUID?) async {
         // Cancellation is honoured at command boundaries only: a superseded automation run must not
         // start further commands, but a command that already started always runs to completion (see
         // the shield below). Checked before logging so a skipped command produces no log entry.
@@ -119,7 +121,7 @@ public final class HomeManager: HomeManagable {
         }
 
         // Log action and check if it's a duplicate (cache hit)
-        let hasCacheHit = await actionLogManager.log(action: action)
+        let hasCacheHit = await actionLogManager.log(action: action, runId: runId)
 
         if hasCacheHit {
             log.info("Skipping duplicate command: [\(action)]")
@@ -142,6 +144,7 @@ public final class HomeManager: HomeManagable {
             // Only a command that reached the device may deduplicate its successors.
             await actionLogManager.markExecuted(action)
         } catch {
+            await actionLogManager.markFailed(action)
             let entityId = action.entityId
 
             if let entity = try? await getCurrentEntity(with: entityId) {
@@ -151,7 +154,7 @@ public final class HomeManager: HomeManagable {
 
             let nextAttempt = attempt + 1
             if nextAttempt < Self.maxAttempts {
-                failedActions[entityId] = (action, nextAttempt)
+                failedActions[entityId] = (action, nextAttempt, runId)
             } else {
                 log.critical("Giving up on action [\(action)] after \(Self.maxAttempts) attempts")
             }
@@ -234,12 +237,6 @@ public final class HomeManager: HomeManagable {
         return didChange
     }
 
-    public func maintenance() async throws {
-        // delete storage entries older than 2 days
-        let date = Date().addingTimeInterval(-1 * 2 * 24 * 60 * 60)
-        try await storageRepo.deleteEntries(olderThan: date)
-    }
-
     public func deleteStorageEntries(olderThan date: Date) async throws {
         try await storageRepo.deleteEntries(olderThan: date)
     }
@@ -275,15 +272,15 @@ public final class HomeManager: HomeManagable {
         await windowManager.setWindowOpenState(entityId: entityId, to: state)
     }
 
-    public func getActionLog(limit: Int?) async -> [ActionLogItem] {
-        await actionLogManager.getActions(limit: limit)
+    public func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {
+        await actionLogManager.getActions(limit: limit, runId: runId)
     }
 
     public func clearActionLog() async {
         await actionLogManager.clear()
     }
 
-    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int)] {
+    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?)] {
         let queued = Array(failedActions.values)
         failedActions.removeAll()
         return queued

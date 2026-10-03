@@ -28,14 +28,13 @@ public protocol HomeManagable: EntityValidator, Sendable {
 
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async
-    func maintenance() async throws
     func deleteStorageEntries(olderThan date: Date) async throws
     func getLocation() async -> Location
     func sendNotification(title: String, message: String, id: String) async
     func clearWindowNotification(entityId: EntityId) async
     func getWindowStates() async -> [WindowOpenState]
     func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async
-    func getActionLog(limit: Int?) async -> [ActionLogItem]
+    func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem]
     func clearActionLog() async
 }
 

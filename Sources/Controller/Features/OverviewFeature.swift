@@ -13,6 +13,7 @@ import SwiftUI
 
 @Reducer
 enum OverviewPath {
+    case entity(EntityHistoryDetailFeature)
     case feed(ActivityFeedFeature)
     case run(RunDetailFeature)
 }
@@ -218,10 +219,15 @@ struct OverviewView: View {
             .task { await store.send(.task).finish() }
         } destination: { pathStore in
             switch pathStore.case {
+            case let .entity(entityStore):
+                EntityHistoryDetailView(store: entityStore)
+                    .navigationTitle(entityStore.entity.displayName)
             case let .feed(feedStore):
                 ActivityFeedView(store: feedStore)
             case let .run(runStore):
-                RunDetailView(store: runStore)
+                RunDetailView(store: runStore) {
+                    OverviewPath.State.entity(EntityHistoryDetailFeature.State(entity: EntityInfo(entityId: $0)))
+                }
             }
         }
     }

@@ -59,14 +59,22 @@ struct RunDetailFeature: Sendable {
     }
 }
 
-struct RunDetailView: View {
+struct RunDetailView<EntityDestination>: View {
     let store: StoreOf<RunDetailFeature>
+    /// The stack element showing a device's history; the view sits in more than one stack.
+    let entityDestination: (EntityId) -> EntityDestination
 
     var body: some View {
         Form {
             Section {
                 LabeledContent("Automation", value: store.run.automationName)
-                LabeledContent("Trigger", value: store.run.trigger.summary)
+                if let entityId = store.run.trigger.entityId {
+                    NavigationLink(state: entityDestination(entityId)) {
+                        LabeledContent("Trigger", value: store.run.trigger.summary)
+                    }
+                } else {
+                    LabeledContent("Trigger", value: store.run.trigger.summary)
+                }
                 LabeledContent("Start", value: store.run.startedAt.formatted(date: .abbreviated, time: .standard))
                 if let endedAt = store.run.endedAt {
                     LabeledContent("Duration", value: Duration.seconds(endedAt.timeIntervalSince(store.run.startedAt))
@@ -114,12 +122,14 @@ struct RunDetailView: View {
                 automationName: "Bathroom Night Light",
                 startedAt: Date().addingTimeInterval(-60),
                 endedAt: Date().addingTimeInterval(-46),
-                trigger: AutomationTrigger(kind: .entityChange, entityId: nil, summary: "Motion · Eve Motion (Bathroom)"),
+                trigger: AutomationTrigger(kind: .entityChange,
+                                           entityId: EntityId(placeId: "Bathroom", name: "Eve Motion", characteristicsName: nil, characteristic: .motionSensor),
+                                           summary: "Motion · Eve Motion (Bathroom)"),
                 outcome: .failed,
                 errorDescription: "Mirror Light (Bathroom) not reachable"
             ))) {
                 RunDetailFeature()
             }
-        )
+        ) { $0 }
     }
 }

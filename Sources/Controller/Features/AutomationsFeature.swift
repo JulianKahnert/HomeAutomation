@@ -221,7 +221,9 @@ struct AutomationsView: View {
                 EntityHistoryDetailView(store: entityStore)
                     .navigationTitle(entityStore.entity.displayName)
             case let .run(runStore):
-                RunDetailView(store: runStore)
+                RunDetailView(store: runStore) {
+                    AutomationsPath.State.entity(EntityHistoryDetailFeature.State(entity: EntityInfo(entityId: $0)))
+                }
             }
         }
     }

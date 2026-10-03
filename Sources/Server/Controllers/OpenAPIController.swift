@@ -27,7 +27,7 @@ struct OpenAPIController: APIProtocol {
                                               _type: String(describing: type(of: tmp)),
                                               recordsRuns: tmp.recordsRuns,
                                               lastRun: lastRuns[tmp.name].map(Components.Schemas.AutomationRun.init),
-                                              entities: tmp.getEntityIds().map(Components.Schemas.EntityId.init))
+                                              entities: tmp.involvedEntityIds.map(Components.Schemas.EntityId.init))
             }
         return .ok(.init(body: .json(automations)))
     }

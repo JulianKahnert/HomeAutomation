@@ -59,6 +59,13 @@ public extension Automatable {
         findAllEntityIds(in: self, maxDepth: 20)
     }
 
+    /// The entities worth showing for this automation: `getEntityIds()` without duplicates and
+    /// without battery sensors, which devices carry but no automation reads.
+    var involvedEntityIds: [EntityId] {
+        var seen = Set<EntityId>()
+        return getEntityIds().filter { $0.characteristicType != .batterySensor && seen.insert($0).inserted }
+    }
+
     private func findAllEntityIds(in object: Any, maxDepth: Int) -> [EntityId] {
         // If the maximum depth is reached, stop recursion
         guard maxDepth > 0 else {
@@ -68,7 +75,16 @@ public extension Automatable {
         var entityIds: [EntityId] = []
         let mirror = Mirror(reflecting: object)
 
-        for child in mirror.children {
+        // Devices are subclasses (`EveMotion: MotionSensorDevice`) whose ids live in the base
+        // class, and `Mirror` lists those only via `superclassMirror`.
+        var children = Array(mirror.children)
+        var superclassMirror = mirror.superclassMirror
+        while let current = superclassMirror {
+            children.append(contentsOf: current.children)
+            superclassMirror = current.superclassMirror
+        }
+
+        for child in children {
             let reflectedChild = Mirror(reflecting: child.value)
 
             switch reflectedChild.displayStyle {

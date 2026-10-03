@@ -204,6 +204,13 @@ paths:
             minimum: 1
             maximum: 1000
             default: 1000
+        - name: runId
+          in: query
+          description: Only return the actions sent by this automation run
+          required: false
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: A success response with action logs.
@@ -459,6 +466,14 @@ components:
         hasCacheHit:
           type: boolean
           description: Indicates if the action was a cache hit.
+        runId:
+          type: string
+          format: uuid
+          description: The automation run that sent the action.
+        status:
+          type: string
+          enum: [executed, cacheHit, failed]
+          description: Whether the action was sent, skipped as a duplicate, or failed.
       required:
         - id
         - timestamp

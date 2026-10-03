@@ -150,23 +150,25 @@ struct OpenAPIController: APIProtocol {
     // MARK: - /actions
 
     func getActions(_ input: Operations.GetActions.Input) async throws -> Operations.GetActions.Output {
-        let limit = input.query.limit
+        var runId: UUID?
+        if let runIdString = input.query.runId {
+            guard let parsed = UUID(uuidString: runIdString) else {
+                throw Abort(.badRequest, reason: "Invalid runId: \(runIdString)")
+            }
+            runId = parsed
+        }
 
-        let actionItems = await request.application.homeManager.getActionLog(limit: limit)
+        let actionItems = await request.application.homeManager.getActionLog(limit: input.query.limit, runId: runId)
 
-        // Map to OpenAPI schema types
-        let schemaItems = actionItems.compactMap { item -> Components.Schemas.ActionLogItem? in
-            let entityId = Components.Schemas.EntityId(placeId: item.entityId.placeId,
-                                                       name: item.entityId.name,
-                                                       characteristicsName: item.entityId.characteristicsName ?? "",
-                                                       characteristicType: item.entityId.characteristicType.rawValue)
-
-            return Components.Schemas.ActionLogItem(id: item.id.uuidString,
-                                                    timestamp: item.timestamp,
-                                                    entityId: entityId,
-                                                    actionName: item.actionName,
-                                                    detailDescription: item.detailDescription,
-                                                    hasCacheHit: item.hasCacheHit)
+        let schemaItems = actionItems.map { item in
+            Components.Schemas.ActionLogItem(id: item.id.uuidString,
+                                             timestamp: item.timestamp,
+                                             entityId: .init(item.entityId),
+                                             actionName: item.actionName,
+                                             detailDescription: item.detailDescription,
+                                             hasCacheHit: item.hasCacheHit,
+                                             runId: item.runId?.uuidString,
+                                             status: item.status.flatMap { .init(rawValue: $0.rawValue) })
         }
 
         return .ok(.init(body: .json(schemaItems)))

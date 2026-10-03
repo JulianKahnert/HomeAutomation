@@ -152,7 +152,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
     }
 
-    func getActionLog(limit: Int?) async -> [ActionLogItem] {
+    func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {
         return []
     }
 

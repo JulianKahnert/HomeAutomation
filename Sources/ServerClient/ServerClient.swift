@@ -92,8 +92,8 @@ public struct ServerClient {
             }
     }
 
-    public func getActions(limit: Int? = nil) async throws -> [ActionLogItem] {
-        let response = try await client.getActions(query: .init(limit: limit))
+    public func getActions(limit: Int? = nil, runId: UUID? = nil) async throws -> [ActionLogItem] {
+        let response = try await client.getActions(query: .init(limit: limit, runId: runId?.uuidString))
         return try response.ok.body.json.compactMap { item -> ActionLogItem? in
             guard let id = UUID(uuidString: item.id),
                   let characteristic = CharacteristicsType(rawValue: item.entityId.characteristicType) else {
@@ -110,7 +110,9 @@ public struct ServerClient {
                                  entityId: entityId,
                                  actionName: item.actionName,
                                  detailDescription: item.detailDescription,
-                                 hasCacheHit: item.hasCacheHit)
+                                 hasCacheHit: item.hasCacheHit,
+                                 runId: item.runId.flatMap(UUID.init(uuidString:)),
+                                 status: item.status.flatMap { ActionLogItem.Status(rawValue: $0.rawValue) })
         }
     }
 

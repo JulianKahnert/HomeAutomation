@@ -34,7 +34,7 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func clearWindowNotification(entityId: EntityId) async
     func getWindowStates() async -> [WindowOpenState]
     func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async
-    func getActionLog(limit: Int?) async -> [ActionLogItem]
+    func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem]
     func clearActionLog() async
 }
 

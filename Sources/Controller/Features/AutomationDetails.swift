@@ -174,7 +174,12 @@ struct AutomationDetailView: View {
                 Section("Devices") {
                     ForEach(store.automation.entities, id: \.self) { entityId in
                         NavigationLink(state: AutomationsPath.State.entity(EntityHistoryDetailFeature.State(entity: EntityInfo(entityId: entityId)))) {
-                            LabeledContent(entityId.name, value: entityId.characteristicType.displayName)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(entityId.name)
+                                Text(entityId.kindInRoom)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -215,7 +220,7 @@ extension AutomationDetailView {
             .filter { [.switcher, .motionSensor].contains($0.entityId.characteristicType) }
             .map { history in
                 TimelineChart.Lane(
-                    label: history.entityId.name,
+                    label: history.entityId.displayName,
                     color: ChartPalette.color(for: history.entityId.characteristicType),
                     intervals: StateIntervals.intervals(items: history.items, isActive: \.stateValue, from: store.start, to: store.end),
                     kind: history.entityId.characteristicType.displayName

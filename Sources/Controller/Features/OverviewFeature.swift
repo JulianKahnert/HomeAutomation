@@ -191,13 +191,16 @@ struct OverviewView: View {
                                         store.send(.stopButtonTapped(automation.name))
                                     }
                                     .buttonStyle(.bordered)
+                                    .tint(.accentColor)
                                     // Reads like a navigation row: it leaves the tab, so it cannot be a NavigationLink.
                                     Image(systemName: "chevron.forward")
                                         .font(.footnote.weight(.semibold))
                                         .foregroundStyle(.tertiary)
                                 }
-                                .foregroundStyle(.primary)
                             }
+                            // `.primary` and `.secondary` resolve relative to the button's tint, so the
+                            // label stays accent-colored unless the tint itself is the label color.
+                            .tint(.primary)
                         }
                     }
                 }

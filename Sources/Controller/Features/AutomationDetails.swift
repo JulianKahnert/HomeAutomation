@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import Foundation
+import HAImplementations
 import HAModels
 import Sharing
 import SwiftUI
@@ -30,11 +31,20 @@ struct AutomationDetails: Sendable {
         /// Last 24 hours, newest first.
         var runs: [AutomationRun] = []
         @Presents var destination: Destination.State?
+        /// Entity histories of the debug chart, only loaded for `MotionAtNight`.
+        var histories: [EntityHistory] = []
+        var end = Date()
+        @Shared(.serverLocation) var location
+
+        var isMotionAtNight: Bool { automation.type == "MotionAtNight" }
+        var start: Date { end.addingTimeInterval(-86400) }
     }
 
     enum Action: Sendable {
         case destination(PresentationAction<Destination.Action>)
         case entityTapped(EntityId)
+        case historiesResponse(Result<[EntityHistory], Error>)
+        case locationResponse(Result<Location, Error>)
         case runTapped(AutomationRun)
         case runsResponse(Result<[AutomationRun], Error>)
         case task
@@ -61,6 +71,18 @@ struct AutomationDetails: Sendable {
                 state.destination = .entity(EntityHistoryDetailFeature.State(entity: EntityInfo(entityId: entityId)))
                 return .none
 
+            case let .historiesResponse(.success(histories)):
+                state.histories = histories
+                return .none
+
+            case let .locationResponse(.success(location)):
+                state.$location.withLock { $0 = location }
+                return .none
+
+            case let .historiesResponse(.failure(error)), let .locationResponse(.failure(error)):
+                state.error = "Failed to load chart data: \(error.localizedDescription)"
+                return .none
+
             case let .runTapped(run):
                 state.destination = .run(RunDetailFeature.State(run: run))
                 return .none
@@ -74,12 +96,15 @@ struct AutomationDetails: Sendable {
                 return .none
 
             case .task:
-                guard state.automation.recordsRuns else { return .none }
-                return .run { [name = state.automation.name, now] send in
-                    await send(.runsResponse(Result {
-                        try await serverClient.getRuns(name, now.addingTimeInterval(-86400), nil, nil)
-                    }))
-                }
+                state.end = now
+                return .merge(
+                    state.automation.recordsRuns ? .run { [name = state.automation.name, start = state.start] send in
+                        await send(.runsResponse(Result {
+                            try await serverClient.getRuns(name, start, nil, nil)
+                        }))
+                    } : .none,
+                    state.isMotionAtNight ? loadDebugChart(state) : .none
+                )
             case .stopAutomation:
                 state.error = nil
                 state.isLoading = true
@@ -127,6 +152,22 @@ struct AutomationDetails: Sendable {
             }
         }
         .ifLet(\.$destination, action: \.destination)
+    }
+
+    /// One room-history request per room the automation's devices are in.
+    private func loadDebugChart(_ state: State) -> Effect<Action> {
+        .run { [entities = state.automation.entities, start = state.start, end = state.end, hasLocation = state.location != nil] send in
+            if !hasLocation {
+                await send(.locationResponse(Result { try await serverClient.getLocation() }))
+            }
+            await send(.historiesResponse(Result {
+                var histories: [EntityHistory] = []
+                for placeId in Set(entities.map(\.placeId)) {
+                    histories += try await serverClient.getRoomHistory(placeId, start, end, true)
+                }
+                return histories.filter { entities.contains($0.entityId) }
+            }))
+        }
     }
 }
 
@@ -189,15 +230,57 @@ struct AutomationDetailView: View {
                     Text("No runs in the last 24 hours.")
                 }
             }
+
+            if store.isMotionAtNight {
+                motionAtNightSection
+            }
         }
         .buttonStyle(.plain)
         .task { await store.send(.task).finish() }
-        .navigationDestination(item: $store.scope(state: \.destination?.entity, action: \.destination.entity)) { entityStore in
+        .navigationDestination(item: $store.scope(\.$destination, action: \.destination).entity) { entityStore in
             EntityHistoryDetailView(store: entityStore)
                 .navigationTitle(entityStore.entity.displayName)
         }
-        .navigationDestination(item: $store.scope(state: \.destination?.run, action: \.destination.run)) { runStore in
+        .navigationDestination(item: $store.scope(\.$destination, action: \.destination).run) { runStore in
             RunDetailView(store: runStore)
+        }
+    }
+}
+
+extension AutomationDetailView {
+    private var motionAtNightSection: some View {
+        let nights = store.location.map {
+            StateIntervals.nights(in: DateInterval(start: store.start, end: store.end), latitude: $0.latitude, longitude: $0.longitude)
+        } ?? []
+        let lanes = store.histories
+            .filter { [.switcher, .motionSensor].contains($0.entityId.characteristicType) }
+            .map { history in
+                TimelineChart.Lane(
+                    label: history.entityId.name,
+                    color: ChartPalette.color(for: history.entityId.characteristicType),
+                    intervals: StateIntervals.intervals(items: history.items, isActive: \.stateValue, from: store.start, to: store.end)
+                )
+            }
+        let lux = store.histories
+            .filter { $0.entityId.characteristicType == .lightSensor }
+            .flatMap(\.items)
+            .compactMap { item in item.illuminanceInLux.map { (date: item.timestamp, value: $0) } }
+            .sorted { $0.date < $1.date }
+        return Section {
+            TimelineChart(lanes: lanes, domain: store.start...store.end, nights: nights)
+            ValueChart(
+                points: lux,
+                domain: store.start...store.end,
+                color: ChartPalette.color(for: .lightSensor),
+                unit: "lx",
+                isLogarithmic: true,
+                threshold: (MotionAtNight.thresholdInLux, "Threshold \(Int(MotionAtNight.thresholdInLux)) lx"),
+                bands: nights
+            )
+        } header: {
+            Text("Why did it trigger? · 24 h")
+        } footer: {
+            Text("Grey: sun below the horizon. Motion below the threshold turns the lights on.")
         }
     }
 }

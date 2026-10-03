@@ -9,8 +9,8 @@ import Foundation
 import HAModels
 
 public struct MotionAtNight: Automatable {
-    // threshold under which the automation should be triggered
-    private static let thresholdInLux = 60.0
+    /// Illuminance below which motion turns the lights on.
+    public static let thresholdInLux = 60.0
 
     public var isActive = true
     public let name: String

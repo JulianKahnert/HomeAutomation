@@ -64,6 +64,9 @@ struct ServerClientDependency: Sendable {
 
     /// History of every entity in a room, newest first per entity
     var getRoomHistory: @Sendable (_ placeId: String, _ startDate: Date?, _ endDate: Date?, _ includePrevious: Bool) async throws -> [EntityHistory]
+
+    /// The server's location, used for sunrise and sunset
+    var getLocation: @Sendable () async throws -> Location
 }
 
 // MARK: - Dependency Key Implementation
@@ -83,7 +86,8 @@ extension ServerClientDependency: TestDependencyKey {
         registerDevice: { _ in },
         getEntityIdsWithHistory: { [] },
         getEntityHistory: { _, _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) },
-        getRoomHistory: { _, _, _, _ in [] }
+        getRoomHistory: { _, _, _, _ in [] },
+        getLocation: { Location(latitude: 52.5, longitude: 13.4) }
     )
 
     static let previewValue = Self(
@@ -199,7 +203,8 @@ extension ServerClientDependency: TestDependencyKey {
 
             return EntityHistoryResponse(items: items, nextCursor: nil)
         },
-        getRoomHistory: { _, _, _, _ in [] }
+        getRoomHistory: { _, _, _, _ in [] },
+        getLocation: { Location(latitude: 52.5, longitude: 13.4) }
     )
 
     private static let previewRuns = [
@@ -279,6 +284,9 @@ extension ServerClientDependency: DependencyKey {
         },
         getRoomHistory: { placeId, startDate, endDate, includePrevious in
             try await client.getRoomHistory(placeId: placeId, startDate: startDate, endDate: endDate, includePrevious: includePrevious)
+        },
+        getLocation: {
+            try await client.getLocation()
         }
     )
 }

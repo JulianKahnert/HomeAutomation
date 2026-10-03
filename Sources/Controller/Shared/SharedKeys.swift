@@ -40,6 +40,13 @@ extension SharedKey where Self == AppStorageKey<AutomationsFeature.Grouping>.Def
     }
 }
 
+extension SharedKey where Self == AppStorageKey<Location?>.Default {
+    /// Server location from `GET /config`, for night bands in charts
+    static var serverLocation: Self {
+        Self[.appStorage("serverLocation", store: .standard), default: nil]
+    }
+}
+
 // MARK: - In-Memory (volatile state)
 
  extension SharedKey where Self == InMemoryKey<IdentifiedArrayOf<AutomationInfo>> {

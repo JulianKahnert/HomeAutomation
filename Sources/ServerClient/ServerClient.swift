@@ -56,6 +56,15 @@ public struct ServerClient {
         return (response as? HTTPURLResponse)?.statusCode == 200
     }
 
+    /// The server's location from `GET /config`, which is not part of the OpenAPI spec because its
+    /// automations are polymorphic JSON; only `location` is decoded.
+    public func getLocation() async throws -> Location {
+        struct Config: Decodable { let location: Location }
+        let (data, response) = try await session.data(from: url.appending(path: "config"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return try JSONDecoder().decode(Config.self, from: data).location
+    }
+
     public func getRuns(automation name: String, startDate: Date? = nil, endDate: Date? = nil, limit: Int? = nil) async throws -> [AutomationRun] {
         let response = try await client.getAutomationRuns(path: .init(name: name),
                                                           query: .init(startDate: startDate, endDate: endDate, limit: limit))

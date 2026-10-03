@@ -18,13 +18,32 @@ struct OpenAPIController: APIProtocol {
 
     func getAutomations(_ input: Operations.GetAutomations.Input) async throws -> Operations.GetAutomations.Output {
         let automationNames = await request.application.automationService.getActiveAutomationNames()
+        let lastRuns = try await request.application.automationRunRepository.latestRunPerAutomation()
         let automations = await request.application.homeAutomationConfigService.automations
             .map { tmp in
                 Components.Schemas.Automation(name: tmp.name,
                                               isActive: tmp.isActive,
-                                              isRunning: automationNames.contains(tmp.name))
+                                              isRunning: automationNames.contains(tmp.name),
+                                              _type: String(describing: type(of: tmp)),
+                                              recordsRuns: tmp.recordsRuns,
+                                              lastRun: lastRuns[tmp.name].map(Components.Schemas.AutomationRun.init),
+                                              entities: tmp.getEntityIds().map(Components.Schemas.EntityId.init))
             }
         return .ok(.init(body: .json(automations)))
+    }
+
+    func getAutomationRuns(_ input: Operations.GetAutomationRuns.Input) async throws -> Operations.GetAutomationRuns.Output {
+        let runs = try await request.application.automationRunRepository.runs(for: input.path.name,
+                                                                              startDate: input.query.startDate,
+                                                                              endDate: input.query.endDate,
+                                                                              limit: input.query.limit ?? 100)
+        return .ok(.init(body: .json(runs.map(Components.Schemas.AutomationRun.init))))
+    }
+
+    func getRecentRuns(_ input: Operations.GetRecentRuns.Input) async throws -> Operations.GetRecentRuns.Output {
+        let runs = try await request.application.automationRunRepository.latestRuns(since: input.query.since,
+                                                                                    limit: input.query.limit ?? 100)
+        return .ok(.init(body: .json(runs.map(Components.Schemas.AutomationRun.init))))
     }
 
     func activateAutomation(_ input: Operations.ActivateAutomation.Input) async throws -> Operations.ActivateAutomation.Output {
@@ -281,4 +300,27 @@ struct OpenAPIController: APIProtocol {
         return .ok(.init(body: .json(response)))
     }
 
+}
+
+extension Components.Schemas.EntityId {
+    init(_ entityId: EntityId) {
+        self.init(placeId: entityId.placeId,
+                  name: entityId.name,
+                  characteristicsName: entityId.characteristicsName ?? "",
+                  characteristicType: entityId.characteristicType.rawValue)
+    }
+}
+
+extension Components.Schemas.AutomationRun {
+    init(_ run: AutomationRun) {
+        self.init(id: run.id.uuidString,
+                  automationName: run.automationName,
+                  startedAt: run.startedAt,
+                  endedAt: run.endedAt,
+                  trigger: .init(kind: .init(rawValue: run.trigger.kind.rawValue) ?? .entityChange,
+                                 entityId: run.trigger.entityId.map(Components.Schemas.EntityId.init),
+                                 summary: run.trigger.summary),
+                  outcome: .init(rawValue: run.outcome.rawValue) ?? .failed,
+                  errorDescription: run.errorDescription)
+    }
 }

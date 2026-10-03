@@ -73,6 +73,83 @@ paths:
         "200":
           description: The currently running automation was stopped or the automation is not running.
 
+  /config/automations/{name}/runs:
+    get:
+      summary: Get the runs of an automation
+      description: Retrieve the recorded runs of one automation, newest first.
+      operationId: getAutomationRuns
+      parameters:
+        - name: name
+          in: path
+          description: Name of the automation
+          required: true
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          description: ISO 8601 timestamp; only runs started at or after it
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          description: ISO 8601 timestamp; only runs started before it
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Maximum number of runs to return (default 100, max 1000)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: The runs of the automation.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AutomationRun"
+
+  /runs:
+    get:
+      summary: Get recent runs
+      description: Retrieve the runs of all automations started since a date, newest first.
+      operationId: getRecentRuns
+      parameters:
+        - name: since
+          in: query
+          description: ISO 8601 timestamp; only runs started at or after it
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Maximum number of runs to return (default 100, max 1000)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: The recent runs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AutomationRun"
+
   /pushdevices:
     post:
       summary: Register a push device
@@ -261,10 +338,66 @@ components:
         isRunning:
           type: boolean
           description: Indicates if the automation is currently running.
+        type:
+          type: string
+          description: Type name of the automation, e.g. MotionAtNight.
+        recordsRuns:
+          type: boolean
+          description: Whether runs of this automation are recorded.
+        lastRun:
+          $ref: "#/components/schemas/AutomationRun"
+        entities:
+          type: array
+          description: All entities the automation reads or controls.
+          items:
+            $ref: "#/components/schemas/EntityId"
       required:
         - name
         - isActive
         - isRunning
+
+    AutomationRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        automationName:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        trigger:
+          $ref: "#/components/schemas/AutomationTrigger"
+        outcome:
+          type: string
+          enum: [running, completed, superseded, stopped, failed, interrupted]
+        errorDescription:
+          type: string
+      required:
+        - id
+        - automationName
+        - startedAt
+        - trigger
+        - outcome
+
+    AutomationTrigger:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [entityChange, time, sunrise, sunset]
+        entityId:
+          $ref: "#/components/schemas/EntityId"
+        summary:
+          type: string
+          description: Human-readable description of what triggered the run.
+      required:
+        - kind
+        - summary
 
     PushDevice:
       type: object

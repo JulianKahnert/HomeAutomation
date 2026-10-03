@@ -75,6 +75,85 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     }
 }
 
+extension EntityHistoryItem {
+    public init(_ item: EntityStorageItem) {
+        self.init(timestamp: item.timestamp,
+                  motionDetected: item.motionDetected,
+                  illuminanceInLux: item.illuminance?.value,
+                  isDeviceOn: item.isDeviceOn,
+                  brightness: item.brightness,
+                  colorTemperature: item.colorTemperature,
+                  colorRed: item.color?.red,
+                  colorGreen: item.color?.green,
+                  colorBlue: item.color?.blue,
+                  isContactOpen: item.isContactOpen,
+                  isDoorLocked: item.isDoorLocked,
+                  stateOfCharge: item.stateOfCharge,
+                  isHeaterActive: item.isHeaterActive,
+                  temperatureInC: item.temperatureInC?.value,
+                  relativeHumidity: item.relativeHumidity,
+                  carbonDioxideSensorId: item.carbonDioxideSensorId,
+                  pmDensity: item.pmDensity,
+                  airQuality: item.airQuality,
+                  valveOpen: item.valveOpen)
+    }
+
+    /// Human-readable description of the primary value
+    public var valueDescription: String {
+        if let temperatureInC {
+            return "\(String(format: "%.1f", temperatureInC))°C"
+        }
+        if let relativeHumidity {
+            return "\(String(format: "%.1f", relativeHumidity))%"
+        }
+        if let carbonDioxideSensorId {
+            return "\(carbonDioxideSensorId) ppm"
+        }
+        if let airQuality {
+            return "AQI: \(airQuality)"
+        }
+        if let pmDensity {
+            return "\(String(format: "%.1f", pmDensity)) µg/m³"
+        }
+        if let illuminanceInLux {
+            return "\(String(format: "%.1f", illuminanceInLux)) lux"
+        }
+        if let brightness {
+            return "\(brightness)%"
+        }
+        if let stateOfCharge {
+            return "\(stateOfCharge)%"
+        }
+        if let colorTemperature {
+            return "CT: \(String(format: "%.2f", colorTemperature))"
+        }
+        if let isDeviceOn {
+            return isDeviceOn ? "On" : "Off"
+        }
+        if let motionDetected {
+            return motionDetected ? "Motion" : "No Motion"
+        }
+        if let isContactOpen {
+            return isContactOpen ? "Open" : "Closed"
+        }
+        if let isDoorLocked {
+            return isDoorLocked ? "Locked" : "Unlocked"
+        }
+        if let isHeaterActive {
+            return isHeaterActive ? "Active" : "Inactive"
+        }
+        if let valveOpen {
+            return valveOpen ? "Open" : "Closed"
+        }
+        // Color as hue
+        if let colorRed, let colorGreen, let colorBlue {
+            let hue = Double(RGB(red: colorRed, green: colorGreen, blue: colorBlue).hue)
+            return "\(String(format: "%.0f", hue))° hue"
+        }
+        return "No data"
+    }
+}
+
 /// Response wrapper for paginated entity history
 public struct EntityHistoryResponse: Sendable, Codable, Equatable {
     public let items: [EntityHistoryItem]

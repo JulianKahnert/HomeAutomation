@@ -35,10 +35,25 @@ public struct ServerClient {
         let response = try await client.getAutomations()
         return try response.ok.body.json
             .map { automation in
-                AutomationInfo(name: automation.name,
-                               isActive: automation.isActive,
-                               isRunning: automation.isRunning)
+                try AutomationInfo(name: automation.name,
+                                   isActive: automation.isActive,
+                                   isRunning: automation.isRunning,
+                                   type: automation._type,
+                                   recordsRuns: automation.recordsRuns ?? true,
+                                   lastRun: automation.lastRun.map(AutomationRun.init),
+                                   entities: (automation.entities ?? []).compactMap(EntityId.init))
             }
+    }
+
+    public func getRuns(automation name: String, startDate: Date? = nil, endDate: Date? = nil, limit: Int? = nil) async throws -> [AutomationRun] {
+        let response = try await client.getAutomationRuns(path: .init(name: name),
+                                                          query: .init(startDate: startDate, endDate: endDate, limit: limit))
+        return try response.ok.body.json.map(AutomationRun.init)
+    }
+
+    public func getRecentRuns(since date: Date, limit: Int? = nil) async throws -> [AutomationRun] {
+        let response = try await client.getRecentRuns(query: .init(since: date, limit: limit))
+        return try response.ok.body.json.map(AutomationRun.init)
     }
 
     public func activate(automation name: String) async throws {
@@ -183,5 +198,35 @@ extension Components.Schemas.PushDevice.TokenTypePayload {
         case .liveActivityUpdate:
             return .liveActivityUpdate
         }
+    }
+}
+
+struct InvalidResponseError: Error {
+    let reason: String
+}
+
+extension EntityId {
+    /// `nil` for a characteristic type this client does not know yet.
+    init?(_ entityId: Components.Schemas.EntityId) {
+        guard let characteristic = CharacteristicsType(rawValue: entityId.characteristicType) else { return nil }
+        let characteristicsName = entityId.characteristicsName?.isEmpty == false ? entityId.characteristicsName : nil
+        self.init(placeId: entityId.placeId, name: entityId.name, characteristicsName: characteristicsName, characteristic: characteristic)
+    }
+}
+
+extension AutomationRun {
+    init(_ run: Components.Schemas.AutomationRun) throws {
+        guard let id = UUID(uuidString: run.id),
+              let kind = AutomationTrigger.Kind(rawValue: run.trigger.kind.rawValue),
+              let outcome = Outcome(rawValue: run.outcome.rawValue) else {
+            throw InvalidResponseError(reason: "Invalid automation run \(run.id)")
+        }
+        self.init(id: id,
+                  automationName: run.automationName,
+                  startedAt: run.startedAt,
+                  endedAt: run.endedAt,
+                  trigger: AutomationTrigger(kind: kind, entityId: run.trigger.entityId.flatMap(EntityId.init), summary: run.trigger.summary),
+                  outcome: outcome,
+                  errorDescription: run.errorDescription)
     }
 }

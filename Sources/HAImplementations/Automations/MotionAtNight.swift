@@ -80,6 +80,16 @@ public struct MotionAtNight: Automatable {
         return shouldTrigger
     }
 
+    public func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String? {
+        do {
+            let illuminance = try await lightSensor.illuminanceState(with: hm)
+            return "at \(Int(illuminance.converted(to: .lux).value.rounded())) lx"
+        } catch {
+            log.warning("Failed to get illuminance for the trigger summary - \(error)")
+            return nil
+        }
+    }
+
     /// Window contacts only matter after dark — a lit room with an open window draws insects,
     /// which is not a concern in daylight. Respected unless the sun position is unavailable, so
     /// an unknown sun state never silently switches insect protection off.

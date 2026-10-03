@@ -37,9 +37,20 @@ public protocol Automatable: Sendable, Codable {
     /// - Parameter hm: An instance of HomeManagable providing the current state or context of the home system.
     /// - Throws: An error if something goes wrong during the execution.
     func execute(using hm: HomeManagable) async throws
+
+    /// Whether `AutomationService` records an `AutomationRun` per execution. Off for automations
+    /// that trigger every minute, which would flood the run history.
+    var recordsRuns: Bool { get }
+
+    /// Extra detail appended to the generic trigger summary, e.g. the sensor value that decided it.
+    func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String?
 }
 
 public extension Automatable {
+    var recordsRuns: Bool { true }
+
+    func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String? { nil }
+
     var log: Logger {
         Logger(label: String(describing: Self.self))
     }

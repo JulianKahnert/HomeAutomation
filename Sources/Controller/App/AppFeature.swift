@@ -82,6 +82,7 @@ struct AppFeature: Sendable {
 
         // Scene phase changes
         case scenePhaseChanged(old: ScenePhase, new: ScenePhase)
+        case refreshAll
 
         case binding(BindingAction<State>)
     }
@@ -201,7 +202,9 @@ struct AppFeature: Sendable {
                     return .none
                 }
 
-                // Refresh all tabs and start monitoring when app becomes active
+                return .send(.refreshAll)
+
+            case .refreshAll:
                 return .merge(
                     .send(.automations(.refresh)),
                     .send(.actions(.refresh)),

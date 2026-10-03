@@ -96,7 +96,7 @@ struct ActionsFeature: Sendable {
                 let limit = state.limit
                 return .run { send in
                     await send(.actionsResponse(
-                        Result { try await serverClient.getActions(limit) }
+                        Result { try await serverClient.getActions(limit, nil) }
                     ))
                 }
 

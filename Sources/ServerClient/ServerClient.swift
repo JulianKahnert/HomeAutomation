@@ -11,6 +11,8 @@ import OpenAPIURLSession
 
 public struct ServerClient {
     private let client: Client
+    private let url: URL
+    private let session: URLSession
 
     public init(url: URL, authToken: String? = nil) {
         // Create URLSession with authentication header if token is provided
@@ -25,6 +27,8 @@ public struct ServerClient {
             session = URLSession.shared
         }
 
+        self.url = url
+        self.session = session
         self.client = Client(
             serverURL: url,
             transport: URLSessionTransport(configuration: .init(session: session))
@@ -43,6 +47,13 @@ public struct ServerClient {
                                    lastRun: automation.lastRun.map(AutomationRun.init),
                                    entities: (automation.entities ?? []).compactMap(EntityId.init))
             }
+    }
+
+    /// `true` when the server and its adapter connection are up. `GET /health` is not part of the
+    /// OpenAPI spec because the Docker healthcheck owns it, so this calls it directly.
+    public func isHealthy() async throws -> Bool {
+        let (_, response) = try await session.data(from: url.appending(path: "health"))
+        return (response as? HTTPURLResponse)?.statusCode == 200
     }
 
     public func getRuns(automation name: String, startDate: Date? = nil, endDate: Date? = nil, limit: Int? = nil) async throws -> [AutomationRun] {

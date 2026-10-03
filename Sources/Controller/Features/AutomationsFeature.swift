@@ -14,23 +14,35 @@ import SwiftUI
 @Reducer
 struct AutomationsFeature: Sendable {
 
+    enum Grouping: String, CaseIterable, Sendable {
+        case status
+        case type
+    }
+
     // MARK: - State
 
     @ObservableState
     struct State: Equatable, Sendable {
         @Shared(.automations) var automations: IdentifiedArrayOf<AutomationInfo> = []
+        @Shared(.automationGrouping) var grouping: Grouping = .status
         var isLoading = false
         var selectedAutomationIndex: String?
         var error: String?
 
         @Presents var selectedAutomation: AutomationDetails.State?
 
-        var runningAutomations: [AutomationInfo] {
-            automations.filter(\.isRunning)
-        }
-
-        var inactiveAutomations: [AutomationInfo] {
-            automations.filter { !$0.isRunning }
+        /// Running automations first within each section.
+        var sections: [(title: String, automations: [AutomationInfo])] {
+            let sorted = automations.sorted { ($0.isRunning ? 0 : 1, $0.name) < ($1.isRunning ? 0 : 1, $1.name) }
+            switch grouping {
+            case .status:
+                return [("Active", sorted.filter(\.isActive)), ("Inactive", sorted.filter { !$0.isActive })]
+                    .filter { !$0.1.isEmpty }
+            case .type:
+                return Dictionary(grouping: sorted, by: \.typeLabel)
+                    .sorted { $0.key < $1.key }
+                    .map { ($0.key, $0.value) }
+            }
         }
     }
 
@@ -41,8 +53,10 @@ struct AutomationsFeature: Sendable {
         case onAppear
         case refresh
         case automationsResponse(Result<[AutomationInfo], Error>)
-        case automationOperationResponse(Result<Void, Error>)
+        case setActive(name: String, Bool)
+        case setActiveResponse(name: String, Result<Bool, Error>)
         case dismissError
+        case groupingChanged(Grouping)
         case selectedAutomation(PresentationAction<AutomationDetails.Action>)
     }
 
@@ -93,18 +107,34 @@ struct AutomationsFeature: Sendable {
                 state.error = "Failed to load automations: \(error.localizedDescription)"
                 return .none
 
-            case .automationOperationResponse(.success):
-                // Refresh the list after a successful operation
+            case let .setActive(name, isActive):
+                state.error = nil
+                state.$automations.withLock { $0[id: name]?.isActive = isActive }
                 return .run { send in
-                    await send(.refresh)
+                    await send(.setActiveResponse(name: name, Result {
+                        if isActive {
+                            try await serverClient.activate(name)
+                        } else {
+                            try await serverClient.deactivate(name)
+                        }
+                        return isActive
+                    }))
                 }
 
-            case let .automationOperationResponse(.failure(error)):
-                state.error = "Operation failed: \(error.localizedDescription)"
+            case .setActiveResponse(_, .success):
+                return .none
+
+            case let .setActiveResponse(name, .failure(error)):
+                state.$automations.withLock { $0[id: name]?.isActive.toggle() }
+                state.error = "Failed to change \(name): \(error.localizedDescription)"
                 return .none
 
             case .dismissError:
                 state.error = nil
+                return .none
+
+            case let .groupingChanged(grouping):
+                state.$grouping.withLock { $0 = grouping }
                 return .none
 
             case .selectedAutomation:
@@ -123,18 +153,21 @@ struct AutomationsView: View {
     var body: some View {
         NavigationStack {
             List(selection: $store.selectedAutomationIndex) {
-                if !store.runningAutomations.isEmpty {
-                    Section("Running") {
-                        ForEach(store.runningAutomations) { automation in
-                            automationRow(automation)
-                                .tag(automation.id)
-                        }
-                    }
+                Picker("Grouping", selection: Binding(get: { store.grouping }, set: { store.send(.groupingChanged($0)) })) {
+                    Text("Active / Inactive").tag(AutomationsFeature.Grouping.status)
+                    Text("By Type").tag(AutomationsFeature.Grouping.type)
+                }
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+
+                if let error = store.error {
+                    Text(error)
+                        .foregroundStyle(.red)
                 }
 
-                if !store.inactiveAutomations.isEmpty {
-                    Section("Inactive") {
-                        ForEach(store.inactiveAutomations, id: \.name) { automation in
+                ForEach(store.sections, id: \.title) { section in
+                    Section(section.title) {
+                        ForEach(section.automations) { automation in
                             automationRow(automation)
                                 .tag(automation.id)
                         }
@@ -169,16 +202,26 @@ struct AutomationsView: View {
         }
     }
 
-    @ViewBuilder
     private func automationRow(_ automation: AutomationInfo) -> some View {
         HStack {
-            Text(automation.name)
-                .foregroundStyle(automation.isRunning ? Color.accentColor : Color.primary)
-            Spacer()
-            if !automation.isActive {
-                Image(systemName: "x.circle")
-                    .foregroundStyle(Color.red)
+            Image(systemName: automation.systemImage)
+                .frame(width: 28)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(automation.name)
+                Text(automation.subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
+            Spacer()
+            Pill(outcome: .running)
+                .opacity(automation.isRunning ? 1 : 0)
+            Toggle("Active", isOn: Binding(
+                get: { automation.isActive },
+                set: { store.send(.setActive(name: automation.name, $0)) }
+            ))
+            .labelsHidden()
         }
     }
 }

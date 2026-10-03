@@ -106,7 +106,8 @@ struct EntityHistoryDetailFeature: Sendable {
                                 dateRange.start,
                                 dateRange.end,
                                 nil,
-                                5000  // Higher limit for initial load
+                                1000,
+                                true
                             )
                         }
                     ))
@@ -128,7 +129,8 @@ struct EntityHistoryDetailFeature: Sendable {
                                 dateRange.start,
                                 dateRange.end,
                                 cursor,
-                                1000
+                                1000,
+                                false
                             )
                         }
                     ))

@@ -34,6 +34,12 @@ extension SharedKey where Self == AppStorageKey<Bool>.Default {
     }
 }
 
+extension SharedKey where Self == AppStorageKey<AutomationsFeature.Grouping>.Default {
+    static var automationGrouping: Self {
+        Self[.appStorage("automationGrouping", store: .standard), default: .status]
+    }
+}
+
 // MARK: - In-Memory (volatile state)
 
  extension SharedKey where Self == InMemoryKey<IdentifiedArrayOf<AutomationInfo>> {

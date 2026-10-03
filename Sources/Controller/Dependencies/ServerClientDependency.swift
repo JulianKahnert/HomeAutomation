@@ -28,8 +28,17 @@ struct ServerClientDependency: Sendable {
     /// Stop an automation by name
     var stop: @Sendable (_ name: String) async throws -> Void
 
-    /// Get action log items
-    var getActions: @Sendable (_ limit: Int?) async throws -> [ActionLogItem]
+    /// `true` when the server reaches its adapter
+    var isHealthy: @Sendable () async throws -> Bool
+
+    /// Runs of one automation, newest first
+    var getRuns: @Sendable (_ automation: String, _ startDate: Date?, _ endDate: Date?, _ limit: Int?) async throws -> [AutomationRun]
+
+    /// Runs of all automations since a date, newest first
+    var getRecentRuns: @Sendable (_ since: Date, _ limit: Int?) async throws -> [AutomationRun]
+
+    /// Get action log items, optionally only those sent by one run
+    var getActions: @Sendable (_ limit: Int?, _ runId: UUID?) async throws -> [ActionLogItem]
 
     /// Clear all action log items
     var clearActions: @Sendable () async throws -> Void
@@ -49,8 +58,12 @@ struct ServerClientDependency: Sendable {
         _ startDate: Date?,
         _ endDate: Date?,
         _ cursor: Date?,
-        _ limit: Int
+        _ limit: Int,
+        _ includePrevious: Bool
     ) async throws -> EntityHistoryResponse
+
+    /// History of every entity in a room, newest first per entity
+    var getRoomHistory: @Sendable (_ placeId: String, _ startDate: Date?, _ endDate: Date?, _ includePrevious: Bool) async throws -> [EntityHistory]
 }
 
 // MARK: - Dependency Key Implementation
@@ -61,26 +74,33 @@ extension ServerClientDependency: TestDependencyKey {
         activate: { _ in },
         deactivate: { _ in },
         stop: { _ in },
-        getActions: { _ in [] },
+        isHealthy: { true },
+        getRuns: { _, _, _, _ in [] },
+        getRecentRuns: { _, _ in [] },
+        getActions: { _, _ in [] },
         clearActions: { },
         getWindowStates: { [] },
         registerDevice: { _ in },
         getEntityIdsWithHistory: { [] },
-        getEntityHistory: { _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) }
+        getEntityHistory: { _, _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) },
+        getRoomHistory: { _, _, _, _ in [] }
     )
 
     static let previewValue = Self(
         getAutomations: {
             [
-                AutomationInfo(name: "Morning Routine", isActive: true, isRunning: true),
-                AutomationInfo(name: "Evening Lights", isActive: true, isRunning: false),
-                AutomationInfo(name: "Vacation Mode", isActive: false, isRunning: false)
+                AutomationInfo(name: "Hallway Night Light", isActive: true, isRunning: true, type: "MotionAtNight", lastRun: previewRuns[0]),
+                AutomationInfo(name: "Evening Lights", isActive: true, isRunning: false, type: "Turn", lastRun: previewRuns[1]),
+                AutomationInfo(name: "Vacation Mode", isActive: false, isRunning: false, type: "TriggerScene")
             ]
         },
         activate: { _ in },
         deactivate: { _ in },
         stop: { _ in },
-        getActions: { _ in
+        isHealthy: { true },
+        getRuns: { name, _, _, _ in previewRuns.filter { $0.automationName == name } },
+        getRecentRuns: { _, _ in previewRuns },
+        getActions: { _, _ in
             [
                 ActionLogItem(
                     id: UUID(),
@@ -113,7 +133,7 @@ extension ServerClientDependency: TestDependencyKey {
                 )
             ]
         },
-        getEntityHistory: { entityId, _, _, _, _ in
+        getEntityHistory: { entityId, _, _, _, _, _ in
             // Generate realistic data based on entity type
             let items: [EntityHistoryItem]
 
@@ -178,8 +198,26 @@ extension ServerClientDependency: TestDependencyKey {
             }
 
             return EntityHistoryResponse(items: items, nextCursor: nil)
-        }
+        },
+        getRoomHistory: { _, _, _, _ in [] }
     )
+
+    private static let previewRuns = [
+        AutomationRun(
+            automationName: "Hallway Night Light",
+            startedAt: Date().addingTimeInterval(-120),
+            trigger: AutomationTrigger(kind: .entityChange, entityId: nil, summary: "Motion · Eve Motion (Hallway)"),
+            outcome: .running
+        ),
+        AutomationRun(
+            automationName: "Evening Lights",
+            startedAt: Date().addingTimeInterval(-3600),
+            endedAt: Date().addingTimeInterval(-3590),
+            trigger: AutomationTrigger(kind: .sunset, entityId: nil, summary: "Sunset"),
+            outcome: .failed,
+            errorDescription: "Ceiling Light (Living Room) not reachable"
+        )
+    ]
 }
 
 extension ServerClientDependency: DependencyKey {
@@ -205,8 +243,17 @@ extension ServerClientDependency: DependencyKey {
         stop: { name in
              try await client.stop(automation: name)
         },
-        getActions: { limit in
-            try await client.getActions(limit: limit)
+        isHealthy: {
+            try await client.isHealthy()
+        },
+        getRuns: { name, startDate, endDate, limit in
+            try await client.getRuns(automation: name, startDate: startDate, endDate: endDate, limit: limit)
+        },
+        getRecentRuns: { since, limit in
+            try await client.getRecentRuns(since: since, limit: limit)
+        },
+        getActions: { limit, runId in
+            try await client.getActions(limit: limit, runId: runId)
         },
         clearActions: {
             try await client.clearActions()
@@ -220,14 +267,18 @@ extension ServerClientDependency: DependencyKey {
         getEntityIdsWithHistory: {
             try await client.getEntityIdsWithHistory()
         },
-        getEntityHistory: { entityId, startDate, endDate, cursor, limit in
+        getEntityHistory: { entityId, startDate, endDate, cursor, limit, includePrevious in
             try await client.getEntityHistory(
                 entityId: entityId,
                 startDate: startDate,
                 endDate: endDate,
                 cursor: cursor,
-                limit: limit
+                limit: limit,
+                includePrevious: includePrevious
             )
+        },
+        getRoomHistory: { placeId, startDate, endDate, includePrevious in
+            try await client.getRoomHistory(placeId: placeId, startDate: startDate, endDate: endDate, includePrevious: includePrevious)
         }
     )
 }

@@ -24,7 +24,7 @@ struct ServerClientDependencyTests {
             let automations = try await client.getAutomations()
             #expect(automations.isEmpty)
 
-            let actions = try await client.getActions(10)
+            let actions = try await client.getActions(10, nil)
             #expect(actions.isEmpty)
 
             let windowStates = try await client.getWindowStates()
@@ -41,11 +41,11 @@ struct ServerClientDependencyTests {
 
             let automations = try await client.getAutomations()
             #expect(automations.count == 3)
-            #expect(automations[0].name == "Morning Routine")
+            #expect(automations[0].name == "Hallway Night Light")
             #expect(automations[0].isActive == true)
             #expect(automations[0].isRunning == true)
 
-            let actions = try await client.getActions(10)
+            let actions = try await client.getActions(10, nil)
             #expect(actions.count == 1)
             #expect(actions[0].actionName == "Turn On")
 
@@ -62,9 +62,9 @@ struct ServerClientDependencyTests {
         } operation: {
             @Dependency(\.serverClient) var client
 
-            try await client.activate("Morning Routine")
-            try await client.deactivate("Morning Routine")
-            try await client.stop("Morning Routine")
+            try await client.activate("Hallway Night Light")
+            try await client.deactivate("Hallway Night Light")
+            try await client.stop("Hallway Night Light")
             try await client.clearActions()
         }
     }

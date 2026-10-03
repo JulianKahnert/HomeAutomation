@@ -22,6 +22,7 @@ struct AppFeatureTests {
             AppFeature()
         } withDependencies: {
             $0.serverClient = .previewValue
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.liveActivity = .testValue
             $0.pushNotification = .testValue
         }

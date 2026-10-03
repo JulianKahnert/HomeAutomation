@@ -24,7 +24,8 @@ struct AppFeature: Sendable {
 
     @ObservableState
     struct State: Equatable, Sendable {
-        var selectedTab: Tab = .automations
+        var selectedTab: Tab = .overview
+        var overview = OverviewFeature.State()
         var automations = AutomationsFeature.State()
         var actions = ActionsFeature.State()
         var history = HistoryFeature.State()
@@ -38,6 +39,7 @@ struct AppFeature: Sendable {
     // MARK: - Tab
 
     enum Tab: Sendable, Equatable, CaseIterable {
+        case overview
         case automations
         case actions
         case history
@@ -45,6 +47,7 @@ struct AppFeature: Sendable {
 
         var title: String {
             switch self {
+            case .overview: return "Overview"
             case .automations: return "Automations"
             case .actions: return "Actions"
             case .history: return "History"
@@ -54,6 +57,7 @@ struct AppFeature: Sendable {
 
         var systemImage: String {
             switch self {
+            case .overview: return "house"
             case .automations: return "lamp.floor"
             case .actions: return "list.bullet.clipboard"
             case .history: return "chart.line.uptrend.xyaxis"
@@ -66,6 +70,7 @@ struct AppFeature: Sendable {
 
     enum Action: Sendable, BindableAction {
         case selectedTabChanged(Tab)
+        case overview(OverviewFeature.Action)
         case automations(AutomationsFeature.Action)
         case actions(ActionsFeature.Action)
         case history(HistoryFeature.Action)
@@ -98,6 +103,10 @@ struct AppFeature: Sendable {
     var body: some ReducerOf<Self> {
         BindingReducer()
 
+        Scope(state: \.overview, action: \.overview) {
+            OverviewFeature()
+        }
+
         Scope(state: \.automations, action: \.automations) {
             AutomationsFeature()
         }
@@ -118,6 +127,13 @@ struct AppFeature: Sendable {
             switch action {
             case let .selectedTabChanged(tab):
                 state.selectedTab = tab
+                return .none
+
+            case let .overview(.delegate(.openAutomation(name))):
+                state.selectedTab = .automations
+                return .send(.automations(.binding(.set(\.selectedAutomationIndex, name))))
+
+            case .overview:
                 return .none
 
             case .automations:
@@ -206,6 +222,7 @@ struct AppFeature: Sendable {
 
             case .refreshAll:
                 return .merge(
+                    .send(.overview(.refresh)),
                     .send(.automations(.refresh)),
                     .send(.actions(.refresh)),
                     .send(.history(.refresh)),
@@ -226,6 +243,18 @@ struct AppView: View {
 
     var body: some View {
         TabView(selection: $store.selectedTab) {
+            Tab(
+                AppFeature.Tab.overview.title,
+                systemImage: AppFeature.Tab.overview.systemImage,
+                value: AppFeature.Tab.overview
+            ) {
+                OverviewView(
+                    store: store.scope(state: \.overview, action: \.overview),
+                    openWindows: store.settings.windowContentState?.windowStates ?? []
+                )
+            }
+            .badge(store.openWindowsCount ?? 0)
+
             Tab(
                 AppFeature.Tab.automations.title,
                 systemImage: AppFeature.Tab.automations.systemImage,
@@ -277,7 +306,6 @@ struct AppView: View {
                     )
                 )
             }
-            .badge(store.openWindowsCount ?? 0)
         }
         .tabViewStyle(.sidebarAdaptable)
         .onSceneChange { oldPhase, newPhase in

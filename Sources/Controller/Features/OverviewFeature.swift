@@ -186,14 +186,17 @@ struct OverviewView: View {
                                             .foregroundStyle(.secondary)
                                             .lineLimit(1)
                                     }
-                                    // A button would tint the whole row; the row opens the automation in its tab.
-                                    .foregroundStyle(.primary)
                                     Spacer()
                                     Button("Stop") {
                                         store.send(.stopButtonTapped(automation.name))
                                     }
                                     .buttonStyle(.bordered)
+                                    // Reads like a navigation row: it leaves the tab, so it cannot be a NavigationLink.
+                                    Image(systemName: "chevron.forward")
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(.tertiary)
                                 }
+                                .foregroundStyle(.primary)
                             }
                         }
                     }

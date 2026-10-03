@@ -190,56 +190,47 @@ struct EntityHistoryDetailView: View {
     @Bindable var store: StoreOf<EntityHistoryDetailFeature>
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Time range picker
+        List {
+            Section {
                 Picker("Time Range", selection: $store.timeRange) {
                     ForEach(EntityHistoryDetailFeature.TimeRange.allCases, id: \.self) { range in
                         Text(range.displayName).tag(range)
                     }
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal)
                 .onChange(of: store.timeRange) { _, newValue in
                     store.send(.timeRangeChanged(newValue))
                 }
 
-                // Chart
                 if !store.chartData.isEmpty {
+                    // A single state lane needs far less height than a value chart.
                     chartView
-                        .frame(height: 300)
-                        .padding(.horizontal)
+                        .frame(height: store.chartData.contains { $0.stateValue != nil } ? 100 : 300)
                 } else if store.isLoading {
                     ProgressView()
-                        .frame(height: 300)
+                        .frame(maxWidth: .infinity, minHeight: 300)
                 } else {
                     ContentUnavailableView(
                         "No Data",
                         systemImage: "chart.line.uptrend.xyaxis",
                         description: Text("No history data available for this time range")
                     )
-                    .frame(height: 300)
-                }
-
-                if store.timeRange == .week {
-                    dailyChart
-                        .padding(.horizontal)
-                }
-
-                // History list
-                if !store.historyItems.isEmpty {
-                    VStack(spacing: 0) {
-                        ForEach(store.historyItems) { item in
-                            historyRow(item)
-                            Divider()
-                        }
-                    }
-                    .background(.secondary.opacity(0.1))
-                    .cornerRadius(8)
-                    .padding(.horizontal)
                 }
             }
-            .padding(.vertical)
+
+            if store.timeRange == .week {
+                Section("Per Day") {
+                    dailyChart
+                }
+            }
+
+            if !store.historyItems.isEmpty {
+                Section("History") {
+                    ForEach(store.historyItems) { item in
+                        historyRow(item)
+                    }
+                }
+            }
         }
         .refreshable {
             store.send(.refresh)
@@ -248,6 +239,14 @@ struct EntityHistoryDetailView: View {
             store.send(.onAppear)
         }
         .alert($store.scope(\.$alert, action: \.alert))
+    }
+
+    private var laneLabel: String {
+        switch store.entity.entityId.characteristicType {
+        case .contactSensor: "Open"
+        case .motionSensor: "Motion"
+        default: "On"
+        }
     }
 
     @ViewBuilder
@@ -260,7 +259,7 @@ struct EntityHistoryDetailView: View {
         if isBoolean {
             TimelineChart(
                 lanes: [.init(
-                    label: "On",
+                    label: laneLabel,
                     color: ChartPalette.color(for: store.entity.entityId.characteristicType),
                     intervals: StateIntervals.intervals(items: store.chartData, isActive: \.stateValue, from: dateRange.start, to: dateRange.end)
                 )],
@@ -354,8 +353,6 @@ struct EntityHistoryDetailView: View {
                 .font(.body)
                 .bold()
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
     }
 }
 

@@ -73,7 +73,7 @@ struct RunDetailView: View {
                         .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated)))
                 }
                 LabeledContent("Outcome") {
-                    Pill(outcome: store.run.outcome)
+                    StatusLabel(outcome: store.run.outcome)
                 }
                 if let errorDescription = store.run.errorDescription {
                     LabeledContent("Error") {

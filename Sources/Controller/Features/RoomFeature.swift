@@ -181,7 +181,16 @@ struct RoomView: View {
                     Button {
                         store.send(.entityTapped(entity))
                     } label: {
-                        Label(entity.formattedCharacteristicDisplayName, systemImage: entity.entityId.characteristicType.systemImage)
+                        Label {
+                            VStack(alignment: .leading) {
+                                Text(entity.entityId.name)
+                                Text(entity.formattedCharacteristicDisplayName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: entity.entityId.characteristicType.systemImage)
+                        }
                     }
                 }
             }

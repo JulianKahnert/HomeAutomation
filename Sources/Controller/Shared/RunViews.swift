@@ -6,35 +6,34 @@
 import HAModels
 import SwiftUI
 
-struct Pill: View {
+/// Outcome or command status as a tinted SF Symbol label, the way system lists show state.
+struct StatusLabel: View {
     let text: String
+    let systemImage: String
     let color: Color
 
     var body: some View {
-        Text(text)
-            .font(.caption.bold())
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+        Label(text, systemImage: systemImage)
+            .font(.caption)
             .foregroundStyle(color)
-            .background(color.opacity(0.15), in: .capsule)
     }
 }
 
-extension Pill {
+extension StatusLabel {
     init(outcome: AutomationRun.Outcome) {
         switch outcome {
-        case .running: self.init(text: outcome.label, color: .green)
-        case .completed: self.init(text: outcome.label, color: .accentColor)
-        case .failed, .interrupted: self.init(text: outcome.label, color: .red)
-        case .superseded, .stopped: self.init(text: outcome.label, color: .secondary)
+        case .running: self.init(text: outcome.label, systemImage: "play.circle.fill", color: .green)
+        case .completed: self.init(text: outcome.label, systemImage: "checkmark.circle.fill", color: .accentColor)
+        case .failed, .interrupted: self.init(text: outcome.label, systemImage: "exclamationmark.triangle.fill", color: .red)
+        case .superseded, .stopped: self.init(text: outcome.label, systemImage: "stop.circle", color: .secondary)
         }
     }
 
     init(status: ActionLogItem.Status) {
         switch status {
-        case .executed: self.init(text: "Fresh", color: .green)
-        case .cacheHit: self.init(text: "Cache", color: .yellow)
-        case .failed: self.init(text: "Failed", color: .red)
+        case .executed: self.init(text: "Fresh", systemImage: "bolt.fill", color: .green)
+        case .cacheHit: self.init(text: "Cache", systemImage: "arrow.uturn.backward.circle", color: .yellow)
+        case .failed: self.init(text: "Failed", systemImage: "exclamationmark.triangle.fill", color: .red)
         }
     }
 }
@@ -57,7 +56,7 @@ struct RunRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Pill(outcome: run.outcome)
+            StatusLabel(outcome: run.outcome)
         }
     }
 }
@@ -79,7 +78,7 @@ struct ActionRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if let status = item.status {
-                Pill(status: status)
+                StatusLabel(status: status)
             }
         }
     }

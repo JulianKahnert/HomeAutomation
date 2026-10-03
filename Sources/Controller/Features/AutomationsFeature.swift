@@ -215,7 +215,7 @@ struct AutomationsView: View {
                     .lineLimit(1)
             }
             Spacer()
-            Pill(outcome: .running)
+            StatusLabel(outcome: .running)
                 .opacity(automation.isRunning ? 1 : 0)
             Toggle("Active", isOn: Binding(
                 get: { automation.isActive },

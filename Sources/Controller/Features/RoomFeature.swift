@@ -27,6 +27,7 @@ struct RoomFeature: Sendable {
         var error: String?
         var histories: [EntityHistory] = []
         var timeRange: TimeRange = .day
+        var weekHistories: [EntityHistory] = []
         @Presents var entityDetail: EntityHistoryDetailFeature.State?
 
         var start: Date { end.addingTimeInterval(-timeRange.rawValue) }
@@ -39,6 +40,7 @@ struct RoomFeature: Sendable {
         case entityTapped(EntityInfo)
         case historyResponse(Result<[EntityHistory], Error>)
         case task
+        case weekHistoryResponse(Result<[EntityHistory], Error>)
     }
 
     @Dependency(\.date.now) var now
@@ -56,7 +58,11 @@ struct RoomFeature: Sendable {
                 state.histories = histories
                 return .none
 
-            case let .automationsResponse(.failure(error)), let .historyResponse(.failure(error)):
+            case let .weekHistoryResponse(.success(histories)):
+                state.weekHistories = histories
+                return .none
+
+            case let .automationsResponse(.failure(error)), let .historyResponse(.failure(error)), let .weekHistoryResponse(.failure(error)):
                 state.error = error.localizedDescription
                 return .none
 
@@ -75,6 +81,11 @@ struct RoomFeature: Sendable {
                     loadHistory(&state),
                     .run { send in
                         await send(.automationsResponse(Result { try await serverClient.getAutomations() }))
+                    },
+                    .run { [placeId = state.placeId, end = state.end] send in
+                        await send(.weekHistoryResponse(Result {
+                            try await serverClient.getRoomHistory(placeId, end.addingTimeInterval(-7 * 86_400), end, true)
+                        }))
                     }
                 )
             }
@@ -113,6 +124,14 @@ struct RoomView: View {
             }
     }
 
+    private var weekStart: Date { store.end.addingTimeInterval(-7 * 86_400) }
+
+    private func windowIntervals(_ histories: [EntityHistory], from start: Date, to end: Date) -> [DateInterval] {
+        histories
+            .filter { $0.entityId.characteristicType == .contactSensor }
+            .flatMap { StateIntervals.intervals(items: $0.items, isActive: \.isContactOpen, from: start, to: end) }
+    }
+
     var body: some View {
         List {
             Section {
@@ -130,6 +149,31 @@ struct RoomView: View {
                 }
             } header: {
                 Text("Timeline")
+            }
+
+            if let co2 = store.histories.first(where: { $0.entityId.characteristicType == .carbonDioxideSensorId }) {
+                Section("CO₂") {
+                    ValueChart(
+                        points: co2.items.compactMap { item in item.carbonDioxideSensorId.map { (item.timestamp, Double($0)) } },
+                        domain: store.start...store.end,
+                        color: ChartPalette.color(for: .carbonDioxideSensorId),
+                        unit: "ppm",
+                        threshold: (1_000, "1000 ppm"),
+                        bands: windowIntervals(store.histories, from: store.start, to: store.end),
+                        bandColor: ChartPalette.color(for: .contactSensor).opacity(0.2)
+                    )
+                }
+            }
+
+            if store.weekHistories.contains(where: { $0.entityId.characteristicType == .contactSensor }) {
+                Section("Ventilation per Day") {
+                    DailyBarChart(
+                        bars: DailyTotals.dailyTotals(windowIntervals(store.weekHistories, from: weekStart, to: store.end), days: DailyTotals.days(count: 7, endingAt: store.end, calendar: .current), calendar: .current)
+                            .map { ($0.day, $0.duration / 60) },
+                        color: ChartPalette.color(for: .contactSensor),
+                        unit: "min"
+                    )
+                }
             }
 
             Section("Devices") {

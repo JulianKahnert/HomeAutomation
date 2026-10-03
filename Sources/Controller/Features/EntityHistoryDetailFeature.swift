@@ -221,6 +221,11 @@ struct EntityHistoryDetailView: View {
                     .frame(height: 300)
                 }
 
+                if store.timeRange == .week {
+                    dailyChart
+                        .padding(.horizontal)
+                }
+
                 // History list
                 if !store.historyItems.isEmpty {
                     VStack(spacing: 0) {
@@ -263,6 +268,31 @@ struct EntityHistoryDetailView: View {
             )
         } else {
             lineChart(range: range, isLux: isLux)
+        }
+    }
+
+    /// Per-day summaries of the 7-day range: on-duration for lamps, max and time-weighted mean for lux and CO₂.
+    @ViewBuilder
+    private var dailyChart: some View {
+        let dateRange = store.state.dateRange
+        let type = store.entity.entityId.characteristicType
+        let days = DailyTotals.days(count: 7, endingAt: dateRange.end, calendar: .current)
+        if type == .switcher {
+            let intervals = StateIntervals.intervals(items: store.chartData, isActive: \.isDeviceOn, from: dateRange.start, to: dateRange.end)
+            DailyBarChart(
+                bars: DailyTotals.dailyTotals(intervals, days: days, calendar: .current).map { ($0.day, $0.duration / 3_600) },
+                color: ChartPalette.color(for: type),
+                unit: "h on"
+            )
+        } else if type == .lightSensor || type == .carbonDioxideSensorId {
+            let samples = store.chartData.compactMap { item in item.primaryValue.map { (date: item.timestamp, value: $0) } }
+            let stats = DailyTotals.dailyStats(samples, days: days, end: dateRange.end, calendar: .current)
+            DailyBarChart(
+                bars: stats.map { ($0.day, $0.max) },
+                color: ChartPalette.color(for: type).opacity(0.6),
+                unit: type == .lightSensor ? "lx (max, ● mean)" : "ppm (max, ● mean)",
+                points: stats.map { ($0.day, $0.mean) }
+            )
         }
     }
 

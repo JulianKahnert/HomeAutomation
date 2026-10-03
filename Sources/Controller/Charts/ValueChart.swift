@@ -15,12 +15,13 @@ struct ValueChart: View {
     var isLogarithmic = false
     var threshold: (value: Double, label: String)?
     var bands: [DateInterval] = []
+    var bandColor = ChartPalette.night
 
     var body: some View {
         Chart {
             ForEach(bands, id: \.start) { band in
                 RectangleMark(xStart: .value("Start", band.start), xEnd: .value("End", band.end))
-                    .foregroundStyle(ChartPalette.night)
+                    .foregroundStyle(bandColor)
             }
             ForEach(points.indices, id: \.self) { index in
                 LineMark(

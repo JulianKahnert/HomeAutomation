@@ -118,3 +118,20 @@ struct RunStatisticsTests {
         #expect(counts.map(\.count) == [2, 1])
     }
 }
+
+struct DailyStatsTests {
+    @Test func meanIsWeightedByHowLongEachValueHeld() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let day = Date(timeIntervalSince1970: 86_400)
+        // 400 from the previous day until 06:00, then 1000 until the end at 12:00.
+        let samples = [(date: day.addingTimeInterval(6 * 3600), value: 1_000.0), (date: day.addingTimeInterval(-3600), value: 400.0)]
+
+        let stats = DailyTotals.dailyStats(samples, days: [day.addingTimeInterval(-86_400), day], end: day.addingTimeInterval(12 * 3600), calendar: calendar)
+
+        #expect(stats.count == 2)
+        #expect(stats[1].day == day)
+        #expect(stats[1].max == 1_000)
+        #expect(stats[1].mean == 700)
+    }
+}

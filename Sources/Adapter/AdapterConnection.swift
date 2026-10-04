@@ -36,7 +36,7 @@ public final class AdapterConnection {
     /// Returns nil when no valid WebSocket URL can be built from the address
     /// or the server's event-receiver proxy cannot be resolved.
     public init?(address: ServerAddress, authToken: String) {
-        guard let url = URL(string: "ws://\(address.host):\(address.port)/adapter/v1") else {
+        guard let url = address.webSocketURL(path: "/adapter/v1") else {
             Self.log.error("Failed to build WebSocket URL from address \(address)")
             return nil
         }

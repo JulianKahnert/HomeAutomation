@@ -19,6 +19,19 @@ docker-compose up -d
 docker-compose down
 ```
 
+## Environment variables
+
+| Variable | Required | Notes |
+|---|---|---|
+| `AUTH_TOKEN` | yes | Bearer token for all HTTP endpoints incl. the adapter WebSocket. Generate with `openssl rand -base64 32`. |
+| `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USERNAME` | no | Default to the docker-compose values. |
+| `DATABASE_PASSWORD` | yes (release) | Release builds refuse to start without it; DEBUG builds fall back to the docker-compose default. |
+| `DATABASE_TLS_VERIFY` | no | `true` enables full TLS certificate verification for the MySQL connection. Off by default because the stock MySQL image uses a self-signed certificate; turn it on whenever the database is not on a private container network. A warning is logged while it is off. |
+| `PUSH_NOTIFICATION_*` | yes (release) | APNS key material, see `docker-compose.yml` in the config repository. |
+| `TZ` | no | Time zone used for time-based automations. |
+
+Never commit real values of these variables. Keep them in a git-ignored `.env` file and reference them from `docker-compose.yml` as `${AUTH_TOKEN}` etc.
+
 ## Other Commands
 
 ```

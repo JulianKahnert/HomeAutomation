@@ -203,6 +203,22 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
         switch envelope {
         case .hello(let hello):
             await handleHello(hello, from: connection)
+        case .call, .reply:
+            // The peer's hello is the FIRST frame and the protocol-version gate. A peer that
+            // skips it must not be able to execute calls (or settle replies) on this side.
+            guard lock.withLock({ helloReceived && self.connection === connection }) else {
+                logger.error("closing connection: received \(envelope.kindDescription) frame before a valid hello")
+                await closeUnauthenticated(connection, reason: "frame before hello")
+                return
+            }
+            await handleAuthenticatedFrame(envelope)
+        }
+    }
+
+    private func handleAuthenticatedFrame(_ envelope: WireEnvelope) async {
+        switch envelope {
+        case .hello:
+            return // handled in `receive`
         case .call(let call):
             logger.debug("inbound call", metadata: [
                 "callID": "\(call.callID)",
@@ -216,6 +232,23 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
                 "error": "\(reply.errorMessage ?? "none")"
             ])
             await pendingCalls.settle(reply.callID, with: .success(reply))
+        }
+    }
+
+    /// Drop a connection that violated the handshake rule: close it and, if it was still
+    /// the current one, fail any pending calls. Mirrors the protocol-version-mismatch path.
+    private func closeUnauthenticated(_ connection: any WireConnection, reason: String) async {
+        let stillCurrent: Bool = lock.withLock {
+            guard self.connection === connection else { return false }
+            self.connection = nil
+            self.helloSent = false
+            self.helloReceived = false
+            return true
+        }
+        await connection.close()
+        if stillCurrent {
+            await pendingCalls.failAll(StarRemoteCallError(message: reason))
+            setStatus(.connecting)
         }
     }
 
@@ -377,6 +410,16 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
         }
         for subscriber in subscribers.handshake {
             subscriber.yield(())
+        }
+    }
+}
+
+private extension WireEnvelope {
+    var kindDescription: String {
+        switch self {
+        case .hello: return "hello"
+        case .call: return "call"
+        case .reply: return "reply"
         }
     }
 }

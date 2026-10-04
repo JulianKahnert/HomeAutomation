@@ -64,20 +64,29 @@ func routes(_ app: Application) throws {
         let configDTO = try req.content.decode(ConfigDTO.self)
         let skipValidation = req.query["skipValidation"] == "true"
 
-        if !skipValidation {
-            // validate if all automations are correct, e.g. contain existing entities
-            let configEntityIds = configDTO.automations
-                .map(\.automation)
-                .flatMap { $0.getEntityIds() }
-                .reduce(into: Set<EntityId>()) { partialResult, entityId in
-                    partialResult.insert(entityId)
-                }
-            let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
-
-            let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
-            guard missingEntityIds.isEmpty else {
-                throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
+        // validate if all automations are correct, e.g. contain existing entities
+        let configEntityIds = configDTO.automations
+            .map(\.automation)
+            .flatMap { $0.getEntityIds() }
+            .reduce(into: Set<EntityId>()) { partialResult, entityId in
+                partialResult.insert(entityId)
             }
+
+        // `skipValidation` is a deliberate escape hatch for deploying a config before all
+        // devices exist in HomeKit (or while the adapter is offline), but it must never be
+        // silent: automations referencing unknown entities fail at runtime and flood the
+        // critical-log notifier, so the gaps are logged as warnings instead.
+        do {
+            let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
+            let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
+            if !missingEntityIds.isEmpty {
+                guard skipValidation else {
+                    throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
+                }
+                req.logger.warning("⚠️ Accepting config with skipValidation=true although \(missingEntityIds.count) referenced entities were not found: \(missingEntityIds)")
+            }
+        } catch where skipValidation {
+            req.logger.warning("⚠️ Accepting config with skipValidation=true although entity validation failed: \(error)")
         }
 
         let previousAutomations = await req.application.homeAutomationConfigService.automations

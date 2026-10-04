@@ -141,8 +141,15 @@ AUTH_TOKEN=your-secure-token-here
 #### Security Notes
 
 - Authentication is **enabled by default** (secure by default)
-- Server **crashes on startup** if `AUTH_TOKEN` is missing (fail-safe)
+- Server **crashes on startup** if `AUTH_TOKEN` is missing (fail-safe); release builds also require `DATABASE_PASSWORD`
 - All endpoints on port 8080 require authentication, including the adapter WebSocket (`/adapter/v1`)
+- Tokens are compared in constant time (`TokenAuthenticationMiddleware.constantTimeEquals`) — keep it that way
+- `limit` query parameters are clamped server-side to the bounds declared in `openapi.yaml` (`OpenAPIController.clampedLimit`); the generator does not enforce them
+- The adapter WebSocket rejects any `call`/`reply` frame that arrives before the peer's `hello` handshake frame
+- `HealthCheck` automations only accept public `https` URLs (`HealthCheck.validate`) so `POST /config` cannot be used to reach internal services
+- Set `DATABASE_TLS_VERIFY=true` when the MySQL connection leaves the private container network (see `docs/setup-server.md` for all environment variables)
+- The adapter stores the server token in the keychain (`AdapterCredentialStore`), never in `UserDefaults`; enable **Use TLS (wss://)** in the adapter settings when it connects over an untrusted network
+- Never commit secrets: `docker-compose.yml` must reference `${AUTH_TOKEN}` etc. from a git-ignored `.env`
 
 ## Pre-Commit Checklist
 

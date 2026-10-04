@@ -14,6 +14,20 @@ import Vapor
 struct OpenAPIController: APIProtocol {
     @Dependency(\.request) var request
 
+    /// Largest page size any list endpoint hands to the database. Mirrors the `maximum: 1000`
+    /// declared on the `limit` parameters in `openapi.yaml`.
+    static let maxLimit = 1000
+    static let defaultLimit = 100
+
+    /// Enforces the `minimum`/`maximum` bounds from `openapi.yaml` server-side.
+    ///
+    /// swift-openapi-generator parses `limit` but does not validate its declared bounds, so
+    /// without this a caller can pass `limit=2000000000` and have Fluent load a whole table
+    /// into memory, or `limit=0`/negative values and produce an invalid SQL `LIMIT`.
+    static func clampedLimit(_ requested: Int?, default defaultValue: Int = Self.defaultLimit) -> Int {
+        min(max(requested ?? defaultValue, 1), maxLimit)
+    }
+
     // MARK: - /config/automations
 
     func getAutomations(_ input: Operations.GetAutomations.Input) async throws -> Operations.GetAutomations.Output {
@@ -36,13 +50,13 @@ struct OpenAPIController: APIProtocol {
         let runs = try await request.application.automationRunRepository.runs(for: input.path.name,
                                                                               startDate: input.query.startDate,
                                                                               endDate: input.query.endDate,
-                                                                              limit: input.query.limit ?? 100)
+                                                                              limit: Self.clampedLimit(input.query.limit))
         return .ok(.init(body: .json(runs.map(Components.Schemas.AutomationRun.init))))
     }
 
     func getRecentRuns(_ input: Operations.GetRecentRuns.Input) async throws -> Operations.GetRecentRuns.Output {
         let runs = try await request.application.automationRunRepository.latestRuns(since: input.query.since,
-                                                                                    limit: input.query.limit ?? 100)
+                                                                                    limit: Self.clampedLimit(input.query.limit))
         return .ok(.init(body: .json(runs.map(Components.Schemas.AutomationRun.init))))
     }
 
@@ -255,7 +269,7 @@ struct OpenAPIController: APIProtocol {
         let startDate = input.query.startDate
         let endDate = input.query.endDate
         let cursor = input.query.cursor
-        let limit = input.query.limit ?? 100
+        let limit = Self.clampedLimit(input.query.limit)
 
         let historyItems = try await request.application.entityStorageDbRepository.getHistory(
             for: entityId,

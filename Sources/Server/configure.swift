@@ -95,15 +95,36 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - database setup
 
+    // The stock MySQL image ships an auto-generated self-signed certificate, so full
+    // verification cannot be the default without breaking every docker-compose deployment.
+    // Deployments that reach the database over anything but a private container network
+    // should set DATABASE_TLS_VERIFY=true (and provide a trusted certificate).
     var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
-    tlsConfiguration.certificateVerification = .none
+    if Environment.get("DATABASE_TLS_VERIFY") == "true" {
+        tlsConfiguration.certificateVerification = .fullVerification
+        app.logger.info("✅ Database TLS certificate verification enabled (DATABASE_TLS_VERIFY=true)")
+    } else {
+        tlsConfiguration.certificateVerification = .none
+        app.logger.warning("⚠️ Database TLS certificate verification is disabled - set DATABASE_TLS_VERIFY=true if the database is not on a private container network")
+    }
+
+    #if DEBUG
+    // Local development falls back to the docker-compose defaults.
+    let databasePassword = Environment.get("DATABASE_PASSWORD") ?? "vapor_password"
+    #else
+    // RELEASE: never silently connect with a well-known default password.
+    guard let databasePassword = Environment.get("DATABASE_PASSWORD"), !databasePassword.isEmpty else {
+        fatalError("❌ FATAL: DATABASE_PASSWORD environment variable is required in release builds.")
+    }
+    #endif
+
     app.databases.use(
         DatabaseConfigurationFactory.mysql(
             hostname: Environment.get("DATABASE_HOST") ?? "localhost",
             port: Environment.get("DATABASE_PORT").flatMap(Int.init(_:))
                 ?? MySQLConfiguration.ianaPortNumber,
             username: Environment.get("DATABASE_USERNAME") ?? "vapor_username",
-            password: Environment.get("DATABASE_PASSWORD") ?? "vapor_password",
+            password: databasePassword,
             database: Environment.get("DATABASE_NAME") ?? "vapor_database",
             tlsConfiguration: tlsConfiguration,
             connectionPoolTimeout: .seconds(10)

@@ -72,21 +72,18 @@ func routes(_ app: Application) throws {
                 partialResult.insert(entityId)
             }
 
-        // `skipValidation` is a deliberate escape hatch for deploying a config before all
-        // devices exist in HomeKit (or while the adapter is offline), but it must never be
-        // silent: automations referencing unknown entities fail at runtime and flood the
-        // critical-log notifier, so the gaps are logged as warnings instead.
-        do {
+        if skipValidation {
+            // Deliberate escape hatch for deploying a config before all devices exist in
+            // HomeKit (or while the adapter is offline). It must never be silent: automations
+            // referencing unknown entities fail at runtime and flood the critical-log notifier.
+            req.logger.warning("⚠️ Accepting config with skipValidation=true - \(configEntityIds.count) referenced entities were NOT validated against HomeKit")
+        } else {
             let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
+
             let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
-            if !missingEntityIds.isEmpty {
-                guard skipValidation else {
-                    throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
-                }
-                req.logger.warning("⚠️ Accepting config with skipValidation=true although \(missingEntityIds.count) referenced entities were not found: \(missingEntityIds)")
+            guard missingEntityIds.isEmpty else {
+                throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
             }
-        } catch where skipValidation {
-            req.logger.warning("⚠️ Accepting config with skipValidation=true although entity validation failed: \(error)")
         }
 
         let previousAutomations = await req.application.homeAutomationConfigService.automations

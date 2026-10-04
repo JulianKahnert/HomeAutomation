@@ -30,6 +30,13 @@ The following setup will install a `launchctl` daemon that ensure, that the app 
 
 * Register the plist file in LaunchD `launchctl load ~/Library/LaunchAgents/de.juliankahnert.HomeAutomation.plist`
 
+## Server connection
+
+Open the settings screen (gear icon) in the app and enter host, port and the server's `AUTH_TOKEN`.
+
+* The token is stored in the keychain. Installs that still have it in `UserDefaults` from older versions are migrated automatically on first launch and the plaintext copy is deleted.
+* Enable **Use TLS (wss://)** whenever the adapter does not share a trusted network with the server (e.g. when connecting through the Cloudflare tunnel). Without TLS the token and all HomeKit traffic cross the network unencrypted.
+
 ## Setup on iOS/iPadOS
 
 Start the app and keep it in foreground.

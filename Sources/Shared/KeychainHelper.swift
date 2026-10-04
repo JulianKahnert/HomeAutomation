@@ -10,9 +10,11 @@ public enum KeychainHelper {
         return String(data: data, encoding: .utf8)
     }
 
-    public static func writeString(_ account: String, value: String) {
-        guard let data = value.data(using: .utf8) else { return }
-        writeData(account, data: data)
+    /// Returns `false` when the item could not be stored.
+    @discardableResult
+    public static func writeString(_ account: String, value: String) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
+        return writeData(account, data: data)
     }
 
     public static func readURL(_ account: String) -> URL? {
@@ -20,7 +22,8 @@ public enum KeychainHelper {
         return URL(string: string)
     }
 
-    public static func writeURL(_ account: String, value: URL) {
+    @discardableResult
+    public static func writeURL(_ account: String, value: URL) -> Bool {
         writeString(account, value: value.absoluteString)
     }
 
@@ -42,7 +45,8 @@ public enum KeychainHelper {
         return data
     }
 
-    private static func writeData(_ account: String, data: Data) {
+    @discardableResult
+    private static func writeData(_ account: String, data: Data) -> Bool {
         // Delete first to ensure kSecAttrAccessible is up-to-date
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -58,7 +62,7 @@ public enum KeychainHelper {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
             kSecValueData as String: data,
         ]
-        SecItemAdd(query as CFDictionary, nil)
+        return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
     }
 }
 #endif

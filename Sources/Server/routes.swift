@@ -64,14 +64,20 @@ func routes(_ app: Application) throws {
         let configDTO = try req.content.decode(ConfigDTO.self)
         let skipValidation = req.query["skipValidation"] == "true"
 
-        if !skipValidation {
-            // validate if all automations are correct, e.g. contain existing entities
-            let configEntityIds = configDTO.automations
-                .map(\.automation)
-                .flatMap { $0.getEntityIds() }
-                .reduce(into: Set<EntityId>()) { partialResult, entityId in
-                    partialResult.insert(entityId)
-                }
+        // validate if all automations are correct, e.g. contain existing entities
+        let configEntityIds = configDTO.automations
+            .map(\.automation)
+            .flatMap { $0.getEntityIds() }
+            .reduce(into: Set<EntityId>()) { partialResult, entityId in
+                partialResult.insert(entityId)
+            }
+
+        if skipValidation {
+            // Deliberate escape hatch for deploying a config before all devices exist in
+            // HomeKit (or while the adapter is offline). It must never be silent: automations
+            // referencing unknown entities fail at runtime and flood the critical-log notifier.
+            req.logger.warning("⚠️ Accepting config with skipValidation=true - \(configEntityIds.count) referenced entities were NOT validated against HomeKit")
+        } else {
             let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
 
             let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))

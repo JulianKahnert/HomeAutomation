@@ -49,7 +49,7 @@ struct FlowKitApp {
 
 struct FlowKitAdapter: App, Log {
     @AppStorage("ActorSystemServerAddress") private var serverAddress = ServerAddress(host: "localhost", port: 8080)
-    @AppStorage("ServerAuthToken") private var serverAuthToken = ""
+    @State private var credentials = AdapterCredentialStore()
     @State private var connection: AdapterConnection?
 
     var body: some Scene {
@@ -58,7 +58,8 @@ struct FlowKitAdapter: App, Log {
                 entities: connection?.entities ?? [],
                 connectionStatus: connection?.connectionStatus ?? .connecting
             )
-            .task(id: "\(serverAddress.rawValue)|\(serverAuthToken)") {
+            .environment(credentials)
+            .task(id: "\(serverAddress.rawValue)|\(credentials.authToken)") {
                 Self.log.info("runloop task called for address: \(serverAddress)")
 
                 // do not start run loop when running in preview canvas
@@ -69,7 +70,7 @@ struct FlowKitAdapter: App, Log {
                 connection?.stop()
                 connection = nil
 
-                let newConnection = AdapterConnection(address: serverAddress, authToken: serverAuthToken)
+                let newConnection = AdapterConnection(address: serverAddress, authToken: credentials.authToken)
                 newConnection?.start()
 
                 // Cancellation-safety: if this task was cancelled while setting up (e.g. the

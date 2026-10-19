@@ -32,6 +32,8 @@ public func initLogging(withFileLogging: Bool, logLevel: Logger.Level) {
     if let logBasePath {
         deleteLogFiles(olderThanDays: 7, in: logBasePath)
     }
+    // One stream for all labels keeps file access out of `Logger.init`, which runs at launch.
+    let fileStream = logBasePath.map { FileLogHandler.FileHandlerOutputStream(basePath: $0) }
 
     LoggingSystem.bootstrap { label in
         var handlers: [LogHandler] = []
@@ -42,9 +44,8 @@ public func initLogging(withFileLogging: Bool, logLevel: Logger.Level) {
         handlers.append(StreamLogHandler.standardOutput(label: label))
         #endif
 
-        if let logBasePath {
-            let stream = FileLogHandler.FileHandlerOutputStream(basePath: logBasePath)
-            handlers.append(FileLogHandler(label: label, stream: stream))
+        if let fileStream {
+            handlers.append(FileLogHandler(label: label, stream: fileStream))
         }
 
         var mpxHandler = MultiplexLogHandler(handlers)
@@ -53,18 +54,16 @@ public func initLogging(withFileLogging: Bool, logLevel: Logger.Level) {
     }
 }
 
-/// Directory the `FileLogHandler` writes its daily log files to — a `logs` subfolder so the log
-/// files don't clutter the app's Documents directory.
-private func logFileDirectory() -> URL {
+/// Directory of the daily log files that `FileLogHandler` writes and `LogReader` reads — a `logs`
+/// subfolder so the log files don't clutter the app's Documents directory.
+public func logFileDirectory() -> URL {
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS) || os(visionOS)
     let base = URL.documentsDirectory
     #else
     // Linux fallback: use the temporary directory.
     let base = FileManager.default.temporaryDirectory
     #endif
-    let dir = base.appendingPathComponent("logs")
-    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    return dir
+    return base.appendingPathComponent("logs")
 }
 
 /// Deletes daily log files (`*.txt`) older than `days` so they don't accumulate on disk

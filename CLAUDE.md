@@ -213,6 +213,7 @@ Additional workflows: `docker-publish.yaml` (amd64 + arm64 image for pushes to `
 - [CODING_STANDARDS.md](CODING_STANDARDS.md): the code rules (security, pre-commit checks, Git flow, adding entity fields), the shared ones linked from it and this repo's own. Read it before writing code.
 - `docs/setup-FlowKitAdapter.md` — Adapter setup: launchctl, iOS guided access, logging
 - `docs/setup-server.md` — Server Docker setup, log levels, migration
+- More on how the features work: the project's folder in the knowledge base (the Obsidian vault), under `references/`. Without the vault (a cloud session, CI), go on without it.
 
 ## Common Issues
 

@@ -216,7 +216,7 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - actor system setup
 
-    // Star topology (see docs/adr-001): the server is the hub; the adapter connects to it via an
+    // Star topology (see ADR-001 in the knowledge base): the server is the hub; the adapter connects to it via an
     // authenticated WebSocket (/adapter/v1 on port 8080). Reconnects are handled entirely by the
     // adapter's transport loop — the server just accepts the latest connection and never terminates.
     let actorSystem = StarActorSystem(name: "server", logger: app.logger)

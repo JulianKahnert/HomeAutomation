@@ -19,7 +19,7 @@ func routes(_ app: Application) throws {
         "It works!"
     }
 
-    // Adapter WebSocket transport for the StarActorSystem (see docs/adr-001)
+    // Adapter WebSocket transport for the StarActorSystem (see ADR-001 in the knowledge base)
     registerAdapterWebSocket(on: authenticatedRoutes, system: app.starActorSystem)
 
     authenticatedRoutes.get("health") { req async throws -> HTTPStatus in

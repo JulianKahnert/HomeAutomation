@@ -3,8 +3,9 @@ name: PR Checks
 on:
   # Only on ready for review: every push to a PR started three macOS jobs, about 300 of
   # 528 Actions minutes in October 2026. A draft is checked locally instead.
-  # A PR opened as non-draft gets no run: `gh workflow run "PR Checks" --ref <branch>`,
-  # or switch it to draft and back to ready.
+  # A PR opened as non-draft gets no run: switch it to draft and back to ready
+  # (`gh pr ready <n> --undo && gh pr ready <n>`). `gh workflow run "PR Checks"` also
+  # runs the checks, but the PR's required checks don't count those runs.
   pull_request:
     types: [ready_for_review]
     branches:

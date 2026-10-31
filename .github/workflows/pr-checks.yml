@@ -1,7 +1,13 @@
 name: PR Checks
 
 on:
+  # Only on ready for review: every push to a PR started three macOS jobs, about 300 of
+  # 528 Actions minutes in October 2026. A draft is checked locally instead.
+  # A PR opened as non-draft gets no run: switch it to draft and back to ready
+  # (`gh pr ready <n> --undo && gh pr ready <n>`). `gh workflow run "PR Checks"` also
+  # runs the checks, but the PR's required checks don't count those runs.
   pull_request:
+    types: [ready_for_review]
     branches:
       - main
       - develop
@@ -21,7 +27,9 @@ jobs:
     # The dispatched run (see renovate-package-resolved.yaml) has no head_ref and
     # still runs; a pull_request run on a renovate branch would only fail on the
     # stale Package.resolved that dispatch is about to fix.
-    if: ${{ !startsWith(github.head_ref, 'renovate/') }}
+    # The draft guard holds even if more pull_request types are added above; a
+    # dispatched run has no pull_request, so draft is falsy and it runs.
+    if: ${{ !github.event.pull_request.draft && !startsWith(github.head_ref, 'renovate/') }}
 
     steps:
       - name: Checkout repository
@@ -39,8 +47,8 @@ jobs:
     # whose resolver pins swift-issue-reporting separately from xctest-dynamic-overlay.
     # macos-26 tops out at Xcode 26.6 and would rewrite Package.resolved without it.
     runs-on: xcode-27
-    # See swift-package above: skip the redundant pull_request run on a renovate/** push.
-    if: ${{ !startsWith(github.head_ref, 'renovate/') }}
+    # See swift-package above: skip drafts and the redundant run on a renovate/** push.
+    if: ${{ !github.event.pull_request.draft && !startsWith(github.head_ref, 'renovate/') }}
     strategy:
       fail-fast: false
       matrix:
@@ -119,8 +127,8 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    # See swift-package above: skip the redundant pull_request run on a renovate/** push.
-    if: ${{ !startsWith(github.head_ref, 'renovate/') }}
+    # See swift-package above: skip drafts and the redundant run on a renovate/** push.
+    if: ${{ !github.event.pull_request.draft && !startsWith(github.head_ref, 'renovate/') }}
 
     steps:
       - name: Checkout repository

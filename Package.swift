@@ -35,8 +35,8 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.13.1"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", exact: "1.2.0"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", exact: "1.17.1"),
-        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.12.1"),
-        .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.1"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.12.2"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.2"),
         // TCA and related
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture",
                  exact: "1.26.2",

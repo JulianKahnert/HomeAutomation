@@ -1,5 +1,5 @@
 {
-  "originHash" : "0bc716f53e2da135ff9a4d7401eb194f8e00fde2ab28816cf4e1010892837bce",
+  "originHash" : "14663786d1795a7e55c37d7439c731e3b5aaa8b605093416780175ea7ec1fd41",
   "pins" : [
     {
       "identity" : "apns",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swift-server-community/APNSwift",
       "state" : {
-        "revision" : "81eb92b6d5cbea9dac154becedf316c05189a47a",
-        "version" : "6.6.0"
+        "revision" : "0be1b9d83c104d157cb3da5306cbf2dd360be482",
+        "version" : "7.1.0"
       }
     },
     {
@@ -285,8 +285,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-types",
       "state" : {
-        "revision" : "45eb0224913ea070ec4fba17291b9e7ecf4749ca",
-        "version" : "1.5.1"
+        "revision" : "bff4b6903cdc99dda49649dd52f46c11cfd3ed50",
+        "version" : "1.8.0"
       }
     },
     {

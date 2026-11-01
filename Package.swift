@@ -50,8 +50,8 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.16.2"),
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "fix/linux-foundation-networking"),
-        // Capped at 6.x: vapor/apns 5.0.0 requires apnswift 6.1.0..<7.0.0.
-        .package(url: "https://github.com/swift-server-community/APNSwift", exact: "6.6.0"),
+        // Capped at 7.x: vapor/apns 5.1.0 requires apnswift 7.0.1..<8.0.0.
+        .package(url: "https://github.com/swift-server-community/APNSwift", exact: "7.1.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2")
     ],
     targets: [

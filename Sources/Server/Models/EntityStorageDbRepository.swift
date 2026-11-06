@@ -13,45 +13,23 @@ import SQLKit
 import Vapor
 
 final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
-    let database: any Database
+    /// Resolved per query: a captured `app.db` is bound to one event loop and so to that loop's
+    /// connection pool, which would funnel every query of this long-lived repository through it.
+    let database: @Sendable () -> any Database
     private let log = Logger(label: "EntityStorageDbRepository")
 
-    init(database: any Database) {
+    init(database: @escaping @Sendable () -> any Database) {
         self.database = database
     }
 
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? {
-        try await EntityStorageDbItem
-            .query(on: database)
-            .filter(\.$entityPlaceId == entityId.placeId)
-            .filter(\.$entityServiceName == entityId.name)
-            .filter(\.$entityCharacteristicType == entityId.characteristicType.rawValue)
-            .sort(\.$timestamp, .descending)
-            .all()
-            .filter { item in
-                guard let lhs = item.entityCharacteristicsName,
-                      let rhs = entityId.characteristicsName else { return true }
-                return lhs == rhs
-            }
+        try await latestItems(of: entityId, limit: 1)
             .first
             .map(Self.mapDbItem)
     }
 
     func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? {
-        let items = try await EntityStorageDbItem
-            .query(on: database)
-            .filter(\.$entityPlaceId == entityId.placeId)
-            .filter(\.$entityServiceName == entityId.name)
-            .filter(\.$entityCharacteristicType == entityId.characteristicType.rawValue)
-            .sort(\.$timestamp, .descending)
-            .all()
-            .filter { item in
-                guard let lhs = item.entityCharacteristicsName,
-                      let rhs = entityId.characteristicsName else { return true }
-                return lhs == rhs
-            }
-            .prefix(2)
-
+        let items = try await latestItems(of: entityId, limit: 2)
         guard items.count == 2 else {
             return nil
         }
@@ -59,12 +37,33 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
             .map(Self.mapDbItem)
     }
 
+    /// The newest `limit` rows of an entity. Filters and limits in SQL, so a lookup reads a few
+    /// entries of `idx_entityItems_entity_timestamp` instead of loading the entity's whole history.
+    /// A row without `entityCharacteristicsName` matches any name, as before.
+    private func latestItems(of entityId: EntityId, limit: Int) async throws -> [EntityStorageDbItem] {
+        var query = EntityStorageDbItem
+            .query(on: database())
+            .filter(\.$entityPlaceId == entityId.placeId)
+            .filter(\.$entityServiceName == entityId.name)
+            .filter(\.$entityCharacteristicType == entityId.characteristicType.rawValue)
+        if let characteristicsName = entityId.characteristicsName {
+            query = query.group(.or) { group in
+                group.filter(\.$entityCharacteristicsName == nil)
+                    .filter(\.$entityCharacteristicsName == characteristicsName)
+            }
+        }
+        return try await query
+            .sort(\.$timestamp, .descending)
+            .limit(limit)
+            .all()
+    }
+
     func add(_ item: EntityStorageItem) async throws {
-        try await Self.map(item).save(on: database)
+        try await Self.map(item).save(on: database())
     }
 
     func deleteEntries(olderThan date: Date) async throws {
-        try await EntityStorageDbItem.query(on: database)
+        try await EntityStorageDbItem.query(on: database())
             .filter(\.$timestamp < date)
             .delete()
     }
@@ -77,7 +76,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
         limit: Int
     ) async throws -> [EntityStorageItem] {
         var query = EntityStorageDbItem
-            .query(on: database)
+            .query(on: database())
             .filter(\.$entityPlaceId == entityId.placeId)
             .filter(\.$entityServiceName == entityId.name)
             .filter(\.$entityCharacteristicType == entityId.characteristicType.rawValue)
@@ -112,7 +111,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
     }
 
     func getAllEntityIds() async throws -> [EntityId] {
-        guard let sqlDatabase = database as? SQLDatabase else {
+        guard let sqlDatabase = database() as? SQLDatabase else {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
 

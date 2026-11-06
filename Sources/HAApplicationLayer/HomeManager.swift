@@ -29,6 +29,13 @@ public final class HomeManager: HomeManagable {
     /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
     /// replaying both would be contradictory.
     private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int, runId: UUID?)] = [:]
+    /// Changed entity states on their way to the database. One task drains it in order, so a burst
+    /// of events (the adapter's full resync on every reconnect) uses one database connection at a
+    /// time instead of one query per event at once.
+    private let persistQueue: AsyncStream<EntityStorageItem>.Continuation
+    /// Far above one full resync (~200 entities); only reached while the database is stuck. The
+    /// oldest states are dropped first, so the newest state of each entity still gets written.
+    nonisolated private static let persistQueueLimit = 5_000
 
     /// - Parameter retryTicks: Cadence at which queued failed actions are retried. Pass a stream to
     ///   drive the retries deterministically; the default is a 5s timer.
@@ -39,6 +46,14 @@ public final class HomeManager: HomeManagable {
         self.storageRepo = storageRepo
         self.notificationSender = notificationSender
         self.location = location
+
+        let (persistStream, persistQueue) = AsyncStream<EntityStorageItem>.makeStream(bufferingPolicy: .bufferingNewest(Self.persistQueueLimit))
+        self.persistQueue = persistQueue
+        Task.detached(priority: .background) { [storageRepo, log] in
+            for await item in persistStream {
+                await Self.persist(item, in: storageRepo, log: log)
+            }
+        }
 
 //        Task {
 //            let adapter = await getAdapter()
@@ -214,27 +229,31 @@ public final class HomeManager: HomeManagable {
             log.info("Invalidated \(invalidatedActions.count) cached command(s) for \(item.entityId) due to state drift: \(invalidatedActions)")
         }
 
+        // A value-identical replay is already queued or stored: the cache only holds states that
+        // went through this queue.
+        guard didChange else { return false }
+
         // Persist item in the background to avoid blocking automation execution
-        Task.detached(priority: .background) {
-            do {
-                if var currentItem = try await self.storageRepo.getCurrent(item.entityId) {
-
-                    // found current item, save it when a change has happend
-                    // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
-                    currentItem.timestamp = item.timestamp
-                    guard item != currentItem else { return }
-
-                    try await self.storageRepo.add(item)
-                } else {
-                    // no current item found add it to the store directly
-                    try await self.storageRepo.add(item)
-                }
-            } catch {
-                self.log.critical("Failed to persist entity item \(error)")
-            }
+        if case .dropped(let dropped) = persistQueue.yield(item) {
+            log.warning("Persist queue full, dropped entity item \(dropped.entityId)")
         }
 
         return didChange
+    }
+
+    nonisolated private static func persist(_ item: EntityStorageItem, in storageRepo: StorageRepository, log: Logger) async {
+        do {
+            // After a restart the cache is empty, so the adapter's resync counts as a change; skip
+            // the states the database already holds.
+            if var currentItem = try await storageRepo.getCurrent(item.entityId) {
+                // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
+                currentItem.timestamp = item.timestamp
+                guard item != currentItem else { return }
+            }
+            try await storageRepo.add(item)
+        } catch {
+            log.critical("Failed to persist entity item \(error)")
+        }
     }
 
     public func deleteStorageEntries(olderThan date: Date) async throws {

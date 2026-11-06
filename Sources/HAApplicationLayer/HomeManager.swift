@@ -34,12 +34,24 @@ public final class HomeManager: HomeManagable {
     /// time instead of one query per event at once.
     private let persistQueue: AsyncStream<EntityStorageItem>.Continuation
     /// Far above one full resync (~200 entities); only reached while the database is stuck. The
-    /// oldest states are dropped first, so the newest state of each entity still gets written.
+    /// oldest queued states are dropped first. An entity whose only queued state is dropped is
+    /// missing from the history until its next change, because a replay of that value is not queued.
     nonisolated private static let persistQueueLimit = 5_000
+    /// States dropped since the queue last had room again; keeps a stuck database from flooding the log.
+    private var droppedPersistItems = 0
 
-    /// - Parameter retryTicks: Cadence at which queued failed actions are retried. Pass a stream to
-    ///   drive the retries deterministically; the default is a 5s timer.
-    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, notificationSender: NotificationSender, location: Location, actionLogManager: ActionLogManager, retryTicks: AsyncStream<Void>? = nil) {
+    /// - Parameters:
+    ///   - retryTicks: Cadence at which queued failed actions are retried. Pass a stream to drive the
+    ///     retries deterministically; the default is a 5s timer.
+    ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
+    ///     than there are delays.
+    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?,
+                storageRepo: StorageRepository,
+                notificationSender: NotificationSender,
+                location: Location,
+                actionLogManager: ActionLogManager,
+                retryTicks: AsyncStream<Void>? = nil,
+                persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)]) {
         self.windowManager = WindowManager(notificationSender: notificationSender)
         self.actionLogManager = actionLogManager
         self.getAdapter = getAdapter
@@ -51,7 +63,7 @@ public final class HomeManager: HomeManagable {
         self.persistQueue = persistQueue
         Task.detached(priority: .background) { [storageRepo, log] in
             for await item in persistStream {
-                await Self.persist(item, in: storageRepo, log: log)
+                await Self.persist(item, in: storageRepo, retryDelays: persistRetryDelays, log: log)
             }
         }
 
@@ -234,26 +246,51 @@ public final class HomeManager: HomeManagable {
         guard didChange else { return false }
 
         // Persist item in the background to avoid blocking automation execution
-        if case .dropped(let dropped) = persistQueue.yield(item) {
-            log.warning("Persist queue full, dropped entity item \(dropped.entityId)")
+        switch persistQueue.yield(item) {
+        case .dropped(let dropped):
+            droppedPersistItems += 1
+            if droppedPersistItems == 1 || droppedPersistItems.isMultiple(of: 500) {
+                log.warning("Persist queue full, dropped \(droppedPersistItems) entity item(s) so far, last one \(dropped.entityId)")
+            }
+        case .enqueued(let remaining) where droppedPersistItems > 0 && remaining >= Self.persistQueueLimit / 2:
+            log.notice("Persist queue draining again after dropping \(droppedPersistItems) entity item(s)")
+            droppedPersistItems = 0
+        default:
+            break
         }
 
         return didChange
     }
 
-    nonisolated private static func persist(_ item: EntityStorageItem, in storageRepo: StorageRepository, log: Logger) async {
-        do {
-            // After a restart the cache is empty, so the adapter's resync counts as a change; skip
-            // the states the database already holds.
-            if var currentItem = try await storageRepo.getCurrent(item.entityId) {
-                // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
-                currentItem.timestamp = item.timestamp
-                guard item != currentItem else { return }
+    /// Retries inside the serial queue instead of clearing the cache entry: a cleared entry would make
+    /// the next identical replay count as a change and trigger automations again.
+    nonisolated private static func persist(_ item: EntityStorageItem, in storageRepo: StorageRepository, retryDelays: [Duration], log: Logger) async {
+        var attempt = 0
+        while true {
+            do {
+                try await persistOnce(item, in: storageRepo)
+                return
+            } catch {
+                guard attempt < retryDelays.count else {
+                    log.critical("Failed to persist entity item \(item.entityId) after \(attempt + 1) attempts: \(error)")
+                    return
+                }
+                log.warning("Failed to persist entity item \(item.entityId), retrying: \(error)")
+                try? await Task.sleep(for: retryDelays[attempt])
+                attempt += 1
             }
-            try await storageRepo.add(item)
-        } catch {
-            log.critical("Failed to persist entity item \(error)")
         }
+    }
+
+    nonisolated private static func persistOnce(_ item: EntityStorageItem, in storageRepo: StorageRepository) async throws {
+        // After a restart the cache is empty, so the adapter's resync counts as a change; skip the
+        // states the database already holds. This also keeps a retry from saving a state twice.
+        if var currentItem = try await storageRepo.getCurrent(item.entityId) {
+            // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
+            currentItem.timestamp = item.timestamp
+            guard item != currentItem else { return }
+        }
+        try await storageRepo.add(item)
     }
 
     public func deleteStorageEntries(olderThan date: Date) async throws {

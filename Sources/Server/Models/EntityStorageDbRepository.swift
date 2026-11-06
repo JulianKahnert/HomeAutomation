@@ -41,21 +41,27 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
     /// entries of `idx_entityItems_entity_timestamp` instead of loading the entity's whole history.
     /// A row without `entityCharacteristicsName` matches any name, as before.
     private func latestItems(of entityId: EntityId, limit: Int) async throws -> [EntityStorageDbItem] {
-        var query = EntityStorageDbItem
+        try await itemsQuery(of: entityId)
+            .sort(\.$timestamp, .descending)
+            .limit(limit)
+            .all()
+    }
+
+    /// All rows of an entity. A row without `entityCharacteristicsName`, or an `entityId` without
+    /// one, matches any name.
+    private func itemsQuery(of entityId: EntityId) -> QueryBuilder<EntityStorageDbItem> {
+        let query = EntityStorageDbItem
             .query(on: database())
             .filter(\.$entityPlaceId == entityId.placeId)
             .filter(\.$entityServiceName == entityId.name)
             .filter(\.$entityCharacteristicType == entityId.characteristicType.rawValue)
-        if let characteristicsName = entityId.characteristicsName {
-            query = query.group(.or) { group in
-                group.filter(\.$entityCharacteristicsName == nil)
-                    .filter(\.$entityCharacteristicsName == characteristicsName)
-            }
+        guard let characteristicsName = entityId.characteristicsName else {
+            return query
         }
-        return try await query
-            .sort(\.$timestamp, .descending)
-            .limit(limit)
-            .all()
+        return query.group(.or) { group in
+            group.filter(\.$entityCharacteristicsName == nil)
+                .filter(\.$entityCharacteristicsName == characteristicsName)
+        }
     }
 
     func add(_ item: EntityStorageItem) async throws {
@@ -75,11 +81,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
         cursor: Date?,
         limit: Int
     ) async throws -> [EntityStorageItem] {
-        var query = EntityStorageDbItem
-            .query(on: database())
-            .filter(\.$entityPlaceId == entityId.placeId)
-            .filter(\.$entityServiceName == entityId.name)
-            .filter(\.$entityCharacteristicType == entityId.characteristicType.rawValue)
+        var query = itemsQuery(of: entityId)
 
         // Apply time range filters
         if let startDate {
@@ -94,20 +96,13 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
             query = query.filter(\.$timestamp < cursor)
         }
 
-        // Order by timestamp descending and apply limit
-        let items = try await query
+        // Order by timestamp descending and apply limit; the characteristicsName filter is part of
+        // the query, so a page is never cut short after the limit.
+        return try await query
             .sort(\.$timestamp, .descending)
             .limit(limit)
             .all()
-
-        // Filter by characteristicsName if present (must be done in-memory due to optional field)
-        let filteredItems = items.filter { item in
-            guard let lhs = item.entityCharacteristicsName,
-                  let rhs = entityId.characteristicsName else { return true }
-            return lhs == rhs
-        }
-
-        return filteredItems.map(Self.mapDbItem)
+            .map(Self.mapDbItem)
     }
 
     func getAllEntityIds() async throws -> [EntityId] {

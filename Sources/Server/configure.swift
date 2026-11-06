@@ -236,7 +236,7 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - home automation setup
 
-    app.homeAutomationConfigService = await HomeAutomationConfigService.load(from: app.db)
+    app.homeAutomationConfigService = await HomeAutomationConfigService.load(from: { app.db })
     let notificationSender = PushNotifcationService(database: { app.db },
                                                     apnsClient: apnsClient,
                                                     notificationTopic: notificationTopic)

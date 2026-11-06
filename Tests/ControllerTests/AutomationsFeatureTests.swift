@@ -36,7 +36,7 @@ struct AutomationsFeatureTests {
         state.$automations.withLock { $0 = automations }
         state.$grouping.withLock { $0 = .type }
 
-        #expect(state.sections.map(\.title) == ["Motion", "Scene", "Schedule"])
+        #expect(state.sections.map(\.title) == ["Motion", "Schedule"])
     }
 
     @Test("toggle is applied optimistically and rolled back on failure")

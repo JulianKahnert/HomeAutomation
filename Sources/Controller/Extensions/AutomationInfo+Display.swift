@@ -17,7 +17,7 @@ extension AutomationInfo {
         "MotionAtNight": ("Motion", "figure.walk", "Motion sensor"),
         "RestartSystem": ("System", "arrow.clockwise", "Schedule"),
         "SetLightProperties": ("Light", "lightbulb", "Light change"),
-        "TriggerScene": ("Scene", "sparkles", "Device change"),
+        "TriggerScene": ("Schedule", "clock", "Schedule"),
         "Turn": ("Schedule", "clock", "Schedule"),
         "TurnOnForDuration": ("Light", "timer", "Device change"),
         "UpsertScene": ("Scene", "sparkles", "Manual"),

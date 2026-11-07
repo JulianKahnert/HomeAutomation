@@ -41,8 +41,25 @@ RUN cp "$(swift build --package-path /build -c release --show-bin-path)/Server" 
 # Copy static swift backtracer binary to staging area
 RUN cp "/usr/libexec/swift/linux/swift-backtrace-static" ./
 
-# Copy resources bundled by SPM to staging area
-RUN find -L "$(swift build --package-path /build -c release --show-bin-path)/" -regex '.*\.resources$' -exec cp -Ra {} ./ \;
+# Copy resources bundled by SPM to staging area.
+# The native build system names them `<Package>_<Target>.resources`, swiftbuild
+# (the default since Swift 6.4) names them `<Package>_<Target>.bundle`; the
+# generated accessor only looks for the name its build system wrote, so copy both.
+# Every module with resources gets a generated resource_bundle_accessor.swift
+# whose fatalError names its bundle: fail the build when one of them is not staged,
+# instead of shipping an image that crashes on the first `Bundle.module` access.
+RUN set -eu; \
+    bin_path="$(swift build --package-path /build -c release --show-bin-path)"; \
+    find -L "$bin_path/" -maxdepth 1 -type d \( -name '*.resources' -o -name '*.bundle' \) -exec cp -Ra {} ./ \; ; \
+    expected="$(find /build/.build \( -path /build/.build/checkouts -o -path /build/.build/repositories \) -prune -o -name resource_bundle_accessor.swift -exec sed -n 's/.*unable to find bundle named \([A-Za-z0-9_.-]*\).*/\1/p' {} + | sort -u)"; \
+    [ -n "$expected" ] || { echo "error: no resource_bundle_accessor.swift found, cannot check resource bundles" >&2; exit 1; }; \
+    for name in $expected; do \
+      if [ -d "./$name.bundle" ] || [ -d "./$name.resources" ]; then \
+        echo "staged resource bundle: $name"; \
+      else \
+        echo "error: resource bundle $name is missing from /staging (searched $bin_path)" >&2; exit 1; \
+      fi; \
+    done
 
 # Copy any resources from the public directory and views directory if the directories exist
 # Ensure that by default, neither the directory nor any of its contents are writable.

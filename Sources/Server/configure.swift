@@ -127,6 +127,10 @@ public func configure(_ app: Application) async throws {
             password: databasePassword,
             database: Environment.get("DATABASE_NAME") ?? "vapor_database",
             tlsConfiguration: tlsConfiguration,
+            // The driver's default is a single connection per event loop. Every entity write,
+            // automation run record and HTTP request queues on it, and a burst of events then
+            // outlasts the pool timeout ("Connection request timed out").
+            maxConnectionsPerEventLoop: 4,
             connectionPoolTimeout: .seconds(10)
         ), as: .mysql)
 
@@ -135,6 +139,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(AddSensorFields())
     app.migrations.add(CreateConfigItem())
     app.migrations.add(CreateAutomationRun())
+    app.migrations.add(AddLookupIndexes())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -231,8 +236,8 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - home automation setup
 
-    app.homeAutomationConfigService = await HomeAutomationConfigService.load(from: app.db)
-    let notificationSender = PushNotifcationService(database: app.db,
+    app.homeAutomationConfigService = await HomeAutomationConfigService.load(from: { app.db })
+    let notificationSender = PushNotifcationService(database: { app.db },
                                                     apnsClient: apnsClient,
                                                     notificationTopic: notificationTopic)
 

@@ -17,11 +17,11 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
 
  extension Application {
      var entityStorageDbRepository: EntityStorageDbRepository {
-         EntityStorageDbRepository(database: db)
+         EntityStorageDbRepository(database: { self.db })
      }
 
      var automationRunRepository: AutomationRunDbRepository {
-         AutomationRunDbRepository(database: db)
+         AutomationRunDbRepository(database: { self.db })
      }
 
     private struct HomeEventsStreamKey: StorageKey {

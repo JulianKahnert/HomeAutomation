@@ -50,10 +50,11 @@ actor HomeAutomationConfigService: Log {
         try await persist(JSONEncoder().encode(configDto))
     }
 
-    static func load(from database: any Database) async -> Self {
-        let persist: @Sendable (Data) async throws -> Void = { try await ConfigItem.save(json: $0, on: database) }
+    /// - Parameter database: Resolved per query, so saves are not tied to one event loop's pool.
+    static func load(from database: @escaping @Sendable () -> any Database) async -> Self {
+        let persist: @Sendable (Data) async throws -> Void = { try await ConfigItem.save(json: $0, on: database()) }
         do {
-            var data = try await ConfigItem.loadJSON(on: database)
+            var data = try await ConfigItem.loadJSON(on: database())
             if data == nil, FileManager.default.fileExists(atPath: legacyFileURL.path) {
                 log.notice("Importing legacy config file into the database")
                 let legacyData = try Data(contentsOf: legacyFileURL)

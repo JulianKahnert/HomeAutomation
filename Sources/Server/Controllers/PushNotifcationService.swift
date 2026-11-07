@@ -20,11 +20,12 @@ private struct ClearNotificationPayload: Encodable, Sendable {
 actor PushNotifcationService: NotificationSender {
     private static let logger = Logger(label: "PushNotifcationService")
 
-    let database: any Database
+    /// Resolved per query, see `EntityStorageDbRepository.database`.
+    let database: @Sendable () -> any Database
     let apnsClient: any APNSClientProtocol & Sendable
     let notificationTopic: String
 
-    init(database: any Database, apnsClient: any APNSClientProtocol & Sendable, notificationTopic: String) {
+    init(database: @escaping @Sendable () -> any Database, apnsClient: any APNSClientProtocol & Sendable, notificationTopic: String) {
         self.database = database
         self.apnsClient = apnsClient
         self.notificationTopic = notificationTopic
@@ -36,7 +37,7 @@ actor PushNotifcationService: NotificationSender {
 
     func clearNotification(id: String) async throws {
         let deviceTokens = try await DeviceToken
-            .query(on: database)
+            .query(on: database())
             .filter(\.$tokenType == "pushNotification")
             .all()
 
@@ -55,7 +56,7 @@ actor PushNotifcationService: NotificationSender {
                     "Failed to send clear notification to \(deviceToken.deviceName): \(error.localizedDescription)"
                 )
                 do {
-                    try await DeviceToken.query(on: database)
+                    try await DeviceToken.query(on: database())
                         .filter(\.$tokenString == deviceToken.tokenString)
                         .delete()
                 } catch {
@@ -70,7 +71,7 @@ actor PushNotifcationService: NotificationSender {
     private func sendAlert(title: String, message: String, id: String?) async throws {
         let deviceTokens =
             try await DeviceToken
-            .query(on: database)
+            .query(on: database())
             .filter(\.$tokenType == "pushNotification")
             .all()
 
@@ -94,7 +95,7 @@ actor PushNotifcationService: NotificationSender {
                     "Failed to send push notification to \(deviceToken.deviceName) [\(deviceToken.tokenType)]: \(error.localizedDescription)"
                 )
                 do {
-                    try await DeviceToken.query(on: database)
+                    try await DeviceToken.query(on: database())
                         .filter(\.$tokenString == deviceToken.tokenString)
                         .delete()
                 } catch {
@@ -110,7 +111,7 @@ actor PushNotifcationService: NotificationSender {
         do {
             let allDeviceTokens =
             try await DeviceToken
-                .query(on: database)
+                .query(on: database())
                 .filter(\.$tokenType != "pushNotification")
                 .all()
 
@@ -126,7 +127,7 @@ actor PushNotifcationService: NotificationSender {
 
                     // delete liveActivityUpdate tokens that are older than 4 hours
                     try await DeviceToken
-                        .query(on: database)
+                        .query(on: database())
                         .filter(\.$id == tokenId)
                         .delete()
                     expiredCount += 1
@@ -200,7 +201,7 @@ actor PushNotifcationService: NotificationSender {
                         // 4. If the app was not woken (force-quit / iOS budget), the token is
                         //    re-registered when the user next opens the app
                         do {
-                            try await DeviceToken.query(on: database)
+                            try await DeviceToken.query(on: database())
                                 .filter(\.$tokenString == startToken.tokenString)
                                 .delete()
                         } catch {
@@ -227,7 +228,7 @@ actor PushNotifcationService: NotificationSender {
                         "[startOrUpdateLiveActivity] Failed to send live activity push notification to \(usedToken?.deviceName ?? "") [\(usedToken?.tokenType ?? "")]: \(error.localizedDescription)"
                     )
                     do {
-                        try await DeviceToken.query(on: database)
+                        try await DeviceToken.query(on: database())
                             .filter(\.$tokenString == usedToken?.tokenString ?? "")
                             .delete()
                     } catch {
@@ -245,7 +246,7 @@ actor PushNotifcationService: NotificationSender {
     func endAllLiveActivities(ofActivityType activityType: String) async {
         do {
             let deviceTokens = try await DeviceToken
-                .query(on: database)
+                .query(on: database())
                 .filter(\.$activityType == activityType)
                 .all()
 
@@ -267,7 +268,7 @@ actor PushNotifcationService: NotificationSender {
 
                     // delete token when ending the live activity
                     do {
-                        try await DeviceToken.query(on: database)
+                        try await DeviceToken.query(on: database())
                             .filter(\.$tokenString == deviceToken.tokenString)
                             .delete()
                     } catch {
@@ -284,7 +285,7 @@ actor PushNotifcationService: NotificationSender {
                         "[endAllLiveActivities] Failed to send live activity push notification to \(deviceToken.deviceName) [\(deviceToken.tokenType)]: \(error.localizedDescription)"
                     )
                     do {
-                        try await DeviceToken.query(on: database)
+                        try await DeviceToken.query(on: database())
                             .filter(\.$tokenString == deviceToken.tokenString)
                             .delete()
                     } catch {
@@ -298,7 +299,7 @@ actor PushNotifcationService: NotificationSender {
 
         do {
             try await DeviceToken
-                .query(on: database)
+                .query(on: database())
                 .filter(\.$activityType == activityType)
                 .delete()
         } catch {

@@ -15,6 +15,8 @@ private enum FakeAdapterError: Error {
     case unreachable
 }
 
+private struct StorageFailure: Error {}
+
 /// Observes what the adapter was asked to do and controls how it responds.
 private actor AdapterProbe {
     private(set) var startedPerforms = 0
@@ -90,14 +92,18 @@ struct HomeManagerTests {
 
     /// - Parameter retryTicks: Defaults to a stream that finishes right away, so retries only happen
     ///   in the tests that drive them.
-    private func makeHomeManager(probe: AdapterProbe, retryTicks: AsyncStream<Void> = AsyncStream { _ in }) async -> HomeManager {
+    private func makeHomeManager(probe: AdapterProbe,
+                                 storageRepo: any StorageRepository = MockStorageRepository(),
+                                 retryTicks: AsyncStream<Void> = AsyncStream { _ in },
+                                 persistRetryDelays: [Duration] = [.zero, .zero]) async -> HomeManager {
         let adapter = FakeEntityAdapter(actorSystem: LocalTestingDistributedActorSystem(), probe: probe)
         return await HomeManager(getAdapter: { adapter },
-                                 storageRepo: MockStorageRepository(),
+                                 storageRepo: storageRepo,
                                  notificationSender: MockNotificationSender(),
                                  location: Location(latitude: 0, longitude: 0),
                                  actionLogManager: ActionLogManager(),
-                                 retryTicks: retryTicks)
+                                 retryTicks: retryTicks,
+                                 persistRetryDelays: persistRetryDelays)
     }
 
     // MARK: - command deduplication
@@ -261,5 +267,128 @@ struct HomeManagerTests {
 
         #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)))
         #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: false)))
+    }
+
+    @Test("A value-identical replay is not written to storage")
+    func replayIsNotPersisted() async {
+        let storage = RecordingStorageRepository()
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        let timestamp = Date()
+
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: timestamp, isDeviceOn: true))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: timestamp.addingTimeInterval(30), isDeviceOn: true))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: timestamp.addingTimeInterval(60), isDeviceOn: false))
+        // The replay never reaches the serial queue and the queue is FIFO, so once the third
+        // event is saved the counts are final.
+        await storage.waitForAdds(2)
+
+        #expect(await storage.added.map(\.isDeviceOn) == [true, false])
+        // the replay does not even reach the database for a lookup
+        #expect(await storage.lookups == 2)
+    }
+
+    @Test("A burst of events is persisted one at a time and in order")
+    func burstIsPersistedSerially() async {
+        let storage = RecordingStorageRepository(addDuration: .milliseconds(2))
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        let entityIds = (0..<50).map { EntityId(placeId: "room", name: "light \($0)", characteristicsName: nil, characteristic: .switcher) }
+
+        for entityId in entityIds {
+            await homeManager.addEntityHistory(EntityStorageItem(entityId: entityId, isDeviceOn: true))
+        }
+        await storage.waitForAdds(entityIds.count)
+
+        #expect(await storage.added.map(\.entityId) == entityIds)
+        #expect(await storage.maxConcurrentCalls == 1)
+    }
+
+    @Test("A failed save is retried without counting the state as a change again")
+    func failedSaveIsRetried() async {
+        let storage = RecordingStorageRepository(failingAdds: 2)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)))
+        await storage.waitForAdds(1)
+
+        #expect(await storage.added.map(\.isDeviceOn) == [true])
+        #expect(await storage.addAttempts == 3)
+    }
+
+    @Test("A save that keeps failing is given up and does not block later states")
+    func failingSaveIsGivenUp() async {
+        let storage = RecordingStorageRepository(failingAdds: 3)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: false))
+        await storage.waitForAdds(1)
+
+        #expect(await storage.added.map(\.isDeviceOn) == [false])
+        #expect(await storage.addAttempts == 4)
+    }
+}
+
+/// Records what reaches the database and how many calls overlap.
+private actor RecordingStorageRepository: StorageRepository {
+    private(set) var added: [EntityStorageItem] = []
+    private(set) var lookups = 0
+    private(set) var maxConcurrentCalls = 0
+    private(set) var addAttempts = 0
+    private var concurrentCalls = 0
+    private var failingAdds: Int
+    private let addDuration: Duration?
+
+    /// - Parameter failingAdds: Number of `add` calls that throw before the first one succeeds.
+    init(addDuration: Duration? = nil, failingAdds: Int = 0) {
+        self.addDuration = addDuration
+        self.failingAdds = failingAdds
+    }
+
+    func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? {
+        lookups += 1
+        return await track { added.last { $0.entityId == entityId } }
+    }
+
+    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? {
+        nil
+    }
+
+    func add(_ item: EntityStorageItem) async throws {
+        addAttempts += 1
+        if failingAdds > 0 {
+            failingAdds -= 1
+            throw StorageFailure()
+        }
+        await track {
+            if let addDuration {
+                try? await Task.sleep(for: addDuration)
+            }
+            added.append(item)
+        }
+    }
+
+    func deleteEntries(olderThan date: Date) async throws {}
+
+    func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] {
+        []
+    }
+
+    func getAllEntityIds() async throws -> [EntityId] {
+        []
+    }
+
+    func waitForAdds(_ count: Int, timeout: Duration = .seconds(2)) async {
+        let deadline = ContinuousClock.now + timeout
+        while added.count < count, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
+    /// The actor is reentrant across the `await` in `body`, so overlapping calls are counted.
+    private func track<T>(_ body: () async -> T) async -> T {
+        concurrentCalls += 1
+        maxConcurrentCalls = max(maxConcurrentCalls, concurrentCalls)
+        defer { concurrentCalls -= 1 }
+        return await body()
     }
 }

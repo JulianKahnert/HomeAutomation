@@ -36,13 +36,38 @@ public struct HealthCheck: Automatable {
         // would act as a request proxy into the container network (`http://db:3306/`,
         // `http://cloudflared:2000/metrics`, cloud metadata endpoints, ...).
         try Self.validate(url)
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 30
+        let health = await hm.homeKitHealth()
+        guard let request = Self.pingRequest(for: url, health: health) else {
+            log.info("Skipping healthcheck ping: \(health)")
+            return
+        }
+        if case .degraded(let reason) = health {
+            log.warning("Reporting HomeKit as degraded to the healthcheck: \(reason)")
+        }
         let (_, response) = try await URLSession.shared.data(for: request)
         // Only the status is logged: the response body of an attacker-chosen URL must never
         // end up in the logs.
         let statusCode = (response as? HTTPURLResponse)?.statusCode
         log.debug("Healthcheck response status: \(statusCode.map(String.init) ?? "unknown")")
+    }
+
+    /// The healthchecks.io ping for `health`: the URL itself on success, `<url>/fail` with the
+    /// reason as body when degraded, none while the health is still unknown (server start,
+    /// adapter reconnect) so a short gap never raises an alert.
+    static func pingRequest(for url: URL, health: HomeKitHealth) -> URLRequest? {
+        var request: URLRequest
+        switch health {
+        case .healthy:
+            request = URLRequest(url: url)
+        case .unknown:
+            return nil
+        case .degraded(let reason):
+            request = URLRequest(url: url.appending(path: "fail"))
+            request.httpMethod = "POST"
+            request.httpBody = Data(reason.utf8)
+        }
+        request.timeoutInterval = 30
+        return request
     }
 
     // MARK: - URL validation

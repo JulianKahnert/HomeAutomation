@@ -36,6 +36,8 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async
     func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem]
     func clearActionLog() async
+    /// Whether HomeKit works end to end; shared by `/health` and the `HealthCheck` automation.
+    func homeKitHealth() async -> HomeKitHealth
 }
 
 public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equatable {

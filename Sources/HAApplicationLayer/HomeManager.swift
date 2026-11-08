@@ -39,6 +39,7 @@ public final class HomeManager: HomeManagable {
     nonisolated private static let persistQueueLimit = 5_000
     /// States dropped since the queue last had room again; keeps a stuck database from flooding the log.
     private var droppedPersistItems = 0
+    private var liveness = HomeKitLiveness(startedAt: Date())
 
     /// - Parameters:
     ///   - retryTicks: Cadence at which queued failed actions are retried. Pass a stream to drive the
@@ -170,7 +171,9 @@ public final class HomeManager: HomeManagable {
 
             // Only a command that reached the device may deduplicate its successors.
             await actionLogManager.markExecuted(action)
+            liveness.recordCommandSuccess(at: Date())
         } catch {
+            liveness.recordCommandFailure(error, at: Date())
             await actionLogManager.markFailed(action)
             let entityId = action.entityId
 
@@ -198,9 +201,11 @@ public final class HomeManager: HomeManagable {
         let start = ContinuousClock.now
         do {
             try await getAdapter().get(with: log).trigger(scene: sceneName)
+            liveness.recordCommandSuccess(at: Date())
             let duration = start.duration(to: .now)
             log.info("Triggering scene '\(sceneName)' — completed in \(duration)")
         } catch {
+            liveness.recordCommandFailure(error, at: Date())
             let duration = start.duration(to: .now)
             log.error("Failed to trigger scene '\(sceneName)' after \(duration)\n\(error)")
         }
@@ -209,6 +214,8 @@ public final class HomeManager: HomeManagable {
     @discardableResult
     public func addEntityHistory(_ item: EntityStorageItem) async -> Bool {
         log.debug("Adding entity item to storage \(item.entityId)")
+        // Every change event counts, a value-identical replay too: it proves HomeKit still delivers.
+        liveness.recordEvent(at: Date())
 
         // `EntityStorageItem` is Equatable including its timestamp, so align it before comparing —
         // only the values decide whether this is new information. An unknown entity counts as a
@@ -334,6 +341,11 @@ public final class HomeManager: HomeManagable {
 
     public func clearActionLog() async {
         await actionLogManager.clear()
+    }
+
+    public func homeKitHealth() async -> HomeKitHealth {
+        let isConnected = await getAdapter() != nil
+        return liveness.evaluate(isConnected: isConnected, at: Date())
     }
 
     private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?)] {

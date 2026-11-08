@@ -13,6 +13,8 @@ import Testing
 
 private enum FakeAdapterError: Error {
     case unreachable
+    /// What the adapter answers once `homed` dropped it.
+    case accessDenied(String = #"Error Domain=HMErrorDomain Code=80 "Missing entitlement for API.""#)
 }
 
 private struct StorageFailure: Error {}
@@ -325,6 +327,31 @@ struct HomeManagerTests {
 
         #expect(await storage.added.map(\.isDeviceOn) == [false])
         #expect(await storage.addAttempts == 4)
+    }
+
+    // MARK: - HomeKit health
+
+    @Test("A command refused with Code=80 marks HomeKit degraded until the next event")
+    func accessDeniedCommandDegradesHealth() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .accessDenied()))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        #expect(await homeManager.homeKitHealth() == .healthy)
+
+        await homeManager.perform(.turnOff(switchId))
+        #expect(await homeManager.homeKitHealth() == .degraded(reason: "HomeKit refuses access (HMErrorDomain Code=80)"))
+
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: false))
+        #expect(await homeManager.homeKitHealth() == .healthy)
+    }
+
+    @Test("A command that fails for another reason leaves HomeKit healthy")
+    func otherCommandFailureKeepsHealth() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+
+        await homeManager.perform(.turnOff(switchId))
+
+        #expect(await homeManager.homeKitHealth() == .healthy)
     }
 }
 

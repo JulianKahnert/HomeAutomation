@@ -17,6 +17,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     let entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation
 
     var storageItems: [EntityStorageItem] = []
+    var health = HomeKitHealth.healthy
     private let log = Logger(label: "MockHomeAdapter")
     private var traceMap: [String: Int] = [:]
 
@@ -157,5 +158,9 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     }
 
     func clearActionLog() async {
+    }
+
+    func homeKitHealth() async -> HomeKitHealth {
+        health
     }
 }

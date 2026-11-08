@@ -27,6 +27,7 @@ func routes(_ app: Application) throws {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
         let system = req.application.starActorSystem
+        let homeManager = req.application.homeManager
 
         // Race the health checks against a hard timeout so the Docker healthcheck always gets a
         // fast, definitive answer (503 peer-not-up / 504 timeout) instead of hanging.
@@ -37,6 +38,11 @@ func routes(_ app: Application) throws {
                 let connectionStatus = system.latestConnectionStatus
                 guard connectionStatus == .up else {
                     throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(connectionStatus.rawValue)")
+                }
+
+                // The link can stay up while macOS has cut the adapter off from HomeKit.
+                if case .degraded(let reason) = await homeManager.homeKitHealth() {
+                    throw Abort(.serviceUnavailable, reason: "HomeKit degraded: \(reason)")
                 }
                 return .ok
             }

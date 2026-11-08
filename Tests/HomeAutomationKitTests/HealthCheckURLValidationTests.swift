@@ -10,7 +10,7 @@ import Testing
 struct HealthCheckURLValidationTests {
 
     @Test("Public https URLs are accepted", arguments: [
-        "https://hc-ping.com/ef0777d6-77d2-4153-aa3e-9cea2f471d0c",
+        "https://example.com/ping/00000000-0000-0000-0000-000000000000",
         "https://example.org/",
         "https://8.8.8.8/ping",
         "https://[2001:db8::1]/ping",
@@ -22,7 +22,7 @@ struct HealthCheckURLValidationTests {
     }
 
     @Test("Non-https schemes are rejected", arguments: [
-        "http://hc-ping.com/x",
+        "http://example.com/x",
         "ftp://example.org/",
         "file:///etc/passwd",
         "gopher://example.org/"

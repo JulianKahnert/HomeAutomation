@@ -32,10 +32,10 @@ let package = Package(
         // 🐬 Fluent driver for MySQL.
         .package(url: "https://github.com/vapor/fluent-mysql-driver.git", exact: "4.8.0"),
         // open api generator
-        .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.14.3"),
+        .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.14.4"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", exact: "1.2.0"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", exact: "1.17.2"),
-        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.13.3"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.13.4"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.4.0"),
         // TCA and related
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture",
@@ -47,7 +47,7 @@ let package = Package(
         .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.10.1"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", exact: "5.1.0"),
-        .package(url: "https://github.com/apple/swift-log.git", exact: "1.16.2"),
+        .package(url: "https://github.com/apple/swift-log.git", exact: "1.17.0"),
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "fix/linux-foundation-networking"),
         // Capped at 7.x: vapor/apns 5.1.0 requires apnswift 7.0.1..<8.0.0.

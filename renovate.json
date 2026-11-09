@@ -4,6 +4,7 @@
   "schedule": ["before 6am on monday"],
   "timezone": "Europe/Berlin",
   "rebaseWhen": "conflicted",
+  "draftPR": true,
   "swift": {
     "enabled": true,
     "updateLockFiles": false

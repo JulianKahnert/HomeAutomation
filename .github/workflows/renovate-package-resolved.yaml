@@ -12,7 +12,6 @@ jobs:
     runs-on: xcode-27
     permissions:
       contents: write
-      actions: write
 
     steps:
       - name: Checkout repository
@@ -42,6 +41,8 @@ jobs:
           fi
 
       - name: Commit Package.resolved changes
+        # A GITHUB_TOKEN push starts no workflow run. PR Checks run once the draft
+        # Renovate PR is set ready for review, which checks this commit.
         if: steps.changes.outputs.changed == 'true'
         run: |
           set -euo pipefail
@@ -50,15 +51,3 @@ jobs:
           git add Package.resolved "Apps/FlowKitAdapter/FlowKit Adapter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "Apps/FlowKitController/FlowKit Controller.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
           git commit -m "Package.resolved updated"
           git push
-
-      - name: Trigger PR checks
-        # The commit pushed above uses GITHUB_TOKEN, which GitHub deliberately
-        # prevents from triggering further workflow runs. Without this the PR
-        # checks never run against the regenerated Package.resolved. Dispatch
-        # them explicitly (workflow_dispatch is exempt from that restriction).
-        # Runs even when Package.resolved did not change: pr-checks.yml now
-        # skips its own pull_request run on renovate/** branches, so without
-        # this dispatch such a PR would get no checks at all.
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run pr-checks.yml --ref "${{ github.ref_name }}"

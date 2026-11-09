@@ -11,9 +11,8 @@ on:
     branches:
       - main
       - develop
-  # Allow the renovate-package-resolved workflow to dispatch these checks after
-  # it commits a regenerated Package.resolved (that commit is pushed with
-  # GITHUB_TOKEN and therefore cannot trigger pull_request runs itself).
+  # Manual runs only. Renovate PRs open as drafts (renovate.json) and get their
+  # counted run on ready_for_review, after renovate-package-resolved.yaml committed.
   workflow_dispatch:
 
 concurrency:
@@ -24,12 +23,9 @@ jobs:
   swift-package:
     name: Swift Package Build & Test
     runs-on: macos-26
-    # The dispatched run (see renovate-package-resolved.yaml) has no head_ref and
-    # still runs; a pull_request run on a renovate branch would only fail on the
-    # stale Package.resolved that dispatch is about to fix.
     # The draft guard holds even if more pull_request types are added above; a
     # dispatched run has no pull_request, so draft is falsy and it runs.
-    if: ${{ !github.event.pull_request.draft && !startsWith(github.head_ref, 'renovate/') }}
+    if: ${{ !github.event.pull_request.draft }}
 
     steps:
       - name: Checkout repository
@@ -47,8 +43,8 @@ jobs:
     # whose resolver pins swift-issue-reporting separately from xctest-dynamic-overlay.
     # macos-26 tops out at Xcode 26.6 and would rewrite Package.resolved without it.
     runs-on: xcode-27
-    # See swift-package above: skip drafts and the redundant run on a renovate/** push.
-    if: ${{ !github.event.pull_request.draft && !startsWith(github.head_ref, 'renovate/') }}
+    # See swift-package above.
+    if: ${{ !github.event.pull_request.draft }}
     strategy:
       fail-fast: false
       matrix:
@@ -127,8 +123,8 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    # See swift-package above: skip drafts and the redundant run on a renovate/** push.
-    if: ${{ !github.event.pull_request.draft && !startsWith(github.head_ref, 'renovate/') }}
+    # See swift-package above.
+    if: ${{ !github.event.pull_request.draft }}
 
     steps:
       - name: Checkout repository

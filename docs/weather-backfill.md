@@ -25,17 +25,17 @@ FROM weatherSnapshots s,
 WHERE s.id = (SELECT id FROM weatherSnapshots ORDER BY fetchedAt DESC LIMIT 1);
 ```
 
-The simple way for one hour: find its index in `$.hourly.time` and extract the same index.
+One variable for one hour from the newest snapshot that contains it (filter `t.hour`; the first query's `idx` aligns the series, so a simple client-side alternative is `JSON_EXTRACT(json, '$.hourly.temperature_2m[idx]')` with `idx` from `$.hourly.time`):
 
 ```sql
-SELECT s.fetchedAt,
-       JSON_EXTRACT(s.json, CONCAT('$.hourly.temperature_2m[',
-         JSON_UNQUOTE(JSON_SEARCH(s.json, 'one', '2026-11-14T12:00', NULL, '$.hourly.time[*]')) , ']')) AS dummy
-FROM weatherSnapshots s LIMIT 1;
+SELECT s.fetchedAt, v.temperature_2m
+FROM weatherSnapshots s,
+     JSON_TABLE(s.json, '$.hourly' COLUMNS (
+       NESTED PATH '$.time[*]' COLUMNS (idx FOR ORDINALITY, hour VARCHAR(16) PATH '$')) ) t,
+     JSON_TABLE(s.json, '$.hourly.temperature_2m[*]' COLUMNS (idx2 FOR ORDINALITY, temperature_2m DOUBLE PATH '$')) v
+WHERE t.hour = '2026-11-14T12:00' AND v.idx2 = t.idx
+ORDER BY s.fetchedAt DESC LIMIT 1;
 ```
-
-If the path gymnastics get annoying, take the index in a client instead: `time` is hourly from the first element, so for the hour `H` the index is the hours between `$.hourly.time[0]` and `H`.
-
 ## Backfill from the archive
 
 The archive API (`archive-api.open-meteo.com/v1/archive`) returns the same `hourly` format, so a day of archive data is a valid snapshot. One row per day is enough. Use your own latitude and longitude; the `locationKey` must be the same string the server uses (`latitude,longitude` exactly as configured).

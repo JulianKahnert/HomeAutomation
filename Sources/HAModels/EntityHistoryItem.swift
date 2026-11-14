@@ -29,6 +29,10 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     public let pmDensity: Double?
     public let airQuality: Int?
     public let valveOpen: Bool?
+    public let targetTemperatureInC: Double?
+    /// HomeKit raw value: 0 off, 1 heat, 2 cool, 3 auto
+    public let heatingMode: Int?
+    public let valvePositionPercent: Int?
 
     public init(
         id: UUID = UUID(),
@@ -50,7 +54,10 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         carbonDioxideSensorId: Int? = nil,
         pmDensity: Double? = nil,
         airQuality: Int? = nil,
-        valveOpen: Bool? = nil
+        valveOpen: Bool? = nil,
+        targetTemperatureInC: Double? = nil,
+        heatingMode: Int? = nil,
+        valvePositionPercent: Int? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -72,6 +79,9 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         self.pmDensity = pmDensity
         self.airQuality = airQuality
         self.valveOpen = valveOpen
+        self.targetTemperatureInC = targetTemperatureInC
+        self.heatingMode = heatingMode
+        self.valvePositionPercent = valvePositionPercent
     }
 }
 
@@ -95,7 +105,10 @@ extension EntityHistoryItem {
                   carbonDioxideSensorId: item.carbonDioxideSensorId,
                   pmDensity: item.pmDensity,
                   airQuality: item.airQuality,
-                  valveOpen: item.valveOpen)
+                  valveOpen: item.valveOpen,
+                  targetTemperatureInC: item.targetTemperatureInC,
+                  heatingMode: item.heatingMode,
+                  valvePositionPercent: item.valvePositionPercent)
     }
 
     /// Human-readable description of the primary value
@@ -144,6 +157,15 @@ extension EntityHistoryItem {
         }
         if let valveOpen {
             return valveOpen ? "Open" : "Closed"
+        }
+        if let valvePositionPercent {
+            return "Valve \(valvePositionPercent)%"
+        }
+        if let targetTemperatureInC {
+            return "Target \(String(format: "%.1f", targetTemperatureInC))°C"
+        }
+        if let heatingMode {
+            return "Mode \(heatingMode)"
         }
         // Color as hue
         if let colorRed, let colorGreen, let colorBlue {

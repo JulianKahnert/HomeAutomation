@@ -11,4 +11,12 @@ public enum CharacteristicsType: String, Sendable, Codable, CaseIterable {
     case switcher, brightness, colorTemperature, color, valve
     case lock
     case heating
+    /// Thermostat target temperature, stored in `targetTemperatureInC`.
+    case targetTemperature
+    /// Thermostat target mode (HomeKit `TargetHeatingCoolingState`), stored in `heatingMode`.
+    case heatingMode
+    /// Eve valve opening in percent, stored in `valvePositionPercent`.
+    case valvePosition
+    /// Outdoor temperature from a weather service, stored in `temperatureInC`.
+    case outdoorTemperature
 }

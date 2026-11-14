@@ -103,6 +103,26 @@ struct EntityCharacteristicView: View {
                         .font(.caption)
                 }
             }
+        case .targetTemperature:
+            if let target = item.targetTemperatureInC {
+                Spacer()
+                Label(String(format: "%.1f °C", target), systemImage: "target")
+            }
+        case .heatingMode:
+            if let mode = item.heatingMode {
+                Spacer()
+                Label("mode \(mode)", systemImage: "thermostat")
+            }
+        case .valvePosition:
+            if let percent = item.valvePositionPercent {
+                Spacer()
+                Label("\(percent) %", systemImage: "spigot")
+            }
+        case .outdoorTemperature:
+            if let temperature = item.temperatureInC {
+                Spacer()
+                Label(temperature.formatted(.measurement(width: .abbreviated, usage: .general, numberFormatStyle: .number.precision(.fractionLength(1)))), systemImage: "cloud.sun")
+            }
         case .valve:
             if let valveOpen = item.valveOpen {
                 Spacer()

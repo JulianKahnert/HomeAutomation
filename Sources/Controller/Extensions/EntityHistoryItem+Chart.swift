@@ -77,6 +77,15 @@ extension EntityHistoryItem {
         if let colorTemperature {
             return Double(colorTemperature)
         }
+        if let targetTemperatureInC {
+            return targetTemperatureInC
+        }
+        if let valvePositionPercent {
+            return Double(valvePositionPercent)
+        }
+        if let heatingMode {
+            return Double(heatingMode)
+        }
         // Boolean sensors (lower priority)
         if let isDeviceOn {
             return isDeviceOn ? 1.0 : 0.0

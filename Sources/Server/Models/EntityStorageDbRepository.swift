@@ -179,7 +179,10 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                  carbonDioxideSensorId: item.carbonDioxideSensorId,
                                  pmDensity: item.pmDensity,
                                  airQuality: item.airQuality,
-                                 valveOpen: item.valveOpen)
+                                 valveOpen: item.valveOpen,
+                                 targetTemperatureInC: item.targetTemperatureInC,
+                                 heatingMode: item.heatingMode,
+                                 valvePositionPercent: item.valvePositionPercent)
     }
 
     static func map(_ item: EntityStorageItem) -> EntityStorageDbItem {
@@ -205,6 +208,9 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                    carbonDioxideSensorId: item.carbonDioxideSensorId,
                                    pmDensity: item.pmDensity,
                                    airQuality: item.airQuality,
-                                   valveOpen: item.valveOpen)
+                                   valveOpen: item.valveOpen,
+                                   targetTemperatureInC: item.targetTemperatureInC,
+                                   heatingMode: item.heatingMode,
+                                   valvePositionPercent: item.valvePositionPercent)
     }
 }

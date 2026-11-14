@@ -635,7 +635,16 @@ components:
           description: Heater active state (if applicable).
         temperatureInC:
           type: number
-          description: Temperature in Celsius (if applicable).
+          description: Temperature in Celsius (if applicable). Also holds the outdoor temperature of the `outdoorTemperature` entity.
+        targetTemperatureInC:
+          type: number
+          description: Thermostat target temperature in Celsius (characteristic type `targetTemperature`).
+        heatingMode:
+          type: integer
+          description: Thermostat target mode, HomeKit raw value 0 off, 1 heat, 2 cool, 3 auto (characteristic type `heatingMode`).
+        valvePositionPercent:
+          type: integer
+          description: Valve opening in percent, 0 to 100 (characteristic type `valvePosition`, Eve custom characteristic).
         relativeHumidity:
           type: number
           description: Relative humidity percentage 0-100 (if applicable).

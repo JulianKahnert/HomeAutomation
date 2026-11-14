@@ -410,7 +410,7 @@ extension HMCharacteristic: @retroactive Comparable {
         case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId, .brightness, .colorTemperature, .color:
             return true
         case .batterySensor, .heating, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor,
-             .targetTemperature, .heatingMode, .valvePosition, .outdoorTemperature:
+             .targetTemperature, .heatingMode, .valvePosition:
             return false
         }
     }

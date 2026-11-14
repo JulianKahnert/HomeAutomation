@@ -9,47 +9,52 @@ import Foundation
 import Testing
 
 struct OutdoorTemperatureJobTests {
-    private let response = Data(#"{"latitude":52.5,"current":{"time":"2026-11-14T12:00","interval":900,"temperature_2m":8.3}}"#.utf8)
+    private let location = Location(latitude: 52.5, longitude: 13.4)
+    private let response = Data(#"{"latitude":52.5,"hourly":{"time":["2026-11-14T11:00","2026-11-14T12:00"],"temperature_2m":[7.9,8.3],"cloud_cover":[100,null],"is_day":[1,1]}}"#.utf8)
 
-    @Test func parsesCurrentTemperature() throws {
-        #expect(try OutdoorTemperatureJob.parseTemperature(response) == 8.3)
+    @Test func parsesOneRowPerHourWithAllVariables() throws {
+        let fetched = Date(timeIntervalSince1970: 100)
+        let hours = try OutdoorTemperatureJob.parseHours(response, location: location, fetchedAt: fetched)
+
+        #expect(hours.count == 2)
+        #expect(hours[1].hour == Date(timeIntervalSince1970: 1_794_657_600)) // 2026-11-14T12:00Z
+        #expect(hours[1].temperatureInC == 8.3)
+        #expect(hours[1].locationKey == "52.5,13.4")
+        #expect(hours[1].fetchedAt == fetched)
+        let first = try JSONSerialization.jsonObject(with: Data(hours[0].data.utf8)) as? [String: Double]
+        let second = try JSONSerialization.jsonObject(with: Data(hours[1].data.utf8)) as? [String: Double]
+        #expect(first == ["cloud_cover": 100, "is_day": 1, "temperature_2m": 7.9])
+        #expect(second == ["is_day": 1, "temperature_2m": 8.3]) // null values are left out
     }
 
-    @Test func rejectsResponseWithoutTemperature() {
-        #expect(throws: (any Error).self) { try OutdoorTemperatureJob.parseTemperature(Data("{}".utf8)) }
-    }
-
-    @Test func urlUsesLocation() {
-        let url = OutdoorTemperatureJob.url(for: Location(latitude: 52.5, longitude: 13.4))
-        #expect(url.absoluteString == "https://api.open-meteo.com/v1/forecast?latitude=52.5&longitude=13.4&current=temperature_2m&hourly=\(OutdoorTemperatureJob.hourlyVariables)&past_days=1&forecast_days=2&timezone=UTC")
-    }
-
-    @Test func recordOnceStoresOutdoorEntity() async throws {
-        let repository = RecordingRepository()
-        let snapshots = RecordingSnapshots()
-        let data = response
-        var job = OutdoorTemperatureJob(location: Location(latitude: 52.5, longitude: 13.4), storage: repository, snapshots: snapshots)
-        job.fetch = { _ in data }
-
-        let item = try await job.recordOnce(now: Date(timeIntervalSince1970: 100))
-
-        #expect(item.entityId == OutdoorTemperatureJob.entityId)
-        #expect(item.entityId.characteristicType == .outdoorTemperature)
-        #expect(item.temperatureInC?.value == 8.3)
-        #expect(await repository.items.count == 1)
-        let stored = try #require(await snapshots.rows.first)
-        #expect(stored.json == String(decoding: data, as: UTF8.self))
-        #expect(stored.locationKey == "52.5,13.4")
-        #expect(stored.fetchedAt == Date(timeIntervalSince1970: 100))
+    @Test func rejectsResponseWithoutHourlyBlock() {
+        #expect(throws: (any Error).self) { try OutdoorTemperatureJob.parseHours(Data("{}".utf8), location: location, fetchedAt: Date()) }
     }
 
     @Test func urlRequestsAllHourlyVariablesWithPastAndForecastDays() {
-        let query = OutdoorTemperatureJob.url(for: Location(latitude: 1, longitude: 2)).absoluteString
+        let query = OutdoorTemperatureJob.url(for: location).absoluteString
         for variable in ["temperature_2m", "apparent_temperature", "relative_humidity_2m", "dew_point_2m", "precipitation", "cloud_cover", "wind_speed_10m", "wind_direction_10m", "shortwave_radiation", "direct_radiation", "diffuse_radiation", "direct_normal_irradiance", "sunshine_duration", "is_day"] {
             #expect(query.contains(variable))
         }
+        #expect(query.contains("latitude=52.5&longitude=13.4"))
         #expect(query.contains("past_days=1"))
         #expect(query.contains("forecast_days=2"))
+        #expect(query.contains("timezone=UTC"))
+    }
+
+    @Test func laterFetchOverwritesTheSameHour() async throws {
+        let store = InMemoryWeather()
+        var job = OutdoorTemperatureJob(location: location, weather: store)
+        let first = response
+        let second = Data(#"{"hourly":{"time":["2026-11-14T12:00","2026-11-14T13:00"],"temperature_2m":[9.0,9.5]}}"#.utf8)
+        job.fetch = { _ in first }
+        try await job.recordOnce(now: Date(timeIntervalSince1970: 100))
+        job.fetch = { _ in second }
+        try await job.recordOnce(now: Date(timeIntervalSince1970: 200))
+
+        let rows = await store.rows.values.sorted { $0.hour < $1.hour }
+        #expect(rows.map(\.temperatureInC) == [7.9, 9.0, 9.5])
+        #expect(rows[1].fetchedAt == Date(timeIntervalSince1970: 200))
     }
 
     @Test func historyItemExposesHeatingFields() {
@@ -68,25 +73,24 @@ struct OutdoorTemperatureJobTests {
         #expect(api.valvePositionPercent == 35)
     }
 
+    @Test func weatherHourMapsToApiSchema() {
+        let value = WeatherHourValue(locationKey: "k", hour: Date(timeIntervalSince1970: 3600), temperatureInC: 4.5, fetchedAt: Date(timeIntervalSince1970: 7200), data: "{}")
+        let api = Components.Schemas.WeatherHour(value)
+        #expect(api.hour == value.hour)
+        #expect(api.temperatureInC == 4.5)
+        #expect(api.data == "{}")
+    }
+
     @Test func eveValvePositionUUIDMatchesCaseInsensitively() {
         #expect(EveCharacteristic.isValvePosition("e863f12e-079e-48ff-8f27-9c2605a29f52"))
         #expect(!EveCharacteristic.isValvePosition("E863F12C-079E-48FF-8F27-9C2605A29F52"))
     }
 }
 
-private actor RecordingRepository: StorageRepository {
-    private(set) var items: [EntityStorageItem] = []
-    func add(_ item: EntityStorageItem) async throws { items.append(item) }
-    func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? { nil }
-    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? { nil }
-    func deleteEntries(olderThan date: Date) async throws {}
-    func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] { [] }
-    func getAllEntityIds() async throws -> [EntityId] { [] }
-}
-
-private actor RecordingSnapshots: WeatherSnapshotStoring {
-    private(set) var rows: [(locationKey: String, fetchedAt: Date, json: String)] = []
-    func add(locationKey: String, fetchedAt: Date, json: String) async throws {
-        rows.append((locationKey, fetchedAt, json))
+private actor InMemoryWeather: WeatherHourStoring {
+    private(set) var rows: [String: WeatherHourValue] = [:]
+    func upsert(_ values: [WeatherHourValue]) async throws {
+        for value in values { rows["\(value.locationKey)|\(value.hour.timeIntervalSince1970)"] = value }
     }
+    func history(locationKey: String, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [WeatherHourValue] { [] }
 }

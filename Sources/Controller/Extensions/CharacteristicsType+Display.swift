@@ -50,8 +50,6 @@ extension CharacteristicsType {
             return "Heating Mode"
         case .valvePosition:
             return "Valve Position"
-        case .outdoorTemperature:
-            return "Outdoor Temperature"
         }
     }
 
@@ -75,7 +73,6 @@ extension CharacteristicsType {
         case .targetTemperature: return "target"
         case .heatingMode: return "thermostat"
         case .valvePosition: return "spigot"
-        case .outdoorTemperature: return "cloud.sun"
         }
     }
 }

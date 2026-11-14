@@ -118,11 +118,6 @@ struct EntityCharacteristicView: View {
                 Spacer()
                 Label("\(percent) %", systemImage: "spigot")
             }
-        case .outdoorTemperature:
-            if let temperature = item.temperatureInC {
-                Spacer()
-                Label(temperature.formatted(.measurement(width: .abbreviated, usage: .general, numberFormatStyle: .number.precision(.fractionLength(1)))), systemImage: "cloud.sun")
-            }
         case .valve:
             if let valveOpen = item.valveOpen {
                 Spacer()

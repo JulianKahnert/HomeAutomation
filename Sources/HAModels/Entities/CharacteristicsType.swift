@@ -17,6 +17,4 @@ public enum CharacteristicsType: String, Sendable, Codable, CaseIterable {
     case heatingMode
     /// Eve valve opening in percent, stored in `valvePositionPercent`.
     case valvePosition
-    /// Outdoor temperature from a weather service, stored in `temperatureInC`.
-    case outdoorTemperature
 }

@@ -21,13 +21,14 @@ struct OutdoorTemperatureJobTests {
 
     @Test func urlUsesLocation() {
         let url = OutdoorTemperatureJob.url(for: Location(latitude: 52.5, longitude: 13.4))
-        #expect(url.absoluteString == "https://api.open-meteo.com/v1/forecast?latitude=52.5&longitude=13.4&current=temperature_2m")
+        #expect(url.absoluteString == "https://api.open-meteo.com/v1/forecast?latitude=52.5&longitude=13.4&current=temperature_2m&hourly=\(OutdoorTemperatureJob.hourlyVariables)&past_days=1&forecast_days=2&timezone=UTC")
     }
 
     @Test func recordOnceStoresOutdoorEntity() async throws {
         let repository = RecordingRepository()
+        let snapshots = RecordingSnapshots()
         let data = response
-        var job = OutdoorTemperatureJob(location: Location(latitude: 52.5, longitude: 13.4), storage: repository)
+        var job = OutdoorTemperatureJob(location: Location(latitude: 52.5, longitude: 13.4), storage: repository, snapshots: snapshots)
         job.fetch = { _ in data }
 
         let item = try await job.recordOnce(now: Date(timeIntervalSince1970: 100))
@@ -36,6 +37,19 @@ struct OutdoorTemperatureJobTests {
         #expect(item.entityId.characteristicType == .outdoorTemperature)
         #expect(item.temperatureInC?.value == 8.3)
         #expect(await repository.items.count == 1)
+        let stored = try #require(await snapshots.rows.first)
+        #expect(stored.json == String(decoding: data, as: UTF8.self))
+        #expect(stored.locationKey == "52.5,13.4")
+        #expect(stored.fetchedAt == Date(timeIntervalSince1970: 100))
+    }
+
+    @Test func urlRequestsAllHourlyVariablesWithPastAndForecastDays() {
+        let query = OutdoorTemperatureJob.url(for: Location(latitude: 1, longitude: 2)).absoluteString
+        for variable in ["temperature_2m", "apparent_temperature", "relative_humidity_2m", "dew_point_2m", "precipitation", "cloud_cover", "wind_speed_10m", "wind_direction_10m", "shortwave_radiation", "direct_radiation", "diffuse_radiation", "direct_normal_irradiance", "sunshine_duration", "is_day"] {
+            #expect(query.contains(variable))
+        }
+        #expect(query.contains("past_days=1"))
+        #expect(query.contains("forecast_days=2"))
     }
 
     @Test func historyItemExposesHeatingFields() {
@@ -68,4 +82,11 @@ private actor RecordingRepository: StorageRepository {
     func deleteEntries(olderThan date: Date) async throws {}
     func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] { [] }
     func getAllEntityIds() async throws -> [EntityId] { [] }
+}
+
+private actor RecordingSnapshots: WeatherSnapshotStoring {
+    private(set) var rows: [(locationKey: String, fetchedAt: Date, json: String)] = []
+    func add(locationKey: String, fetchedAt: Date, json: String) async throws {
+        rows.append((locationKey, fetchedAt, json))
+    }
 }

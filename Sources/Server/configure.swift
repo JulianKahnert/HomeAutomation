@@ -141,6 +141,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateAutomationRun())
     app.migrations.add(AddLookupIndexes())
     app.migrations.add(AddHeatingControlFields())
+    app.migrations.add(CreateWeatherSnapshot())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -272,7 +273,9 @@ public func configure(_ app: Application) async throws {
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
-        OutdoorTemperatureJob(location: location, storage: app.entityStorageDbRepository),
+        OutdoorTemperatureJob(location: location,
+                              storage: app.entityStorageDbRepository,
+                              snapshots: WeatherSnapshotDbRepository(database: { app.db })),
         DatabaseCleanupJob(homeManager: app.homeManager, automationRuns: app.automationRunRepository)
     ]
 

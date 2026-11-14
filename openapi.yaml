@@ -338,50 +338,6 @@ paths:
         "400":
           description: Bad request - invalid parameters.
 
-  /weather/history:
-    get:
-      summary: Get hourly weather history
-      description: Hourly weather of the configured location (Open-Meteo), newest first, one item per hour.
-      operationId: getWeatherHistory
-      parameters:
-        - name: startDate
-          in: query
-          description: ISO 8601 timestamp for the start of the time range (inclusive)
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: endDate
-          in: query
-          description: ISO 8601 timestamp for the end of the time range (exclusive)
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: cursor
-          in: query
-          description: ISO 8601 timestamp cursor for pagination (fetch hours before this)
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: limit
-          in: query
-          description: Maximum number of hours to return (default 100, max 1000)
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 1000
-            default: 100
-      responses:
-        "200":
-          description: A success response with hourly weather.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/WeatherHistoryResponse"
-
   /entities/history/room:
     get:
       summary: Get the history of a room
@@ -719,42 +675,6 @@ components:
           type: string
           format: date-time
           description: Cursor for the next page of results (timestamp of the last item, or null if no more data).
-      required:
-        - items
-
-    WeatherHour:
-      type: object
-      properties:
-        hour:
-          type: string
-          format: date-time
-          description: Start of the hour (UTC).
-        temperatureInC:
-          type: number
-          description: Outdoor temperature (temperature_2m) in Celsius.
-        fetchedAt:
-          type: string
-          format: date-time
-          description: When this hour was last written; later fetches overwrite forecasts.
-        data:
-          type: string
-          description: JSON object with every stored variable of this hour as received from Open-Meteo.
-      required:
-        - hour
-        - fetchedAt
-        - data
-
-    WeatherHistoryResponse:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/WeatherHour"
-        nextCursor:
-          type: string
-          format: date-time
-          description: Cursor for the next page (hour of the last item, or null if no more data).
       required:
         - items
 

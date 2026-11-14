@@ -292,18 +292,6 @@ struct OpenAPIController: APIProtocol {
         return .ok(.init(body: .json(response)))
     }
 
-    func getWeatherHistory(_ input: Operations.GetWeatherHistory.Input) async throws -> Operations.GetWeatherHistory.Output {
-        let location = await request.application.homeAutomationConfigService.location
-        let hours = try await WeatherHourDbRepository(database: { request.application.db })
-            .history(locationKey: OutdoorTemperatureJob.locationKey(for: location),
-                     startDate: input.query.startDate,
-                     endDate: input.query.endDate,
-                     cursor: input.query.cursor,
-                     limit: Self.clampedLimit(input.query.limit))
-        let items = hours.map(Components.Schemas.WeatherHour.init)
-        return .ok(.init(body: .json(.init(items: items, nextCursor: items.last?.hour))))
-    }
-
     func getRoomHistory(_ input: Operations.GetRoomHistory.Input) async throws -> Operations.GetRoomHistory.Output {
         let histories = try await request.application.entityStorageDbRepository.getRoomHistory(placeId: input.query.placeId,
                                                                                                startDate: input.query.startDate,
@@ -316,12 +304,6 @@ struct OpenAPIController: APIProtocol {
         return .ok(.init(body: .json(body)))
     }
 
-}
-
-extension Components.Schemas.WeatherHour {
-    init(_ value: WeatherHourValue) {
-        self.init(hour: value.hour, temperatureInC: value.temperatureInC, fetchedAt: value.fetchedAt, data: value.data)
-    }
 }
 
 extension Components.Schemas.EntityId {

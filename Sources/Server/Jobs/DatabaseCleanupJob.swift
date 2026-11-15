@@ -14,7 +14,7 @@ import Shared
 /// Once a day: deletes raw entity rows past their type's retention in ``StoragePolicy``, old
 /// automation runs, and warns about entities that store too many rows.
 ///
-/// `weatherSnapshots` are deliberately not touched here or by any other job: they are kept
+/// `weatherHours` are deliberately not touched here or by any other job: they are kept
 /// indefinitely for now.
 struct DatabaseCleanupJob: Job, Log {
     private static let runRetentionDays = 30

@@ -29,7 +29,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         app.migrations.add(CreateAutomationRun())
         app.migrations.add(AddLookupIndexes())
         app.migrations.add(AddHeatingControlFields())
-        app.migrations.add(CreateWeatherSnapshot())
+        app.migrations.add(CreateWeatherHour())
         app.migrations.add(CreateEntityHourlyAggregate())
         try await app.autoMigrate()
     }
@@ -189,4 +189,28 @@ final class EntityStorageMySQLTests: XCTestCase {
         let rows = try await sql.raw("SELECT COLUMN_NAME FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityItems' AND INDEX_NAME = 'idx_entityItems_type_timestamp' ORDER BY SEQ_IN_INDEX").all()
         XCTAssertEqual(try rows.map { try $0.decode(column: "COLUMN_NAME", as: String.self) }, ["entityCharacteristicType", "timestamp"])
     }
+
+    // MARK: - weather
+
+    func testWeatherUpsertOverwritesAnHourWithTheNewerFetch() async throws {
+        let app = try XCTUnwrap(app)
+        let repository = WeatherHourDbRepository(database: { app.db })
+        let hour = Date(timeIntervalSince1970: 1_794_654_000)
+        let forecast = WeatherHour(locationKey: "52.5,13.4", hour: hour, fetchedAt: hour.addingTimeInterval(-86_400),
+                                   temperature2mC: 7.5, relativeHumidity2mPercent: 80, cloudCoverPercent: 100,
+                                   windDirection10mDeg: 270, shortwaveRadiationWm2: 12, isDay: true)
+        var observed = forecast
+        observed.fetchedAt = hour.addingTimeInterval(3600)
+        observed.temperature2mC = 8.25
+        observed.cloudCoverPercent = nil
+        var next = forecast
+        next.hour = hour.addingTimeInterval(3600)
+
+        try await repository.upsert([forecast])
+        try await repository.upsert([observed, next])
+
+        let rows = try await repository.hours(locationKey: "52.5,13.4")
+        XCTAssertEqual(rows, [observed, next])
+    }
 }
+

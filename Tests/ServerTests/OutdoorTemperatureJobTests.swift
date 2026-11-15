@@ -12,25 +12,30 @@ struct OutdoorTemperatureJobTests {
     private let location = Location(latitude: 52.5, longitude: 13.4)
     private let response = Data(#"{"latitude":52.5,"hourly":{"time":["2026-11-14T11:00","2026-11-14T12:00"],"temperature_2m":[7.9,8.3],"cloud_cover":[100,null],"is_day":[1,1]}}"#.utf8)
 
-    @Test func storesTheRawResponseAsOneSnapshot() async throws {
-        let store = InMemorySnapshots()
-        var job = OutdoorTemperatureJob(location: location, snapshots: store)
+    @Test func storesOneTypedRowPerHour() async throws {
+        let store = InMemoryHours()
+        var job = OutdoorTemperatureJob(location: location, hours: store)
         let data = response
         job.fetch = { _ in data }
 
         try await job.recordOnce(now: Date(timeIntervalSince1970: 100))
-        try await job.recordOnce(now: Date(timeIntervalSince1970: 200))
 
         let rows = await store.rows
         #expect(rows.count == 2)
-        #expect(rows[0].json == String(decoding: data, as: UTF8.self))
         #expect(rows[0].locationKey == "52.5,13.4")
-        #expect(rows[1].fetchedAt == Date(timeIntervalSince1970: 200))
+        #expect(rows[0].hour == Date(timeIntervalSince1970: 1_794_654_000)) // 2026-11-14T11:00Z
+        #expect(rows[1].hour.timeIntervalSince(rows[0].hour) == 3600)
+        #expect(rows[0].temperature2mC == 7.9)
+        #expect(rows[0].cloudCoverPercent == 100)
+        #expect(rows[1].cloudCoverPercent == nil)
+        #expect(rows[0].isDay == true)
+        #expect(rows[0].windSpeed10mKmh == nil) // not in the response
+        #expect(rows[0].fetchedAt == Date(timeIntervalSince1970: 100))
     }
 
     @Test func rejectsResponseWithoutHourlyBlock() async {
-        let store = InMemorySnapshots()
-        var job = OutdoorTemperatureJob(location: location, snapshots: store)
+        let store = InMemoryHours()
+        var job = OutdoorTemperatureJob(location: location, hours: store)
         job.fetch = { _ in Data(#"{"reason":"rate limit"}"#.utf8) }
 
         await #expect(throws: (any Error).self) { try await job.recordOnce() }
@@ -80,9 +85,9 @@ struct OutdoorTemperatureJobTests {
     }
 }
 
-private actor InMemorySnapshots: WeatherSnapshotStoring {
-    private(set) var rows: [(locationKey: String, fetchedAt: Date, json: String)] = []
-    func add(locationKey: String, fetchedAt: Date, json: String) async throws {
-        rows.append((locationKey, fetchedAt, json))
+private actor InMemoryHours: WeatherHourStoring {
+    private(set) var rows: [WeatherHour] = []
+    func upsert(_ hours: [WeatherHour]) async throws {
+        rows.append(contentsOf: hours)
     }
 }

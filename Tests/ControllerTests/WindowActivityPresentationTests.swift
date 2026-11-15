@@ -89,6 +89,17 @@ struct WindowActivityPresentationTests {
         #expect(WindowActivityPresentation(contentState: cappedOverdue, rowBudget: 1).more?.isOverdue == true)
     }
 
+    @Test("a stale activity marks the first window not yet überschritten as possibly überschritten")
+    func staleActivityMarksFirstPendingWindow() {
+        let state = Self.state([Self.window("Küche", overdue: true), Self.window("Bad"), Self.window("Flur")])
+
+        #expect(WindowActivityPresentation(contentState: state, rowBudget: 3, isStale: true).possiblyOverdueWindowId == "window-Bad-Fenster")
+        #expect(WindowActivityPresentation(contentState: state, rowBudget: 3, isStale: false).possiblyOverdueWindowId == nil)
+
+        let allOverdue = Self.state([Self.window("Küche", overdue: true), Self.window("Bad", overdue: true)])
+        #expect(WindowActivityPresentation(contentState: allOverdue, rowBudget: 3, isStale: true).possiblyOverdueWindowId == nil)
+    }
+
     @Test("the compact and minimal tint is red once any window is überschritten")
     func compactTintFollowsOverdueCount() {
         #expect(WindowActivityPresentation(contentState: Self.state([Self.window("Küche")]), rowBudget: 1).isAnyOverdue == false)

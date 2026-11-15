@@ -17,7 +17,8 @@ struct WindowOpenPushConfiguration: Widget {
             // banner on the Home Screen of devices that don't support the
             // Dynamic Island.
             WindowOpenLiveActivityView(contentState: context.state,
-                                       rowBudget: WindowActivityPresentation.lockScreenRowBudget)
+                                       rowBudget: WindowActivityPresentation.lockScreenRowBudget,
+                                       isStale: context.isStale)
         } dynamicIsland: { context in
             let presentation = WindowActivityPresentation(contentState: context.state,
                                                           rowBudget: WindowActivityPresentation.expandedRowBudget)

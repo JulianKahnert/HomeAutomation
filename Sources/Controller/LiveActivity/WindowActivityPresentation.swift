@@ -7,7 +7,8 @@ import HAModels
 
 /// What a window Live Activity surface shows, decided from the ``WindowContentState`` and a row budget alone.
 ///
-/// It never reads the current time: order and überschritten come from the server.
+/// It never reads the current time: order and überschritten come from the server. The only
+/// exception is the stale state the system reports once the next Fensterschließzeit has passed.
 public struct WindowActivityPresentation: Equatable, Sendable {
     /// Rows on the Lock Screen, in StandBy and on the Mac.
     public static let lockScreenRowBudget = 3
@@ -29,8 +30,12 @@ public struct WindowActivityPresentation: Equatable, Sendable {
     public let more: More?
     /// Tints the compact and minimal presentations.
     public let isAnyOverdue: Bool
+    /// The window shown as "überschritten?": the activity went stale because the update marking it
+    /// überschritten did not arrive. The stale date is the earliest Fensterschließzeit among windows
+    /// not yet überschritten, so that is the first such window in server order.
+    public let possiblyOverdueWindowId: String?
 
-    public init(contentState: WindowContentState, rowBudget: Int) {
+    public init(contentState: WindowContentState, rowBudget: Int, isStale: Bool = false) {
         let rows = Array(contentState.windows.prefix(max(rowBudget, 0)))
         let hidden = contentState.windows.dropFirst(rows.count)
         let hiddenCount = contentState.openCount - rows.count
@@ -38,6 +43,7 @@ public struct WindowActivityPresentation: Equatable, Sendable {
         header = "\(contentState.openCount) offen · \(contentState.overdueCount) überschritten"
         self.rows = rows
         isAnyOverdue = contentState.overdueCount > 0
+        possiblyOverdueWindowId = isStale ? contentState.windows.first { !$0.isOverdue }?.id : nil
 
         if hiddenCount > 0 {
             var rooms: [String] = []

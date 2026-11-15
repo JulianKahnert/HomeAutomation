@@ -14,9 +14,11 @@ import SwiftUI
 public struct WindowOpenLiveActivityView: View {
     let presentation: WindowActivityPresentation
 
+    /// - Parameter isStale: The activity context's stale state; shows the first window not yet überschritten as "überschritten?".
     public init(contentState: WindowAttributes.ContentState,
-                rowBudget: Int = WindowActivityPresentation.lockScreenRowBudget) {
-        self.presentation = WindowActivityPresentation(contentState: contentState, rowBudget: rowBudget)
+                rowBudget: Int = WindowActivityPresentation.lockScreenRowBudget,
+                isStale: Bool = false) {
+        self.presentation = WindowActivityPresentation(contentState: contentState, rowBudget: rowBudget, isStale: isStale)
     }
 
     public var body: some View {
@@ -29,7 +31,7 @@ public struct WindowOpenLiveActivityView: View {
             .font(.caption.weight(.semibold))
 
             ForEach(presentation.rows) { window in
-                WindowActivityRow(window: window)
+                WindowActivityRow(window: window, isPossiblyOverdue: window.id == presentation.possiblyOverdueWindowId)
             }
 
             if let more = presentation.more {
@@ -47,23 +49,36 @@ public struct WindowOpenLiveActivityView: View {
 /// and the countdown or the red overtime.
 public struct WindowActivityRow: View {
     let window: WindowContentState.Window
+    let isPossiblyOverdue: Bool
 
-    public init(window: WindowContentState.Window) {
+    /// - Parameter isPossiblyOverdue: Shows "überschritten?" instead of the window name, for a stale activity.
+    public init(window: WindowContentState.Window, isPossiblyOverdue: Bool = false) {
         self.window = window
+        self.isPossiblyOverdue = isPossiblyOverdue
     }
 
     public var body: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(window.room).font(.subheadline.weight(.semibold))
-                Text(window.name).font(.caption2).foregroundStyle(.secondary)
+                if isPossiblyOverdue {
+                    Text("überschritten?").font(.caption2).foregroundStyle(.red)
+                } else {
+                    Text(window.name).font(.caption2).foregroundStyle(.secondary)
+                }
             }
             .lineLimit(1)
             .frame(width: 104, alignment: .leading)
 
-            ProgressView(timerInterval: window.opened...window.closeBy, countsDown: false)
-                .labelsHidden()
-                .tint(window.isOverdue ? .red : .blue)
+            if window.isOverdue {
+                // Full and red once the server marked the window überschritten.
+                ProgressView(value: 1)
+                    .tint(.red)
+            } else {
+                ProgressView(timerInterval: window.opened...window.closeBy, countsDown: false)
+                    .labelsHidden()
+                    .tint(.blue)
+            }
 
             WindowActivityTimeLabel(window: window)
                 .font(.subheadline.weight(.semibold))
@@ -106,8 +121,8 @@ public struct WindowActivityTimeLabel: View {
                                          room: room,
                                          opened: opened,
                                          closeBy: opened.addingTimeInterval(25 * 60),
-                                         isOverdue: false)
+                                         isOverdue: index == 0)
     }
-    WindowOpenLiveActivityView(contentState: WindowContentState(windows: windows, openCount: windows.count, overdueCount: 0))
+    WindowOpenLiveActivityView(contentState: WindowContentState(windows: windows, openCount: windows.count, overdueCount: 1))
 }
 #endif

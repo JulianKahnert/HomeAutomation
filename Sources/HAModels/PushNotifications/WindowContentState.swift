@@ -39,6 +39,13 @@ public struct WindowContentState: Codable, Hashable, Sendable {
 
     /// No offenen Fenster.
     public static let empty = WindowContentState(windows: [], openCount: 0, overdueCount: 0)
+
+    /// When the Live Activity goes stale: the earliest Fensterschließzeit among windows not yet
+    /// überschritten, so the widget shows "überschritten?" if the update marking it is lost.
+    /// `nil` when every window is überschritten.
+    public var staleDate: Date? {
+        windows.filter { !$0.isOverdue }.map(\.closeBy).min()
+    }
 }
 
 extension WindowContentState: Identifiable {

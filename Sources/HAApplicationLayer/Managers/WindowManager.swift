@@ -97,9 +97,7 @@ actor WindowManager {
         let contentState = WindowContentState(windows: Array(windows),
                                               openCount: windowStates.count,
                                               overdueCount: windowStates.filter(isOverdue).count)
-        // Stale at the next Fensterschließzeit, so the widget shows "überschritten?" if that update is lost.
-        let staleDate = windowStates.filter { !isOverdue($0) }.map(\.closeBy).min()
-        let options = LiveActivityOptions(alert: alert, staleDate: staleDate, priority: .high)
+        let options = LiveActivityOptions(alert: alert, staleDate: contentState.staleDate, priority: .high)
 
         await notificationSender.startOrUpdateLiveActivity(contentState: contentState,
                                                            activityName: WindowContentState.activityTypeName,

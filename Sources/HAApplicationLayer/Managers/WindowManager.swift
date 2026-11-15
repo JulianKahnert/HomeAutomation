@@ -67,9 +67,8 @@ actor WindowManager {
         }
     }
 
-    /// Marks an offenes Fenster überschritten once its Fensterschließzeit has passed and reminds the
-    /// resident with a Live Activity alert. Does nothing for a closed window or one already überschritten,
-    /// so every window alerts exactly once.
+    /// Marks an offenes Fenster überschritten at its Fensterschließzeit with a Live Activity alert;
+    /// a closed or already überschritten window is skipped, so every window alerts exactly once.
     func markWindowOverdue(entityId: EntityId) async {
         guard let window = windowStateIsOpen[entityId],
               overdueWindowIds.insert(window.id).inserted else {

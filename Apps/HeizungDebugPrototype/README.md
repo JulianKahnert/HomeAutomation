@@ -22,6 +22,18 @@ the variant is chosen.
     optional derived observations (manual change, valve, sensor push); room filter.
   - **D Diagnose (Hybrid):** one radiator, answer first, checklist of all causes in automation
     order, compact chart, "seit wann", its log slice.
+  - **E Skizze v3** (default in the live window): Δ = Ist − Soll bars per room, coldest first,
+    comfort band ±0,5 K, room without values hatched with "?"; tap a bar for the lollipop and the
+    detail below (Soll dashed step / Ist solid / gap shaded, 2 h / 24 h / 7 T, event pins 📅 🪟 🔥
+    ✋ ⚙︎ with popover, duration events as bands, valve step chart sharing x-domain, rules and
+    crosshair); week heatmap Δ per room × hour, tap a cell to open room and time. Agreed design
+    from `06-prototype--debug-ansichten.md`, section "Zwischenstand Skizze v3".
+    Real rooms and thermos: Küche, Esszimmer, Kaminzimmer ("Eve Thermo", Devices.swift), Bad OG
+    ("Eve Thermo Bad OG"), Julians Arbeitszimmer ("Eve Thermo Arbeitszimmer", name assumed),
+    Schlafzimmer ("Heizung links"); window contacts from Devices.swift. Mock week 08.–15.11.2026:
+    Küche "Fenster Links" open, Bad OG valve stuck at 0 %, Arbeitszimmer changed by hand at the
+    device, Esszimmer on the fireplace list with "Kamin an", Kaminzimmer thermo silent since
+    10.11. (as in reality).
 - **Better means:** the question is answered without reading a chart in the common case, and the
   chart is there when the answer is not obvious (valve stuck).
 - **Platform:** iOS decides (Controller); judged here at phone width (430 pt) on macOS.
@@ -33,7 +45,7 @@ the variant is chosen.
 ## Run
 
 - `swift run HeizungDebugPrototype`: live macOS window; switch candidates via the **Variants**
-  menu (⌘1…⌘4). The radiator picker inside A and D switches scenarios.
+  menu (⌘1…⌘5). The radiator picker inside A and D switches scenarios.
 - Snapshots: jk:prototyper's `verify-snapshots.sh Apps/HeizungDebugPrototype` renders every
   `#Preview` to `snapshots/`. Needs the GUI session (from SSH it renders nothing).
 - iOS: open `Package.swift` in Xcode and use Previews on the Kit target.

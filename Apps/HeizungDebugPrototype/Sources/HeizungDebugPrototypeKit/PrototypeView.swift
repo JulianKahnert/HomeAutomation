@@ -20,6 +20,8 @@ public struct PrototypeView: View {
                 DecisionLogVariant()
             case .diagnosis:
                 DiagnosisVariant(radiatorID: "bad-1")
+            case .skizzeV3:
+                SkizzeV3Variant()
             }
         }
         .environment(\.locale, Fmt.de)

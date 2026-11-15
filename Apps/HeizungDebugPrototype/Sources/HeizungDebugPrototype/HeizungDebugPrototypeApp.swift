@@ -26,7 +26,7 @@ enum Main {
 struct HeizungDebugPrototypeApp: App {
     // The last selection survives relaunches, so `swift run` reopens on the variant
     // under discussion.
-    @AppStorage("variant") private var variantID = Variant.allCases[0].rawValue
+    @AppStorage("variant") private var variantID = Variant.skizzeV3.rawValue
 
     // A bare swift-run executable never becomes the active app on its own, so
     // every keystroke would stay with the terminal that launched it.

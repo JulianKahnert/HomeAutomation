@@ -7,6 +7,7 @@ public enum Variant: String, CaseIterable, Identifiable, Sendable {
     case roomCards
     case decisionLog
     case diagnosis
+    case skizzeV3
 
     public var id: String { rawValue }
 
@@ -17,6 +18,7 @@ public enum Variant: String, CaseIterable, Identifiable, Sendable {
         case .roomCards: "B Raumkarten"
         case .decisionLog: "C Entscheidungsprotokoll"
         case .diagnosis: "D Diagnose (Hybrid)"
+        case .skizzeV3: "E Skizze v3"
         }
     }
 }

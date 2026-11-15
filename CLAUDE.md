@@ -222,6 +222,12 @@ Additional workflows: `docker-publish.yaml` (amd64 + arm64 image for pushes to `
 - `docs/setup-server.md` — Server Docker setup, log levels, migration
 - More on how the features work: the project's folder in the knowledge base (the Obsidian vault), under `references/`. Without the vault (a cloud session, CI), go on without it.
 
+## Agent skills
+
+### Issue tracker
+
+Specs are GitHub issues; their tickets live in a `## Tickets` section of the spec issue, never as issues of their own. See `docs/agents/issue-tracker.md`.
+
 ## Common Issues
 
 ### "Cannot find [Type] in scope" in Xcode build

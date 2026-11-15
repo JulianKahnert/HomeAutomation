@@ -248,13 +248,24 @@ public func configure(_ app: Application) async throws {
     await CriticalLogNotifier.shared.configure(notificationSender: notificationSender)
 
     let actionLogManager = ActionLogManager()
+    let location = await app.homeAutomationConfigService.location
+    let weatherHours = WeatherHourDbRepository(database: { app.db })
     let homeManager = await HomeManager(getAdapter: {
         actorSystem.isConnected ? adapterProxy : nil
     },
                                         storageRepo: app.entityStorageDbRepository,
                                         notificationSender: notificationSender,
                                         location: app.homeAutomationConfigService.location,
-                                        actionLogManager: actionLogManager)
+                                        actionLogManager: actionLogManager,
+                                        outdoorTemperature: { [logger = app.logger] in
+        // The same rows the OutdoorTemperatureJob writes for this location.
+        do {
+            return try await weatherHours.latestTemperature(locationKey: OutdoorTemperatureJob.locationKey(for: location), at: Date())
+        } catch {
+            logger.error("Failed to read the outdoor temperature", metadata: ["error": "\(error)"])
+            return nil
+        }
+    })
     app.homeManager = homeManager
     // Runs still marked `running` belong to a previous server process that died mid-run.
     try await app.automationRunRepository.markRunningAsInterrupted()
@@ -267,14 +278,13 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - register jobs
 
-    let location = await app.homeAutomationConfigService.location
     let jobs: [any Job] = [
         ClockJob(location: location,
                  homeEventsContinuation: app.homeEventsContinuation),
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
-        OutdoorTemperatureJob(location: location, hours: WeatherHourDbRepository(database: { app.db })),
+        OutdoorTemperatureJob(location: location, hours: weatherHours),
         DatabaseCleanupJob(entities: app.entityStorageDbRepository,
                            automationRuns: app.automationRunRepository,
                            noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),

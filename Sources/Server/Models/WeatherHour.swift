@@ -78,6 +78,22 @@ struct WeatherHourDbRepository: WeatherHourStoring {
             .run()
     }
 
+    /// The latest stored outdoor temperature reading in °C of one location at `now`: the newest hour
+    /// that has started and has a temperature. Later hours are forecasts and are skipped.
+    func latestTemperature(locationKey: String, at now: Date) async throws -> Double? {
+        guard let sql = database() as? SQLDatabase else {
+            throw Abort(.internalServerError, reason: "Database does not support SQL queries")
+        }
+        return try await sql.select().column("temperature2mC").from(WeatherHour.schema)
+            .where("locationKey", .equal, locationKey)
+            .where("hour", .lessThanOrEqual, now)
+            .where("temperature2mC", .isNot, SQLLiteral.null)
+            .orderBy("hour", .descending)
+            .limit(1)
+            .first()?
+            .decode(column: "temperature2mC", as: Double.self)
+    }
+
     /// Hours of one location, oldest first.
     func hours(locationKey: String) async throws -> [WeatherHour] {
         guard let sql = database() as? SQLDatabase else {

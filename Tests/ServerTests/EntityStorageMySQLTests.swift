@@ -228,4 +228,31 @@ final class EntityStorageMySQLTests: XCTestCase {
         let rows = try await repository.hours(locationKey: "52.5,13.4")
         XCTAssertEqual(rows, [observed, next])
     }
+
+    func testLatestOutdoorTemperatureIsTheCurrentHoursReadingNotAForecast() async throws {
+        let app = try XCTUnwrap(app)
+        let repository = WeatherHourDbRepository(database: { app.db })
+        let hour = Date(timeIntervalSince1970: 1_794_654_000)
+        func reading(_ location: String, hoursFromNow offset: Double, _ temperature: Double?) -> WeatherHour {
+            WeatherHour(locationKey: location,
+                        hour: hour.addingTimeInterval(offset * 3600),
+                        fetchedAt: hour,
+                        temperature2mC: temperature)
+        }
+        let now = hour.addingTimeInterval(20 * 60)
+
+        let before = try await repository.latestTemperature(locationKey: "52.5,13.4", at: now)
+        XCTAssertNil(before)
+
+        try await repository.upsert([
+            reading("52.5,13.4", hoursFromNow: -2, 5),
+            reading("52.5,13.4", hoursFromNow: -1, 6.5),
+            reading("52.5,13.4", hoursFromNow: 0, nil),
+            reading("52.5,13.4", hoursFromNow: 1, 9),
+            reading("48.1,11.6", hoursFromNow: 0, 12)
+        ])
+
+        let latest = try await repository.latestTemperature(locationKey: "52.5,13.4", at: now)
+        XCTAssertEqual(latest, 6.5)
+    }
 }

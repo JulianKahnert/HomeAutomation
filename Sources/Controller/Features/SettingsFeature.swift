@@ -59,7 +59,7 @@ struct SettingsFeature: Sendable {
         case cancelEditServerURL
         case toggleLiveActivities(Bool)
         case refreshWindowStates
-        case windowStatesResponse(Result<[WindowContentState.WindowState], Error>)
+        case windowStatesResponse(Result<WindowContentState, Error>)
         case requestPushAuthorization
         case dismissError
         case path(StackActionOf<SettingsPath>)
@@ -131,28 +131,28 @@ struct SettingsFeature: Sendable {
                 state.error = nil
                 return .run { send in
                     await send(.windowStatesResponse(
-                        Result { try await serverClient.getWindowStates() }
+                        Result { try await serverClient.getWindowContentState() }
                     ))
                 }
 
-            case let .windowStatesResponse(.success(windowStates)):
+            case let .windowStatesResponse(.success(contentState)):
                 state.isLoadingWindowStates = false
-                state.windowContentState = WindowContentState(windowStates: windowStates)
-                Self.logger.info("Received \(windowStates.count) window state(s)")
+                state.windowContentState = contentState
+                Self.logger.info("Received open windows", metadata: ["openCount": "\(contentState.openCount)"])
 
                 if state.liveActivitiesEnabled {
                     return .run { _ in
                         let hasActive = await liveActivity.hasActiveActivities()
 
-                        if windowStates.isEmpty {
+                        if contentState.windows.isEmpty {
                             Self.logger.info("No open windows, stopping Live Activities")
                             await liveActivity.stopActivity()
                         } else if hasActive {
-                            Self.logger.info("Updating existing Live Activity with \(windowStates.count) window(s)")
-                            await liveActivity.updateActivity(windowStates)
+                            Self.logger.info("Updating existing Live Activity", metadata: ["openCount": "\(contentState.openCount)"])
+                            await liveActivity.updateActivity(contentState)
                         } else {
-                            Self.logger.info("No active Live Activity, starting new one with \(windowStates.count) window(s)")
-                            try await liveActivity.startActivity(windowStates)
+                            Self.logger.info("No active Live Activity, starting a new one", metadata: ["openCount": "\(contentState.openCount)"])
+                            try await liveActivity.startActivity(contentState)
                         }
                     }
                 } else {
@@ -163,10 +163,10 @@ struct SettingsFeature: Sendable {
             case let .windowStatesResponse(.failure(error)):
                 state.isLoadingWindowStates = false
                 state.error = "Failed to load window states: \(error.localizedDescription)"
-                Self.logger.error("Failed to load window states: \(error)")
+                Self.logger.error("Failed to load window states", metadata: ["error": "\(error)"])
 
                 return .run { _ in
-                    await liveActivity.updateActivity([])
+                    await liveActivity.updateActivity(.empty)
                 }
 
             case .requestPushAuthorization:

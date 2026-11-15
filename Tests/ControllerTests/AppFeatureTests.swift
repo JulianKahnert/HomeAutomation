@@ -35,7 +35,7 @@ struct AppFeatureTests {
         await store.skipReceivedActions()
 
         #expect(store.state.automations.automations.count == 3)
-        #expect(store.state.settings.windowContentState?.windowStates.first?.name == "Living Room Window")
+        #expect(store.state.settings.windowContentState?.windows.first?.room == "Living Room")
     }
 
     @Test("scenePhaseChanged ignores non-active transitions")
@@ -94,7 +94,7 @@ struct AppFeatureTests {
 
         await store.receive(\.settings.windowStatesResponse) { state in
             state.settings.isLoadingWindowStates = false
-            state.settings.windowContentState = WindowContentState(windowStates: [])
+            state.settings.windowContentState = .empty
         }
     }
 }

@@ -105,8 +105,13 @@ actor PushNotifcationService: NotificationSender {
         }
     }
 
-    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String) async {
+    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
+                                                                       activityName: String,
+                                                                       options: LiveActivityOptions) async {
         Self.logger.debug("Start or update live activity")
+        let priority = APNSPriority(options.priority)
+        let staleDate = options.staleDate.map { Int($0.timeIntervalSince1970) }
+        let alert = options.alert.map(APNSAlertNotificationContent.init)
 
         do {
             let allDeviceTokens =
@@ -153,11 +158,13 @@ actor PushNotifcationService: NotificationSender {
                         Self.logger.info("Update LiveActivity (on: \(updateToken.deviceName)): \(contentState)")
                         let notification = APNSLiveActivityNotification<ContentState>(
                             expiration: .none,
-                            priority: .consideringDevicePower,
+                            priority: priority,
                             appID: notificationTopic,
                             contentState: contentState,
                             event: .update,
-                            timestamp: Int(Date().timeIntervalSince1970))
+                            alert: alert,
+                            timestamp: Int(Date().timeIntervalSince1970),
+                            staleDate: staleDate)
 
                         // if an update token was found, we assume a live activity was found, so we use this token
                         usedToken = updateToken
@@ -174,13 +181,14 @@ actor PushNotifcationService: NotificationSender {
                         // and the Live Activity will never appear.
                         let notification = APNSStartLiveActivityNotification<ContentState, ContentState>(
                             expiration: .none,
-                            priority: .immediately,
+                            priority: priority,
                             appID: notificationTopic,
                             contentState: contentState,
                             timestamp: Int(Date().timeIntervalSince1970),
+                            staleDate: staleDate,
                             attributes: contentState,
                             attributesType: activityName,
-                            alert: APNSAlertNotificationContent(
+                            alert: alert ?? APNSAlertNotificationContent(
                                 title: .raw("empty"),
                                 body: .raw("empty")))
 
@@ -250,7 +258,7 @@ actor PushNotifcationService: NotificationSender {
                 .filter(\.$activityType == activityType)
                 .all()
 
-            let contentState = WindowContentState(windowStates: [])
+            let contentState = WindowContentState.empty
             let notification = APNSLiveActivityNotification<WindowContentState>(
                 expiration: .immediately,
                 priority: .immediately,
@@ -305,5 +313,21 @@ actor PushNotifcationService: NotificationSender {
         } catch {
             Self.logger.error("Failed to delete old token: \(error)")
         }
+    }
+}
+
+private extension APNSPriority {
+    init(_ priority: LiveActivityOptions.Priority) {
+        switch priority {
+        case .low: self = .consideringDevicePower
+        case .high: self = .immediately
+        }
+    }
+}
+
+private extension APNSAlertNotificationContent {
+    /// A Live Activity alert that expands the Dynamic Island and plays the default sound.
+    init(_ alert: LiveActivityOptions.Alert) {
+        self.init(title: .raw(alert.title), body: .raw(alert.body), sound: .default)
     }
 }

@@ -50,7 +50,7 @@ public struct WindowOpen: Automatable {
 
         let end = opened.addingTimeInterval(notificationWait.timeInterval)
 
-        log.debug("Start sleeping for \(notificationWait.description) before sending notification")
+        log.debug("Start sleeping until the Fensterschließzeit", metadata: ["notificationWait": "\(notificationWait.description)"])
         var shouldWait = true
         while shouldWait {
             let waitSeconds = min(60, end.timeIntervalSinceNow)
@@ -61,10 +61,8 @@ public struct WindowOpen: Automatable {
             }
         }
 
-        log.debug("Start sending notification")
-        let message = "\(windowContact.contactSensorId.name) (\(windowContact.contactSensorId.placeId))"
-
-        await hm.sendNotification(title: "🪟 offen", message: message, id: windowContact.contactSensorId.windowNotificationId)
-        log.debug("End sending notification")
+        // The Live Activity marks the window überschritten and alerts the resident.
+        log.debug("Fensterschließzeit reached, marking window überschritten")
+        await hm.markWindowOverdue(entityId: windowContact.contactSensorId)
     }
 }

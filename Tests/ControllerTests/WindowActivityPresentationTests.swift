@@ -107,4 +107,81 @@ struct WindowActivityPresentationTests {
         let overdueBeyondCap = Self.state([Self.window("Küche")], openCount: 25, overdueCount: 1)
         #expect(WindowActivityPresentation(contentState: overdueBeyondCap, rowBudget: 1).isAnyOverdue == true)
     }
+
+    // MARK: Dynamic Island
+
+    @Test("the expanded Dynamic Island with 8 windows shows two rows and names the other 6 rooms")
+    func expandedIslandShowsTwoRows() {
+        let presentation = WindowActivityPresentation(contentState: Self.state(Self.eightRooms.map { Self.window($0) }),
+                                                      rowBudget: WindowActivityPresentation.expandedRowBudget)
+
+        #expect(presentation.rows.map(\.room) == ["Küche", "Bad"])
+        #expect(presentation.more?.text == "+6 weitere: Büro, Flur, Schlafzimmer, Wohnzimmer, Kinderzimmer, Keller")
+    }
+
+    @Test("the expanded leading region says how many windows are offen, beyond the server's cap too")
+    func expandedLeadingCountsOpenWindows() {
+        let presentation = WindowActivityPresentation(contentState: Self.state([Self.window("Küche")], openCount: 23),
+                                                      rowBudget: WindowActivityPresentation.expandedRowBudget)
+
+        #expect(presentation.openSummary == "23 offen")
+    }
+
+    @Test("the expanded trailing region counts überschrittene Fenster and stays empty without one")
+    func expandedTrailingCountsOverdueWindows() {
+        let none = Self.state([Self.window("Küche")])
+        #expect(WindowActivityPresentation(contentState: none, rowBudget: 2).overdueBadge == nil)
+
+        let twoOverdue = Self.state([Self.window("Bad", overdue: true), Self.window("Küche")], openCount: 25, overdueCount: 2)
+        #expect(WindowActivityPresentation(contentState: twoOverdue, rowBudget: 2).overdueBadge == 2)
+    }
+
+    @Test("the compact trailing region shows the first window in server order")
+    func compactTrailingShowsFirstWindow() {
+        let windows = [Self.window("Bad", overdue: true), Self.window("Küche")]
+        #expect(WindowActivityPresentation(contentState: Self.state(windows), rowBudget: 2).mostUrgent == windows[0])
+
+        #expect(WindowActivityPresentation(contentState: .empty, rowBudget: 2).mostUrgent == nil)
+    }
+
+    @Test("compact and minimal stay uncoloured for a window past its Fensterschließzeit the server has not marked überschritten")
+    func compactTintIgnoresTheClock() {
+        let past = Date(timeIntervalSince1970: 0)
+        let window = WindowContentState.Window(id: "window-Küche-Fenster",
+                                               name: "Fenster",
+                                               room: "Küche",
+                                               opened: past,
+                                               closeBy: past.addingTimeInterval(25 * 60),
+                                               isOverdue: false)
+
+        #expect(WindowActivityPresentation(contentState: Self.state([window]), rowBudget: 2).isAnyOverdue == false)
+        #expect(WindowActivityPresentation(contentState: Self.state([Self.window("Küche", overdue: true)]), rowBudget: 2).isAnyOverdue == true)
+    }
+
+    @Test("the Watch shows the most urgent window and +X weitere offen for the rest")
+    func watchShowsFirstWindowAndCountsTheRest() {
+        let presentation = WindowActivityPresentation(contentState: Self.state(Self.eightRooms.map { Self.window($0) }),
+                                                      rowBudget: WindowActivityPresentation.watchRowBudget)
+
+        #expect(presentation.rows.map(\.room) == ["Küche"])
+        #expect(presentation.moreCount?.text == "+7 weitere offen")
+        #expect(presentation.moreCount?.isOverdue == false)
+    }
+
+    @Test("the Watch's +X weitere offen counts windows beyond the server's cap and turns red for a hidden überschritten window")
+    func watchMoreCountUsesFullCounts() {
+        let capped = Self.state([Self.window("Küche"), Self.window("Bad", overdue: true)], openCount: 23, overdueCount: 1)
+        let presentation = WindowActivityPresentation(contentState: capped, rowBudget: WindowActivityPresentation.watchRowBudget)
+
+        #expect(presentation.moreCount?.text == "+22 weitere offen")
+        #expect(presentation.moreCount?.isOverdue == true)
+    }
+
+    @Test("a single window on the Watch has no +X weitere offen")
+    func watchSingleWindowHasNoMoreCount() {
+        let presentation = WindowActivityPresentation(contentState: Self.state([Self.window("Küche")]),
+                                                      rowBudget: WindowActivityPresentation.watchRowBudget)
+
+        #expect(presentation.moreCount == nil)
+    }
 }

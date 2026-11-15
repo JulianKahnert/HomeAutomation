@@ -50,7 +50,7 @@ public struct WindowOpen: Automatable {
 
         let end = opened.addingTimeInterval(notificationWait.timeInterval)
 
-        log.debug("Start sleeping for \(notificationWait.description) until the Fensterschließzeit")
+        log.debug("Start sleeping until the Fensterschließzeit", metadata: ["notificationWait": "\(notificationWait.description)"])
         var shouldWait = true
         while shouldWait {
             let waitSeconds = min(60, end.timeIntervalSinceNow)

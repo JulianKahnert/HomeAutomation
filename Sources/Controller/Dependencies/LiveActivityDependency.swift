@@ -78,13 +78,13 @@ extension LiveActivityDependency: DependencyKey {
     static let liveValue: Self = {
         return Self(
             startActivity: { initialState in
-                logger.info("Starting new Live Activity with \(initialState.openCount) window(s)")
+                logger.info("Starting new Live Activity", metadata: ["openCount": "\(initialState.openCount)"])
                 let activity = try Activity<WindowAttributes>.request(
                     attributes: WindowAttributes(),
                     content: .init(state: initialState, staleDate: initialState.staleDate),
                     pushType: .token
                 )
-                logger.info("Live Activity started: id=\(activity.id)")
+                logger.info("Live Activity started", metadata: ["activityId": "\(activity.id)"])
             },
             updateActivity: { newState in
                 var activities = Activity<WindowAttributes>.activities
@@ -96,11 +96,15 @@ extension LiveActivityDependency: DependencyKey {
                     return
                 }
 
-                logger.info("Updating Live Activity: id=\(lastActivity.id), windows=\(newState.openCount), ending \(activities.count) duplicate(s)")
+                logger.info("Updating Live Activity", metadata: [
+                    "activityId": "\(lastActivity.id)",
+                    "openCount": "\(newState.openCount)",
+                    "duplicateCount": "\(activities.count)"
+                ])
                 await lastActivity.update(.init(state: newState, staleDate: newState.staleDate))
 
                 for activity in activities {
-                    logger.info("Ending duplicate Live Activity: id=\(activity.id)")
+                    logger.info("Ending duplicate Live Activity", metadata: ["activityId": "\(activity.id)"])
                     await activity.end(nil, dismissalPolicy: .immediate)
                 }
             },

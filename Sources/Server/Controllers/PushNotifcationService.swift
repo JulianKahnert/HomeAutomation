@@ -250,7 +250,7 @@ actor PushNotifcationService: NotificationSender {
                 .filter(\.$activityType == activityType)
                 .all()
 
-            let contentState = WindowContentState(windowStates: [])
+            let contentState = WindowContentState.empty
             let notification = APNSLiveActivityNotification<WindowContentState>(
                 expiration: .immediately,
                 priority: .immediately,

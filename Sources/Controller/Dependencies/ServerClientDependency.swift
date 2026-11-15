@@ -43,8 +43,8 @@ struct ServerClientDependency: Sendable {
     /// Clear all action log items
     var clearActions: @Sendable () async throws -> Void
 
-    /// Get window states for Live Activities
-    var getWindowStates: @Sendable () async throws -> [WindowContentState.WindowState]
+    /// Get the offenen Fenster as a Live Activity content state, in server order
+    var getWindowStates: @Sendable () async throws -> WindowContentState
 
     /// Register device for push notifications
     var registerDevice: @Sendable (_ token: PushToken) async throws -> Void
@@ -82,7 +82,7 @@ extension ServerClientDependency: TestDependencyKey {
         getRecentRuns: { _, _ in [] },
         getActions: { _, _ in [] },
         clearActions: { },
-        getWindowStates: { [] },
+        getWindowStates: { .empty },
         registerDevice: { _ in },
         getEntityIdsWithHistory: { [] },
         getEntityHistory: { _, _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) },
@@ -118,13 +118,21 @@ extension ServerClientDependency: TestDependencyKey {
         },
         clearActions: { },
         getWindowStates: {
-            [
-                WindowContentState.WindowState(
-                    name: "Living Room Window",
-                    opened: Date().addingTimeInterval(-3600),
-                    maxOpenDuration: 7200
-                )
-            ]
+            let opened = Date().addingTimeInterval(-3600)
+            return WindowContentState(
+                windows: [
+                    WindowContentState.Window(
+                        id: "window-Living Room-Window",
+                        name: "Window",
+                        room: "Living Room",
+                        opened: opened,
+                        closeBy: opened.addingTimeInterval(7200),
+                        isOverdue: false
+                    )
+                ],
+                openCount: 1,
+                overdueCount: 0
+            )
         },
         registerDevice: { _ in },
         getEntityIdsWithHistory: {

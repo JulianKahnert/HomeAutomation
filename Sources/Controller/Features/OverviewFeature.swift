@@ -145,7 +145,7 @@ struct OverviewFeature: Sendable {
 
 struct OverviewView: View {
     @Bindable var store: StoreOf<OverviewFeature>
-    let openWindows: [WindowContentState.WindowState]
+    let openWindows: [WindowContentState.Window]
 
     var body: some View {
         NavigationStack(path: $store.scope(\.path, action: \.path)) {
@@ -160,13 +160,14 @@ struct OverviewView: View {
 
                 if !openWindows.isEmpty {
                     Section("Open Windows") {
-                        ForEach(openWindows, id: \.name) { window in
-                            ProgressView(timerInterval: window.opened...window.end, countsDown: false) {
-                                LabeledContent(window.name, value: "Limit \(Int(window.maxOpenDuration / 60)) min")
+                        ForEach(openWindows) { window in
+                            ProgressView(timerInterval: window.opened...window.closeBy, countsDown: false) {
+                                LabeledContent("\(window.name) (\(window.room))",
+                                               value: "Limit \(Int(window.closeBy.timeIntervalSince(window.opened) / 60)) min")
                             } currentValueLabel: {
                                 Text("Open for \(Text(window.opened, style: .relative))")
                             }
-                            .tint(Date() <= window.end ? Color.accentColor : Color.red)
+                            .tint(Date() <= window.closeBy ? Color.accentColor : Color.red)
                         }
                     }
                 }

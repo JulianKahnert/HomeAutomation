@@ -101,15 +101,22 @@ public struct ServerClient {
         _ = try response.ok
     }
 
-    public func getWindowStates() async throws -> [WindowContentState.WindowState] {
+    /// The offenen Fenster as a Live Activity content state, in the order the server sent them.
+    public func getWindowStates() async throws -> WindowContentState {
         let response = try await client.getWindowStates()
-        return try response.ok.body.json.windowStates
+        let windows = try response.ok.body.json.windowStates
             .map { state in
                 let opened = try Date(state.openedIsoTimeStamp, strategy: .iso8601)
-                return WindowContentState.WindowState(name: state.name,
-                                                      opened: opened,
-                                                      maxOpenDuration: state.maxOpenDuration)
+                return WindowContentState.Window(id: state.id,
+                                                 name: state.name,
+                                                 room: state.room,
+                                                 opened: opened,
+                                                 closeBy: opened.addingTimeInterval(state.maxOpenDuration),
+                                                 isOverdue: false)
             }
+        return WindowContentState(windows: Array(windows.prefix(WindowContentState.maxWindowCount)),
+                                  openCount: windows.count,
+                                  overdueCount: 0)
     }
 
     public func getActions(limit: Int? = nil, runId: UUID? = nil) async throws -> [ActionLogItem] {

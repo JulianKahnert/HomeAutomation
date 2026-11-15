@@ -61,14 +61,19 @@ struct LiveActivityDependencyTests {
         } operation: {
             @Dependency(\.liveActivity) var liveActivity
 
-            let windowState = WindowContentState.WindowState(
-                name: "Test Window",
-                opened: Date(),
-                maxOpenDuration: 3600
+            let opened = Date()
+            let window = WindowContentState.Window(
+                id: "window-Test-Window",
+                name: "Window",
+                room: "Test",
+                opened: opened,
+                closeBy: opened.addingTimeInterval(3600),
+                isOverdue: false
             )
+            let contentState = WindowContentState(windows: [window], openCount: 1, overdueCount: 0)
 
-            try await liveActivity.startActivity([windowState])
-            await liveActivity.updateActivity([windowState])
+            try await liveActivity.startActivity(contentState)
+            await liveActivity.updateActivity(contentState)
             await liveActivity.stopActivity()
         }
     }

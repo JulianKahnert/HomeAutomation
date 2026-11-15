@@ -5,17 +5,24 @@
 //  Created by Julian Kahnert on 15.03.25.
 //
 
+import Foundation
 import HAModels
 import Logging
 
+/// The single owner of the offenen Fenster and the only place that builds the Live Activity's
+/// ``WindowContentState``.
 actor WindowManager {
     private static let logger = Logger(label: "WindowManager")
 
     private let notificationSender: NotificationSender
+    /// The current time. Injected so the überschritten transition and the stale date can be
+    /// driven deterministically in tests.
+    private let now: @Sendable () -> Date
     private var windowStateIsOpen: [EntityId: WindowOpenState] = [:]
 
-    init(notificationSender: any NotificationSender) {
+    init(notificationSender: any NotificationSender, now: @escaping @Sendable () -> Date = { Date() }) {
         self.notificationSender = notificationSender
+        self.now = now
     }
 
     /// Set newState to nil, if the window was closed
@@ -29,7 +36,7 @@ actor WindowManager {
             try? await notificationSender.clearNotification(id: entityId.windowNotificationId)
         }
 
-        let windowStates = windowStateIsOpen.values.sorted(by: { $0.name < $1.name })
+        let windowStates = getWindowStates()
         if !windowStates.isEmpty {
             Self.logger.info("Open windows: \(windowStates.map(\.name).joined(separator: ", "))")
             await startOrUpdateOpenWindowActivities(with: windowStates)
@@ -39,23 +46,31 @@ actor WindowManager {
         }
     }
 
-    func getWindowStates() async -> [WindowOpenState] {
-        var states = Array(windowStateIsOpen.values)
-        states.sort { $0.name < $1.name }
-        return states
+    /// The offenen Fenster in Live Activity order: by Fensterschließzeit, window name as tiebreak.
+    func getWindowStates() -> [WindowOpenState] {
+        windowStateIsOpen.values.sorted { lhs, rhs in
+            if lhs.closeBy != rhs.closeBy {
+                return lhs.closeBy < rhs.closeBy
+            }
+            return lhs.name < rhs.name
+        }
     }
 
     private func startOrUpdateOpenWindowActivities(with windowStates: [WindowOpenState]) async {
         assert(!windowStates.isEmpty, "Use 'endAllOpenWindowActivities' when no window is opened")
         Self.logger.debug("Start or update open window activity")
 
-        let states = windowStates.map { windowState in
-            WindowContentState.WindowState(
-                name: windowState.name,
-                opened: windowState.opened,
-                maxOpenDuration: windowState.maxOpenDuration)
+        let windows = windowStates.prefix(WindowContentState.maxWindowCount).map { state in
+            WindowContentState.Window(id: state.id,
+                                      name: state.name,
+                                      room: state.room,
+                                      opened: state.opened,
+                                      closeBy: state.closeBy,
+                                      isOverdue: false)
         }
-        let contentState = WindowContentState(windowStates: states)
+        let contentState = WindowContentState(windows: Array(windows),
+                                              openCount: windowStates.count,
+                                              overdueCount: 0)
 
         await notificationSender.startOrUpdateLiveActivity(contentState: contentState, activityName: WindowContentState.activityTypeName)
     }

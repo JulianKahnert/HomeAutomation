@@ -153,7 +153,9 @@ struct OpenAPIController: APIProtocol {
     func getWindowStates(_ input: Operations.GetWindowStates.Input) async throws -> Operations.GetWindowStates.Output {
         let states: [Components.Schemas.WindowState] = await request.application.homeManager.getWindowStates()
             .map { state in
-                Components.Schemas.WindowState(name: state.name,
+                Components.Schemas.WindowState(id: state.id,
+                                               name: state.name,
+                                               room: state.room,
                                                openedIsoTimeStamp: state.opened.ISO8601Format(),
                                                maxOpenDuration: state.maxOpenDuration)
             }

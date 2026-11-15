@@ -28,7 +28,7 @@ struct ServerClientDependencyTests {
             #expect(actions.isEmpty)
 
             let windowStates = try await client.getWindowStates()
-            #expect(windowStates.isEmpty)
+            #expect(windowStates.windows.isEmpty)
         }
     }
 
@@ -50,8 +50,9 @@ struct ServerClientDependencyTests {
             #expect(actions[0].actionName == "Turn On")
 
             let windowStates = try await client.getWindowStates()
-            #expect(windowStates.count == 1)
-            #expect(windowStates[0].name == "Living Room Window")
+            #expect(windowStates.openCount == 1)
+            #expect(windowStates.windows[0].name == "Window")
+            #expect(windowStates.windows[0].room == "Living Room")
         }
     }
 

@@ -16,17 +16,17 @@ import Shared
 
 @DependencyClient
 struct LiveActivityDependency: Sendable {
-    /// Start a new Live Activity with initial window states.
+    /// Start a new Live Activity with the initial content state.
     ///
     /// This intentionally does **not** end existing activities before creating a new one.
     /// Duplicate cleanup is handled by ``updateActivity`` which keeps only the most recent
     /// activity and ends all others. This separation ensures that `startActivity` remains
     /// a simple, single-responsibility operation while `updateActivity` serves as the
     /// centralized deduplication point — which is always called when window states change.
-    var startActivity: @Sendable (_ windowStates: [WindowContentState.WindowState]) async throws -> Void
+    var startActivity: @Sendable (_ contentState: WindowContentState) async throws -> Void
 
-    /// Update the current Live Activity with new window states
-    var updateActivity: @Sendable (_ windowStates: [WindowContentState.WindowState]) async -> Void
+    /// Update the current Live Activity with a new content state
+    var updateActivity: @Sendable (_ contentState: WindowContentState) async -> Void
 
     /// Stop the current Live Activity
     var stopActivity: @Sendable () async -> Void
@@ -77,9 +77,8 @@ private let logger = Logger(label: "LiveActivityDependency")
 extension LiveActivityDependency: DependencyKey {
     static let liveValue: Self = {
         return Self(
-            startActivity: { windowStates in
-                logger.info("Starting new Live Activity with \(windowStates.count) window(s)")
-                let initialState = WindowContentState(windowStates: windowStates)
+            startActivity: { initialState in
+                logger.info("Starting new Live Activity with \(initialState.openCount) window(s)")
                 let activity = try Activity<WindowAttributes>.request(
                     attributes: WindowAttributes(),
                     content: .init(state: initialState, staleDate: nil),
@@ -87,7 +86,7 @@ extension LiveActivityDependency: DependencyKey {
                 )
                 logger.info("Live Activity started: id=\(activity.id)")
             },
-            updateActivity: { windowStates in
+            updateActivity: { newState in
                 var activities = Activity<WindowAttributes>.activities
                 let lastActivity = activities.popLast()
 
@@ -97,8 +96,7 @@ extension LiveActivityDependency: DependencyKey {
                     return
                 }
 
-                logger.info("Updating Live Activity: id=\(lastActivity.id), windows=\(windowStates.count), ending \(activities.count) duplicate(s)")
-                let newState = WindowContentState(windowStates: windowStates)
+                logger.info("Updating Live Activity: id=\(lastActivity.id), windows=\(newState.openCount), ending \(activities.count) duplicate(s)")
                 await lastActivity.update(.init(state: newState, staleDate: nil))
 
                 for activity in activities {

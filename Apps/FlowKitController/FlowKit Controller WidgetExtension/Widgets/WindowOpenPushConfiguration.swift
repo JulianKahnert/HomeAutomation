@@ -16,23 +16,25 @@ struct WindowOpenPushConfiguration: Widget {
             // Create the presentation that appears on the Lock Screen and as a
             // banner on the Home Screen of devices that don't support the
             // Dynamic Island.
-            WindowOpenLiveActivityView(contentState: context.state)
+            WindowOpenLiveActivityView(contentState: context.state,
+                                       rowBudget: WindowActivityPresentation.lockScreenRowBudget)
         } dynamicIsland: { context in
+            let presentation = WindowActivityPresentation(contentState: context.state,
+                                                          rowBudget: WindowActivityPresentation.expandedRowBudget)
             // Create the presentations that appear in the Dynamic Island.
-            DynamicIsland {
+            return DynamicIsland {
                 DynamicIslandExpandedRegion(.bottom) {
-                    WindowOpenLiveActivityView(contentState: context.state)
+                    WindowOpenLiveActivityView(contentState: context.state,
+                                               rowBudget: WindowActivityPresentation.expandedRowBudget)
                 }
             } compactLeading: {
-                let shouldClose = context.state.windowStates.contains { Date() > $0.end }
-                Label("\(context.state.windowStates.count)", systemImage: "window.vertical.open")
-                    .foregroundStyle(shouldClose ? Color.red : Color.primary)
+                Label("\(context.state.openCount)", systemImage: "window.vertical.open")
+                    .foregroundStyle(presentation.isAnyOverdue ? Color.red : Color.primary)
             } compactTrailing: {
                 EmptyView()
             } minimal: {
-                let shouldClose = context.state.windowStates.contains { Date() > $0.end }
-                Label("\(context.state.windowStates.count)", systemImage: "window.vertical.open")
-                    .foregroundStyle(shouldClose ? Color.red : Color.primary)
+                Label("\(context.state.openCount)", systemImage: "window.vertical.open")
+                    .foregroundStyle(presentation.isAnyOverdue ? Color.red : Color.primary)
             }
         }
     }

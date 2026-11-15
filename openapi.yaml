@@ -172,7 +172,7 @@ paths:
   /windowstates:
     get:
       summary: Get window states
-      description: Retrieve the current states of all windows.
+      description: Retrieve all open windows, in Live Activity order (by the time they have to be closed, window name as tiebreak).
       operationId: getWindowStates
       responses:
         "200":
@@ -480,9 +480,15 @@ components:
     WindowState:
       type: object
       properties:
+        id:
+          type: string
+          description: Stable identifier of the window, derived from its entity.
         name:
           type: string
-          description: The name of the window.
+          description: The name of the window, without the room.
+        room:
+          type: string
+          description: The room the window is in.
         openedIsoTimeStamp:
           type: string
           description: The ISO timestamp when the window was opened.
@@ -490,7 +496,9 @@ components:
           type: number
           description: The maximum duration the window can remain open.
       required:
+        - id
         - name
+        - room
         - openedIsoTimeStamp
         - maxOpenDuration
 

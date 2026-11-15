@@ -31,7 +31,7 @@ struct AppFeature: Sendable {
         var settings = SettingsFeature.State()
 
         var openWindowsCount: Int? {
-            settings.windowContentState?.windowStates.count
+            settings.windowContentState?.openCount
         }
     }
 
@@ -237,7 +237,7 @@ struct AppView: View {
             ) {
                 OverviewView(
                     store: store.scope(\.overview, action: \.overview),
-                    openWindows: store.settings.windowContentState?.windowStates ?? []
+                    openWindows: store.settings.windowContentState?.windows ?? []
                 )
             }
             .badge(store.openWindowsCount ?? 0)

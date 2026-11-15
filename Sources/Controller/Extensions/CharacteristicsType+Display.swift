@@ -44,6 +44,12 @@ extension CharacteristicsType {
             return "Lock"
         case .heating:
             return "Heating"
+        case .targetTemperature:
+            return "Target Temperature"
+        case .heatingMode:
+            return "Heating Mode"
+        case .valvePosition:
+            return "Valve Position"
         }
     }
 
@@ -64,6 +70,9 @@ extension CharacteristicsType {
         case .valve: return "spigot"
         case .lock: return "lock"
         case .heating: return "heater.vertical"
+        case .targetTemperature: return "target"
+        case .heatingMode: return "thermostat"
+        case .valvePosition: return "spigot"
         }
     }
 }

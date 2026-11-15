@@ -300,10 +300,6 @@ public final class HomeManager: HomeManagable {
         try await storageRepo.add(item)
     }
 
-    public func deleteStorageEntries(olderThan date: Date) async throws {
-        try await storageRepo.deleteEntries(olderThan: date)
-    }
-
     public func getLocation() -> Location {
         return location
     }

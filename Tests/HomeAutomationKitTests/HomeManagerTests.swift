@@ -394,8 +394,6 @@ private actor RecordingStorageRepository: StorageRepository {
         }
     }
 
-    func deleteEntries(olderThan date: Date) async throws {}
-
     func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] {
         []
     }

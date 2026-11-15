@@ -636,6 +636,16 @@ components:
         temperatureInC:
           type: number
           description: Temperature in Celsius (if applicable).
+        targetTemperatureInC:
+          type: number
+          description: Thermostat target temperature in Celsius (characteristic type `targetTemperature`).
+        heatingMode:
+          type: string
+          enum: ["off", "heat", "cool", "auto"]
+          description: Thermostat target mode, HomeKit TargetHeatingCoolingState (characteristic type `heatingMode`).
+        valvePositionPercent:
+          type: integer
+          description: Valve opening in percent, 0 to 100 (characteristic type `valvePosition`, Eve custom characteristic).
         relativeHumidity:
           type: number
           description: Relative humidity percentage 0-100 (if applicable).

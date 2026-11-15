@@ -263,6 +263,9 @@ extension EntityHistoryItem {
                   carbonDioxideSensorId: item.carbonDioxideSensorId,
                   pmDensity: item.pmDensity,
                   airQuality: item.airQuality,
-                  valveOpen: item.valveOpen)
+                  valveOpen: item.valveOpen,
+                  targetTemperatureInC: item.targetTemperatureInC,
+                  heatingMode: item.heatingMode.flatMap { HeatingMode(name: $0.rawValue) },
+                  valvePositionPercent: item.valvePositionPercent)
     }
 }

@@ -269,7 +269,10 @@ final class EntityStorageDbRepositoryTests: XCTestCase {
             carbonDioxideSensorId: 450,
             pmDensity: 8.5,
             airQuality: 2,
-            valveOpen: true
+            valveOpen: true,
+            targetTemperatureInC: 19.5,
+            heatingMode: .heat,
+            valvePositionPercent: 42
         )
     }
 
@@ -322,6 +325,9 @@ final class EntityStorageDbRepositoryTests: XCTestCase {
         // Heating
         XCTAssertEqual(lhs.isHeaterActive, rhs.isHeaterActive, message, file: file, line: line)
         XCTAssertEqual(lhs.valveOpen, rhs.valveOpen, message, file: file, line: line)
+        XCTAssertEqual(lhs.targetTemperatureInC, rhs.targetTemperatureInC, message, file: file, line: line)
+        XCTAssertEqual(lhs.heatingMode, rhs.heatingMode, message, file: file, line: line)
+        XCTAssertEqual(lhs.valvePositionPercent, rhs.valvePositionPercent, message, file: file, line: line)
 
         // Air Quality Sensors
         if let lhsTemp = lhs.temperatureInC, let rhsTemp = rhs.temperatureInC {

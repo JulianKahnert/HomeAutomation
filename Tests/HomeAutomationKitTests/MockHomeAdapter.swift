@@ -135,9 +135,6 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return didChange
     }
 
-    func deleteStorageEntries(olderThan date: Date) async throws {
-    }
-
     func getLocation() async -> Location {
         return Location(latitude: 0, longitude: 0)
     }

@@ -103,11 +103,11 @@ struct OpenAPIController: APIProtocol {
             assert(token.activityType == nil, "For pushNotification and liveActivityStart, activityType should be nil")
 
             // upsert: update existing token or create new one
-            if let existing = try await DeviceToken
+            let existingQuery = DeviceToken
                 .query(on: request.db)
                 .filter(\.$deviceName == token.deviceName)
                 .filter(\.$tokenType == token.tokenType.rawValue)
-                .first() {
+            if let existing = try await existingQuery.first() {
                 existing.tokenString = token.tokenString
                 try await existing.save(on: request.db)
                 request.logger.info("Updated existing \(token.tokenType.rawValue) token for \(token.deviceName)")
@@ -128,12 +128,12 @@ struct OpenAPIController: APIProtocol {
             }
 
             // upsert: update existing token or create new one
-            if let existing = try await DeviceToken
+            let existingQuery = DeviceToken
                 .query(on: request.db)
                 .filter(\.$deviceName == token.deviceName)
                 .filter(\.$tokenType == token.tokenType.rawValue)
                 .filter(\.$activityType == activityType)
-                .first() {
+            if let existing = try await existingQuery.first() {
                 existing.tokenString = token.tokenString
                 try await existing.save(on: request.db)
                 request.logger.info("Updated existing liveActivityUpdate token for \(token.deviceName) (activity: \(activityType))")
@@ -345,6 +345,9 @@ extension Components.Schemas.EntityHistoryItem {
                   stateOfCharge: item.stateOfCharge,
                   isHeaterActive: item.isHeaterActive,
                   temperatureInC: item.temperatureInC?.value,
+                  targetTemperatureInC: item.targetTemperatureInC,
+                  heatingMode: item.heatingMode.flatMap { .init(rawValue: $0.name) },
+                  valvePositionPercent: item.valvePositionPercent,
                   relativeHumidity: item.relativeHumidity,
                   carbonDioxideSensorId: item.carbonDioxideSensorId,
                   pmDensity: item.pmDensity,

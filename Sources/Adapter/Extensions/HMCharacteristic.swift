@@ -61,6 +61,9 @@ extension HMCharacteristic: @retroactive Comparable {
             let pmDensity = try await getPMDensity()
             let airQuality = try await getAirQuality()
             let valveOpen = try await getValveOpen()
+            let targetTemperature = try await getTargetTemperature()
+            let heatingMode = try await getHeatingMode()
+            let valvePositionPercent = try await getValvePositionPercent()
 
             return EntityStorageItem(entityId: entityId,
                                      timestamp: timestamp,
@@ -79,7 +82,10 @@ extension HMCharacteristic: @retroactive Comparable {
                                      carbonDioxideSensorId: carbonDioxideLevel,
                                      pmDensity: pmDensity,
                                      airQuality: airQuality,
-                                     valveOpen: valveOpen)
+                                     valveOpen: valveOpen,
+                                     targetTemperatureInC: targetTemperature,
+                                     heatingMode: heatingMode,
+                                     valvePositionPercent: valvePositionPercent)
         } catch {
             // this might occur when e.g. the IKEA hub or a device is not available
             homeKitLogger.warning("Error while getting characteristic data - \(self.service?.accessory?.room?.name ?? "")@\(self.service?.accessory?.name ?? "") - \(self)\n\(error)")
@@ -268,8 +274,8 @@ extension HMCharacteristic: @retroactive Comparable {
         }
 
         // Convert HSV to RGB using the utility function
-        let h = hue / 360.0  // Normalize 0-360° to 0-1
-        return rgb(h: h, s: saturation, v: brightness)
+        let normalizedHue = hue / 360.0  // Normalize 0-360° to 0-1
+        return rgb(h: normalizedHue, s: saturation, v: brightness)
     }
 
     private func getTemperature() async throws -> Measurement<UnitTemperature>? {
@@ -348,6 +354,49 @@ extension HMCharacteristic: @retroactive Comparable {
         return state == .active
     }
 
+    private func getTargetTemperature() async throws -> Double? {
+        guard characteristicType == HMCharacteristicTypeTargetTemperature,
+              service?.serviceType == HMServiceTypeThermostat else { return nil }
+
+        try await readValue()
+
+        guard let target = (value as? NSNumber)?.doubleValue else {
+            assertionFailure("TargetTemperature characteristic value is not a number - value: \(String(describing: value))")
+            return nil
+        }
+        return target
+    }
+
+    private func getHeatingMode() async throws -> HeatingMode? {
+        guard characteristicType == HMCharacteristicTypeTargetHeatingCooling,
+              service?.serviceType == HMServiceTypeThermostat else { return nil }
+
+        try await readValue()
+
+        guard let mode = (value as? NSNumber)?.intValue else {
+            assertionFailure("TargetHeatingCooling characteristic value is not a number - value: \(String(describing: value))")
+            return nil
+        }
+        guard let heatingMode = HeatingMode(rawValue: mode) else {
+            homeKitLogger.warning("Unknown TargetHeatingCooling value \(mode), stored as nil")
+            return nil
+        }
+        return heatingMode
+    }
+
+    /// Eve custom characteristic, matched by UUID because HomeKit reports it as "Custom".
+    private func getValvePositionPercent() async throws -> Int? {
+        guard EveCharacteristic.isValvePosition(characteristicType) else { return nil }
+
+        try await readValue()
+
+        guard let percent = (value as? NSNumber)?.intValue else {
+            homeKitLogger.warning("Eve valve position value is not a number - value: \(String(describing: value))")
+            return nil
+        }
+        return percent
+    }
+
     var entityId: EntityId? {
         guard let placeId = service?.accessory?.room?.name,
               let name = service?.accessory?.name,
@@ -364,12 +413,13 @@ extension HMCharacteristic: @retroactive Comparable {
         switch entityCharacteristicType {
         case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId, .brightness, .colorTemperature, .color:
             return true
-        case .batterySensor, .heating, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor:
+        case .batterySensor, .heating, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor,
+             .targetTemperature, .heatingMode, .valvePosition:
             return false
         }
     }
 
-    private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Cooling Threshold Temperature", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Target Heating Cooling State", "Target Temperature", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event", "Smoke Detected", "Leak Detected", "Status Tampered"])
+    private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Cooling Threshold Temperature", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "Heating Threshold Temperature", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Target Heater Cooler State", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event", "Smoke Detected", "Leak Detected", "Status Tampered"])
     var entityCharacteristicType: CharacteristicsType? {
         guard let homeKitCharacteristic = HomeKitCharacteristic(characteristicType: characteristicType) else {
             guard !Self.skippableCharacteristics.contains(localizedDescription) else { return nil }

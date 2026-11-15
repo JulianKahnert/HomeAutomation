@@ -72,6 +72,15 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// Valve open state (true if open)
     public let valveOpen: Bool?
 
+    /// Thermostat target temperature in Celsius
+    public let targetTemperatureInC: Double?
+
+    /// Thermostat target mode
+    public let heatingMode: HeatingMode?
+
+    /// Valve opening in percent (0-100), Eve custom characteristic
+    public let valvePositionPercent: Int?
+
     public var description: String {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -101,7 +110,10 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         carbonDioxideSensorId: Int? = nil,
         pmDensity: Double? = nil,
         airQuality: Int? = nil,
-        valveOpen: Bool? = nil
+        valveOpen: Bool? = nil,
+        targetTemperatureInC: Double? = nil,
+        heatingMode: HeatingMode? = nil,
+        valvePositionPercent: Int? = nil
     ) {
         self.entityId = entityId
         self.timestamp = timestamp
@@ -121,6 +133,9 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         self.pmDensity = pmDensity
         self.airQuality = airQuality
         self.valveOpen = valveOpen
+        self.targetTemperatureInC = targetTemperatureInC
+        self.heatingMode = heatingMode
+        self.valvePositionPercent = valvePositionPercent
     }
 
     /// Retrieves a non-optional value for a given optional property key path

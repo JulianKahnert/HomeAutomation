@@ -12,7 +12,6 @@ public protocol StorageRepository: Sendable {
     func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem?
 
     func add(_ item: EntityStorageItem) async throws
-    func deleteEntries(olderThan date: Date) async throws
 
     /// Query entity history with cursor-based pagination
     /// - Parameters:

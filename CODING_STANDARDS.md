@@ -209,6 +209,7 @@ When adding new entity fields, verify ALL of these:
 - [ ] Updated `EntityHistoryItem.swift` with new properties
 - [ ] Updated OpenAPIController mapping logic
 - [ ] Updated chart display logic (if visualization needed)
+- [ ] New `CharacteristicsType`: gave it a value kind in `StoragePolicy.policy(for:)` (dead band, raw retention, rollup, valid range); the switch is exhaustive, so it does not compile without one
 - [ ] Tested with `swift build` and app builds
 
 **Example PRs that missed migrations:**

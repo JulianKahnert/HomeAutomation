@@ -72,9 +72,9 @@ struct EntityCharacteristicView: View {
                 Label("\(co2) ppm", systemImage: "cloud")
             }
         case .pmDensitySensor:
-            if let pm = item.pmDensity {
+            if let density = item.pmDensity {
                 Spacer()
-                Label(String(format: "%.1f µg/m³", pm), systemImage: "aqi.medium")
+                Label(String(format: "%.1f µg/m³", density), systemImage: "aqi.medium")
             }
         case .airQualitySensor:
             if let airQuality = item.airQuality {
@@ -102,6 +102,21 @@ struct EntityCharacteristicView: View {
                     Text("RGB")
                         .font(.caption)
                 }
+            }
+        case .targetTemperature:
+            if let target = item.targetTemperatureInC {
+                Spacer()
+                Label(String(format: "%.1f °C", target), systemImage: "target")
+            }
+        case .heatingMode:
+            if let mode = item.heatingMode {
+                Spacer()
+                Label("mode \(mode.name)", systemImage: "thermostat")
+            }
+        case .valvePosition:
+            if let percent = item.valvePositionPercent {
+                Spacer()
+                Label("\(percent) %", systemImage: "spigot")
             }
         case .valve:
             if let valveOpen = item.valveOpen {

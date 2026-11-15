@@ -28,7 +28,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
 
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async
-    func deleteStorageEntries(olderThan date: Date) async throws
     func getLocation() async -> Location
     func sendNotification(title: String, message: String, id: String) async
     func clearWindowNotification(entityId: EntityId) async
@@ -43,6 +42,7 @@ public protocol HomeManagable: EntityValidator, Sendable {
 public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equatable {
     public enum SceneEntityAction: Sendable, Codable, Equatable {
         case lockDoor
+        // swiftlint:disable:next identifier_name - "on" is the Codable key in stored config JSON and used by the config repo
         case on
         case off
     }

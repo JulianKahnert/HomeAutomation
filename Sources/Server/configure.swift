@@ -140,6 +140,9 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateConfigItem())
     app.migrations.add(CreateAutomationRun())
     app.migrations.add(AddLookupIndexes())
+    app.migrations.add(AddHeatingControlFields())
+    app.migrations.add(CreateWeatherHour())
+    app.migrations.add(CreateEntityHourlyAggregate())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -158,9 +161,9 @@ public func configure(_ app: Application) async throws {
 
         // Real APNS configuration (same as release)
         notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.HomeAutomation"
-        let notificationPrivateKey = String.fromBase64(Environment.get("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")!)!
-        let notificationKeyIdentifier = Environment.get("PUSH_NOTIFICATION_KEY_IDENTIFIER")!
-        let notificationTeamIdentifier = Environment.get("PUSH_NOTIFICATION_TEAM_IDENTIFIER")!
+        let notificationPrivateKey = requiredPushPrivateKey()
+        let notificationKeyIdentifier = requiredEnvironment("PUSH_NOTIFICATION_KEY_IDENTIFIER")
+        let notificationTeamIdentifier = requiredEnvironment("PUSH_NOTIFICATION_TEAM_IDENTIFIER")
 
         let apnsEnvironment: APNSEnvironment = app.environment == .production ? .production : .development
         app.logger.info("Using apns url \(apnsEnvironment.absoluteURL)")
@@ -192,9 +195,9 @@ public func configure(_ app: Application) async throws {
     #else
     // RELEASE: Always use real APNS
     let notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.HomeAutomation"
-    let notificationPrivateKey = String.fromBase64(Environment.get("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")!)!
-    let notificationKeyIdentifier = Environment.get("PUSH_NOTIFICATION_KEY_IDENTIFIER")!
-    let notificationTeamIdentifier = Environment.get("PUSH_NOTIFICATION_TEAM_IDENTIFIER")!
+    let notificationPrivateKey = requiredPushPrivateKey()
+    let notificationKeyIdentifier = requiredEnvironment("PUSH_NOTIFICATION_KEY_IDENTIFIER")
+    let notificationTeamIdentifier = requiredEnvironment("PUSH_NOTIFICATION_TEAM_IDENTIFIER")
 
     let apnsEnvironment: APNSEnvironment = app.environment == .production ? .production : .development
     app.logger.info("Using apns url \(apnsEnvironment.absoluteURL)")
@@ -271,7 +274,11 @@ public func configure(_ app: Application) async throws {
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
-        DatabaseCleanupJob(homeManager: app.homeManager, automationRuns: app.automationRunRepository)
+        OutdoorTemperatureJob(location: location, hours: WeatherHourDbRepository(database: { app.db })),
+        DatabaseCleanupJob(entities: app.entityStorageDbRepository,
+                           automationRuns: app.automationRunRepository,
+                           noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
+        EntityRollupJob(entities: app.entityStorageDbRepository)
     ]
 
     Task.detached {
@@ -291,4 +298,19 @@ public func configure(_ app: Application) async throws {
     try routes(app)
 
     app.logger.notice("StarActorSystem server ready, waiting for adapter on /adapter/v1")
+}
+
+/// The server cannot send pushes without these, so a missing value stops it at startup.
+private func requiredEnvironment(_ key: String) -> String {
+    guard let value = Environment.get(key) else {
+        fatalError("Missing environment variable \(key)")
+    }
+    return value
+}
+
+private func requiredPushPrivateKey() -> String {
+    guard let key = String.fromBase64(requiredEnvironment("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")) else {
+        fatalError("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64 is not valid base64")
+    }
+    return key
 }

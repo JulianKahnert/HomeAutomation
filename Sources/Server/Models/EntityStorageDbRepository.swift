@@ -65,13 +65,56 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
     }
 
     func add(_ item: EntityStorageItem) async throws {
-        try await Self.map(item).save(on: database())
+        let dbItem = Self.map(item)
+        guard try await passesDeadBand(dbItem, of: item.entityId) else { return }
+        try await dbItem.save(on: database())
     }
 
     func deleteEntries(olderThan date: Date) async throws {
         try await EntityStorageDbItem.query(on: database())
             .filter(\.$timestamp < date)
             .delete()
+    }
+
+    /// Whether `item` moved out of its type's write dead band (`StoragePolicy`) around the last
+    /// stored row. Types without a dead band cost no extra query.
+    private func passesDeadBand(_ item: EntityStorageDbItem, of entityId: EntityId) async throws -> Bool {
+        let policy = StoragePolicy.policy(for: entityId.characteristicType)
+        guard let deadBand = policy.deadBand, let column = policy.valueColumn, let value = column.value(in: item) else {
+            return true
+        }
+        let lastStored = try await latestItems(of: entityId, limit: 1).first.flatMap { row in
+            column.value(in: row).map { (value: $0, timestamp: row.timestamp) }
+        }
+        return deadBand.shouldStore(value, at: item.timestamp, lastStored: lastStored)
+    }
+
+    /// The rollup rows of an entity, oldest hour first.
+    func hourlyAggregates(of entityId: EntityId) async throws -> [EntityHourlyAggregate] {
+        let rows = try await sqlDatabase().raw("""
+            SELECT * FROM \(ident: EntityHourlyAggregate.schema)
+            WHERE \(ident: "entityPlaceId") = \(bind: entityId.placeId)
+              AND \(ident: "entityServiceName") = \(bind: entityId.name)
+              AND \(ident: "entityCharacteristicType") = \(bind: entityId.characteristicType.rawValue)
+            ORDER BY \(ident: "hourStart")
+            """)
+            .all()
+        return try rows.map { row in
+            try EntityHourlyAggregate(entityId: entityId,
+                                      hourStart: row.decode(column: "hourStart", as: Date.self),
+                                      minValue: row.decode(column: "minValue", as: Double.self),
+                                      meanValue: row.decode(column: "meanValue", as: Double.self),
+                                      maxValue: row.decode(column: "maxValue", as: Double.self),
+                                      lastValue: row.decode(column: "lastValue", as: Double.self),
+                                      valueCount: row.decode(column: "valueCount", as: Int.self))
+        }
+    }
+
+    private func sqlDatabase() throws -> any SQLDatabase {
+        guard let sqlDatabase = database() as? SQLDatabase else {
+            throw Abort(.internalServerError, reason: "Database does not support SQL queries")
+        }
+        return sqlDatabase
     }
 
     func getHistory(
@@ -106,9 +149,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
     }
 
     func getAllEntityIds() async throws -> [EntityId] {
-        guard let sqlDatabase = database() as? SQLDatabase else {
-            throw Abort(.internalServerError, reason: "Database does not support SQL queries")
-        }
+        let sqlDatabase = try sqlDatabase()
 
         // DISTINCT over the three indexed columns lets MySQL use a covering index skip scan
         // (`idx_entityItems_entity_timestamp`) instead of scanning the whole table. The name comes from
@@ -223,5 +264,77 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                    targetTemperatureInC: item.targetTemperatureInC,
                                    heatingMode: item.heatingMode,
                                    valvePositionPercent: item.valvePositionPercent)
+    }
+}
+
+extension EntityStorageDbRepository: EntityRetentionStore {
+    func deleteEntries(ofType type: CharacteristicsType, olderThan date: Date) async throws {
+        try await sqlDatabase().raw("""
+            DELETE FROM \(ident: EntityStorageDbItem.schema)
+            WHERE \(ident: "entityCharacteristicType") = \(bind: type.rawValue) AND \(ident: "timestamp") < \(bind: date)
+            """)
+            .run()
+    }
+
+    func rollUpHourly(type: CharacteristicsType, column: StoragePolicy.ValueColumn, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
+        let range = validRange ?? -Double.greatestFiniteMagnitude...Double.greatestFiniteMagnitude
+        try await database().transaction { database in
+            guard let sql = database as? SQLDatabase else {
+                throw Abort(.internalServerError, reason: "Database does not support SQL queries")
+            }
+            // An hour that already has a row (a late raw row) is merged; the update order matters
+            // because MySQL assigns left to right, so the mean reads the old count. `maxValue` is a
+            // reserved word, hence the backticks.
+            try await sql.raw("""
+                INSERT INTO \(ident: EntityHourlyAggregate.schema)
+                    (entityPlaceId, entityServiceName, entityCharacteristicType, hourStart, `minValue`, `meanValue`, `maxValue`, `lastValue`, `valueCount`)
+                SELECT * FROM (
+                    SELECT entityPlaceId, entityServiceName, entityCharacteristicType, hourStart,
+                           MIN(v) AS minV, AVG(v) AS meanV, MAX(v) AS maxV, MAX(CASE WHEN rn = 1 THEN v END) AS lastV, COUNT(*) AS countV
+                    FROM (
+                        SELECT entityPlaceId, entityServiceName, entityCharacteristicType,
+                               TIMESTAMP(DATE_FORMAT(\(ident: "timestamp"), '%Y-%m-%d %H:00:00')) AS hourStart,
+                               \(ident: column.rawValue) AS v,
+                               ROW_NUMBER() OVER (PARTITION BY entityPlaceId, entityServiceName, entityCharacteristicType,
+                                                               DATE_FORMAT(\(ident: "timestamp"), '%Y-%m-%d %H')
+                                                  ORDER BY \(ident: "timestamp") DESC) AS rn
+                        FROM \(ident: EntityStorageDbItem.schema)
+                        WHERE entityCharacteristicType = \(bind: type.rawValue)
+                          AND \(ident: "timestamp") < \(bind: date)
+                          AND \(ident: column.rawValue) BETWEEN \(bind: range.lowerBound) AND \(bind: range.upperBound)
+                    ) raw
+                    GROUP BY entityPlaceId, entityServiceName, entityCharacteristicType, hourStart
+                ) AS hourly
+                ON DUPLICATE KEY UPDATE
+                    `minValue` = LEAST(`minValue`, hourly.minV),
+                    `maxValue` = GREATEST(`maxValue`, hourly.maxV),
+                    `meanValue` = (`meanValue` * `valueCount` + hourly.meanV * hourly.countV) / (`valueCount` + hourly.countV),
+                    `lastValue` = hourly.lastV,
+                    `valueCount` = `valueCount` + hourly.countV
+                """)
+                .run()
+            try await sql.raw("""
+                DELETE FROM \(ident: EntityStorageDbItem.schema)
+                WHERE \(ident: "entityCharacteristicType") = \(bind: type.rawValue) AND \(ident: "timestamp") < \(bind: date)
+                """)
+                .run()
+        }
+    }
+
+    func entitiesWithRowCount(above limit: Int, since date: Date) async throws -> [EntityRowCount] {
+        try await sqlDatabase().raw("""
+            SELECT entityPlaceId, entityServiceName, entityCharacteristicType, COUNT(*) AS \(ident: "rowCount")
+            FROM \(ident: EntityStorageDbItem.schema)
+            WHERE \(ident: "timestamp") >= \(bind: date)
+            GROUP BY entityPlaceId, entityServiceName, entityCharacteristicType
+            HAVING COUNT(*) > \(bind: limit)
+            """)
+            .all()
+            .map { row in
+                try EntityRowCount(placeId: row.decode(column: "entityPlaceId", as: String.self),
+                                   serviceName: row.decode(column: "entityServiceName", as: String.self),
+                                   characteristicType: row.decode(column: "entityCharacteristicType", as: String.self),
+                                   rows: row.decode(column: "rowCount", as: Int.self))
+            }
     }
 }

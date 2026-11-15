@@ -10,8 +10,9 @@ struct AddHeatingControlFields: AsyncMigration {
     func prepare(on database: Database) async throws {
         try await database.schema(EntityStorageDbItem.schema)
             .field("targetTemperatureInC", .double)
-            .field("heatingMode", .int)
-            .field("valvePositionPercent", .int)
+            // Fluent maps .int8/.uint8 to INT on MySQL, so the narrow types are spelled out.
+            .field("heatingMode", .custom("TINYINT"))
+            .field("valvePositionPercent", .custom("TINYINT UNSIGNED"))
             .update()
     }
 

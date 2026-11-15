@@ -110,14 +110,25 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
 
-        // Use raw SQL DISTINCT for optimal performance with large datasets
+        // DISTINCT over the three indexed columns lets MySQL use a covering index skip scan
+        // (`idx_entityItems_entity_timestamp`) instead of scanning the whole table. The name comes from
+        // the newest row of each entity, one index lookup per entity.
         let rows = try await sqlDatabase.raw("""
-            SELECT DISTINCT
-                \(ident: "entityPlaceId"),
-                \(ident: "entityServiceName"),
-                \(ident: "entityCharacteristicsName"),
-                \(ident: "entityCharacteristicType")
-            FROM \(ident: EntityStorageDbItem.schema)
+            SELECT
+                d.\(ident: "entityPlaceId"),
+                d.\(ident: "entityServiceName"),
+                d.\(ident: "entityCharacteristicType"),
+                (SELECT n.\(ident: "entityCharacteristicsName")
+                 FROM \(ident: EntityStorageDbItem.schema) n
+                 WHERE n.\(ident: "entityPlaceId") = d.\(ident: "entityPlaceId")
+                   AND n.\(ident: "entityServiceName") = d.\(ident: "entityServiceName")
+                   AND n.\(ident: "entityCharacteristicType") = d.\(ident: "entityCharacteristicType")
+                 ORDER BY n.\(ident: "timestamp") DESC
+                 LIMIT 1) AS \(ident: "entityCharacteristicsName")
+            FROM (
+                SELECT DISTINCT \(ident: "entityPlaceId"), \(ident: "entityServiceName"), \(ident: "entityCharacteristicType")
+                FROM \(ident: EntityStorageDbItem.schema)
+            ) d
             """)
             .all()
 

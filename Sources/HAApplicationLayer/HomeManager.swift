@@ -320,8 +320,8 @@ public final class HomeManager: HomeManagable {
         await windowManager.markWindowOverdue(entityId: entityId)
     }
 
-    public func getWindowStates() async -> [WindowOpenState] {
-        await windowManager.getWindowStates()
+    public func getWindowContentState() async -> WindowContentState {
+        await windowManager.contentState()
     }
 
     public func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {

@@ -150,8 +150,8 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         overdueWindowIds.append(entityId)
     }
 
-    func getWindowStates() async -> [WindowOpenState] {
-        return []
+    func getWindowContentState() async -> WindowContentState {
+        .empty
     }
 
     func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {

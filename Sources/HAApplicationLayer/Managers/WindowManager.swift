@@ -46,17 +46,17 @@ actor WindowManager {
 
     /// Set newState to nil, if the window was closed
     func setWindowOpenState(entityId: EntityId, to newState: WindowOpenState?) async {
-        let action = newState != nil ? "opened" : "closed"
-        Self.logger.info("Window \(action): \(entityId.name) (\(entityId.placeId))")
+        Self.logger.info(newState != nil ? "Window opened" : "Window closed",
+                         metadata: ["window": "\(entityId.name)", "room": "\(entityId.placeId)"])
         // A newly opened window starts a new Lüftungslimit; a closed one is no longer überschritten.
         if let previous = windowStateIsOpen[entityId] {
             overdueWindowIds.remove(previous.id)
         }
         windowStateIsOpen[entityId] = newState
 
-        let windowStates = getWindowStates()
+        let windowStates = sortedWindowStates()
         if !windowStates.isEmpty {
-            Self.logger.info("Open windows: \(windowStates.map(\.name).joined(separator: ", "))")
+            Self.logger.info("Open windows changed", metadata: ["windows": "\(windowStates.map(\.name).joined(separator: ", "))"])
             startRefreshIfNeeded()
             await startOrUpdateOpenWindowActivities(alert: nil, priority: .high)
         } else {
@@ -73,10 +73,10 @@ actor WindowManager {
     func markWindowOverdue(entityId: EntityId) async {
         guard let window = windowStateIsOpen[entityId],
               overdueWindowIds.insert(window.id).inserted else {
-            Self.logger.debug("Skip marking window überschritten: \(entityId.name) (\(entityId.placeId))")
+            Self.logger.debug("Skip marking window überschritten", metadata: ["window": "\(entityId.name)", "room": "\(entityId.placeId)"])
             return
         }
-        Self.logger.info("Window überschritten: \(entityId.name) (\(entityId.placeId))")
+        Self.logger.info("Window überschritten", metadata: ["window": "\(entityId.name)", "room": "\(entityId.placeId)"])
 
         let alert = LiveActivityOptions.Alert(title: "Fenster schließen", body: "\(window.room): \(window.name)")
         await startOrUpdateOpenWindowActivities(alert: alert, priority: .high)
@@ -104,9 +104,23 @@ actor WindowManager {
         await startOrUpdateOpenWindowActivities(alert: nil, priority: .low)
     }
 
-    /// The offenen Fenster in Live Activity order: überschritten first, then by Fensterschließzeit,
-    /// window name as tiebreak.
-    func getWindowStates() -> [WindowOpenState] {
+    /// The Live Activity's content state with the latest outdoor temperature reading.
+    func contentState() async -> WindowContentState {
+        let temperature = await outdoorTemperature()
+        // Read the windows after the suspension, so the state reflects every change made meanwhile.
+        let windows = sortedWindowStates().map { state in
+            WindowContentState.Window(id: state.id,
+                                      name: state.name,
+                                      room: state.room,
+                                      opened: state.opened,
+                                      closeBy: state.closeBy,
+                                      isOverdue: isOverdue(state))
+        }
+        return WindowContentState(sortedWindows: windows, outdoorTemperature: temperature)
+    }
+
+    /// Überschritten first, then by Fensterschließzeit, window name as tiebreak.
+    private func sortedWindowStates() -> [WindowOpenState] {
         windowStateIsOpen.values.sorted { lhs, rhs in
             let lhsIsOverdue = isOverdue(lhs)
             let rhsIsOverdue = isOverdue(rhs)
@@ -125,29 +139,14 @@ actor WindowManager {
     }
 
     private func startOrUpdateOpenWindowActivities(alert: LiveActivityOptions.Alert?, priority: LiveActivityOptions.Priority) async {
-        let temperature = await outdoorTemperature()
-        // Read the windows after the suspension, so the update reflects every change made meanwhile.
-        let windowStates = getWindowStates()
-        guard !windowStates.isEmpty else {
+        let contentState = await contentState()
+        guard !contentState.windows.isEmpty else {
             Self.logger.debug("Skip open window activity update, all windows closed meanwhile")
             return
         }
         Self.logger.debug("Start or update open window activity")
 
-        let windows = windowStates.prefix(WindowContentState.maxWindowCount).map { state in
-            WindowContentState.Window(id: state.id,
-                                      name: state.name,
-                                      room: state.room,
-                                      opened: state.opened,
-                                      closeBy: state.closeBy,
-                                      isOverdue: isOverdue(state))
-        }
-        let contentState = WindowContentState(windows: Array(windows),
-                                              openCount: windowStates.count,
-                                              overdueCount: windowStates.filter(isOverdue).count,
-                                              outdoorTemperature: temperature)
         let options = LiveActivityOptions(alert: alert, staleDate: contentState.staleDate, priority: priority)
-
         await notificationSender.startOrUpdateLiveActivity(contentState: contentState,
                                                            activityName: WindowContentState.activityTypeName,
                                                            options: options)

@@ -25,17 +25,9 @@ public struct WindowOpenState: Hashable, Encodable, Sendable {
     }
 
     public init(entityId: EntityId, opened: Date, maxOpenDuration: TimeInterval) {
-        self.id = "window-\(entityId.placeId)-\(entityId.name)"
-        self.name = entityId.name
-        self.room = entityId.placeId
-        self.opened = opened
-        self.maxOpenDuration = maxOpenDuration
-    }
-
-    public init(id: String, name: String, room: String, opened: Date, maxOpenDuration: TimeInterval) {
-        self.id = id
-        self.name = name
-        self.room = room
+        id = WindowContentState.Window.id(room: entityId.placeId, name: entityId.name)
+        name = entityId.name
+        room = entityId.placeId
         self.opened = opened
         self.maxOpenDuration = maxOpenDuration
     }

@@ -151,16 +151,21 @@ struct OpenAPIController: APIProtocol {
 
     // MARK: - /windowopenstates
     func getWindowStates(_ input: Operations.GetWindowStates.Input) async throws -> Operations.GetWindowStates.Output {
-        let states: [Components.Schemas.WindowState] = await request.application.homeManager.getWindowStates()
-            .map { state in
-                Components.Schemas.WindowState(id: state.id,
-                                               name: state.name,
-                                               room: state.room,
-                                               openedIsoTimeStamp: state.opened.ISO8601Format(),
-                                               maxOpenDuration: state.maxOpenDuration)
-            }
+        let contentState = await request.application.homeManager.getWindowContentState()
+        let windows = contentState.windows.map { window in
+            Components.Schemas.WindowState(id: window.id,
+                                           name: window.name,
+                                           room: window.room,
+                                           openedIsoTimeStamp: window.opened.ISO8601Format(),
+                                           closeByIsoTimeStamp: window.closeBy.ISO8601Format(),
+                                           isOverdue: window.isOverdue)
+        }
 
-        return .ok(.init(body: .json(.init(windowStates: states))))
+        return .ok(.init(body: .json(.init(windowStates: windows,
+                                           openCount: contentState.openCount,
+                                           overdueCount: contentState.overdueCount,
+                                           outdoorTemperature: contentState.outdoorTemperature,
+                                           staleDateIsoTimeStamp: contentState.staleDate?.ISO8601Format()))))
     }
 
     // MARK: - /actions

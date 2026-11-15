@@ -131,14 +131,14 @@ struct SettingsFeature: Sendable {
                 state.error = nil
                 return .run { send in
                     await send(.windowStatesResponse(
-                        Result { try await serverClient.getWindowStates() }
+                        Result { try await serverClient.getWindowContentState() }
                     ))
                 }
 
             case let .windowStatesResponse(.success(contentState)):
                 state.isLoadingWindowStates = false
                 state.windowContentState = contentState
-                Self.logger.info("Received \(contentState.openCount) open window(s)")
+                Self.logger.info("Received open windows", metadata: ["openCount": "\(contentState.openCount)"])
 
                 if state.liveActivitiesEnabled {
                     return .run { _ in
@@ -148,10 +148,10 @@ struct SettingsFeature: Sendable {
                             Self.logger.info("No open windows, stopping Live Activities")
                             await liveActivity.stopActivity()
                         } else if hasActive {
-                            Self.logger.info("Updating existing Live Activity with \(contentState.openCount) window(s)")
+                            Self.logger.info("Updating existing Live Activity", metadata: ["openCount": "\(contentState.openCount)"])
                             await liveActivity.updateActivity(contentState)
                         } else {
-                            Self.logger.info("No active Live Activity, starting new one with \(contentState.openCount) window(s)")
+                            Self.logger.info("No active Live Activity, starting a new one", metadata: ["openCount": "\(contentState.openCount)"])
                             try await liveActivity.startActivity(contentState)
                         }
                     }
@@ -163,7 +163,7 @@ struct SettingsFeature: Sendable {
             case let .windowStatesResponse(.failure(error)):
                 state.isLoadingWindowStates = false
                 state.error = "Failed to load window states: \(error.localizedDescription)"
-                Self.logger.error("Failed to load window states: \(error)")
+                Self.logger.error("Failed to load window states", metadata: ["error": "\(error)"])
 
                 return .run { _ in
                     await liveActivity.updateActivity(.empty)

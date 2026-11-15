@@ -43,8 +43,8 @@ struct ServerClientDependency: Sendable {
     /// Clear all action log items
     var clearActions: @Sendable () async throws -> Void
 
-    /// Get the offenen Fenster as a Live Activity content state, in server order
-    var getWindowStates: @Sendable () async throws -> WindowContentState
+    /// Get the offenen Fenster as the server's Live Activity content state, in server order
+    var getWindowContentState: @Sendable () async throws -> WindowContentState
 
     /// Register device for push notifications
     var registerDevice: @Sendable (_ token: PushToken) async throws -> Void
@@ -82,7 +82,7 @@ extension ServerClientDependency: TestDependencyKey {
         getRecentRuns: { _, _ in [] },
         getActions: { _, _ in [] },
         clearActions: { },
-        getWindowStates: { .empty },
+        getWindowContentState: { .empty },
         registerDevice: { _ in },
         getEntityIdsWithHistory: { [] },
         getEntityHistory: { _, _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) },
@@ -117,22 +117,18 @@ extension ServerClientDependency: TestDependencyKey {
             ]
         },
         clearActions: { },
-        getWindowStates: {
+        getWindowContentState: {
             let opened = Date().addingTimeInterval(-3600)
-            return WindowContentState(
-                windows: [
-                    WindowContentState.Window(
-                        id: "window-Living Room-Window",
-                        name: "Window",
-                        room: "Living Room",
-                        opened: opened,
-                        closeBy: opened.addingTimeInterval(7200),
-                        isOverdue: false
-                    )
-                ],
-                openCount: 1,
-                overdueCount: 0
-            )
+            return WindowContentState(sortedWindows: [
+                WindowContentState.Window(
+                    id: WindowContentState.Window.id(room: "Living Room", name: "Window"),
+                    name: "Window",
+                    room: "Living Room",
+                    opened: opened,
+                    closeBy: opened.addingTimeInterval(7200),
+                    isOverdue: false
+                )
+            ])
         },
         registerDevice: { _ in },
         getEntityIdsWithHistory: {
@@ -271,8 +267,8 @@ extension ServerClientDependency: DependencyKey {
         clearActions: {
             try await client.clearActions()
         },
-        getWindowStates: {
-            try await client.getWindowStates()
+        getWindowContentState: {
+            try await client.getWindowContentState()
         },
         registerDevice: { token in
             try await client.register(token: token)

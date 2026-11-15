@@ -101,22 +101,23 @@ public struct ServerClient {
         _ = try response.ok
     }
 
-    /// The offenen Fenster as a Live Activity content state, in the order the server sent them.
-    public func getWindowStates() async throws -> WindowContentState {
+    /// The offenen Fenster as the server's Live Activity content state, in server order.
+    public func getWindowContentState() async throws -> WindowContentState {
         let response = try await client.getWindowStates()
-        let windows = try response.ok.body.json.windowStates
-            .map { state in
-                let opened = try Date(state.openedIsoTimeStamp, strategy: .iso8601)
-                return WindowContentState.Window(id: state.id,
-                                                 name: state.name,
-                                                 room: state.room,
-                                                 opened: opened,
-                                                 closeBy: opened.addingTimeInterval(state.maxOpenDuration),
-                                                 isOverdue: false)
-            }
-        return WindowContentState(windows: Array(windows.prefix(WindowContentState.maxWindowCount)),
-                                  openCount: windows.count,
-                                  overdueCount: 0)
+        let body = try response.ok.body.json
+        let windows = try body.windowStates.map { state in
+            WindowContentState.Window(id: state.id,
+                                      name: state.name,
+                                      room: state.room,
+                                      opened: try Date(state.openedIsoTimeStamp, strategy: .iso8601),
+                                      closeBy: try Date(state.closeByIsoTimeStamp, strategy: .iso8601),
+                                      isOverdue: state.isOverdue)
+        }
+        return WindowContentState(windows: windows,
+                                  openCount: body.openCount,
+                                  overdueCount: body.overdueCount,
+                                  outdoorTemperature: body.outdoorTemperature,
+                                  staleDate: try body.staleDateIsoTimeStamp.map { try Date($0, strategy: .iso8601) })
     }
 
     public func getActions(limit: Int? = nil, runId: UUID? = nil) async throws -> [ActionLogItem] {

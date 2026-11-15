@@ -10,7 +10,7 @@ import Foundation
 /// The Live Activity data format for offene Fenster (ContentState v2).
 ///
 /// The server fills and sorts it; the widget renders it as it is and never re-sorts.
-public struct WindowContentState: Codable, Hashable, Sendable {
+public struct WindowContentState: Hashable, Sendable {
     /// The name used in APNS `attributes-type` field for push-to-start Live Activities.
     ///
     /// IMPORTANT: This value MUST exactly match the name of the `ActivityAttributes` struct
@@ -32,22 +32,53 @@ public struct WindowContentState: Codable, Hashable, Sendable {
     public let overdueCount: Int
     /// The latest stored outdoor temperature reading in °C; `nil` without a reading.
     public let outdoorTemperature: Double?
+    /// When the Live Activity goes stale: the earliest Fensterschließzeit among all windows not yet
+    /// überschritten, including those cut off by ``maxWindowCount``. `nil` when every window is überschritten.
+    public let staleDate: Date?
 
-    public init(windows: [Window], openCount: Int, overdueCount: Int, outdoorTemperature: Double? = nil) {
+    public init(windows: [Window], openCount: Int, overdueCount: Int, outdoorTemperature: Double? = nil, staleDate: Date? = nil) {
         self.windows = windows
         self.openCount = openCount
         self.overdueCount = overdueCount
         self.outdoorTemperature = outdoorTemperature
+        self.staleDate = staleDate
+    }
+
+    /// Caps `sortedWindows` at ``maxWindowCount`` and derives the counts and the stale date from all of them.
+    /// - Parameter sortedWindows: Every offene Fenster, already in Live Activity order.
+    public init(sortedWindows: [Window], outdoorTemperature: Double? = nil) {
+        self.init(windows: Array(sortedWindows.prefix(Self.maxWindowCount)),
+                  openCount: sortedWindows.count,
+                  overdueCount: sortedWindows.filter(\.isOverdue).count,
+                  outdoorTemperature: outdoorTemperature,
+                  staleDate: sortedWindows.filter { !$0.isOverdue }.map(\.closeBy).min())
     }
 
     /// No offenen Fenster.
     public static let empty = WindowContentState(windows: [], openCount: 0, overdueCount: 0)
+}
 
-    /// When the Live Activity goes stale: the earliest Fensterschließzeit among windows not yet
-    /// überschritten, so the widget shows "überschritten?" if the update marking it is lost.
-    /// `nil` when every window is überschritten.
-    public var staleDate: Date? {
-        windows.filter { !$0.isOverdue }.map(\.closeBy).min()
+extension WindowContentState: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case windows, openCount, overdueCount, outdoorTemperature, staleDate
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        windows = try container.decode([Window].self, forKey: .windows)
+        openCount = try container.decode(Int.self, forKey: .openCount)
+        overdueCount = try container.decode(Int.self, forKey: .overdueCount)
+        outdoorTemperature = try container.decodeIfPresent(Double.self, forKey: .outdoorTemperature)
+        staleDate = try container.decodeIfPresent(String.self, forKey: .staleDate).map { try Date($0, strategy: .iso8601) }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(windows, forKey: .windows)
+        try container.encode(openCount, forKey: .openCount)
+        try container.encode(overdueCount, forKey: .overdueCount)
+        try container.encodeIfPresent(outdoorTemperature, forKey: .outdoorTemperature)
+        try container.encodeIfPresent(staleDate?.ISO8601Format(), forKey: .staleDate)
     }
 }
 
@@ -78,6 +109,11 @@ extension WindowContentState {
             self.opened = opened
             self.closeBy = closeBy
             self.isOverdue = isOverdue
+        }
+
+        /// The id of the window `name` in `room`, the same for every update.
+        public static func id(room: String, name: String) -> String {
+            "window-\(room)-\(name)"
         }
     }
 }

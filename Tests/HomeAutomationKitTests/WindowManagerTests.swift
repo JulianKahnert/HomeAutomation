@@ -164,6 +164,36 @@ struct WindowManagerTests {
         #expect(afterOverdue.options.staleDate == Self.start.addingTimeInterval(30 * 60))
     }
 
+    @Test("the content state the app fetches keeps the überschritten flag, the counts and the order of the last update")
+    func fetchedContentStateMatchesLastUpdate() async throws {
+        await open("Fenster", in: "Küche", minutesAfterStart: 0, limit: 30 * 60)
+        await open("Tür", in: "Flur", minutesAfterStart: 1, limit: 10 * 60)
+        await markOverdue("Fenster", in: "Küche")
+
+        let fetched = await manager.contentState()
+        #expect(fetched == (try #require(await sender.contentStates.last)))
+        #expect(fetched.windows.map(\.room) == ["Küche", "Flur"])
+        #expect(fetched.windows.map(\.isOverdue) == [true, false])
+        #expect(fetched.overdueCount == 1)
+        #expect(fetched.staleDate == Self.start.addingTimeInterval(11 * 60))
+    }
+
+    @Test("the stale date counts windows cut off by the cap, when more than 20 windows are überschritten")
+    func staleDateIncludesWindowsBeyondTheCap() async throws {
+        for index in 0..<21 {
+            await open("Fenster \(index)", in: "Raum \(index)", minutesAfterStart: Double(index), limit: 60)
+        }
+        await open("Tür", in: "Flur", minutesAfterStart: 0, limit: 40 * 60)
+        for index in 0..<21 {
+            await markOverdue("Fenster \(index)", in: "Raum \(index)")
+        }
+
+        let last = try #require(await sender.updates.last)
+        #expect(last.contentState.windows.allSatisfy { $0.isOverdue })
+        #expect(last.contentState.openCount == 22)
+        #expect(last.options.staleDate == Self.start.addingTimeInterval(40 * 60))
+    }
+
     @Test("there is no stale date once every window is überschritten")
     func noStaleDateWhenEveryWindowIsOverdue() async throws {
         await open("Fenster", in: "Küche", minutesAfterStart: 0)
@@ -295,5 +325,25 @@ private final class OutdoorTemperatureReading: Sendable {
     var value: Double? {
         get { reading.withLock { $0 } }
         set { reading.withLock { $0 = newValue } }
+    }
+}
+
+@Suite("WindowContentState payload")
+struct WindowContentStatePayloadTests {
+    @Test("the payload decodes to the same content state, stale date included")
+    func payloadRoundTripsStaleDate() throws {
+        let opened = Date(timeIntervalSince1970: 1_800_000_000)
+        let window = WindowContentState.Window(id: WindowContentState.Window.id(room: "Küche", name: "Fenster"),
+                                               name: "Fenster",
+                                               room: "Küche",
+                                               opened: opened,
+                                               closeBy: opened.addingTimeInterval(25 * 60),
+                                               isOverdue: false)
+        let state = WindowContentState(sortedWindows: [window], outdoorTemperature: 7.5)
+
+        let decoded = try JSONDecoder().decode(WindowContentState.self, from: JSONEncoder().encode(state))
+
+        #expect(decoded == state)
+        #expect(decoded.staleDate == opened.addingTimeInterval(25 * 60))
     }
 }

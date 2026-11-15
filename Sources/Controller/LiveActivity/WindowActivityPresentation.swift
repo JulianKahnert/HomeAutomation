@@ -31,6 +31,9 @@ public struct WindowActivityPresentation: Equatable, Sendable {
     /// The number of überschrittenen Fenster beside the warning symbol, trailing in the expanded
     /// Dynamic Island; `nil` when no window is überschritten.
     public let overdueBadge: Int?
+    /// The outdoor temperature in whole degrees ("7°"), right in the Lock Screen header and trailing
+    /// in the expanded Dynamic Island; `nil` without a reading.
+    public let outdoorTemperature: String?
     /// The windows that get a row, in server order.
     public let rows: [WindowContentState.Window]
     /// The first window in server order, whose countdown or overtime the compact Dynamic Island shows.
@@ -54,6 +57,7 @@ public struct WindowActivityPresentation: Equatable, Sendable {
         header = "\(contentState.openCount) offen · \(contentState.overdueCount) überschritten"
         openSummary = "\(contentState.openCount) offen"
         overdueBadge = contentState.overdueCount > 0 ? contentState.overdueCount : nil
+        outdoorTemperature = contentState.outdoorTemperature.map { "\(Int($0.rounded()))°" }
         self.rows = rows
         mostUrgent = contentState.windows.first
         isAnyOverdue = contentState.overdueCount > 0

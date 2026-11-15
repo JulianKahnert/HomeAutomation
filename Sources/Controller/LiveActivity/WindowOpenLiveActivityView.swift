@@ -27,6 +27,14 @@ public struct WindowOpenLiveActivityView: View {
             HStack(spacing: 6) {
                 Image(systemName: "window.vertical.open")
                 Text(presentation.header)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if let outdoorTemperature = presentation.outdoorTemperature {
+                    Label(outdoorTemperature, systemImage: "thermometer.medium")
+                        .labelStyle(.titleAndIcon)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
             }
             .font(.caption.weight(.semibold))
 
@@ -185,7 +193,8 @@ public struct WindowActivityTimeLabel: View {
                                          closeBy: opened.addingTimeInterval(25 * 60),
                                          isOverdue: index == 0)
     }
-    WindowOpenLiveActivityView(contentState: WindowContentState(windows: windows, openCount: windows.count, overdueCount: 1))
+    WindowOpenLiveActivityView(contentState: WindowContentState(windows: windows, openCount: windows.count, overdueCount: 1,
+                                                                outdoorTemperature: 7.4))
 }
 
 #Preview("Watch, 8 offen") {

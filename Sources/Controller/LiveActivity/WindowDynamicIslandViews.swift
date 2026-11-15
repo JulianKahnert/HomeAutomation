@@ -27,7 +27,8 @@ public struct WindowIslandExpandedLeading: View {
     }
 }
 
-/// Expanded, trailing: a warning symbol with the number of überschrittenen Fenster, if any.
+/// Expanded, trailing: a warning symbol with the number of überschrittenen Fenster, if any,
+/// and the outdoor temperature, if there is a reading.
 public struct WindowIslandExpandedTrailing: View {
     let presentation: WindowActivityPresentation
 
@@ -36,12 +37,19 @@ public struct WindowIslandExpandedTrailing: View {
     }
 
     public var body: some View {
-        if let overdueCount = presentation.overdueBadge {
-            Label("\(overdueCount)", systemImage: "exclamationmark.triangle.fill")
-                .labelStyle(.titleAndIcon)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.red)
+        HStack(spacing: 8) {
+            if let overdueCount = presentation.overdueBadge {
+                Label("\(overdueCount)", systemImage: "exclamationmark.triangle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.red)
+            }
+            if let outdoorTemperature = presentation.outdoorTemperature {
+                Text(outdoorTemperature)
+                    .monospacedDigit()
+            }
         }
+        .font(.subheadline.weight(.semibold))
+        .lineLimit(1)
     }
 }
 

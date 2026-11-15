@@ -184,4 +184,25 @@ struct WindowActivityPresentationTests {
 
         #expect(presentation.moreCount == nil)
     }
+
+    // MARK: outdoor temperature
+
+    @Test("the outdoor temperature is shown in whole degrees", arguments: [
+        (7.4, "7°"), (7.5, "8°"), (-0.4, "0°"), (-3.6, "-4°"), (21.0, "21°")
+    ])
+    func outdoorTemperatureInWholeDegrees(temperature: Double, expected: String) {
+        let contentState = WindowContentState(windows: [Self.window("Küche")], openCount: 1, overdueCount: 0,
+                                              outdoorTemperature: temperature)
+
+        let presentation = WindowActivityPresentation(contentState: contentState, rowBudget: 3)
+
+        #expect(presentation.outdoorTemperature == expected)
+    }
+
+    @Test("without a reading no outdoor temperature is shown")
+    func noOutdoorTemperatureWithoutReading() {
+        let presentation = WindowActivityPresentation(contentState: Self.state([Self.window("Küche")]), rowBudget: 3)
+
+        #expect(presentation.outdoorTemperature == nil)
+    }
 }

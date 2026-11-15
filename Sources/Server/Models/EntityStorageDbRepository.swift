@@ -68,6 +68,15 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
         let dbItem = Self.map(item)
         guard try await passesDeadBand(dbItem, of: item.entityId) else { return }
         try await dbItem.save(on: database())
+        if item.entityId.characteristicType.isHeatingRelated {
+            log.debug("Stored heating entity item", metadata: [
+                "entityId": "\(item.entityId)",
+                "isHeaterActive": "\(item.isHeaterActive.map { "\($0)" } ?? "nil")",
+                "targetTemperatureInC": "\(item.targetTemperatureInC.map { "\($0)" } ?? "nil")",
+                "heatingMode": "\(item.heatingMode?.name ?? "nil")",
+                "valvePositionPercent": "\(item.valvePositionPercent.map { "\($0)" } ?? "nil")"
+            ])
+        }
     }
 
     /// Whether `item` moved out of its type's write dead band (`StoragePolicy`) around the last

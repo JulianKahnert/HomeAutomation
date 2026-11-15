@@ -29,6 +29,8 @@ docker-compose down
 | `DATABASE_TLS_VERIFY` | no | `true` enables full TLS certificate verification for the MySQL connection. Off by default because the stock MySQL image uses a self-signed certificate; turn it on whenever the database is not on a private container network. A warning is logged while it is off. |
 | `PUSH_NOTIFICATION_*` | yes (release) | APNS key material, see `docker-compose.yml` in the config repository. |
 | `TZ` | no | Time zone used for time-based automations. |
+| `LOG_LEVEL` | no | `trace` … `critical`. Defaults to `notice` with `--env production` (the Docker image), else `info`. |
+| `HA_DEBUG_LOGGING` | no | `1`/`true` lowers the log level to `debug` (a `trace` level stays), e.g. to see each stored thermostat value (`Stored heating entity item`). Off by default. |
 
 Never commit real values of these variables. Keep them in a git-ignored `.env` file and reference them from `docker-compose.yml` as `${AUTH_TOKEN}` etc.
 
@@ -40,6 +42,9 @@ docker-compose up db
 
 # set log level
 LOG_LEVEL=trace docker-compose up app
+
+# debug logs on top of the configured level
+HA_DEBUG_LOGGING=1 docker-compose up app
 
 # run migration
 docker-compose run migrate

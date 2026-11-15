@@ -130,7 +130,18 @@ extension HomeKitAdapter {
                 accessory.delegate = self
 
                 let shouldSubscribe = characteristic.shouldSubscribe
-                log.info("\(accessory.room?.name ?? "") @ \(characteristic.service?.name ?? ""): \(characteristic.localizedDescription) - \(characteristic.uniqueIdentifier.uuidString) - shouldSubscribe: \(shouldSubscribe)")
+                let entityType = characteristic.entityCharacteristicType
+                let isDropped = characteristic.entityId == nil
+                // Most dropped characteristics are expected (firmware version, name, ...); a thermostat's
+                // are not, because their history silently stays empty.
+                let isUnexpectedDrop = isDropped
+                    && (HeatingControlCharacteristic.isHeatingService(characteristic.service?.serviceType) || entityType != nil)
+                // The type UUIDs identify characteristics HomeKit only calls "Custom", e.g. Eve's valve position.
+                log.log(level: isUnexpectedDrop ? .notice : .info, "Characteristic found", metadata: characteristic.logMetadata.merging([
+                    "entityType": "\(entityType.map { "\($0)" } ?? "nil")",
+                    "shouldSubscribe": "\(shouldSubscribe)",
+                    "dropped": "\(isDropped)"
+                ]) { _, new in new })
 
                 do {
                     let requests = NotificationResubscription.notificationRequests(
@@ -292,6 +303,12 @@ extension HomeKitAdapter.HomeKitHomeManager: HMAccessoryDelegate {
         update(homes: manager.homes)
     }
     func accessory(_ accessory: HMAccessory, service: HMService, didUpdateValueFor characteristic: HMCharacteristic) {
+        // Every characteristic of a thermostat accessory, its "Custom" ones in separate services included.
+        if accessory.services.contains(where: { HeatingControlCharacteristic.isHeatingService($0.serviceType) }) {
+            log.debug("Heating characteristic value updated", metadata: characteristic.logMetadata.merging([
+                "value": "\(characteristic.value.map { "\($0)" } ?? "nil")"
+            ]) { _, new in new })
+        }
         Task {
             let item = await characteristic.getEntityStorageItem()
             log.info("home:didUpdateValueFor accessory [\(accessory.room?.name ?? "") @ \(characteristic.service?.name ?? "")] changed characteristic [\(characteristic.localizedDescription)]")

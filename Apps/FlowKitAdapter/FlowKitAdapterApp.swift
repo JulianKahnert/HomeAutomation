@@ -15,16 +15,21 @@ import StarActorSystem
 import SwiftUI
 
 @main
-struct FlowKitApp {
+enum FlowKitApp {
     private static let log = Logger(label: "FlowKitAdapter")
 
     /// Entrypoint of the app
     static func main() {
 
         // we use this workaround to initialize the logging system before anything else is constructed
-        initLogging(withFileLogging: true, logLevel: .debug)
+        // Debug logs only with `HA_DEBUG_LOGGING` (environment, `defaults write` or the settings toggle),
+        // read once here, so a change needs an app restart. Outside any view, so no `@AppStorage`;
+        // `SettingsView` writes the same key.
+        let isDebugLoggingEnabled = DebugLogging.isEnabled(userSetting: UserDefaults.standard.bool(forKey: DebugLogging.key))
+        initLogging(withFileLogging: true, logLevel: DebugLogging.level(.info, enabled: isDebugLoggingEnabled))
 
         logStartupProvenance()
+        Self.log.info("Debug logging", metadata: ["enabled": "\(isDebugLoggingEnabled)"])
 
         // start the app
         FlowKitAdapter.main()

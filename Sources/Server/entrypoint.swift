@@ -1,5 +1,6 @@
 import HAModels
 import Logging
+import Shared
 import Vapor
 
 @main
@@ -8,12 +9,13 @@ enum Entrypoint {
         var env = try Environment.detect()
 
         // Read the level from the `LOG_LEVEL` env (and `--log` flag) so it can be set once in
-        // docker-compose, and wrap each handler with CriticalNotifyingLogHandler so CRITICAL log
-        // events trigger push notifications.
+        // docker-compose, `HA_DEBUG_LOGGING=1` lowers it to debug, and wrap each handler with
+        // CriticalNotifyingLogHandler so CRITICAL log events trigger push notifications.
+        let isDebugLoggingEnabled = DebugLogging.isEnabled()
         try LoggingSystem.bootstrap(from: &env) { level in
             { label in
                 var underlying = StreamLogHandler.standardOutput(label: label)
-                underlying.logLevel = level
+                underlying.logLevel = DebugLogging.level(level, enabled: isDebugLoggingEnabled)
                 return CriticalNotifyingLogHandler(label: label, underlying: underlying)
             }
         }

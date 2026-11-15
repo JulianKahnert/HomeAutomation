@@ -28,8 +28,8 @@ enum HomeKitCharacteristic {
     case carbonDioxideLevel
     case pm2_5Density
     case airQuality
-    case targetTemperature
-    case targetHeatingCoolingState
+    /// Target temperature or mode on a Thermostat or HeaterCooler service, see `HeatingControlCharacteristic`.
+    case heatingControl(characteristicType: String)
     case eveValvePosition
 
     /// Maps HomeKit characteristic type string to our enum
@@ -69,10 +69,8 @@ enum HomeKitCharacteristic {
             self = .pm2_5Density
         case HMCharacteristicTypeAirQuality:
             self = .airQuality
-        case HMCharacteristicTypeTargetTemperature:
-            self = .targetTemperature
-        case HMCharacteristicTypeTargetHeatingCooling:
-            self = .targetHeatingCoolingState
+        case _ where HeatingControlCharacteristic.isHeatingControl(characteristicType):
+            self = .heatingControl(characteristicType: characteristicType)
         case _ where EveCharacteristic.isValvePosition(characteristicType):
             self = .eveValvePosition
         default:
@@ -115,10 +113,8 @@ enum HomeKitCharacteristic {
             return serviceType == HMServiceTypeValve ? .valve : nil
         case .active:
             return serviceType == HMServiceTypeHeaterCooler ? .heating : nil
-        case .targetTemperature:
-            return serviceType == HMServiceTypeThermostat ? .targetTemperature : nil
-        case .targetHeatingCoolingState:
-            return serviceType == HMServiceTypeThermostat ? .heatingMode : nil
+        case .heatingControl(let characteristicType):
+            return HeatingControlCharacteristic.characteristicsType(characteristicType: characteristicType, serviceType: serviceType)
         case .eveValvePosition:
             return .valvePosition
         }

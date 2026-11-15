@@ -138,6 +138,13 @@ Create/update `.env` file:
 AUTH_TOKEN=your-secure-token-here
 ```
 
+## Debug logging
+
+`HA_DEBUG_LOGGING` turns on debug logs in both processes, off by default:
+
+- Server: environment variable `HA_DEBUG_LOGGING=1` lowers `LOG_LEVEL` to `debug` (see `docs/setup-server.md`).
+- Adapter: the **Debug Logs** settings toggle, `defaults write de.juliankahnert.HomeKitAdapterApp HA_DEBUG_LOGGING -bool YES`, or the environment variable, which wins; read at launch (see `docs/setup-FlowKitAdapter.md`).
+
 ## Project Structure
 
 ### SPM Modules (`Sources/`)

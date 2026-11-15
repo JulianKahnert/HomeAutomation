@@ -8,9 +8,9 @@
 
 import Fluent
 import FluentMySQLDriver
-import SQLKit
 @testable import HAModels
 @testable import Server
+import SQLKit
 import XCTVapor
 
 final class EntityStorageMySQLTests: XCTestCase {
@@ -45,8 +45,10 @@ final class EntityStorageMySQLTests: XCTestCase {
         let repository = app.entityStorageDbRepository
         let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .valvePosition)
         for (offset, values) in [(0, (.off, 0)), (1, (.auto, 100)), (2, (nil, nil))] as [(Int, (HeatingMode?, Int?))] {
-            try await repository.add(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: Double(1_000 + offset)),
-                                                       heatingMode: values.0, valvePositionPercent: values.1))
+            try await repository.add(EntityStorageItem(entityId: id,
+                                                       timestamp: Date(timeIntervalSince1970: Double(1_000 + offset)),
+                                                       heatingMode: values.0,
+                                                       valvePositionPercent: values.1))
         }
 
         let items = try await repository.getHistory(for: id, startDate: nil, endDate: nil, cursor: nil, limit: 10)
@@ -57,8 +59,11 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     func testUnknownHeatingModeIsReadAsNil() async throws {
         let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .heatingMode)
-        try await EntityStorageDbItem(timestamp: Date(timeIntervalSince1970: 1_000), entityPlaceId: id.placeId, entityServiceName: id.name,
-                                      entityCharacteristicType: id.characteristicType.rawValue, heatingMode: 9)
+        try await EntityStorageDbItem(timestamp: Date(timeIntervalSince1970: 1_000),
+                                      entityPlaceId: id.placeId,
+                                      entityServiceName: id.name,
+                                      entityCharacteristicType: id.characteristicType.rawValue,
+                                      heatingMode: 9)
             .save(on: app.db)
 
         let item = try await app.entityStorageDbRepository.getCurrent(id)
@@ -77,17 +82,17 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     func testGetAllEntityIdsReturnsEachEntityOnceWithItsName() async throws {
         let repository = app.entityStorageDbRepository
-        let a = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .temperatureSensor)
-        let b = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .valvePosition)
-        let c = EntityId(placeId: "Hall", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
-        for (index, id) in [a, a, b, c].enumerated() {
+        let temperature = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .temperatureSensor)
+        let valve = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .valvePosition)
+        let lamp = EntityId(placeId: "Hall", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
+        for (index, id) in [temperature, temperature, valve, lamp].enumerated() {
             try await repository.add(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: Double(index)), isDeviceOn: true))
         }
 
         let ids = try await repository.getAllEntityIds()
 
         XCTAssertEqual(ids.count, 3)
-        XCTAssertEqual(Set(ids.map(\.description)), Set([a, b, c].map(\.description)))
+        XCTAssertEqual(Set(ids.map(\.description)), Set([temperature, valve, lamp].map(\.description)))
         XCTAssertEqual(ids.first { $0.characteristicType == .valvePosition }?.characteristicsName, "Thermostat")
         XCTAssertNil(ids.first { $0.characteristicType == .switcher }?.characteristicsName)
     }
@@ -98,8 +103,12 @@ final class EntityStorageMySQLTests: XCTestCase {
     private let hour = Date(timeIntervalSince1970: 1_699_999_200)
 
     private func insertRaw(_ id: EntityId, minutes: Double, co2: Int? = nil, lux: Double? = nil, isOn: Bool? = nil) async throws {
-        try await EntityStorageDbItem(timestamp: hour.addingTimeInterval(minutes * 60), entityPlaceId: id.placeId, entityServiceName: id.name,
-                                      entityCharacteristicType: id.characteristicType.rawValue, illuminanceInLux: lux, isDeviceOn: isOn,
+        try await EntityStorageDbItem(timestamp: hour.addingTimeInterval(minutes * 60),
+                                      entityPlaceId: id.placeId,
+                                      entityServiceName: id.name,
+                                      entityCharacteristicType: id.characteristicType.rawValue,
+                                      illuminanceInLux: lux,
+                                      isDeviceOn: isOn,
                                       carbonDioxideSensorId: co2)
             .save(on: app.db)
     }
@@ -126,7 +135,8 @@ final class EntityStorageMySQLTests: XCTestCase {
         try await insertRaw(lamp, minutes: 10, isOn: true)
         try await insertRaw(lux, minutes: 10, lux: 0)
 
-        try await repository.rollUpHourly(type: .carbonDioxideSensorId, column: .carbonDioxideSensorId,
+        try await repository.rollUpHourly(type: .carbonDioxideSensorId,
+                                          column: .carbonDioxideSensorId,
                                           validRange: StoragePolicy.policy(for: .carbonDioxideSensorId).validRange,
                                           olderThan: hour.addingTimeInterval(2 * 3600))
 
@@ -196,9 +206,15 @@ final class EntityStorageMySQLTests: XCTestCase {
         let app = try XCTUnwrap(app)
         let repository = WeatherHourDbRepository(database: { app.db })
         let hour = Date(timeIntervalSince1970: 1_794_654_000)
-        let forecast = WeatherHour(locationKey: "52.5,13.4", hour: hour, fetchedAt: hour.addingTimeInterval(-86_400),
-                                   temperature2mC: 7.5, relativeHumidity2mPercent: 80, cloudCoverPercent: 100,
-                                   windDirection10mDeg: 270, shortwaveRadiationWm2: 12, isDay: true)
+        let forecast = WeatherHour(locationKey: "52.5,13.4",
+                                   hour: hour,
+                                   fetchedAt: hour.addingTimeInterval(-86_400),
+                                   temperature2mC: 7.5,
+                                   relativeHumidity2mPercent: 80,
+                                   cloudCoverPercent: 100,
+                                   windDirection10mDeg: 270,
+                                   shortwaveRadiationWm2: 12,
+                                   isDay: true)
         var observed = forecast
         observed.fetchedAt = hour.addingTimeInterval(3600)
         observed.temperature2mC = 8.25
@@ -213,4 +229,3 @@ final class EntityStorageMySQLTests: XCTestCase {
         XCTAssertEqual(rows, [observed, next])
     }
 }
-

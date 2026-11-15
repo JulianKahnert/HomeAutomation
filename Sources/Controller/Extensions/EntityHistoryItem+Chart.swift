@@ -12,23 +12,23 @@ import SwiftUI
 extension EntityHistoryItem {
     /// Returns a SwiftUI Color from RGB values if available
     public var color: Color? {
-        guard let r = colorRed,
-              let g = colorGreen,
-              let b = colorBlue else {
+        guard let red = colorRed,
+              let green = colorGreen,
+              let blue = colorBlue else {
             return nil
         }
-        return Color(red: Double(r), green: Double(g), blue: Double(b))
+        return Color(red: Double(red), green: Double(green), blue: Double(blue))
     }
 
     /// Returns the hue (color tone) in degrees (0-360°) from RGB values
     /// Uses the existing RGB.hue helper from HAModels
     private var hue: Double? {
-        guard let r = colorRed,
-              let g = colorGreen,
-              let b = colorBlue else {
+        guard let red = colorRed,
+              let green = colorGreen,
+              let blue = colorBlue else {
             return nil
         }
-        let rgb = RGB(red: r, green: g, blue: b)
+        let rgb = RGB(red: red, green: green, blue: blue)
         return Double(rgb.hue)
     }
 

@@ -32,14 +32,29 @@ struct OutdoorTemperatureJob: Job, Log {
     }
 
     /// `past_days`/`forecast_days` let later fetches fill gaps and replace forecasts with newer values.
-    static func url(for location: Location) -> URL {
-        URL(string: "https://api.open-meteo.com/v1/forecast?latitude=\(location.latitude)&longitude=\(location.longitude)&hourly=\(hourlyVariables)&past_days=1&forecast_days=2&timezone=UTC")!
+    static func url(for location: Location) throws -> URL {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "api.open-meteo.com"
+        components.path = "/v1/forecast"
+        components.queryItems = [
+            URLQueryItem(name: "latitude", value: "\(location.latitude)"),
+            URLQueryItem(name: "longitude", value: "\(location.longitude)"),
+            URLQueryItem(name: "hourly", value: hourlyVariables),
+            URLQueryItem(name: "past_days", value: "1"),
+            URLQueryItem(name: "forecast_days", value: "2"),
+            URLQueryItem(name: "timezone", value: "UTC")
+        ]
+        guard let url = components.url else {
+            throw URLError(.badURL)
+        }
+        return url
     }
 
     /// Fetches the weather and upserts one row per hour; returns the stored hours.
     @discardableResult
     func recordOnce(now: Date = Date()) async throws -> [WeatherHour] {
-        let data = try await fetch(Self.url(for: location))
+        let data = try await fetch(try Self.url(for: location))
         let hours = try Self.parse(data, locationKey: Self.locationKey(for: location), fetchedAt: now)
         try await self.hours.upsert(hours)
         return hours
@@ -58,7 +73,9 @@ struct OutdoorTemperatureJob: Job, Log {
                 guard let series, index < series.count else { return nil }
                 return series[index]
             }
-            return WeatherHour(locationKey: locationKey, hour: hour, fetchedAt: fetchedAt,
+            return WeatherHour(locationKey: locationKey,
+                               hour: hour,
+                               fetchedAt: fetchedAt,
                                temperature2mC: value(hourly.temperature2m),
                                apparentTemperatureC: value(hourly.apparentTemperature),
                                relativeHumidity2mPercent: value(hourly.relativeHumidity2m).map { Int($0.rounded()) },

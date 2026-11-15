@@ -111,7 +111,8 @@ struct StoragePolicyTests {
     @Test func cleanupJobDeletesOnlyRunsAndRollupJobCondensesLuxAndCO2() async {
         let store = RecordingRetentionStore()
         let runs = RecordingRunDeleter()
-        let job = DatabaseCleanupJob(entities: store, automationRuns: runs,
+        let job = DatabaseCleanupJob(entities: store,
+                                     automationRuns: runs,
                                      noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender()))
 
         await job.performCleanup(now: now)

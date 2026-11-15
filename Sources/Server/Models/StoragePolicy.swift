@@ -105,12 +105,19 @@ struct StoragePolicy: Sendable, Equatable {
         switch type {
         case .lightSensor:
             // Lux already jumps in big steps, so a dead band saves little; the rollup after 90 days does.
-            StoragePolicy(kind: .analog, valueColumn: .illuminanceInLux, deadBand: nil,
-                          rawRetentionDays: 90, rollup: .hourly, validRange: 0...100_000)
+            StoragePolicy(kind: .analog,
+                          valueColumn: .illuminanceInLux,
+                          deadBand: nil,
+                          rawRetentionDays: 90,
+                          rollup: .hourly,
+                          validRange: 0...100_000)
         case .carbonDioxideSensorId:
-            StoragePolicy(kind: .analog, valueColumn: .carbonDioxideSensorId,
+            StoragePolicy(kind: .analog,
+                          valueColumn: .carbonDioxideSensorId,
                           deadBand: DeadBand(threshold: .absolute(25), maxInterval: .minutes(15)),
-                          rawRetentionDays: 90, rollup: .hourly, validRange: 1...100_000)
+                          rawRetentionDays: 90,
+                          rollup: .hourly,
+                          validRange: 1...100_000)
         case .temperatureSensor:
             analog(.temperatureInC)
         case .relativeHumiditySensor:

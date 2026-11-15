@@ -274,8 +274,8 @@ extension HMCharacteristic: @retroactive Comparable {
         }
 
         // Convert HSV to RGB using the utility function
-        let h = hue / 360.0  // Normalize 0-360° to 0-1
-        return rgb(h: h, s: saturation, v: brightness)
+        let normalizedHue = hue / 360.0  // Normalize 0-360° to 0-1
+        return rgb(h: normalizedHue, s: saturation, v: brightness)
     }
 
     private func getTemperature() async throws -> Measurement<UnitTemperature>? {

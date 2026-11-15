@@ -72,9 +72,9 @@ struct EntityCharacteristicView: View {
                 Label("\(co2) ppm", systemImage: "cloud")
             }
         case .pmDensitySensor:
-            if let pm = item.pmDensity {
+            if let density = item.pmDensity {
                 Spacer()
-                Label(String(format: "%.1f µg/m³", pm), systemImage: "aqi.medium")
+                Label(String(format: "%.1f µg/m³", density), systemImage: "aqi.medium")
             }
         case .airQualitySensor:
             if let airQuality = item.airQuality {

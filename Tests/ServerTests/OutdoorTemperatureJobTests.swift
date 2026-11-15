@@ -42,8 +42,8 @@ struct OutdoorTemperatureJobTests {
         #expect(await store.rows.isEmpty)
     }
 
-    @Test func urlRequestsAllHourlyVariablesWithPastAndForecastDays() {
-        let query = OutdoorTemperatureJob.url(for: location).absoluteString
+    @Test func urlRequestsAllHourlyVariablesWithPastAndForecastDays() throws {
+        let query = try OutdoorTemperatureJob.url(for: location).absoluteString
         for variable in ["temperature_2m", "apparent_temperature", "relative_humidity_2m", "dew_point_2m", "precipitation", "cloud_cover", "wind_speed_10m", "wind_direction_10m", "shortwave_radiation", "direct_radiation", "diffuse_radiation", "direct_normal_irradiance", "sunshine_duration", "is_day"] {
             #expect(query.contains(variable))
         }

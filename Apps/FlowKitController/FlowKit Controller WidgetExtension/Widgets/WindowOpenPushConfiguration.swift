@@ -13,11 +13,9 @@ import WidgetKit
 struct WindowOpenPushConfiguration: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WindowAttributes.self) { context in
-            // Create the presentation that appears on the Lock Screen and as a
-            // banner on the Home Screen of devices that don't support the
-            // Dynamic Island.
-            WindowOpenLiveActivityView(contentState: context.state,
-                                       rowBudget: WindowActivityPresentation.lockScreenRowBudget)
+            // The Lock Screen, the banner, StandBy and the Mac menu bar get the `.medium` family;
+            // the Watch Smart Stack gets `.small`.
+            WindowOpenActivityContent(contentState: context.state)
         } dynamicIsland: { context in
             let presentation = WindowActivityPresentation(contentState: context.state,
                                                           rowBudget: WindowActivityPresentation.expandedRowBudget)
@@ -40,6 +38,27 @@ struct WindowOpenPushConfiguration: Widget {
                 WindowIslandCountBadge(contentState: context.state, presentation: presentation)
             }
             .keylineTint(presentation.isAnyOverdue ? Color.red : nil)
+        }
+        .supplementalActivityFamilies([.small])
+    }
+}
+
+/// Picks the layout for the activity family: the compact list (design 1c) for `.medium`, the most
+/// urgent window for `.small` on the Watch.
+private struct WindowOpenActivityContent: View {
+    @Environment(\.activityFamily) private var activityFamily
+    let contentState: WindowAttributes.ContentState
+
+    var body: some View {
+        switch activityFamily {
+        case .small:
+            WindowOpenWatchActivityView(contentState: contentState)
+        case .medium:
+            WindowOpenLiveActivityView(contentState: contentState,
+                                       rowBudget: WindowActivityPresentation.lockScreenRowBudget)
+        @unknown default:
+            WindowOpenLiveActivityView(contentState: contentState,
+                                       rowBudget: WindowActivityPresentation.lockScreenRowBudget)
         }
     }
 }

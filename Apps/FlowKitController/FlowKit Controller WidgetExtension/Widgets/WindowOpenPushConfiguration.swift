@@ -32,14 +32,15 @@ struct WindowOpenPushConfiguration: Widget {
                     WindowIslandExpandedBottom(presentation: presentation)
                 }
             } compactLeading: {
-                WindowIslandCountBadge(contentState: context.state, presentation: presentation)
+                WindowIslandCountBadge(openCount: context.state.openCount, tint: presentation.compactTint)
             } compactTrailing: {
                 WindowIslandCompactTrailing(presentation: presentation)
             } minimal: {
-                WindowIslandCountBadge(contentState: context.state, presentation: presentation)
+                WindowIslandCountBadge(openCount: context.state.openCount, tint: presentation.compactTint)
             }
             .keylineTint(presentation.isAnyOverdue ? Color.red : nil)
         }
+        // There is no API to limit `.small` to the Watch, so CarPlay may show it too.
         .supplementalActivityFamilies([.small])
     }
 }
@@ -52,14 +53,9 @@ private struct WindowOpenActivityContent: View {
     let isStale: Bool
 
     var body: some View {
-        switch activityFamily {
-        case .small:
-            WindowOpenWatchActivityView(contentState: contentState)
-        case .medium:
-            WindowOpenLiveActivityView(contentState: contentState,
-                                       rowBudget: WindowActivityPresentation.lockScreenRowBudget,
-                                       isStale: isStale)
-        @unknown default:
+        if activityFamily == .small {
+            WindowOpenWatchActivityView(contentState: contentState, isStale: isStale)
+        } else {
             WindowOpenLiveActivityView(contentState: contentState,
                                        rowBudget: WindowActivityPresentation.lockScreenRowBudget,
                                        isStale: isStale)

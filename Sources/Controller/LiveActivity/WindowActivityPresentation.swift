@@ -4,11 +4,10 @@
 //
 
 import HAModels
+import SwiftUI
 
-/// What a window Live Activity surface shows, decided from the ``WindowContentState`` and a row budget alone.
-///
-/// It never reads the current time: order and überschritten come from the server. The only
-/// exception is the stale state the system reports once the next Fensterschließzeit has passed.
+/// What a window Live Activity surface shows, decided from the ``WindowContentState``, a row budget and
+/// the system's stale state alone; it never reads the current time.
 public struct WindowActivityPresentation: Equatable, Sendable {
     /// Rows on the Lock Screen, in StandBy and on the Mac.
     public static let lockScreenRowBudget = 3
@@ -17,11 +16,14 @@ public struct WindowActivityPresentation: Equatable, Sendable {
     /// The one window in the Watch Smart Stack (`.small` supplemental family).
     public static let watchRowBudget = 1
 
-    /// The "+X weitere: Raum, Raum, …" line for the windows that do not fit.
-    public struct More: Equatable, Sendable {
+    /// A line of text, red when it stands for an überschritten window.
+    public struct Caption: Equatable, Sendable {
         public let text: String
-        /// Red when a hidden window is überschritten.
         public let isOverdue: Bool
+
+        public var color: Color {
+            isOverdue ? .red : .secondary
+        }
     }
 
     /// "<n> offen · <m> überschritten"
@@ -38,16 +40,21 @@ public struct WindowActivityPresentation: Equatable, Sendable {
     public let rows: [WindowContentState.Window]
     /// The first window in server order, whose countdown or overtime the compact Dynamic Island shows.
     public let mostUrgent: WindowContentState.Window?
-    /// `nil` when every offene Fenster has a row.
-    public let more: More?
-    /// The short "+X weitere offen" for the Watch, with the same count and colour as ``more``.
-    public let moreCount: More?
-    /// Tints the compact and minimal presentations.
+    /// The "+X weitere: Raum, Raum, …" line; red when a window without a row is überschritten or
+    /// possibly überschritten. `nil` when every offene Fenster has a row.
+    public let more: Caption?
+    /// The line below the Watch's window: "überschritten?", else "+X weitere offen" coloured like
+    /// ``more``, else the window name. `nil` without a window.
+    public let watchCaption: Caption?
     public let isAnyOverdue: Bool
-    /// The window shown as "überschritten?": the activity went stale because the update marking it
-    /// überschritten did not arrive. The stale date is the earliest Fensterschließzeit among windows
-    /// not yet überschritten, so that is the first such window in server order.
+    /// The window shown as "überschritten?" in a stale activity: the first window not yet überschritten,
+    /// whose Fensterschließzeit is the stale date.
     public let possiblyOverdueWindowId: String?
+
+    /// Tints the compact and minimal presentations.
+    public var compactTint: Color {
+        isAnyOverdue ? .red : .primary
+    }
 
     public init(contentState: WindowContentState, rowBudget: Int, isStale: Bool = false) {
         let rows = Array(contentState.windows.prefix(max(rowBudget, 0)))
@@ -61,25 +68,55 @@ public struct WindowActivityPresentation: Equatable, Sendable {
         self.rows = rows
         mostUrgent = contentState.windows.first
         isAnyOverdue = contentState.overdueCount > 0
-        possiblyOverdueWindowId = isStale ? contentState.windows.first { !$0.isOverdue }?.id : nil
+        let possiblyOverdueWindowId = isStale ? contentState.windows.first { !$0.isOverdue }?.id : nil
+        self.possiblyOverdueWindowId = possiblyOverdueWindowId
 
-        if hiddenCount > 0 {
-            var rooms: [String] = []
-            for room in hidden.map(\.room) where !rooms.contains(room) {
-                rooms.append(room)
-            }
-            // Windows cut off by the server's cap are counted but not named.
-            if contentState.openCount > contentState.windows.count {
-                rooms.append("…")
-            }
-            let shownOverdueCount = rows.filter(\.isOverdue).count
-            let isHiddenOverdue = contentState.overdueCount > shownOverdueCount
-            more = More(text: "+\(hiddenCount) weitere: \(rooms.joined(separator: ", "))",
-                        isOverdue: isHiddenOverdue)
-            moreCount = More(text: "+\(hiddenCount) weitere offen", isOverdue: isHiddenOverdue)
-        } else {
-            more = nil
-            moreCount = nil
+        watchCaption = contentState.windows.first.map { window in
+            Self.watchCaption(for: window, contentState: contentState, possiblyOverdueWindowId: possiblyOverdueWindowId, isStale: isStale)
         }
+
+        guard hiddenCount > 0 else {
+            more = nil
+            return
+        }
+        var rooms: [String] = []
+        for room in hidden.map(\.room) where !rooms.contains(room) {
+            rooms.append(room)
+        }
+        // Windows cut off by the server's cap are counted but not named.
+        if contentState.openCount > contentState.windows.count {
+            rooms.append("…")
+        }
+        let isMoreOverdue = Self.isHiddenOverdue(rows: rows,
+                                                 contentState: contentState,
+                                                 possiblyOverdueWindowId: possiblyOverdueWindowId,
+                                                 isStale: isStale)
+        more = Caption(text: "+\(hiddenCount) weitere: \(rooms.joined(separator: ", "))", isOverdue: isMoreOverdue)
+    }
+
+    /// Whether a window without a row is überschritten, or possibly überschritten in a stale activity.
+    private static func isHiddenOverdue(rows: [WindowContentState.Window],
+                                        contentState: WindowContentState,
+                                        possiblyOverdueWindowId: String?,
+                                        isStale: Bool) -> Bool {
+        let isHiddenPossiblyOverdue = isStale && !rows.contains { $0.id == possiblyOverdueWindowId }
+        return contentState.overdueCount > rows.filter(\.isOverdue).count || isHiddenPossiblyOverdue
+    }
+
+    private static func watchCaption(for window: WindowContentState.Window,
+                                     contentState: WindowContentState,
+                                     possiblyOverdueWindowId: String?,
+                                     isStale: Bool) -> Caption {
+        if window.id == possiblyOverdueWindowId {
+            return Caption(text: "überschritten?", isOverdue: true)
+        }
+        guard contentState.openCount > 1 else {
+            return Caption(text: window.name, isOverdue: false)
+        }
+        let isOverdue = isHiddenOverdue(rows: [window],
+                                        contentState: contentState,
+                                        possiblyOverdueWindowId: possiblyOverdueWindowId,
+                                        isStale: isStale)
+        return Caption(text: "+\(contentState.openCount - 1) weitere offen", isOverdue: isOverdue)
     }
 }

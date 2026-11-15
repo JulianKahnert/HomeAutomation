@@ -13,7 +13,7 @@ struct WindowActivityPresentationTests {
     private static let start = Date(timeIntervalSince1970: 1_800_000_000)
 
     private static func window(_ room: String, overdue: Bool = false) -> WindowContentState.Window {
-        WindowContentState.Window(id: "window-\(room)-Fenster",
+        WindowContentState.Window(id: WindowContentState.Window.id(room: room, name: "Fenster"),
                                   name: "Fenster",
                                   room: room,
                                   opened: start,
@@ -93,7 +93,7 @@ struct WindowActivityPresentationTests {
     func staleActivityMarksFirstPendingWindow() {
         let state = Self.state([Self.window("Küche", overdue: true), Self.window("Bad"), Self.window("Flur")])
 
-        #expect(WindowActivityPresentation(contentState: state, rowBudget: 3, isStale: true).possiblyOverdueWindowId == "window-Bad-Fenster")
+        #expect(WindowActivityPresentation(contentState: state, rowBudget: 3, isStale: true).possiblyOverdueWindowId == WindowContentState.Window.id(room: "Bad", name: "Fenster"))
         #expect(WindowActivityPresentation(contentState: state, rowBudget: 3, isStale: false).possiblyOverdueWindowId == nil)
 
         let allOverdue = Self.state([Self.window("Küche", overdue: true), Self.window("Bad", overdue: true)])
@@ -147,7 +147,7 @@ struct WindowActivityPresentationTests {
     @Test("compact and minimal stay uncoloured for a window past its Fensterschließzeit the server has not marked überschritten")
     func compactTintIgnoresTheClock() {
         let past = Date(timeIntervalSince1970: 0)
-        let window = WindowContentState.Window(id: "window-Küche-Fenster",
+        let window = WindowContentState.Window(id: WindowContentState.Window.id(room: "Küche", name: "Fenster"),
                                                name: "Fenster",
                                                room: "Küche",
                                                opened: past,
@@ -164,25 +164,54 @@ struct WindowActivityPresentationTests {
                                                       rowBudget: WindowActivityPresentation.watchRowBudget)
 
         #expect(presentation.rows.map(\.room) == ["Küche"])
-        #expect(presentation.moreCount?.text == "+7 weitere offen")
-        #expect(presentation.moreCount?.isOverdue == false)
+        #expect(presentation.watchCaption?.text == "+7 weitere offen")
+        #expect(presentation.watchCaption?.isOverdue == false)
     }
 
     @Test("the Watch's +X weitere offen counts windows beyond the server's cap and turns red for a hidden überschritten window")
-    func watchMoreCountUsesFullCounts() {
+    func watchCaptionUsesFullCounts() {
         let capped = Self.state([Self.window("Küche"), Self.window("Bad", overdue: true)], openCount: 23, overdueCount: 1)
         let presentation = WindowActivityPresentation(contentState: capped, rowBudget: WindowActivityPresentation.watchRowBudget)
 
-        #expect(presentation.moreCount?.text == "+22 weitere offen")
-        #expect(presentation.moreCount?.isOverdue == true)
+        #expect(presentation.watchCaption?.text == "+22 weitere offen")
+        #expect(presentation.watchCaption?.isOverdue == true)
     }
 
-    @Test("a single window on the Watch has no +X weitere offen")
-    func watchSingleWindowHasNoMoreCount() {
+    @Test("a single window on the Watch shows its name below the bar")
+    func watchSingleWindowShowsItsName() {
         let presentation = WindowActivityPresentation(contentState: Self.state([Self.window("Küche")]),
                                                       rowBudget: WindowActivityPresentation.watchRowBudget)
 
-        #expect(presentation.moreCount == nil)
+        #expect(presentation.watchCaption == WindowActivityPresentation.Caption(text: "Fenster", isOverdue: false))
+        #expect(WindowActivityPresentation(contentState: .empty, rowBudget: WindowActivityPresentation.watchRowBudget).watchCaption == nil)
+    }
+
+    // MARK: stale
+
+    @Test("a stale activity turns the +X weitere line red when the possibly überschritten window has no row")
+    func staleHiddenWindowTurnsMoreRed() {
+        let state = Self.state([Self.window("Küche", overdue: true), Self.window("Bad"), Self.window("Flur")])
+
+        #expect(WindowActivityPresentation(contentState: state, rowBudget: 1, isStale: true).more?.isOverdue == true)
+        #expect(WindowActivityPresentation(contentState: state, rowBudget: 1, isStale: false).more?.isOverdue == false)
+        // With a row of its own the window shows "überschritten?" there, so the line stays as it is.
+        #expect(WindowActivityPresentation(contentState: state, rowBudget: 2, isStale: true).more?.isOverdue == false)
+    }
+
+    @Test("a stale activity on the Watch shows the most urgent window as überschritten?")
+    func staleWatchShowsPossiblyOverdue() {
+        let state = Self.state([Self.window("Küche"), Self.window("Bad")])
+        let presentation = WindowActivityPresentation(contentState: state, rowBudget: WindowActivityPresentation.watchRowBudget, isStale: true)
+
+        #expect(presentation.watchCaption == WindowActivityPresentation.Caption(text: "überschritten?", isOverdue: true))
+    }
+
+    @Test("a stale activity on the Watch turns +X weitere offen red when the possibly überschritten window is hidden")
+    func staleWatchHiddenWindowTurnsCaptionRed() {
+        let state = Self.state([Self.window("Küche", overdue: true), Self.window("Bad")])
+        let presentation = WindowActivityPresentation(contentState: state, rowBudget: WindowActivityPresentation.watchRowBudget, isStale: true)
+
+        #expect(presentation.watchCaption == WindowActivityPresentation.Caption(text: "+1 weitere offen", isOverdue: true))
     }
 
     // MARK: outdoor temperature
@@ -191,8 +220,7 @@ struct WindowActivityPresentationTests {
         (7.4, "7°"), (7.5, "8°"), (-0.4, "0°"), (-3.6, "-4°"), (21.0, "21°")
     ])
     func outdoorTemperatureInWholeDegrees(temperature: Double, expected: String) {
-        let contentState = WindowContentState(windows: [Self.window("Küche")], openCount: 1, overdueCount: 0,
-                                              outdoorTemperature: temperature)
+        let contentState = WindowContentState(sortedWindows: [Self.window("Küche")], outdoorTemperature: temperature)
 
         let presentation = WindowActivityPresentation(contentState: contentState, rowBudget: 3)
 

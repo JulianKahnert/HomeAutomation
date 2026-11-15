@@ -7,9 +7,8 @@
 import HAModels
 import SwiftUI
 
-// The Dynamic Island presentations of the window Live Activity (design 1c). Tint and content come
-// only from the ``WindowActivityPresentation``, never from the current time. Nothing goes into the
-// centre region, which sits over the camera.
+// The Dynamic Island presentations (design 1c), driven only by ``WindowActivityPresentation``.
+// Nothing goes into the centre region, which sits over the camera.
 
 /// Expanded, leading: "<n> offen".
 public struct WindowIslandExpandedLeading: View {
@@ -72,18 +71,18 @@ public struct WindowIslandExpandedBottom: View {
 /// red once any window is überschritten.
 public struct WindowIslandCountBadge: View {
     let openCount: Int
-    let isAnyOverdue: Bool
+    let tint: Color
 
-    public init(contentState: WindowContentState, presentation: WindowActivityPresentation) {
-        self.openCount = contentState.openCount
-        self.isAnyOverdue = presentation.isAnyOverdue
+    public init(openCount: Int, tint: Color) {
+        self.openCount = openCount
+        self.tint = tint
     }
 
     public var body: some View {
         Label("\(openCount)", systemImage: "window.vertical.open")
             .labelStyle(.titleAndIcon)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(isAnyOverdue ? Color.red : Color.primary)
+            .foregroundStyle(tint)
     }
 }
 
@@ -99,9 +98,40 @@ public struct WindowIslandCompactTrailing: View {
         if let window = presentation.mostUrgent {
             WindowActivityTimeLabel(window: window)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(presentation.isAnyOverdue ? Color.red : Color.primary)
+                .foregroundStyle(presentation.compactTint)
                 .frame(maxWidth: 52, alignment: .trailing)
         }
     }
+}
+
+#Preview("Expanded") {
+    let presentation = WindowActivityPresentation(contentState: .sample(overdueCount: 2),
+                                                  rowBudget: WindowActivityPresentation.expandedRowBudget)
+    VStack(spacing: 12) {
+        HStack {
+            WindowIslandExpandedLeading(presentation: presentation)
+            Spacer()
+            WindowIslandExpandedTrailing(presentation: presentation)
+        }
+        WindowIslandExpandedBottom(presentation: presentation)
+    }
+    .padding()
+    .frame(width: 370)
+    .background(.black, in: .rect(cornerRadius: 40))
+    .environment(\.colorScheme, .dark)
+}
+
+#Preview("Compact and minimal") {
+    let contentState = WindowContentState.sample(overdueCount: 2)
+    let presentation = WindowActivityPresentation(contentState: contentState,
+                                                  rowBudget: WindowActivityPresentation.expandedRowBudget)
+    HStack(spacing: 24) {
+        WindowIslandCountBadge(openCount: contentState.openCount, tint: presentation.compactTint)
+        WindowIslandCompactTrailing(presentation: presentation)
+        WindowIslandCountBadge(openCount: contentState.openCount, tint: presentation.compactTint)
+    }
+    .padding()
+    .background(.black, in: .capsule)
+    .environment(\.colorScheme, .dark)
 }
 #endif

@@ -18,7 +18,7 @@ public struct WindowOpenLiveActivityView: View {
     public init(contentState: WindowAttributes.ContentState,
                 rowBudget: Int = WindowActivityPresentation.lockScreenRowBudget,
                 isStale: Bool = false) {
-        self.presentation = WindowActivityPresentation(contentState: contentState, rowBudget: rowBudget, isStale: isStale)
+        presentation = WindowActivityPresentation(contentState: contentState, rowBudget: rowBudget, isStale: isStale)
     }
 
     public var body: some View {
@@ -62,19 +62,20 @@ public struct WindowActivityList: View {
             Text(more.text)
                 .font(.caption)
                 .lineLimit(1)
-                .foregroundStyle(more.isOverdue ? Color.red : Color.secondary)
+                .foregroundStyle(more.color)
         }
     }
 }
 
 /// The most urgent offene Fenster in the Watch Smart Stack (`.small` activity family, 162 × 69 pt):
-/// Raum and countdown, its bar, and "+X weitere offen" (or the window name when it is the only one).
+/// Raum and countdown, its bar, and the ``WindowActivityPresentation/watchCaption``.
 public struct WindowOpenWatchActivityView: View {
     let presentation: WindowActivityPresentation
 
-    public init(contentState: WindowAttributes.ContentState) {
-        self.presentation = WindowActivityPresentation(contentState: contentState,
-                                                       rowBudget: WindowActivityPresentation.watchRowBudget)
+    public init(contentState: WindowAttributes.ContentState, isStale: Bool = false) {
+        presentation = WindowActivityPresentation(contentState: contentState,
+                                                  rowBudget: WindowActivityPresentation.watchRowBudget,
+                                                  isStale: isStale)
     }
 
     public var body: some View {
@@ -94,16 +95,11 @@ public struct WindowOpenWatchActivityView: View {
                     .labelsHidden()
                     .tint(window.isOverdue ? .red : .blue)
 
-                if let moreCount = presentation.moreCount {
-                    Text(moreCount.text)
+                if let caption = presentation.watchCaption {
+                    Text(caption.text)
                         .font(.caption2)
                         .lineLimit(1)
-                        .foregroundStyle(moreCount.isOverdue ? Color.red : Color.secondary)
-                } else {
-                    Text(window.name)
-                        .font(.caption2)
-                        .lineLimit(1)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(caption.color)
                 }
             } else {
                 Label(presentation.header, systemImage: "window.vertical.open")
@@ -182,34 +178,15 @@ public struct WindowActivityTimeLabel: View {
 }
 
 #Preview("8 offen") {
-    let date = Date()
-    let rooms = ["Küche", "Bad", "Büro", "Flur", "Schlafzimmer", "Wohnzimmer", "Kinderzimmer", "Keller"]
-    let windows = rooms.enumerated().map { index, room in
-        let opened = date.addingTimeInterval(Double(-index) * 60)
-        return WindowContentState.Window(id: "window-\(room)-Fenster",
-                                         name: "Fenster",
-                                         room: room,
-                                         opened: opened,
-                                         closeBy: opened.addingTimeInterval(25 * 60),
-                                         isOverdue: index == 0)
-    }
-    WindowOpenLiveActivityView(contentState: WindowContentState(windows: windows, openCount: windows.count, overdueCount: 1,
-                                                                outdoorTemperature: 7.4))
+    WindowOpenLiveActivityView(contentState: .sample())
+}
+
+#Preview("8 offen, stale") {
+    WindowOpenLiveActivityView(contentState: .sample(overdueCount: 0), isStale: true)
 }
 
 #Preview("Watch, 8 offen") {
-    let date = Date()
-    let rooms = ["Küche", "Bad", "Büro", "Flur", "Schlafzimmer", "Wohnzimmer", "Kinderzimmer", "Keller"]
-    let windows = rooms.enumerated().map { index, room in
-        let opened = date.addingTimeInterval(Double(-index) * 60)
-        return WindowContentState.Window(id: "window-\(room)-Fenster",
-                                         name: "Fenster",
-                                         room: room,
-                                         opened: opened,
-                                         closeBy: opened.addingTimeInterval(25 * 60),
-                                         isOverdue: false)
-    }
-    WindowOpenWatchActivityView(contentState: WindowContentState(windows: windows, openCount: windows.count, overdueCount: 0))
+    WindowOpenWatchActivityView(contentState: .sample(overdueCount: 0))
         .frame(width: 162, height: 69)
         .background(Color(white: 0.15), in: .rect(cornerRadius: 18))
 }

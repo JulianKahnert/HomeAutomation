@@ -63,7 +63,7 @@ struct LiveActivityDependencyTests {
 
             let opened = Date()
             let window = WindowContentState.Window(
-                id: "window-Test-Window",
+                id: WindowContentState.Window.id(room: "Test", name: "Window"),
                 name: "Window",
                 room: "Test",
                 opened: opened,

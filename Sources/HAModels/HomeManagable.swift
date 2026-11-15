@@ -42,6 +42,7 @@ public protocol HomeManagable: EntityValidator, Sendable {
 public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equatable {
     public enum SceneEntityAction: Sendable, Codable, Equatable {
         case lockDoor
+        // swiftlint:disable:next identifier_name - "on" is the Codable key in stored config JSON and used by the config repo
         case on
         case off
     }

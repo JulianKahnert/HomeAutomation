@@ -181,7 +181,7 @@ private actor RecordingNotificationSender: NotificationSender {
     }
 
     func clearNotification(id: String) async throws {}
-    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String) async {}
+    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String, options: LiveActivityOptions) async {}
     func endAllLiveActivities(ofActivityType activityType: String) async {}
 }
 

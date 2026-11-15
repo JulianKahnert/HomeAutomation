@@ -93,8 +93,85 @@ struct WindowManagerTests {
             Issue.record("Expected an update after the first close, got \(events[2])")
             return
         }
-        #expect(afterFirstClose.windows.map(\.room) == ["Flur"])
-        #expect(afterFirstClose.openCount == 1)
+        #expect(afterFirstClose.contentState.windows.map(\.room) == ["Flur"])
+        #expect(afterFirstClose.contentState.openCount == 1)
         #expect(events[3] == .end(activityType: WindowContentState.activityTypeName))
+    }
+
+    // MARK: überschritten
+
+    private func markOverdue(_ name: String, in room: String) async {
+        await manager.markWindowOverdue(entityId: Self.contact(name, in: room))
+    }
+
+    @Test("reaching the Fensterschließzeit sends one priority-10 update with an alert, the window flagged and sorted first")
+    func reachingCloseBySendsOneAlertUpdate() async throws {
+        await open("Fenster", in: "Küche", minutesAfterStart: 0, limit: 30 * 60)
+        await open("Tür", in: "Flur", minutesAfterStart: 1, limit: 10 * 60)
+        await open("Kipp", in: "Bad", minutesAfterStart: 2, limit: 20 * 60)
+        let updatesBefore = await sender.updates.count
+
+        await markOverdue("Kipp", in: "Bad")
+
+        let updates = await sender.updates
+        #expect(updates.count == updatesBefore + 1)
+        let update = try #require(updates.last)
+        #expect(update.options.priority == .high)
+        #expect(update.options.alert == LiveActivityOptions.Alert(title: "Fenster schließen", body: "Bad: Kipp"))
+        #expect(update.contentState.windows.map(\.room) == ["Bad", "Flur", "Küche"])
+        #expect(update.contentState.windows.map(\.isOverdue) == [true, false, false])
+        #expect(update.contentState.overdueCount == 1)
+        #expect(update.contentState.openCount == 3)
+    }
+
+    @Test("a window alerts only once, and a closed window not at all")
+    func windowAlertsOnlyOnce() async {
+        await open("Fenster", in: "Küche", minutesAfterStart: 0)
+        await open("Tür", in: "Flur", minutesAfterStart: 1)
+        await close("Tür", in: "Flur")
+
+        await markOverdue("Fenster", in: "Küche")
+        await markOverdue("Fenster", in: "Küche")
+        await markOverdue("Tür", in: "Flur")
+
+        let alerts = await sender.updates.compactMap(\.options.alert)
+        #expect(alerts == [LiveActivityOptions.Alert(title: "Fenster schließen", body: "Küche: Fenster")])
+    }
+
+    @Test("opening and closing a window sends priority-10 updates without an alert")
+    func openAndCloseSendHighPriorityWithoutAlert() async {
+        await open("Fenster", in: "Küche", minutesAfterStart: 0)
+        await open("Tür", in: "Flur", minutesAfterStart: 1)
+        await close("Tür", in: "Flur")
+
+        let options = await sender.updates.map(\.options)
+        #expect(options.count == 3)
+        #expect(options.allSatisfy { $0.priority == .high && $0.alert == nil })
+    }
+
+    @Test("the stale date is the earliest Fensterschließzeit among windows not yet überschritten")
+    func staleDateIsEarliestPendingCloseBy() async throws {
+        await open("Fenster", in: "Küche", minutesAfterStart: 0, limit: 30 * 60)
+        await open("Tür", in: "Flur", minutesAfterStart: 1, limit: 10 * 60)
+
+        let afterOpen = try #require(await sender.updates.last)
+        #expect(afterOpen.options.staleDate == Self.start.addingTimeInterval(11 * 60))
+
+        await markOverdue("Tür", in: "Flur")
+
+        let afterOverdue = try #require(await sender.updates.last)
+        #expect(afterOverdue.options.staleDate == Self.start.addingTimeInterval(30 * 60))
+    }
+
+    @Test("there is no stale date once every window is überschritten")
+    func noStaleDateWhenEveryWindowIsOverdue() async throws {
+        await open("Fenster", in: "Küche", minutesAfterStart: 0)
+        await open("Tür", in: "Flur", minutesAfterStart: 1)
+        await markOverdue("Fenster", in: "Küche")
+        await markOverdue("Tür", in: "Flur")
+
+        let last = try #require(await sender.updates.last)
+        #expect(last.contentState.overdueCount == 2)
+        #expect(last.options.staleDate == nil)
     }
 }

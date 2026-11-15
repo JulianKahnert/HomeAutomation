@@ -30,7 +30,8 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func trigger(scene sceneName: String) async
     func getLocation() async -> Location
     func sendNotification(title: String, message: String, id: String) async
-    func clearWindowNotification(entityId: EntityId) async
+    /// Marks an offenes Fenster überschritten once its Fensterschließzeit has passed; the Live Activity alerts once.
+    func markWindowOverdue(entityId: EntityId) async
     func getWindowStates() async -> [WindowOpenState]
     func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async
     func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem]

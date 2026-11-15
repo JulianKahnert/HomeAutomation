@@ -19,6 +19,8 @@ actor WindowManager {
     /// driven deterministically in tests.
     private let now: @Sendable () -> Date
     private var windowStateIsOpen: [EntityId: WindowOpenState] = [:]
+    /// The offenen Fenster whose Fensterschließzeit has passed.
+    private var overdueWindowIds: Set<String> = []
 
     init(notificationSender: any NotificationSender, now: @escaping @Sendable () -> Date = { Date() }) {
         self.notificationSender = notificationSender
@@ -29,26 +31,46 @@ actor WindowManager {
     func setWindowOpenState(entityId: EntityId, to newState: WindowOpenState?) async {
         let action = newState != nil ? "opened" : "closed"
         Self.logger.info("Window \(action): \(entityId.name) (\(entityId.placeId))")
-        windowStateIsOpen[entityId] = newState
-
-        // Clear the delivered push notification for this specific window
-        if newState == nil {
-            try? await notificationSender.clearNotification(id: entityId.windowNotificationId)
+        // A newly opened window starts a new Lüftungslimit; a closed one is no longer überschritten.
+        if let previous = windowStateIsOpen[entityId] {
+            overdueWindowIds.remove(previous.id)
         }
+        windowStateIsOpen[entityId] = newState
 
         let windowStates = getWindowStates()
         if !windowStates.isEmpty {
             Self.logger.info("Open windows: \(windowStates.map(\.name).joined(separator: ", "))")
-            await startOrUpdateOpenWindowActivities(with: windowStates)
+            await startOrUpdateOpenWindowActivities(with: windowStates, alert: nil)
         } else {
             Self.logger.info("All windows closed, ending Live Activities")
             await notificationSender.endAllLiveActivities(ofActivityType: WindowContentState.activityTypeName)
         }
     }
 
-    /// The offenen Fenster in Live Activity order: by Fensterschließzeit, window name as tiebreak.
+    /// Marks an offenes Fenster überschritten once its Fensterschließzeit has passed and reminds the
+    /// resident with a Live Activity alert. Does nothing for a closed window or one already überschritten,
+    /// so every window alerts exactly once.
+    func markWindowOverdue(entityId: EntityId) async {
+        guard let window = windowStateIsOpen[entityId],
+              overdueWindowIds.insert(window.id).inserted else {
+            Self.logger.debug("Skip marking window überschritten: \(entityId.name) (\(entityId.placeId))")
+            return
+        }
+        Self.logger.info("Window überschritten: \(entityId.name) (\(entityId.placeId))")
+
+        let alert = LiveActivityOptions.Alert(title: "Fenster schließen", body: "\(window.room): \(window.name)")
+        await startOrUpdateOpenWindowActivities(with: getWindowStates(), alert: alert)
+    }
+
+    /// The offenen Fenster in Live Activity order: überschritten first, then by Fensterschließzeit,
+    /// window name as tiebreak.
     func getWindowStates() -> [WindowOpenState] {
         windowStateIsOpen.values.sorted { lhs, rhs in
+            let lhsIsOverdue = isOverdue(lhs)
+            let rhsIsOverdue = isOverdue(rhs)
+            if lhsIsOverdue != rhsIsOverdue {
+                return lhsIsOverdue
+            }
             if lhs.closeBy != rhs.closeBy {
                 return lhs.closeBy < rhs.closeBy
             }
@@ -56,7 +78,11 @@ actor WindowManager {
         }
     }
 
-    private func startOrUpdateOpenWindowActivities(with windowStates: [WindowOpenState]) async {
+    private func isOverdue(_ state: WindowOpenState) -> Bool {
+        overdueWindowIds.contains(state.id)
+    }
+
+    private func startOrUpdateOpenWindowActivities(with windowStates: [WindowOpenState], alert: LiveActivityOptions.Alert?) async {
         assert(!windowStates.isEmpty, "Use 'endAllOpenWindowActivities' when no window is opened")
         Self.logger.debug("Start or update open window activity")
 
@@ -66,12 +92,17 @@ actor WindowManager {
                                       room: state.room,
                                       opened: state.opened,
                                       closeBy: state.closeBy,
-                                      isOverdue: false)
+                                      isOverdue: isOverdue(state))
         }
         let contentState = WindowContentState(windows: Array(windows),
                                               openCount: windowStates.count,
-                                              overdueCount: 0)
+                                              overdueCount: windowStates.filter(isOverdue).count)
+        // Stale at the next Fensterschließzeit, so the widget shows "überschritten?" if that update is lost.
+        let staleDate = windowStates.filter { !isOverdue($0) }.map(\.closeBy).min()
+        let options = LiveActivityOptions(alert: alert, staleDate: staleDate, priority: .high)
 
-        await notificationSender.startOrUpdateLiveActivity(contentState: contentState, activityName: WindowContentState.activityTypeName)
+        await notificationSender.startOrUpdateLiveActivity(contentState: contentState,
+                                                           activityName: WindowContentState.activityTypeName,
+                                                           options: options)
     }
 }

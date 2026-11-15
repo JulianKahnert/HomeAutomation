@@ -313,14 +313,8 @@ public final class HomeManager: HomeManagable {
         }
     }
 
-    public func clearWindowNotification(entityId: EntityId) async {
-        do {
-            let id = entityId.windowNotificationId
-            log.debug("Clearing window notification [id: \(id)]")
-            try await notificationSender.clearNotification(id: id)
-        } catch {
-            log.warning("Failed to clear window notification: \(error)")
-        }
+    public func markWindowOverdue(entityId: EntityId) async {
+        await windowManager.markWindowOverdue(entityId: entityId)
     }
 
     public func getWindowStates() async -> [WindowOpenState] {

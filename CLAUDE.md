@@ -33,8 +33,10 @@ xcodebuild -project "FlowKit Adapter.xcodeproj" -scheme "FlowKit Adapter" -sdk i
 ### FlowKitController (iOS App)
 ```bash
 cd Apps/FlowKitController
-xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -sdk iphonesimulator -configuration Debug build
+xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -destination 'generic/platform=iOS Simulator' -configuration Debug -skipPackagePluginValidation -skipMacroValidation build
 ```
+
+Use `-destination`, not `-sdk iphonesimulator`: `-sdk` also builds the OpenAPIGenerator plugin's host tool for the simulator and fails with "_OpenAPIGeneratorCore is only to be used by swift-openapi-generator itself". The two `-skip…Validation` flags trust the plugin and macros non-interactively (CI uses `ci_scripts/ci_post_clone.sh` instead).
 
 ## Local Development with Docker
 

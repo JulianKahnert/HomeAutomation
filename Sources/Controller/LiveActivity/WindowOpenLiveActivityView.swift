@@ -43,6 +43,54 @@ public struct WindowOpenLiveActivityView: View {
     }
 }
 
+/// The most urgent offene Fenster in the Watch Smart Stack (`.small` activity family, 162 × 69 pt):
+/// Raum and countdown, its bar, and "+X weitere offen" (or the window name when it is the only one).
+public struct WindowOpenWatchActivityView: View {
+    let presentation: WindowActivityPresentation
+
+    public init(contentState: WindowAttributes.ContentState) {
+        self.presentation = WindowActivityPresentation(contentState: contentState,
+                                                       rowBudget: WindowActivityPresentation.watchRowBudget)
+    }
+
+    public var body: some View {
+        // Layout from the prototype's Watch surface (design 1c).
+        VStack(alignment: .leading, spacing: 2) {
+            if let window = presentation.rows.first {
+                HStack {
+                    Text(window.room)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    WindowActivityTimeLabel(window: window)
+                        .font(.caption.weight(.semibold))
+                }
+
+                ProgressView(timerInterval: window.opened...window.closeBy, countsDown: false)
+                    .labelsHidden()
+                    .tint(window.isOverdue ? .red : .blue)
+
+                if let moreCount = presentation.moreCount {
+                    Text(moreCount.text)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .foregroundStyle(moreCount.isOverdue ? Color.red : Color.secondary)
+                } else {
+                    Text(window.name)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Label(presentation.header, systemImage: "window.vertical.open")
+                    .font(.caption.weight(.semibold))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+    }
+}
+
 /// One offenes Fenster: Raum over window name, a progress bar towards the Fensterschließzeit,
 /// and the countdown or the red overtime.
 public struct WindowActivityRow: View {
@@ -109,5 +157,22 @@ public struct WindowActivityTimeLabel: View {
                                          isOverdue: false)
     }
     WindowOpenLiveActivityView(contentState: WindowContentState(windows: windows, openCount: windows.count, overdueCount: 0))
+}
+
+#Preview("Watch, 8 offen") {
+    let date = Date()
+    let rooms = ["Küche", "Bad", "Büro", "Flur", "Schlafzimmer", "Wohnzimmer", "Kinderzimmer", "Keller"]
+    let windows = rooms.enumerated().map { index, room in
+        let opened = date.addingTimeInterval(Double(-index) * 60)
+        return WindowContentState.Window(id: "window-\(room)-Fenster",
+                                         name: "Fenster",
+                                         room: room,
+                                         opened: opened,
+                                         closeBy: opened.addingTimeInterval(25 * 60),
+                                         isOverdue: false)
+    }
+    WindowOpenWatchActivityView(contentState: WindowContentState(windows: windows, openCount: windows.count, overdueCount: 0))
+        .frame(width: 162, height: 69)
+        .background(Color(white: 0.15), in: .rect(cornerRadius: 18))
 }
 #endif

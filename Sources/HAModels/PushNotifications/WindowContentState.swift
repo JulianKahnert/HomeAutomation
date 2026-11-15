@@ -30,11 +30,14 @@ public struct WindowContentState: Codable, Hashable, Sendable {
     public let openCount: Int
     /// The number of all überschrittenen Fenster, including those cut off by ``maxWindowCount``.
     public let overdueCount: Int
+    /// The latest stored outdoor temperature reading in °C; `nil` without a reading.
+    public let outdoorTemperature: Double?
 
-    public init(windows: [Window], openCount: Int, overdueCount: Int) {
+    public init(windows: [Window], openCount: Int, overdueCount: Int, outdoorTemperature: Double? = nil) {
         self.windows = windows
         self.openCount = openCount
         self.overdueCount = overdueCount
+        self.outdoorTemperature = outdoorTemperature
     }
 
     /// No offenen Fenster.

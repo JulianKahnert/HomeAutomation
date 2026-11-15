@@ -6,6 +6,7 @@
 import Foundation
 @testable import HAApplicationLayer
 import HAModels
+import Synchronization
 import Testing
 
 @Suite("WindowManager Live Activity updates")
@@ -173,5 +174,126 @@ struct WindowManagerTests {
         let last = try #require(await sender.updates.last)
         #expect(last.contentState.overdueCount == 2)
         #expect(last.options.staleDate == nil)
+    }
+}
+
+@Suite("WindowManager outdoor temperature")
+struct WindowManagerOutdoorTemperatureTests {
+    private static let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private static func contact(_ name: String, in room: String) -> EntityId {
+        EntityId(placeId: room, name: name, characteristicsName: nil, characteristic: .contactSensor)
+    }
+
+    private static func open(_ name: String, in room: String, on manager: WindowManager) async {
+        let entityId = contact(name, in: room)
+        let state = WindowOpenState(entityId: entityId, opened: start, maxOpenDuration: 25 * 60)
+        await manager.setWindowOpenState(entityId: entityId, to: state)
+    }
+
+    @Test("an update carries the latest outdoor temperature reading")
+    func updateCarriesLatestOutdoorTemperature() async throws {
+        let sender = RecordingNotificationSender()
+        let manager = WindowManager(notificationSender: sender, now: { Self.start }, outdoorTemperature: { 7.5 })
+
+        await Self.open("Fenster", in: "Küche", on: manager)
+
+        let state = try #require(await sender.contentStates.last)
+        #expect(state.outdoorTemperature == 7.5)
+    }
+
+    @Test("an update carries no outdoor temperature when no reading exists")
+    func updateCarriesNoOutdoorTemperatureWithoutReading() async throws {
+        let sender = RecordingNotificationSender()
+        let manager = WindowManager(notificationSender: sender, now: { Self.start }, outdoorTemperature: { nil })
+
+        await Self.open("Fenster", in: "Küche", on: manager)
+
+        let state = try #require(await sender.contentStates.last)
+        #expect(state.outdoorTemperature == nil)
+    }
+}
+
+@Suite("WindowManager periodic refresh")
+struct WindowManagerRefreshTests {
+    private static let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private let sender = RecordingNotificationSender()
+    private let sleeper = ManualSleeper()
+    private let temperature = OutdoorTemperatureReading(4)
+    private let manager: WindowManager
+
+    init() {
+        manager = WindowManager(notificationSender: sender,
+                                now: { Self.start },
+                                outdoorTemperature: { [temperature] in temperature.value },
+                                sleep: { [sleeper] duration in try await sleeper.sleep(for: duration) })
+    }
+
+    private static func contact(_ name: String, in room: String) -> EntityId {
+        EntityId(placeId: room, name: name, characteristicsName: nil, characteristic: .contactSensor)
+    }
+
+    private func open(_ name: String, in room: String) async {
+        let entityId = Self.contact(name, in: room)
+        let state = WindowOpenState(entityId: entityId, opened: Self.start, maxOpenDuration: 25 * 60)
+        await manager.setWindowOpenState(entityId: entityId, to: state)
+    }
+
+    private func close(_ name: String, in room: String) async {
+        await manager.setWindowOpenState(entityId: Self.contact(name, in: room), to: nil)
+    }
+
+    @Test("while a window is open, an update with priority 5, no alert and the current outdoor temperature follows every 15 minutes")
+    func refreshRunsEveryFifteenMinutesWhileWindowIsOpen() async throws {
+        await open("Fenster", in: "Küche")
+        #expect(await sleeper.nextSleep() == .seconds(15 * 60))
+
+        temperature.value = 5.5
+        sleeper.wake()
+        #expect(await sleeper.nextSleep() == .seconds(15 * 60))
+
+        temperature.value = nil
+        sleeper.wake()
+        #expect(await sleeper.nextSleep() == .seconds(15 * 60))
+
+        let refreshes = await sender.updates.dropFirst()
+        #expect(refreshes.map(\.options.priority) == [.low, .low])
+        #expect(refreshes.allSatisfy { $0.options.alert == nil })
+        #expect(refreshes.map(\.contentState.outdoorTemperature) == [5.5, nil])
+        #expect(refreshes.allSatisfy { $0.contentState.windows.map(\.room) == ["Küche"] })
+        #expect(refreshes.allSatisfy { $0.options.staleDate == Self.start.addingTimeInterval(25 * 60) })
+    }
+
+    @Test("the refresh stops when the last window closes")
+    func refreshStopsAfterLastWindowCloses() async throws {
+        await open("Fenster", in: "Küche")
+        await open("Tür", in: "Flur")
+        _ = await sleeper.nextSleep()
+
+        await close("Fenster", in: "Küche")
+        #expect(sleeper.pendingCount == 1)
+
+        await close("Tür", in: "Flur")
+        #expect(sleeper.pendingCount == 0)
+        sleeper.wake()
+
+        let events = await sender.events
+        #expect(events.last == .end(activityType: WindowContentState.activityTypeName))
+        #expect(await sender.updates.allSatisfy { $0.options.priority == .high })
+    }
+}
+
+/// The latest stored outdoor temperature reading, changeable while a test runs.
+private final class OutdoorTemperatureReading: Sendable {
+    private let reading: Mutex<Double?>
+
+    init(_ value: Double?) {
+        reading = Mutex(value)
+    }
+
+    var value: Double? {
+        get { reading.withLock { $0 } }
+        set { reading.withLock { $0 = newValue } }
     }
 }

@@ -46,14 +46,17 @@ public final class HomeManager: HomeManagable {
     ///     retries deterministically; the default is a 5s timer.
     ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
     ///     than there are delays.
+    ///   - outdoorTemperature: The latest stored outdoor temperature reading in °C, `nil` without one;
+    ///     shown in the window Live Activity.
     public init(getAdapter: @escaping () async -> (any EntityAdapterable)?,
                 storageRepo: StorageRepository,
                 notificationSender: NotificationSender,
                 location: Location,
                 actionLogManager: ActionLogManager,
                 retryTicks: AsyncStream<Void>? = nil,
-                persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)]) {
-        self.windowManager = WindowManager(notificationSender: notificationSender)
+                persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
+                outdoorTemperature: @escaping @Sendable () async -> Double? = { nil }) {
+        self.windowManager = WindowManager(notificationSender: notificationSender, outdoorTemperature: outdoorTemperature)
         self.actionLogManager = actionLogManager
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo

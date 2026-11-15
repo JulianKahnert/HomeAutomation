@@ -346,7 +346,7 @@ extension Components.Schemas.EntityHistoryItem {
                   isHeaterActive: item.isHeaterActive,
                   temperatureInC: item.temperatureInC?.value,
                   targetTemperatureInC: item.targetTemperatureInC,
-                  heatingMode: item.heatingMode,
+                  heatingMode: item.heatingMode.flatMap { .init(rawValue: $0.name) },
                   valvePositionPercent: item.valvePositionPercent,
                   relativeHumidity: item.relativeHumidity,
                   carbonDioxideSensorId: item.carbonDioxideSensorId,

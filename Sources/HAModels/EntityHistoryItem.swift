@@ -30,8 +30,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     public let airQuality: Int?
     public let valveOpen: Bool?
     public let targetTemperatureInC: Double?
-    /// HomeKit raw value: 0 off, 1 heat, 2 cool, 3 auto
-    public let heatingMode: Int?
+    public let heatingMode: HeatingMode?
     public let valvePositionPercent: Int?
 
     public init(
@@ -56,7 +55,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         airQuality: Int? = nil,
         valveOpen: Bool? = nil,
         targetTemperatureInC: Double? = nil,
-        heatingMode: Int? = nil,
+        heatingMode: HeatingMode? = nil,
         valvePositionPercent: Int? = nil
     ) {
         self.id = id
@@ -165,7 +164,7 @@ extension EntityHistoryItem {
             return "Target \(String(format: "%.1f", targetTemperatureInC))°C"
         }
         if let heatingMode {
-            return "Mode \(heatingMode)"
+            return "Mode \(heatingMode.name)"
         }
         // Color as hue
         if let colorRed, let colorGreen, let colorBlue {

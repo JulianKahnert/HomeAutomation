@@ -75,8 +75,8 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// Thermostat target temperature in Celsius
     public let targetTemperatureInC: Double?
 
-    /// Thermostat target mode as HomeKit raw value: 0 off, 1 heat, 2 cool, 3 auto
-    public let heatingMode: Int?
+    /// Thermostat target mode
+    public let heatingMode: HeatingMode?
 
     /// Valve opening in percent (0-100), Eve custom characteristic
     public let valvePositionPercent: Int?
@@ -112,7 +112,7 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         airQuality: Int? = nil,
         valveOpen: Bool? = nil,
         targetTemperatureInC: Double? = nil,
-        heatingMode: Int? = nil,
+        heatingMode: HeatingMode? = nil,
         valvePositionPercent: Int? = nil
     ) {
         self.entityId = entityId

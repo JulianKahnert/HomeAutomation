@@ -188,6 +188,16 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
         }
     }
 
+    /// An unknown raw value (a future HAP mode) becomes `nil` instead of failing the whole row.
+    private static func heatingMode(of item: EntityStorageDbItem) -> HeatingMode? {
+        guard let raw = item.heatingMode else { return nil }
+        guard let mode = HeatingMode(rawValue: raw) else {
+            Logger(label: "EntityStorageDbRepository").warning("Unknown heatingMode \(raw) in entityItems, read as nil")
+            return nil
+        }
+        return mode
+    }
+
     static func mapDbItem(_ item: EntityStorageDbItem) -> EntityStorageItem {
         var illuminance: Measurement<UnitIlluminance>?
         if let illuminanceInLux = item.illuminanceInLux {
@@ -227,7 +237,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                  airQuality: item.airQuality,
                                  valveOpen: item.valveOpen,
                                  targetTemperatureInC: item.targetTemperatureInC,
-                                 heatingMode: item.heatingMode,
+                                 heatingMode: heatingMode(of: item),
                                  valvePositionPercent: item.valvePositionPercent)
     }
 
@@ -256,7 +266,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                    airQuality: item.airQuality,
                                    valveOpen: item.valveOpen,
                                    targetTemperatureInC: item.targetTemperatureInC,
-                                   heatingMode: item.heatingMode,
+                                   heatingMode: item.heatingMode?.rawValue,
                                    valvePositionPercent: item.valvePositionPercent)
     }
 }

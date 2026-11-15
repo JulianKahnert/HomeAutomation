@@ -367,7 +367,7 @@ extension HMCharacteristic: @retroactive Comparable {
         return target
     }
 
-    private func getHeatingMode() async throws -> Int? {
+    private func getHeatingMode() async throws -> HeatingMode? {
         guard characteristicType == HMCharacteristicTypeTargetHeatingCooling,
               service?.serviceType == HMServiceTypeThermostat else { return nil }
 
@@ -377,7 +377,11 @@ extension HMCharacteristic: @retroactive Comparable {
             assertionFailure("TargetHeatingCooling characteristic value is not a number - value: \(String(describing: value))")
             return nil
         }
-        return mode
+        guard let heatingMode = HeatingMode(rawValue: mode) else {
+            homeKitLogger.warning("Unknown TargetHeatingCooling value \(mode), stored as nil")
+            return nil
+        }
+        return heatingMode
     }
 
     /// Eve custom characteristic, matched by UUID because HomeKit reports it as "Custom".

@@ -640,8 +640,9 @@ components:
           type: number
           description: Thermostat target temperature in Celsius (characteristic type `targetTemperature`).
         heatingMode:
-          type: integer
-          description: Thermostat target mode, HomeKit raw value 0 off, 1 heat, 2 cool, 3 auto (characteristic type `heatingMode`).
+          type: string
+          enum: ["off", "heat", "cool", "auto"]
+          description: Thermostat target mode, HomeKit TargetHeatingCoolingState (characteristic type `heatingMode`).
         valvePositionPercent:
           type: integer
           description: Valve opening in percent, 0 to 100 (characteristic type `valvePosition`, Eve custom characteristic).

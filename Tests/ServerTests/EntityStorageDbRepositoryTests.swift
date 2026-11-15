@@ -271,7 +271,7 @@ final class EntityStorageDbRepositoryTests: XCTestCase {
             airQuality: 2,
             valveOpen: true,
             targetTemperatureInC: 19.5,
-            heatingMode: 1,
+            heatingMode: .heat,
             valvePositionPercent: 42
         )
     }

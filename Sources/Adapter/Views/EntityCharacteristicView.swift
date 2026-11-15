@@ -111,7 +111,7 @@ struct EntityCharacteristicView: View {
         case .heatingMode:
             if let mode = item.heatingMode {
                 Spacer()
-                Label("mode \(mode)", systemImage: "thermostat")
+                Label("mode \(mode.name)", systemImage: "thermostat")
             }
         case .valvePosition:
             if let percent = item.valvePositionPercent {

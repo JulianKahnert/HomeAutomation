@@ -84,7 +84,7 @@ extension EntityHistoryItem {
             return Double(valvePositionPercent)
         }
         if let heatingMode {
-            return Double(heatingMode)
+            return Double(heatingMode.rawValue)
         }
         // Boolean sensors (lower priority)
         if let isDeviceOn {

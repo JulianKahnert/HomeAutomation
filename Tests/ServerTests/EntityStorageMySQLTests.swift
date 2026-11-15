@@ -44,15 +44,27 @@ final class EntityStorageMySQLTests: XCTestCase {
     func testHeatingFieldsRoundTripThroughTinyIntColumns() async throws {
         let repository = app.entityStorageDbRepository
         let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .valvePosition)
-        for (offset, values) in [(0, (0, 0)), (1, (3, 100)), (2, (nil, nil))] as [(Int, (Int?, Int?))] {
+        for (offset, values) in [(0, (.off, 0)), (1, (.auto, 100)), (2, (nil, nil))] as [(Int, (HeatingMode?, Int?))] {
             try await repository.add(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: Double(1_000 + offset)),
                                                        heatingMode: values.0, valvePositionPercent: values.1))
         }
 
         let items = try await repository.getHistory(for: id, startDate: nil, endDate: nil, cursor: nil, limit: 10)
 
-        XCTAssertEqual(items.map(\.heatingMode), [nil, 3, 0])
+        XCTAssertEqual(items.map(\.heatingMode), [nil, .auto, .off])
         XCTAssertEqual(items.map(\.valvePositionPercent), [nil, 100, 0])
+    }
+
+    func testUnknownHeatingModeIsReadAsNil() async throws {
+        let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .heatingMode)
+        try await EntityStorageDbItem(timestamp: Date(timeIntervalSince1970: 1_000), entityPlaceId: id.placeId, entityServiceName: id.name,
+                                      entityCharacteristicType: id.characteristicType.rawValue, heatingMode: 9)
+            .save(on: app.db)
+
+        let item = try await app.entityStorageDbRepository.getCurrent(id)
+
+        XCTAssertNotNil(item)
+        XCTAssertNil(item?.heatingMode)
     }
 
     func testColumnsAreNarrowIntegers() async throws {

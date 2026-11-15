@@ -28,7 +28,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
 
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async
-    func deleteStorageEntries(olderThan date: Date) async throws
     func getLocation() async -> Location
     func sendNotification(title: String, message: String, id: String) async
     func clearWindowNotification(entityId: EntityId) async

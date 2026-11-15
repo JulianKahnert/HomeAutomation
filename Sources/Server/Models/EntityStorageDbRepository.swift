@@ -70,12 +70,6 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
         try await dbItem.save(on: database())
     }
 
-    func deleteEntries(olderThan date: Date) async throws {
-        try await EntityStorageDbItem.query(on: database())
-            .filter(\.$timestamp < date)
-            .delete()
-    }
-
     /// Whether `item` moved out of its type's write dead band (`StoragePolicy`) around the last
     /// stored row. Types without a dead band cost no extra query.
     private func passesDeadBand(_ item: EntityStorageDbItem, of entityId: EntityId) async throws -> Bool {

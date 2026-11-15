@@ -27,10 +27,6 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
         items.append(item)
     }
 
-    func deleteEntries(olderThan date: Date) async throws {
-        fatalError()
-    }
-
     func getHistory(
         for entityId: EntityId,
         startDate: Date?,

@@ -275,7 +275,10 @@ public func configure(_ app: Application) async throws {
                                automationService: automationService,
                                homeManager: app.homeManager),
         OutdoorTemperatureJob(location: location, snapshots: WeatherSnapshotDbRepository(database: { app.db })),
-        DatabaseCleanupJob(homeManager: app.homeManager, automationRuns: app.automationRunRepository)
+        DatabaseCleanupJob(entities: app.entityStorageDbRepository,
+                           automationRuns: app.automationRunRepository,
+                           noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
+        EntityRollupJob(entities: app.entityStorageDbRepository)
     ]
 
     Task.detached {

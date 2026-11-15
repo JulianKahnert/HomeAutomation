@@ -19,7 +19,10 @@ struct SettingsView: View {
     @State private var port = 8080
     @State private var useTLS = false
     @State private var token = ""
+    /// Draft of `storedDebugLogging`, written on Save like the other settings.
     @State private var isDebugLoggingEnabled = false
+    /// The app reads this key once at launch (`DebugLogging`), so it lives in `UserDefaults`, not the keychain.
+    @AppStorage(DebugLogging.key) private var storedDebugLogging = false
 
     var newServerAddress: ServerAddress {
         ServerAddress(host: host, port: port, useTLS: useTLS)
@@ -56,7 +59,7 @@ struct SettingsView: View {
             port = serverAddress.port
             useTLS = serverAddress.useTLS
             token = credentials?.authToken ?? ""
-            isDebugLoggingEnabled = UserDefaults.standard.bool(forKey: DebugLogging.key)
+            isDebugLoggingEnabled = storedDebugLogging
         }
         .navigationTitle("Settings")
         .toolbar {
@@ -64,7 +67,7 @@ struct SettingsView: View {
                 Button("Save") {
                     serverAddress = newServerAddress
                     credentials?.update(authToken: token)
-                    UserDefaults.standard.set(isDebugLoggingEnabled, forKey: DebugLogging.key)
+                    storedDebugLogging = isDebugLoggingEnabled
                     dismiss()
                 }
             }

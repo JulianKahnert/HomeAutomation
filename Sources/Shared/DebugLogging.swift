@@ -9,17 +9,19 @@ import Logging
 /// The `HA_DEBUG_LOGGING` switch that turns on debug logs in the server and the adapter, off by default.
 ///
 /// The environment variable wins, so it can also switch the logs off. The adapter is a sandboxed GUI app
-/// where environment variables are awkward, so it also reads the key from `UserDefaults`
-/// (`defaults write de.juliankahnert.HomeKitAdapterApp HA_DEBUG_LOGGING -bool YES`).
+/// where environment variables are awkward, so it passes its stored setting as `userSetting`: the same
+/// `key` in its `UserDefaults`, written by the settings toggle or
+/// `defaults write de.juliankahnert.HomeKitAdapterApp HA_DEBUG_LOGGING -bool YES`.
 public enum DebugLogging {
+    /// Environment variable and `UserDefaults` key.
     public static let key = "HA_DEBUG_LOGGING"
 
     public static func isEnabled(environment: [String: String] = ProcessInfo.processInfo.environment,
-                                 defaults: UserDefaults? = nil) -> Bool {
+                                 userSetting: Bool = false) -> Bool {
         if let value = environment[key] {
             return ["1", "true", "yes", "on"].contains(value.trimmingCharacters(in: .whitespaces).lowercased())
         }
-        return defaults?.bool(forKey: key) ?? false
+        return userSetting
     }
 
     /// `level` lowered to `debug` when the switch is on; a more verbose `level` (`trace`) stays.

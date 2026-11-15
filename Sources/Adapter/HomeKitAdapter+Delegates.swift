@@ -130,10 +130,17 @@ extension HomeKitAdapter {
                 accessory.delegate = self
 
                 let shouldSubscribe = characteristic.shouldSubscribe
+                let entityType = characteristic.entityCharacteristicType
+                let isDropped = characteristic.entityId == nil
+                // Most dropped characteristics are expected (firmware version, name, ...); a thermostat's
+                // are not, because their history silently stays empty.
+                let isUnexpectedDrop = isDropped
+                    && (HeatingControlCharacteristic.isHeatingService(characteristic.service?.serviceType) || entityType != nil)
                 // The type UUIDs identify characteristics HomeKit only calls "Custom", e.g. Eve's valve position.
-                log.info("Characteristic found", metadata: characteristic.logMetadata.merging([
-                    "entityType": "\(characteristic.entityCharacteristicType.map { "\($0)" } ?? "nil")",
-                    "shouldSubscribe": "\(shouldSubscribe)"
+                log.log(level: isUnexpectedDrop ? .notice : .info, "Characteristic found", metadata: characteristic.logMetadata.merging([
+                    "entityType": "\(entityType.map { "\($0)" } ?? "nil")",
+                    "shouldSubscribe": "\(shouldSubscribe)",
+                    "dropped": "\(isDropped)"
                 ]) { _, new in new })
 
                 do {

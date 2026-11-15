@@ -19,19 +19,15 @@ struct DebugLoggingTests {
 
     @Test("Off by default")
     func offByDefault() {
-        #expect(!DebugLogging.isEnabled(environment: [:], defaults: nil))
+        #expect(!DebugLogging.isEnabled(environment: [:]))
     }
 
-    @Test("UserDefaults switch it when the environment does not, the environment wins")
-    func userDefaults() throws {
-        let suiteName = "DebugLoggingTests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        #expect(!DebugLogging.isEnabled(environment: [:], defaults: defaults))
-        defaults.set(true, forKey: DebugLogging.key)
-        #expect(DebugLogging.isEnabled(environment: [:], defaults: defaults))
-        #expect(!DebugLogging.isEnabled(environment: [DebugLogging.key: "0"], defaults: defaults))
+    @Test("The user setting switches it when the environment does not, the environment wins")
+    func userSetting() {
+        #expect(!DebugLogging.isEnabled(environment: [:], userSetting: false))
+        #expect(DebugLogging.isEnabled(environment: [:], userSetting: true))
+        #expect(!DebugLogging.isEnabled(environment: [DebugLogging.key: "0"], userSetting: true))
+        #expect(DebugLogging.isEnabled(environment: [DebugLogging.key: "1"], userSetting: false))
     }
 
     @Test("The switch lowers the level to debug and keeps trace", arguments: [

@@ -9,12 +9,8 @@
 import HAModels
 import HomeKit
 import Logging
-import Synchronization
 
 let homeKitLogger = Logger(label: "HomeKitExtensions")
-
-/// Characteristics already logged as dropped, so each one is logged once per launch and not on every refresh.
-private let droppedCharacteristicIds = Mutex<Set<UUID>>([])
 
 extension HMCharacteristic: @retroactive Comparable {
     public static func < (lhs: HMCharacteristic, rhs: HMCharacteristic) -> Bool {
@@ -45,7 +41,8 @@ extension HMCharacteristic: @retroactive Comparable {
         let timestamp = Date() // since we have no better date when this changed, so we use this date here
 
         guard let entityId else {
-            logDroppedOnce()
+            // Classified once per setup in the `Characteristic found` log; this runs on every refresh.
+            homeKitLogger.debug("Skipped characteristic without entity id", metadata: logMetadata)
             return nil
         }
         guard isReadable else {
@@ -122,16 +119,6 @@ extension HMCharacteristic: @retroactive Comparable {
             "characteristicType": "\(characteristicType)",
             "characteristicId": "\(uniqueIdentifier.uuidString)"
         ]
-    }
-
-    /// Logs once per characteristic that it has no entity id and is never sent to the server.
-    private func logDroppedOnce() {
-        let isFirstDrop = droppedCharacteristicIds.withLock { $0.insert(uniqueIdentifier).inserted }
-        guard isFirstDrop else { return }
-        // Most dropped characteristics are expected (firmware version, name, ...); a thermostat's
-        // are not, because their history silently stays empty.
-        let isUnexpected = HeatingControlCharacteristic.isHeatingService(service?.serviceType) || entityCharacteristicType != nil
-        homeKitLogger.log(level: isUnexpected ? .notice : .debug, "Dropped characteristic without entity id", metadata: logMetadata)
     }
 
     private func hasMotion() async throws -> Bool? {

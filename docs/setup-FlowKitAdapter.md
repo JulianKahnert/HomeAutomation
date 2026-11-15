@@ -73,8 +73,9 @@ The setting is read at launch, so restart the app after changing it.
 
 At every entity refresh the adapter logs each characteristic once (`Characteristic found`) with its service and
 characteristic type UUIDs (`serviceType`, `characteristicType`) and the stored entity type. Use it to identify
-characteristics HomeKit only calls "Custom". A characteristic of a thermostat that has no entity, and so never
-reaches the server, is logged once per launch as `Dropped characteristic without entity id` (notice).
+characteristics HomeKit only calls "Custom". `dropped: true` marks a characteristic without an entity id, which never
+reaches the server. Most are expected (firmware version, name, ...) and stay at `info`; one of a thermostat or one with a
+known entity type is logged at `notice`, because its history silently stays empty.
 
 
 ```

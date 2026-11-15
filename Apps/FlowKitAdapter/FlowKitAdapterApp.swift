@@ -23,8 +23,9 @@ enum FlowKitApp {
 
         // we use this workaround to initialize the logging system before anything else is constructed
         // Debug logs only with `HA_DEBUG_LOGGING` (environment, `defaults write` or the settings toggle),
-        // read once here, so a change needs an app restart.
-        let isDebugLoggingEnabled = DebugLogging.isEnabled(defaults: .standard)
+        // read once here, so a change needs an app restart. Outside any view, so no `@AppStorage`;
+        // `SettingsView` writes the same key.
+        let isDebugLoggingEnabled = DebugLogging.isEnabled(userSetting: UserDefaults.standard.bool(forKey: DebugLogging.key))
         initLogging(withFileLogging: true, logLevel: DebugLogging.level(.info, enabled: isDebugLoggingEnabled))
 
         logStartupProvenance()

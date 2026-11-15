@@ -28,18 +28,32 @@ public struct WindowOpenLiveActivityView: View {
             }
             .font(.caption.weight(.semibold))
 
-            ForEach(presentation.rows) { window in
-                WindowActivityRow(window: window)
-            }
-
-            if let more = presentation.more {
-                Text(more.text)
-                    .font(.caption)
-                    .lineLimit(1)
-                    .foregroundStyle(more.isOverdue ? Color.red : Color.secondary)
-            }
+            WindowActivityList(presentation: presentation)
         }
         .padding(14)
+    }
+}
+
+/// The rows and the "+X weitere" line of a ``WindowActivityPresentation``, without a header.
+/// Shared by the Lock Screen and the bottom region of the expanded Dynamic Island.
+public struct WindowActivityList: View {
+    let presentation: WindowActivityPresentation
+
+    public init(presentation: WindowActivityPresentation) {
+        self.presentation = presentation
+    }
+
+    public var body: some View {
+        ForEach(presentation.rows) { window in
+            WindowActivityRow(window: window)
+        }
+
+        if let more = presentation.more {
+            Text(more.text)
+                .font(.caption)
+                .lineLimit(1)
+                .foregroundStyle(more.isOverdue ? Color.red : Color.secondary)
+        }
     }
 }
 

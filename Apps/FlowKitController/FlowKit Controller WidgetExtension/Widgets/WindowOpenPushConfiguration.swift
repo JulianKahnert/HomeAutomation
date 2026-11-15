@@ -21,21 +21,25 @@ struct WindowOpenPushConfiguration: Widget {
         } dynamicIsland: { context in
             let presentation = WindowActivityPresentation(contentState: context.state,
                                                           rowBudget: WindowActivityPresentation.expandedRowBudget)
-            // Create the presentations that appear in the Dynamic Island.
+            // Design 1c: leading, trailing and bottom only; the centre region sits over the camera.
             return DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    WindowIslandExpandedLeading(presentation: presentation)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    WindowIslandExpandedTrailing(presentation: presentation)
+                }
                 DynamicIslandExpandedRegion(.bottom) {
-                    WindowOpenLiveActivityView(contentState: context.state,
-                                               rowBudget: WindowActivityPresentation.expandedRowBudget)
+                    WindowIslandExpandedBottom(presentation: presentation)
                 }
             } compactLeading: {
-                Label("\(context.state.openCount)", systemImage: "window.vertical.open")
-                    .foregroundStyle(presentation.isAnyOverdue ? Color.red : Color.primary)
+                WindowIslandCountBadge(contentState: context.state, presentation: presentation)
             } compactTrailing: {
-                EmptyView()
+                WindowIslandCompactTrailing(presentation: presentation)
             } minimal: {
-                Label("\(context.state.openCount)", systemImage: "window.vertical.open")
-                    .foregroundStyle(presentation.isAnyOverdue ? Color.red : Color.primary)
+                WindowIslandCountBadge(contentState: context.state, presentation: presentation)
             }
+            .keylineTint(presentation.isAnyOverdue ? Color.red : nil)
         }
     }
 }

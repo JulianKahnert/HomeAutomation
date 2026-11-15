@@ -23,8 +23,15 @@ public struct WindowActivityPresentation: Equatable, Sendable {
 
     /// "<n> offen · <m> überschritten"
     public let header: String
+    /// "<n> offen", leading in the expanded Dynamic Island.
+    public let openSummary: String
+    /// The number of überschrittenen Fenster beside the warning symbol, trailing in the expanded
+    /// Dynamic Island; `nil` when no window is überschritten.
+    public let overdueBadge: Int?
     /// The windows that get a row, in server order.
     public let rows: [WindowContentState.Window]
+    /// The first window in server order, whose countdown or overtime the compact Dynamic Island shows.
+    public let mostUrgent: WindowContentState.Window?
     /// `nil` when every offene Fenster has a row.
     public let more: More?
     /// Tints the compact and minimal presentations.
@@ -36,7 +43,10 @@ public struct WindowActivityPresentation: Equatable, Sendable {
         let hiddenCount = contentState.openCount - rows.count
 
         header = "\(contentState.openCount) offen · \(contentState.overdueCount) überschritten"
+        openSummary = "\(contentState.openCount) offen"
+        overdueBadge = contentState.overdueCount > 0 ? contentState.overdueCount : nil
         self.rows = rows
+        mostUrgent = contentState.windows.first
         isAnyOverdue = contentState.overdueCount > 0
 
         if hiddenCount > 0 {

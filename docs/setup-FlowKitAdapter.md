@@ -61,6 +61,22 @@ You might want to use [iOS: Guided Access](https://support.apple.com/en-us/11179
 
 ## Logging
 
+The adapter writes one JSON object per line to daily files in
+`~/Library/Containers/de.juliankahnert.HomeKitAdapterApp/Data/Documents/logs/` (on macOS) and to the unified log.
+It logs at `info`; debug logs (e.g. every thermostat value update and read) are off by default. Turn them on with any of:
+
+* the **Debug Logs** toggle in the settings screen,
+* `defaults write de.juliankahnert.HomeKitAdapterApp HA_DEBUG_LOGGING -bool YES` (macOS; `-bool NO` or `defaults delete de.juliankahnert.HomeKitAdapterApp HA_DEBUG_LOGGING` turns them off),
+* the environment variable `HA_DEBUG_LOGGING=1`, which also overrides the other two (`HA_DEBUG_LOGGING=0` forces them off).
+
+The setting is read at launch, so restart the app after changing it.
+
+At every entity refresh the adapter logs each characteristic once (`Characteristic found`) with its service and
+characteristic type UUIDs (`serviceType`, `characteristicType`) and the stored entity type. Use it to identify
+characteristics HomeKit only calls "Custom". A characteristic of a thermostat that has no entity, and so never
+reaches the server, is logged once per launch as `Dropped characteristic without entity id` (notice).
+
+
 ```
 log stream --process "HomeAutomation" --level info --predicate 'subsystem == "SmartHomeAutomation"' > testing.log
 

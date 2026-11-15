@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var port = 8080
     @State private var useTLS = false
     @State private var token = ""
+    @State private var isDebugLoggingEnabled = false
 
     var newServerAddress: ServerAddress {
         ServerAddress(host: host, port: port, useTLS: useTLS)
@@ -42,12 +43,20 @@ struct SettingsView: View {
             } footer: {
                 Text("Bearer token used when connecting to the server. Stored in the keychain. Leave empty if authentication is disabled.")
             }
+            Section {
+                Toggle("Debug Logs", isOn: $isDebugLoggingEnabled)
+            } header: {
+                Text("Logging")
+            } footer: {
+                Text("Writes debug logs, e.g. every thermostat value. Takes effect after restarting the app. The environment variable \(DebugLogging.key) overrides this setting.")
+            }
         }
         .onAppear {
             host = serverAddress.host
             port = serverAddress.port
             useTLS = serverAddress.useTLS
             token = credentials?.authToken ?? ""
+            isDebugLoggingEnabled = UserDefaults.standard.bool(forKey: DebugLogging.key)
         }
         .navigationTitle("Settings")
         .toolbar {
@@ -55,6 +64,7 @@ struct SettingsView: View {
                 Button("Save") {
                     serverAddress = newServerAddress
                     credentials?.update(authToken: token)
+                    UserDefaults.standard.set(isDebugLoggingEnabled, forKey: DebugLogging.key)
                     dismiss()
                 }
             }

@@ -41,6 +41,11 @@ extension HomeKitAdapter {
         /// `NotificationResubscription`.
         private let resubscribeRequests = ResubscribeRequests()
 
+        #if canImport(Matter)
+        /// Eve Thermos paired over Matter report their valve position only there, see `EveMatterValvePoller`.
+        private let eveMatterValvePoller = EveMatterValvePoller()
+        #endif
+
         init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
             self.entityStream = entityStream
             self.entityStreamContinuation = entityStreamContinuation
@@ -53,6 +58,9 @@ extension HomeKitAdapter {
             manager.delegate = self
 
             startManagerResets()
+            #if canImport(Matter)
+            startEveMatterValvePolling()
+            #endif
         }
 
         func getHomes() async -> [HMHome] {
@@ -99,6 +107,9 @@ extension HomeKitAdapter {
         /// Request a full entity refresh without waiting for the debounce delay — a reconnect resync
         /// must not be deferred or coalesced away — but still serialized against a running refresh.
         func updateEntitiesNow() async {
+            #if canImport(Matter)
+            await eveMatterValvePoller.resendOnNextPoll()
+            #endif
             await entityUpdateDebouncer.runNow()
         }
 
@@ -230,6 +241,28 @@ extension HomeKitAdapter {
                 }
             }
         }
+
+        #if canImport(Matter)
+        private func startEveMatterValvePolling() {
+            Task { [weak self] in
+                while true {
+                    guard await self?.pollEveMatterValves() != nil else { return }
+                    do {
+                        try await Task.sleep(for: EveMatterValvePoller.pollInterval)
+                    } catch {
+                        return
+                    }
+                }
+            }
+        }
+
+        private func pollEveMatterValves() async {
+            let homes = await homesPublisher.get()
+            for item in await eveMatterValvePoller.poll(homes: homes) {
+                entityStreamContinuation.yield(item)
+            }
+        }
+        #endif
 
         @MainActor
         private func resetManager() {

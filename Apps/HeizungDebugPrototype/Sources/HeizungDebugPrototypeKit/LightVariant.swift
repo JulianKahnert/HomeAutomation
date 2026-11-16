@@ -130,6 +130,9 @@ enum GStyle {
     static let gapOpacity = (cold: 0.18, ok: 0.12, warm: 0.2)
     static let areaOpacity = 0.08
     static let soft = Color.secondary.opacity(0.12)
+    /// Ist line: opaque grey at about 65 % of primary, so it stays crisp over the gap fill
+    /// without the hardness of black (light) or white (dark).
+    static let istLine = FAdaptive(light: Color(white: 0.38), dark: Color(white: 0.68))
 }
 
 // MARK: - Overview
@@ -530,18 +533,19 @@ struct GSollIstChart: View {
             ForEach(samples, id: \.date) { sample in
                 LineMark(x: .value("Zeit", sample.date), y: .value("°C", sample.sollPlan), series: .value("Serie", "Soll"))
                     .interpolationMethod(.stepEnd)
-                    .foregroundStyle(Color.secondary.opacity(0.8))
-                    .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
+                    .foregroundStyle(Color.secondary.opacity(0.55))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
             }
             ForEach(samples.filter { $0.ist != nil }, id: \.date) { sample in
                 LineMark(x: .value("Zeit", sample.date), y: .value("°C", sample.ist!), series: .value("Serie", "Ist"))
-                    .foregroundStyle(Color.primary)
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(GStyle.istLine)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
             if let selectedSlot {
                 ForEach(selectedSlot.events) { pin in
                     RuleMark(x: .value("Zeit", pin.pinX))
-                        .foregroundStyle(Color.secondary.opacity(0.5))
+                        .foregroundStyle(Color.secondary.opacity(0.4))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
                 }
             }
@@ -555,11 +559,11 @@ struct GSollIstChart: View {
             if let crosshair {
                 let sample = room.sample(at: crosshair)
                 RuleMark(x: .value("Zeit", crosshair))
-                    .foregroundStyle(Color.secondary.opacity(0.6))
+                    .foregroundStyle(Color.secondary.opacity(0.45))
                     .lineStyle(StrokeStyle(lineWidth: 1))
                 if let ist = sample.ist {
                     PointMark(x: .value("Zeit", sample.date), y: .value("°C", ist))
-                        .foregroundStyle(Color.primary)
+                        .foregroundStyle(GStyle.istLine)
                         .symbolSize(40)
                 }
             }
@@ -732,7 +736,7 @@ struct GValveChart: View {
                 }
                 if let crosshair {
                     RuleMark(x: .value("Zeit", crosshair))
-                        .foregroundStyle(Color.secondary.opacity(0.6))
+                        .foregroundStyle(Color.secondary.opacity(0.45))
                         .lineStyle(StrokeStyle(lineWidth: 1))
                 }
             }

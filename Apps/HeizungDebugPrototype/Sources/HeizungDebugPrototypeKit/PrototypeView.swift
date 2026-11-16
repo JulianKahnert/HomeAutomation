@@ -22,6 +22,11 @@ public struct PrototypeView: View {
                 DiagnosisVariant(radiatorID: "bad-1")
             case .skizzeV3:
                 SkizzeV3Variant()
+            case .final:
+                // The live window decides the layout by width, like a size class would.
+                GeometryReader { geo in
+                    FinalVariant(layout: geo.size.width >= 700 ? .regular : .compact)
+                }
             }
         }
         .environment(\.locale, Fmt.de)

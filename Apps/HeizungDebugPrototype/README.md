@@ -34,6 +34,13 @@ the variant is chosen.
     Küche "Fenster Links" open, Bad OG valve stuck at 0 %, Arbeitszimmer changed by hand at the
     device, Esszimmer on the fireplace list with "Kamin an", Kaminzimmer thermo silent since
     10.11. (as in reality).
+  - **F Final** (default in the live window): the binding design of ticket 17 on top of E.
+    iPhone one column (detail opens below the bars), Mac/iPad two columns (bars and heatmap
+    left, detail right, "Raum wählen" placeholder); Δ against the Plan-Soll; Ist source per
+    room (room sensor or thermostat mean); blue/grey/orange for Δ in bars, heatmap and gap;
+    SF Symbol pins; heatmap room × 7 days × 4 segments, tap/hover shows the value only;
+    valve line per radiator; empty states (server unreachable, no rooms, no data). Snapshots
+    `F_<iphone|mac>_<hell|dunkel>_<state>`; the live window switches layout at 700 pt width.
 - **Better means:** the question is answered without reading a chart in the common case, and the
   chart is there when the answer is not obvious (valve stuck).
 - **Platform:** iOS decides (Controller); judged here at phone width (430 pt) on macOS.
@@ -45,7 +52,7 @@ the variant is chosen.
 ## Run
 
 - `swift run HeizungDebugPrototype`: live macOS window; switch candidates via the **Variants**
-  menu (⌘1…⌘5). The radiator picker inside A and D switches scenarios.
+  menu (⌘1…⌘6). The radiator picker inside A and D switches scenarios.
 - Snapshots: jk:prototyper's `verify-snapshots.sh Apps/HeizungDebugPrototype` renders every
   `#Preview` to `snapshots/`. Needs the GUI session (from SSH it renders nothing).
 - iOS: open `Package.swift` in Xcode and use Previews on the Kit target.

@@ -51,7 +51,7 @@ Before committing changes that affect iOS apps:
    cd Apps/FlowKitAdapter && xcodebuild -project "FlowKit Adapter.xcodeproj" -scheme "FlowKit Adapter" -sdk iphonesimulator -configuration Debug build
 
    # For FlowKitController changes
-   cd Apps/FlowKitController && xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -sdk iphonesimulator -configuration Debug build
+   cd Apps/FlowKitController && xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -destination 'generic/platform=iOS Simulator' -configuration Debug -skipPackagePluginValidation -skipMacroValidation build
    ```
 
 4. Ensure all builds pass before committing

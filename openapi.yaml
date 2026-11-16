@@ -172,11 +172,14 @@ paths:
   /windowstates:
     get:
       summary: Get window states
-      description: Retrieve the current states of all windows.
+      description: >-
+        Retrieve the open windows as the window Live Activity shows them: überschritten windows first,
+        then by the time they have to be closed (Fensterschließzeit), window name as tiebreak. The list
+        is capped at 20 windows; the counts and the stale date cover all open windows.
       operationId: getWindowStates
       responses:
         "200":
-          description: A success response with all window states.
+          description: A success response with the open windows.
           content:
             application/json:
               schema:
@@ -184,10 +187,26 @@ paths:
                 properties:
                   windowStates:
                     type: array
+                    description: At most 20 open windows, in the order described above.
                     items:
                       $ref: "#/components/schemas/WindowState"
+                  openCount:
+                    type: integer
+                    description: The number of all open windows, including those cut off by the cap.
+                  overdueCount:
+                    type: integer
+                    description: The number of all überschritten windows, including those cut off by the cap.
+                  outdoorTemperature:
+                    type: number
+                    format: double
+                    description: The latest stored outdoor temperature reading in °C; missing without a reading.
+                  staleDateIsoTimeStamp:
+                    type: string
+                    description: The earliest Fensterschließzeit among all windows not yet überschritten; missing when every window is überschritten.
                 required:
                   - windowStates
+                  - openCount
+                  - overdueCount
 
   /actions:
     get:
@@ -480,19 +499,31 @@ components:
     WindowState:
       type: object
       properties:
+        id:
+          type: string
+          description: Stable identifier of the window, derived from its entity.
         name:
           type: string
-          description: The name of the window.
+          description: The name of the window, without the room.
+        room:
+          type: string
+          description: The room the window is in.
         openedIsoTimeStamp:
           type: string
           description: The ISO timestamp when the window was opened.
-        maxOpenDuration:
-          type: number
-          description: The maximum duration the window can remain open.
+        closeByIsoTimeStamp:
+          type: string
+          description: The ISO timestamp by which the window has to be closed (Fensterschließzeit).
+        isOverdue:
+          type: boolean
+          description: Set by the server once the window's Fensterschließzeit has passed (überschritten).
       required:
+        - id
         - name
+        - room
         - openedIsoTimeStamp
-        - maxOpenDuration
+        - closeByIsoTimeStamp
+        - isOverdue
 
     ActionLogItem:
       type: object

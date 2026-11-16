@@ -33,8 +33,10 @@ xcodebuild -project "FlowKit Adapter.xcodeproj" -scheme "FlowKit Adapter" -sdk i
 ### FlowKitController (iOS App)
 ```bash
 cd Apps/FlowKitController
-xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -sdk iphonesimulator -configuration Debug build
+xcodebuild -project "FlowKit Controller.xcodeproj" -scheme "FlowKit Controller" -destination 'generic/platform=iOS Simulator' -configuration Debug -skipPackagePluginValidation -skipMacroValidation build
 ```
+
+Use `-destination`, not `-sdk iphonesimulator`: `-sdk` also builds the OpenAPIGenerator plugin's host tool for the simulator and fails with "_OpenAPIGeneratorCore is only to be used by swift-openapi-generator itself". The two `-skip…Validation` flags trust the plugin and macros non-interactively (CI uses `ci_scripts/ci_post_clone.sh` instead).
 
 ## Local Development with Docker
 
@@ -221,6 +223,12 @@ Additional workflows: `docker-publish.yaml` (amd64 + arm64 image for pushes to `
 - `docs/setup-FlowKitAdapter.md` — Adapter setup: launchctl, iOS guided access, logging
 - `docs/setup-server.md` — Server Docker setup, log levels, migration
 - More on how the features work: the project's folder in the knowledge base (the Obsidian vault), under `references/`. Without the vault (a cloud session, CI), go on without it.
+
+## Agent skills
+
+### Issue tracker
+
+Specs are GitHub issues; their tickets live in a `## Tickets` section of the spec issue, never as issues of their own. See `docs/agents/issue-tracker.md`.
 
 ## Common Issues
 

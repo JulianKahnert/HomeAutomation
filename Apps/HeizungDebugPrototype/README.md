@@ -41,6 +41,12 @@ the variant is chosen.
     SF Symbol pins; heatmap room × 7 days × 4 segments, tap/hover shows the value only;
     valve line per radiator; empty states (server unreachable, no rooms, no data). Snapshots
     `F_<iphone|mac>_<hell|dunkel>_<state>`; the live window switches layout at 700 pt width.
+  - **G Leicht** (default in the live window): F's content, read at a glance like Apple
+    Health/Weather/Fitness. One plain headline ("Bad OG am kältesten"), bars without axes,
+    labels or legend; numbers only in the selection callout, which takes the headline's place;
+    detail header with big Ist and Plan, replaced by the crosshair values while hovering;
+    one quiet row of pins, soft popovers, no legends; heatmap with title only. F stays for
+    comparison. Snapshots `G_<iphone|mac>_<hell|dunkel>_<state>`.
 - **Better means:** the question is answered without reading a chart in the common case, and the
   chart is there when the answer is not obvious (valve stuck).
 - **Platform:** iOS decides (Controller); judged here at phone width (430 pt) on macOS.
@@ -52,7 +58,7 @@ the variant is chosen.
 ## Run
 
 - `swift run HeizungDebugPrototype`: live macOS window; switch candidates via the **Variants**
-  menu (⌘1…⌘6). The radiator picker inside A and D switches scenarios.
+  menu (⌘1…⌘7). The radiator picker inside A and D switches scenarios.
 - Snapshots: jk:prototyper's `verify-snapshots.sh Apps/HeizungDebugPrototype` renders every
   `#Preview` to `snapshots/`. Needs the GUI session (from SSH it renders nothing).
 - iOS: open `Package.swift` in Xcode and use Previews on the Kit target.

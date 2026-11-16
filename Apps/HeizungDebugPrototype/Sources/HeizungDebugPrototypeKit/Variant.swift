@@ -9,6 +9,7 @@ public enum Variant: String, CaseIterable, Identifiable, Sendable {
     case diagnosis
     case skizzeV3
     case final
+    case light
 
     public var id: String { rawValue }
 
@@ -21,6 +22,7 @@ public enum Variant: String, CaseIterable, Identifiable, Sendable {
         case .diagnosis: "D Diagnose (Hybrid)"
         case .skizzeV3: "E Skizze v3"
         case .final: "F Final"
+        case .light: "G Leicht"
         }
     }
 }

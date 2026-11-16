@@ -27,6 +27,10 @@ public struct PrototypeView: View {
                 GeometryReader { geo in
                     FinalVariant(layout: geo.size.width >= 700 ? .regular : .compact)
                 }
+            case .light:
+                GeometryReader { geo in
+                    LightVariant(layout: geo.size.width >= 700 ? .regular : .compact)
+                }
             }
         }
         .environment(\.locale, Fmt.de)

@@ -29,7 +29,11 @@ public struct PrototypeView: View {
                 }
             case .light:
                 GeometryReader { geo in
-                    LightVariant(layout: geo.size.width >= 700 ? .regular : .compact)
+                    // G_SCENARIO=hover|auswahl opens a fixed state for live checks.
+                    LightScenarioView(
+                        scenario: ProcessInfo.processInfo.environment["G_SCENARIO"] ?? "",
+                        regular: geo.size.width >= 700
+                    )
                 }
             }
         }

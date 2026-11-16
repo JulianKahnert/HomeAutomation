@@ -144,8 +144,9 @@ struct GDeltaBars: View {
     private var cardColor: Color { colorScheme == .dark ? FColor.card.dark : FColor.card.light }
     private let limit = 3.0
 
+    /// Only hover or drag shows the callout; a selected room keeps just the pill on its name.
     private var highlighted: FRoom? {
-        (hoveredRoomID ?? selectedRoomID).flatMap { id in rooms.first { $0.id == id } }
+        hoveredRoomID.flatMap { id in rooms.first { $0.id == id } }
     }
 
     var body: some View {
@@ -199,9 +200,6 @@ struct GDeltaBars: View {
                 RuleMark(x: .value("Raum", room.short), yStart: .value("Δ", max(min(max(room.delta ?? 0.6, -limit), limit), 0.6)), yEnd: .value("Δ", limit + 0.5))
                     .foregroundStyle(Color.secondary.opacity(0.4))
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                    .annotation(position: .top, spacing: 4, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        GBarCallout(room: room)
-                    }
             }
         }
         .chartYScale(domain: -(limit + 0.5)...(limit + 0.5))
@@ -227,11 +225,19 @@ struct GDeltaBars: View {
             GeometryReader { geo in
                 ZStack(alignment: .topLeading) {
                     decorations(proxy: proxy, geo: geo)
+                    callout(proxy: proxy, geo: geo)
                     Rectangle().fill(.clear).contentShape(Rectangle())
-                        .gesture(SpatialTapGesture().onEnded { tap in
-                            guard let room = room(at: tap.location.x, proxy: proxy, geo: geo) else { return }
-                            selectedRoomID = selectedRoomID == room.id ? nil : room.id
-                        })
+                        .gesture(DragGesture(minimumDistance: 0)
+                            .onChanged { drag in
+                                hoveredRoomID = room(at: drag.location.x, proxy: proxy, geo: geo)?.id
+                            }
+                            .onEnded { drag in
+                                hoveredRoomID = nil
+                                // A drag only scrubs the callout; a tap also opens the room.
+                                guard abs(drag.translation.width) < 8,
+                                      let room = room(at: drag.location.x, proxy: proxy, geo: geo) else { return }
+                                selectedRoomID = selectedRoomID == room.id ? nil : room.id
+                            })
                         .onContinuousHover { phase in
                             if case .active(let point) = phase {
                                 hoveredRoomID = room(at: point.x, proxy: proxy, geo: geo)?.id
@@ -249,6 +255,20 @@ struct GDeltaBars: View {
     private func room(at x: CGFloat, proxy: ChartProxy, geo: GeometryProxy) -> FRoom? {
         guard let plot = proxy.plotFrame, let short: String = proxy.value(atX: x - geo[plot].minX) else { return nil }
         return rooms.first { $0.short == short }
+    }
+
+    /// Drawn in the overlay, not as a chart annotation: there `.regularMaterial` has no backdrop
+    /// and renders as a flat dark box.
+    @ViewBuilder
+    private func callout(proxy: ChartProxy, geo: GeometryProxy) -> some View {
+        if let room = highlighted, let plot = proxy.plotFrame, let x = proxy.position(forX: room.short) {
+            let frame = geo[plot]
+            // A bottom-aligned box puts the callout's bottom edge on the plot top.
+            GBarCallout(room: room)
+                .frame(width: 320, height: 200, alignment: .bottom)
+                .position(x: min(max(frame.minX + x, frame.minX + 120), frame.maxX - 120), y: frame.minY - 100)
+                .allowsHitTesting(false)
+        }
     }
 
     /// The hatched "?" box, and a fade at the end of a bar clipped at ±3 K.
@@ -305,7 +325,7 @@ struct GBarCallout: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(FColor.raised, in: .rect(cornerRadius: 10))
+        .background(.regularMaterial, in: .rect(cornerRadius: 10))
         .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
         .fixedSize()
     }
@@ -399,7 +419,7 @@ struct GDetailHeader: View {
                 Text("Plan \(V3Fmt.deg(sample.sollPlan))")
                     .font(.title3.monospacedDigit())
                     .foregroundStyle(.secondary)
-                if date != nil, let delta = sample.delta {
+                if let delta = sample.delta {
                     Text(V3Fmt.kelvin(delta))
                         .font(.title3.weight(.semibold).monospacedDigit())
                         .foregroundStyle(FColor.delta(delta))
@@ -460,9 +480,22 @@ struct GSollIstChart: View {
     private var domain: ClosedRange<Date> { range.domain }
     private var hasIst: Bool { samples.contains { $0.ist != nil } }
 
-    /// Thin orange over near-black turns brown; in dark mode the fill is lightened first.
-    private func gapColor(_ color: Color, _ opacity: Double) -> Color {
-        colorScheme == .dark ? color.mix(with: .white, by: 0.5).opacity(opacity + 0.06) : color.opacity(opacity)
+    /// Thin orange over near-black turns brown, so dark mode needs a lighter tint at more
+    /// opacity to read as soft orange, like the bars.
+    /// Light: Weather-style fill, strong at the Ist line and fading towards the Plan-Soll.
+    /// Dark: any low-opacity or whitened orange over the near-black card reads brown or tan,
+    /// so the fill stays fully saturated at a flat, higher opacity, the same hue as the bars.
+    private func gapStyle(_ name: String, _ color: Color, _ opacity: Double) -> AnyShapeStyle {
+        if colorScheme == .dark {
+            return AnyShapeStyle(color.opacity(name == "ok" ? 0.28 : name == "warm" ? 0.6 : 0.5))
+        }
+        guard name != "ok" else { return AnyShapeStyle(color.opacity(opacity)) }
+        // Warm: Ist above Plan, so strong at the top; cold: strong at the bottom.
+        return AnyShapeStyle(LinearGradient(
+            colors: [color.opacity(opacity * 2), color.opacity(opacity * 0.4)],
+            startPoint: name == "warm" ? .top : .bottom,
+            endPoint: name == "warm" ? .bottom : .top
+        ))
     }
 
     /// One quiet row: a pin without room next to its neighbour joins it as "+n".
@@ -594,7 +627,7 @@ struct GSollIstChart: View {
                     yEnd: .value("°C", matches ? sample.sollPlan : ist),
                     series: .value("Lücke", name)
                 )
-                .foregroundStyle(gapColor(color, opacity))
+                .foregroundStyle(gapStyle(name, color, opacity))
             }
         }
     }
@@ -656,7 +689,7 @@ struct GPopover: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FColor.raised, in: .rect(cornerRadius: 12))
+        .background(.regularMaterial, in: .rect(cornerRadius: 12))
         .shadow(color: .black.opacity(0.14), radius: 10, y: 3)
     }
 }
@@ -830,6 +863,26 @@ private extension View {
     }
 }
 
+/// Opens G in a scenario for live checks outside previews (Mac window, iOS host app).
+public struct LightScenarioView: View {
+    let scenario: String
+    let regular: Bool
+
+    public init(scenario: String, regular: Bool) {
+        self.scenario = scenario
+        self.regular = regular
+    }
+
+    public var body: some View {
+        let layout: FLayout = regular ? .regular : .compact
+        switch scenario {
+        case "hover": GScenario.hover24h(layout)
+        case "auswahl": GScenario.selected(layout)
+        default: GScenario.overview(layout)
+        }
+    }
+}
+
 private enum GScenario {
     static let arbeitPin = FData.room("arbeitszimmer").events.last { $0.kind == .observed }?.id
     static let schlafCell = FData.heatmap.first { $0.roomID == "schlafzimmer" && $0.day == FData.d(13, "00:00") && $0.segment == 1 }?.id
@@ -837,12 +890,12 @@ private enum GScenario {
     /// First glance: nothing selected, no numbers but the headline.
     static func overview(_ layout: FLayout) -> LightVariant { LightVariant(layout: layout) }
 
-    /// Bar tapped: callout replaces the headline, detail open without crosshair.
+    /// Bar tapped: pill on the name, headline stays, detail open without crosshair.
     static func selected(_ layout: FLayout) -> LightVariant { LightVariant(layout: layout, selectedRoomID: "bad-og", range: .day) }
 
-    /// Crosshair and pin popover: the selection values replace the detail header.
+    /// Hover everywhere: callout over the headline, crosshair values in the detail header, pin popover.
     static func hover24h(_ layout: FLayout) -> LightVariant {
-        LightVariant(layout: layout, selectedRoomID: "arbeitszimmer", range: .day, pinID: arbeitPin, crosshair: FData.d(15, "18:30"))
+        LightVariant(layout: layout, selectedRoomID: "arbeitszimmer", hoveredRoomID: "bad-og", range: .day, pinID: arbeitPin, crosshair: FData.d(15, "18:30"))
     }
 
     static func week(_ layout: FLayout) -> LightVariant {

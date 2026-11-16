@@ -47,6 +47,13 @@ the variant is chosen.
     detail header with big Ist and Plan, replaced by the crosshair values while hovering;
     one quiet row of pins, soft popovers, no legends; heatmap with title only. F stays for
     comparison. Snapshots `G_<iphone|mac>_<hell|dunkel>_<state>`.
+    Callout only while hovering or dragging a bar (a selected room keeps a tinted pill);
+    detail header with big Ist, Plan and Δ, replaced by the crosshair values while hovering.
+    Callout and pin popover use `.regularMaterial`. The callout sits in the chart overlay,
+    not in a chart annotation: inside an annotation the material has no backdrop and renders
+    as a flat dark box. Offscreen snapshots only approximate the material (no real blur);
+    judge it live: `G_SCENARIO=hover swift run HeizungDebugPrototype` (also `auswahl`), or
+    in the iOS Simulator via a host app that shows `LightScenarioView(scenario:regular:)`.
 - **Better means:** the question is answered without reading a chart in the common case, and the
   chart is there when the answer is not obvious (valve stuck).
 - **Platform:** iOS decides (Controller); judged here at phone width (430 pt) on macOS.

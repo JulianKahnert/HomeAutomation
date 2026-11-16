@@ -3,6 +3,7 @@
 //  HomeAutomationKit
 //
 
+@testable import Adapter
 import HAModels
 import Testing
 

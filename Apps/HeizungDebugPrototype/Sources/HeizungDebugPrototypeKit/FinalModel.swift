@@ -247,9 +247,18 @@ enum FData {
     }
 
     private static func build(_ setup: Setup) -> FRoom {
+        // Window and fireplace edges join the 10 min grid, so "Modus Aus" starts and ends
+        // exactly at the event instead of at the next grid point.
+        let edges = (setup.windowOpen + setup.fireplace).flatMap { [$0.start, $0.end] }
+        let dates = Array(Set(grid + edges.filter { $0 >= weekStart && $0 <= now })).sorted()
         var ist = setup.startIst
+        var valve = 0.0
+        var previous = weekStart
         var samples: [FSample] = []
-        for (index, date) in grid.enumerated() {
+        for date in dates {
+            // Rates below are per 10 min; scale them to the actual step.
+            let steps = max(date.timeIntervalSince(previous), 1) / 600
+            previous = date
             let plan = planSoll(setup, at: date).0
             let manual = setup.manual.first { $0.0 <= date && (date < $0.1 || $0.1 >= now) }
             let deviceSoll = manual?.2 ?? plan
@@ -260,22 +269,26 @@ enum FData {
             let target: Double
             let alpha: Double
             if windowOpen {
-                (target, alpha) = (12, 0.15)
+                (target, alpha) = (12, 0.06)
             } else if fireplaceOn {
                 (target, alpha) = (23 + setup.bias, 0.07)
             } else if stuck {
-                (target, alpha) = (19.8, 0.03)
+                (target, alpha) = (18.1, 0.04)
             } else {
                 let goal = deviceSoll + setup.bias
                 (target, alpha) = (goal, ist < goal ? 0.08 : 0.035)
             }
-            let wobble = 0.06 * sin(Double(index) * 0.7 + Double(setup.id.count))
-            ist += alpha * (target - ist) + wobble * 0.3
+            let phase = date.timeIntervalSince(weekStart) / 600
+            let wobble = 0.06 * sin(phase * 0.7 + Double(setup.id.count))
+            ist += (1 - pow(1 - alpha, steps)) * (target - ist) + wobble * 0.3 * min(steps, 1)
 
-            var valve = 0.0
-            if !(windowOpen || fireplaceOn || stuck) {
-                valve = min(max((deviceSoll - ist) * 45 + 12, 0), 100)
-                if ist > deviceSoll + 0.3 { valve = 0 }
+            // Window open, fireplace on and a stuck valve all mean 0 %. Otherwise the thermostat
+            // opens at most 20 points per 10 min, as a real valve motor ramps instead of jumping.
+            if windowOpen || fireplaceOn || stuck || ist > deviceSoll + 0.3 {
+                valve = 0
+            } else {
+                let wanted = min(max((deviceSoll - ist) * 30 + 10, 0), 100)
+                valve = wanted < valve ? wanted : min(wanted, valve + 20 * steps)
             }
             let down = setup.sensorDownSince.map { date >= $0 } ?? false
             // The second radiator sits under the window and opens a little further.

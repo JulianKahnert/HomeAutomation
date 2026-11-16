@@ -297,6 +297,7 @@ struct FDeltaBars: View {
                     FSwatch(FColor.cold, "zu kalt")
                     FSwatch(FColor.ok.opacity(0.6), "ok ±0,5 K")
                     FSwatch(FColor.warm, "zu warm")
+                    Label("über ±3 K", systemImage: "chevron.down")
                     HStack(spacing: 4) {
                         FHatch(showsMark: false).frame(width: 12, height: 10)
                         Text("kein Ist")
@@ -356,6 +357,7 @@ struct FDeltaBars: View {
             GeometryReader { geo in
                 ZStack(alignment: .topLeading) {
                     missingBoxes(proxy: proxy, geo: geo)
+                    barDecorations(proxy: proxy, geo: geo)
                     Rectangle().fill(.clear).contentShape(Rectangle())
                         .gesture(SpatialTapGesture().onEnded { tap in
                             guard let plot = proxy.plotFrame,
@@ -370,21 +372,52 @@ struct FDeltaBars: View {
 
     @ChartContentBuilder
     private func bar(_ room: FRoom) -> some ChartContent {
-        let dimmed = selectedRoomID != nil && selectedRoomID != room.id
+        let isSelected = room.id == selectedRoomID
         if let delta = room.delta {
+            // Beyond ±3 K the bar is clipped at the edge; the label keeps the real value.
             BarMark(x: .value("Raum", room.short), y: .value("Δ", min(max(delta, -limit), limit)), width: .ratio(0.6))
-                .foregroundStyle(FColor.delta(delta).opacity(dimmed ? 0.3 : 0.9))
+                .foregroundStyle(FColor.delta(delta).opacity(0.9))
                 .clipShape(.rect(cornerRadius: 3))
-                .annotation(position: delta < 0 ? .bottom : .top, spacing: 3) {
+                .annotation(position: delta < 0 ? .bottom : .top, spacing: 4) {
                     Text(V3Fmt.kelvin(delta).replacingOccurrences(of: " K", with: ""))
                         .font(.caption.monospacedDigit())
-                        .fontWeight(room.id == selectedRoomID ? .bold : .regular)
-                        .foregroundStyle(dimmed ? .tertiary : .secondary)
+                        .fontWeight(isSelected ? .bold : .regular)
+                        .foregroundStyle(isSelected ? .primary : .secondary)
                 }
         } else {
             // Keeps the category on the axis; the hatched box is drawn in the overlay.
             BarMark(x: .value("Raum", room.short), yStart: .value("Δ", -0.6), yEnd: .value("Δ", 0.6), width: .ratio(0.6))
                 .foregroundStyle(Color.clear)
+        }
+    }
+
+    /// Primary outline around the selected bar and a chevron at the edge of a clipped bar.
+    @ViewBuilder
+    private func barDecorations(proxy: ChartProxy, geo: GeometryProxy) -> some View {
+        if let plot = proxy.plotFrame {
+            let frame = geo[plot]
+            let width = frame.width / CGFloat(rooms.count) * 0.6
+            ForEach(rooms.filter { $0.delta != nil }) { room in
+                let delta = room.delta!
+                let end = min(max(delta, -limit), limit)
+                if let x = proxy.position(forX: room.short),
+                   let zero = proxy.position(forY: 0.0),
+                   let tip = proxy.position(forY: end) {
+                    if room.id == selectedRoomID {
+                        RoundedRectangle(cornerRadius: 4)
+                            .strokeBorder(Color.primary, lineWidth: 2)
+                            .frame(width: width + 4, height: abs(tip - zero) + 4)
+                            .position(x: frame.minX + x, y: frame.minY + (tip + zero) / 2)
+                    }
+                    if abs(delta) > limit {
+                        Image(systemName: delta < 0 ? "chevron.down" : "chevron.up")
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(.white)
+                            .position(x: frame.minX + x, y: frame.minY + tip + (delta < 0 ? -8 : 8))
+                    }
+                }
+            }
+            .allowsHitTesting(false)
         }
     }
 
@@ -398,7 +431,6 @@ struct FDeltaBars: View {
                    let bottom = proxy.position(forY: -0.6) {
                     FHatch(isSelected: room.id == selectedRoomID)
                         .frame(width: frame.width / CGFloat(rooms.count) * 0.6, height: bottom - top)
-                        .opacity(selectedRoomID != nil && selectedRoomID != room.id ? 0.4 : 1)
                         .position(x: frame.minX + x, y: frame.minY + (top + bottom) / 2)
                         .allowsHitTesting(false)
                 }
@@ -455,11 +487,8 @@ struct FRoomDetail: View {
 
     private var domain: ClosedRange<Date> { range.domain }
 
-    /// 7 T keeps every third sample, as the 30 min grid of the API would.
     private var samples: [FSample] {
-        let visible = room.samples.filter { domain.contains($0.date) }
-        guard range == .week else { return visible }
-        return visible.enumerated().filter { $0.offset % 3 == 0 || $0.offset == visible.count - 1 }.map(\.element)
+        room.samples.filter { domain.contains($0.date) }
     }
 
     /// Plan pins only up to 24 h; over a week they would bury the rest.
@@ -607,18 +636,27 @@ struct FSollIstChart: View {
     private var domain: ClosedRange<Date> { range.domain }
     private var hasIst: Bool { samples.contains { $0.ist != nil } }
 
-    /// Each pin takes the lowest lane that is free at its x, so close pins stack instead of overlapping.
-    private var lanes: [String: Int] {
+    private static let maxLanes = 2
+
+    /// Each pin takes the lowest free lane at its x. With both lanes taken, the pin joins the
+    /// last pin of the top lane, which becomes a "+n" pin whose popover lists all of them.
+    private var slots: [FPinSlot] {
         let span = domain.upperBound.timeIntervalSince(domain.lowerBound)
-        var lastX: [CGFloat] = []
-        var result: [String: Int] = [:]
+        var slots: [FPinSlot] = []
+        var lastInLane: [Int] = []
         for pin in pins {
             let x = CGFloat(pin.pinX.timeIntervalSince(domain.lowerBound) / span) * plotWidth
-            let lane = lastX.firstIndex { x - $0 >= Self.pinWidth } ?? lastX.count
-            if lane == lastX.count { lastX.append(x) } else { lastX[lane] = x }
-            result[pin.id] = lane
+            if let lane = lastInLane.firstIndex(where: { x - slots[$0].x >= Self.pinWidth }) {
+                slots.append(FPinSlot(x: x, lane: lane, events: [pin]))
+                lastInLane[lane] = slots.count - 1
+            } else if lastInLane.count < Self.maxLanes {
+                slots.append(FPinSlot(x: x, lane: lastInLane.count, events: [pin]))
+                lastInLane.append(slots.count - 1)
+            } else {
+                slots[lastInLane[Self.maxLanes - 1]].events.append(pin)
+            }
         }
-        return result
+        return slots
     }
 
     private var yDomain: ClosedRange<Double> {
@@ -626,11 +664,10 @@ struct FSollIstChart: View {
         return ((values.min() ?? 16) - 1).rounded(.down)...((values.max() ?? 22) + 1).rounded(.up)
     }
 
-    private var selectedPin: FEvent? { pins.first { $0.id == pinID } }
-
     var body: some View {
-        let lanes = lanes
-        let laneCount = max((lanes.values.max() ?? 0) + 1, 1)
+        let slots = slots
+        let laneCount = max((slots.map(\.lane).max() ?? 0) + 1, 1)
+        let selectedSlot = slots.first { $0.matches(pinID) }
         Chart {
             ForEach(areas) { area in
                 RectangleMark(xStart: .value("Start", max(area.date, domain.lowerBound)), xEnd: .value("Ende", min(area.end!, domain.upperBound)))
@@ -649,12 +686,17 @@ struct FSollIstChart: View {
                     .lineStyle(StrokeStyle(lineWidth: 2))
             }
             ForEach(pins) { pin in
-                let isSelected = pin.id == pinID
+                let isSelected = selectedSlot?.events.contains { $0.id == pin.id } ?? false
                 RuleMark(x: .value("Zeit", pin.pinX))
                     .foregroundStyle(isSelected ? Color.primary.opacity(0.8) : Color.secondary.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: isSelected ? 1.5 : 1, dash: [2, 2]))
-                    .annotation(position: .top, spacing: 4 + CGFloat(lanes[pin.id] ?? 0) * Self.laneHeight, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        FPinBadge(kind: pin.kind, isSelected: isSelected)
+            }
+            ForEach(slots) { slot in
+                // An invisible rule carries the badge, so the "+n" sits at its first pin.
+                RuleMark(x: .value("Zeit", slot.events[0].pinX), yStart: .value("°C", yDomain.upperBound), yEnd: .value("°C", yDomain.upperBound))
+                    .foregroundStyle(Color.clear)
+                    .annotation(position: .top, spacing: 4 + CGFloat(slot.lane) * Self.laneHeight, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        FPinBadge(slot: slot, isSelected: slot.id == selectedSlot?.id)
                     }
             }
             if let crosshair {
@@ -690,7 +732,7 @@ struct FSollIstChart: View {
                         Rectangle().fill(.clear).contentShape(Rectangle())
                             .gesture(DragGesture(minimumDistance: 0).onChanged { drag in
                                 if drag.startLocation.y < plot.minY {
-                                    selectPin(near: drag.startLocation.x - plot.minX, proxy: proxy)
+                                    selectSlot(near: drag.startLocation.x - plot.minX, in: slots, proxy: proxy)
                                 } else if let date: Date = proxy.value(atX: drag.location.x - plot.minX) {
                                     crosshair = min(max(date, domain.lowerBound), domain.upperBound)
                                 }
@@ -705,11 +747,12 @@ struct FSollIstChart: View {
                             FNoData(detail: room.lastIst.map { "letzter Ist-Wert \(V3Fmt.dayTime($0.date))" })
                                 .position(x: plot.midX, y: plot.midY)
                         }
-                        if let pin = selectedPin, let x = proxy.position(forX: pin.pinX) {
-                            FPinPopover(event: pin)
+                        if let slot = selectedSlot, let x = proxy.position(forX: slot.events[0].pinX) {
+                            FPinPopover(events: slot.events)
                                 .frame(width: Self.popoverWidth)
                                 .fixedSize(horizontal: false, vertical: true)
-                                .position(x: popoverX(plot.minX + x, in: plot), y: plot.minY + 44)
+                                // Top-aligned under the pin lanes, so it never covers a pin.
+                                .offset(x: popoverX(plot.minX + x, in: plot) - Self.popoverWidth / 2, y: plot.minY + 6)
                         }
                     }
                 }
@@ -738,12 +781,10 @@ struct FSollIstChart: View {
         }
     }
 
-    private func selectPin(near x: CGFloat, proxy: ChartProxy) {
-        let nearest = pins.min { a, b in
-            abs((proxy.position(forX: a.pinX) ?? .infinity) - x) < abs((proxy.position(forX: b.pinX) ?? .infinity) - x)
-        }
-        guard let nearest, let pinX = proxy.position(forX: nearest.pinX), abs(pinX - x) < Self.pinWidth else { return }
-        pinID = pinID == nearest.id ? nil : nearest.id
+    private func selectSlot(near x: CGFloat, in slots: [FPinSlot], proxy: ChartProxy) {
+        let distance = { (slot: FPinSlot) in abs((proxy.position(forX: slot.events[0].pinX) ?? .infinity) - x) }
+        guard let nearest = slots.min(by: { distance($0) < distance($1) }), distance(nearest) < Self.pinWidth else { return }
+        pinID = nearest.matches(pinID) ? nil : nearest.id
     }
 
     /// Hangs the popover beside its pin on the side with more room, so pin and latest values stay visible.
@@ -754,14 +795,33 @@ struct FSollIstChart: View {
     }
 }
 
+/// One badge above the chart: a single event, or "+n" for pins that found no free lane.
+struct FPinSlot: Identifiable {
+    let x: CGFloat
+    let lane: Int
+    var events: [FEvent]
+
+    var id: String { (events.count > 1 ? "gruppe-" : "") + events[0].id }
+
+    func matches(_ pinID: String?) -> Bool {
+        pinID == id || events.contains { $0.id == pinID }
+    }
+}
+
 struct FPinBadge: View {
-    let kind: FEventKind
+    let slot: FPinSlot
     var isSelected = false
 
     var body: some View {
-        Image(systemName: kind.symbol)
-            .font(.caption2.weight(.semibold))
-            .imageScale(.small)
+        Group {
+            if slot.events.count > 1 {
+                Text("+\(slot.events.count)").font(.caption2.weight(.semibold)).monospacedDigit()
+            } else {
+                Image(systemName: slot.events[0].kind.symbol)
+                    .font(.caption2.weight(.semibold))
+                    .imageScale(.small)
+            }
+        }
             .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
             .frame(width: 20, height: 20)
             .background(Circle().fill(FColor.raised))
@@ -771,10 +831,32 @@ struct FPinBadge: View {
 }
 
 struct FPinPopover: View {
-    let event: FEvent
+    let events: [FEvent]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
+            if events.count > 1 {
+                Text("\(events.count) Ereignisse").font(.caption.weight(.semibold))
+            }
+            ForEach(Array(events.enumerated()), id: \.offset) { index, event in
+                if index > 0 { Divider() }
+                FPinEventRow(event: event, compact: events.count > 1)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(FColor.raised, in: .rect(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.3)))
+        .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+    }
+}
+
+struct FPinEventRow: View {
+    let event: FEvent
+    var compact = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 2 : 4) {
             Label {
                 Text(event.kind.label + " · " + V3Fmt.dayTime(event.date) + (event.end.map { $0 >= FData.now ? " – jetzt" : " – \(Fmt.time($0))" } ?? ""))
                     .font(.caption.weight(.semibold).monospacedDigit())
@@ -789,11 +871,6 @@ struct FPinPopover: View {
                 .font(.caption2.monospaced())
                 .foregroundStyle(.secondary)
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FColor.raised, in: .rect(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.3)))
-        .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
     }
 }
 

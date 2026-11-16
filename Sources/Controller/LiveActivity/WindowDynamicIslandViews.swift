@@ -23,6 +23,8 @@ public struct WindowIslandExpandedLeading: View {
             .labelStyle(.titleAndIcon)
             .font(.subheadline.weight(.semibold))
             .lineLimit(1)
+            // The region starts in the island's rounded corner, which clipped the window symbol.
+            .padding(.leading, 8)
     }
 }
 
@@ -49,6 +51,8 @@ public struct WindowIslandExpandedTrailing: View {
         }
         .font(.subheadline.weight(.semibold))
         .lineLimit(1)
+        // The region ends in the island's rounded corner, which clipped the degree sign.
+        .padding(.trailing, 8)
     }
 }
 
@@ -64,6 +68,9 @@ public struct WindowIslandExpandedBottom: View {
         VStack(alignment: .leading, spacing: 5) {
             WindowActivityList(presentation: presentation)
         }
+        // Keeps the last row out of the island's rounded bottom corners, which clipped its first letter.
+        .padding(.horizontal, 10)
+        .padding(.bottom, 6)
     }
 }
 

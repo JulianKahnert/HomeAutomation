@@ -118,6 +118,11 @@ struct EntityCharacteristicView: View {
                 Spacer()
                 Label("\(percent) %", systemImage: "spigot")
             }
+        case .temperatureCalibration:
+            if let offset = item.temperatureCalibrationInC {
+                Spacer()
+                Label(String(format: "%+.1f °C", offset), systemImage: "plusminus")
+            }
         case .valve:
             if let valveOpen = item.valveOpen {
                 Spacer()

@@ -74,7 +74,8 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                 "isHeaterActive": "\(item.isHeaterActive.map { "\($0)" } ?? "nil")",
                 "targetTemperatureInC": "\(item.targetTemperatureInC.map { "\($0)" } ?? "nil")",
                 "heatingMode": "\(item.heatingMode?.name ?? "nil")",
-                "valvePositionPercent": "\(item.valvePositionPercent.map { "\($0)" } ?? "nil")"
+                "valvePositionPercent": "\(item.valvePositionPercent.map { "\($0)" } ?? "nil")",
+                "temperatureCalibrationInC": "\(item.temperatureCalibrationInC.map { "\($0)" } ?? "nil")"
             ])
         }
     }
@@ -247,7 +248,8 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                  valveOpen: item.valveOpen,
                                  targetTemperatureInC: item.targetTemperatureInC,
                                  heatingMode: heatingMode(of: item),
-                                 valvePositionPercent: item.valvePositionPercent)
+                                 valvePositionPercent: item.valvePositionPercent,
+                                 temperatureCalibrationInC: item.temperatureCalibrationInC)
     }
 
     static func map(_ item: EntityStorageItem) -> EntityStorageDbItem {
@@ -276,7 +278,8 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                    valveOpen: item.valveOpen,
                                    targetTemperatureInC: item.targetTemperatureInC,
                                    heatingMode: item.heatingMode?.rawValue,
-                                   valvePositionPercent: item.valvePositionPercent)
+                                   valvePositionPercent: item.valvePositionPercent,
+                                   temperatureCalibrationInC: item.temperatureCalibrationInC)
     }
 }
 

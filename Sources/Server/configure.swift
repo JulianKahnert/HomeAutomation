@@ -143,6 +143,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(AddHeatingControlFields())
     app.migrations.add(CreateWeatherHour())
     app.migrations.add(CreateEntityHourlyAggregate())
+    app.migrations.add(AddTemperatureCalibration())
 
     // Run migrations automatically
     try await app.autoMigrate()

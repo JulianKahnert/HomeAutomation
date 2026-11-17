@@ -13,7 +13,7 @@ struct StoragePolicyTests {
 
     // MARK: - rule table
 
-    @Test(arguments: [CharacteristicsType.temperatureSensor, .targetTemperature, .heatingMode, .valvePosition, .heating, .valve,
+    @Test(arguments: [CharacteristicsType.temperatureSensor, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration, .heating, .valve,
                       .relativeHumiditySensor, .contactSensor, .batterySensor, .lock, .motionSensor, .switcher,
                       .brightness, .colorTemperature, .color, .airQualitySensor, .pmDensitySensor])
     func keepsRawForeverWithoutRollupOrDeadBand(_ type: CharacteristicsType) {
@@ -41,7 +41,7 @@ struct StoragePolicyTests {
     }
 
     @Test func heatingFieldsAreStates() {
-        for type in [CharacteristicsType.targetTemperature, .heatingMode, .valvePosition, .heating, .valve] {
+        for type in [CharacteristicsType.targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration, .heating, .valve] {
             #expect(StoragePolicy.policy(for: type).kind == .state)
         }
         #expect(StoragePolicy.policy(for: .airQualitySensor).kind == .enumeration)

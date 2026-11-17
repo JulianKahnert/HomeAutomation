@@ -96,9 +96,12 @@ final class EntityStorageDbItem: Model, @unchecked Sendable {
     @Field(key: "valvePositionPercent")
     var valvePositionPercent: Int?
 
+    @Field(key: "temperatureCalibrationInC")
+    var temperatureCalibrationInC: Double?
+
     init() { }
 
-    init(timestamp: Date, entityPlaceId: String, entityServiceName: String, entityCharacteristicsName: String? = nil, entityCharacteristicType: String, motionDetected: Bool? = nil, illuminanceInLux: Double? = nil, isDeviceOn: Bool? = nil, isContactOpen: Bool? = nil, isDoorLocked: Bool? = nil, stateOfCharge: Int? = nil, isHeaterActive: Bool? = nil, brightness: Int? = nil, colorTemperature: Float? = nil, colorRed: Float? = nil, colorGreen: Float? = nil, colorBlue: Float? = nil, temperatureInC: Double? = nil, relativeHumidity: Double? = nil, carbonDioxideSensorId: Int? = nil, pmDensity: Double? = nil, airQuality: Int? = nil, valveOpen: Bool? = nil, targetTemperatureInC: Double? = nil, heatingMode: Int? = nil, valvePositionPercent: Int? = nil) {
+    init(timestamp: Date, entityPlaceId: String, entityServiceName: String, entityCharacteristicsName: String? = nil, entityCharacteristicType: String, motionDetected: Bool? = nil, illuminanceInLux: Double? = nil, isDeviceOn: Bool? = nil, isContactOpen: Bool? = nil, isDoorLocked: Bool? = nil, stateOfCharge: Int? = nil, isHeaterActive: Bool? = nil, brightness: Int? = nil, colorTemperature: Float? = nil, colorRed: Float? = nil, colorGreen: Float? = nil, colorBlue: Float? = nil, temperatureInC: Double? = nil, relativeHumidity: Double? = nil, carbonDioxideSensorId: Int? = nil, pmDensity: Double? = nil, airQuality: Int? = nil, valveOpen: Bool? = nil, targetTemperatureInC: Double? = nil, heatingMode: Int? = nil, valvePositionPercent: Int? = nil, temperatureCalibrationInC: Double? = nil) {
         self.timestamp = timestamp
         self.entityPlaceId = entityPlaceId
         self.entityServiceName = entityServiceName
@@ -125,5 +128,6 @@ final class EntityStorageDbItem: Model, @unchecked Sendable {
         self.targetTemperatureInC = targetTemperatureInC
         self.heatingMode = heatingMode
         self.valvePositionPercent = valvePositionPercent
+        self.temperatureCalibrationInC = temperatureCalibrationInC
     }
 }

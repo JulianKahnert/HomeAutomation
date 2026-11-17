@@ -133,7 +133,7 @@ struct StoragePolicy: Sendable, Equatable {
         case .airQualitySensor:
             state(.enumeration)
         case .motionSensor, .contactSensor, .switcher, .color, .valve, .lock, .heating,
-             .targetTemperature, .heatingMode, .valvePosition:
+             .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration:
             state()
         }
     }

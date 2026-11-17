@@ -31,6 +31,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         app.migrations.add(AddHeatingControlFields())
         app.migrations.add(CreateWeatherHour())
         app.migrations.add(CreateEntityHourlyAggregate())
+        app.migrations.add(AddTemperatureCalibration())
         try await app.autoMigrate()
     }
 
@@ -55,6 +56,20 @@ final class EntityStorageMySQLTests: XCTestCase {
 
         XCTAssertEqual(items.map(\.heatingMode), [nil, .auto, .off])
         XCTAssertEqual(items.map(\.valvePositionPercent), [nil, 100, 0])
+    }
+
+    func testTemperatureCalibrationRoundTrips() async throws {
+        let repository = app.entityStorageDbRepository
+        let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .temperatureCalibration)
+        for (offset, value) in [(0, -2.5), (1, 0.3), (2, nil)] as [(Int, Double?)] {
+            try await repository.add(EntityStorageItem(entityId: id,
+                                                       timestamp: Date(timeIntervalSince1970: Double(1_000 + offset)),
+                                                       temperatureCalibrationInC: value))
+        }
+
+        let items = try await repository.getHistory(for: id, startDate: nil, endDate: nil, cursor: nil, limit: 10)
+
+        XCTAssertEqual(items.map(\.temperatureCalibrationInC), [nil, 0.3, -2.5])
     }
 
     func testUnknownHeatingModeIsReadAsNil() async throws {

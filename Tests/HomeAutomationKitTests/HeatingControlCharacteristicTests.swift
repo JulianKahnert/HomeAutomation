@@ -72,7 +72,7 @@ struct HeatingControlCharacteristicTests {
     }
 
     @Test("Heating types are subscribed, so the adapter sends them to the server", arguments: [
-        CharacteristicsType.heating, .targetTemperature, .heatingMode, .valvePosition
+        CharacteristicsType.heating, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration
     ])
     func heatingTypesAreSubscribed(type: CharacteristicsType) {
         #expect(type.isSubscribed)

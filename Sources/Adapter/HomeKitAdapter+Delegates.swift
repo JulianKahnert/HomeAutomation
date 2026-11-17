@@ -42,7 +42,7 @@ extension HomeKitAdapter {
         private let resubscribeRequests = ResubscribeRequests()
 
         #if canImport(Matter)
-        /// Eve Thermos paired over Matter report their valve position only there, see `EveMatterValvePoller`.
+        /// Eve Thermos paired over Matter report their valve position and temperature offset only there, see `EveMatterValvePoller`.
         private let eveMatterValvePoller = EveMatterValvePoller()
         #endif
 

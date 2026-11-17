@@ -136,7 +136,7 @@ extension LiveActivityDependency: DependencyKey {
                                 let tokenString = tokenData.hexadecimalString
                                 logger.info("pushTokenUpdates emitted for activity \(activity.id): token=\(String(tokenString.prefix(8)))...")
                                 let token = await PushToken(
-                                    deviceName: UIDevice.current.name,
+                                    deviceName: PushToken.currentDeviceName,
                                     tokenString: tokenString,
                                     type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName)
                                 )
@@ -151,7 +151,7 @@ extension LiveActivityDependency: DependencyKey {
                 for await pushTokenData in Activity<WindowAttributes>.pushToStartTokenUpdates {
                     let tokenString = pushTokenData.hexadecimalString
                     logger.info("pushToStartTokenUpdates emitted: token=\(String(tokenString.prefix(8)))...")
-                    let token = await PushToken(deviceName: UIDevice.current.name,
+                    let token = await PushToken(deviceName: PushToken.currentDeviceName,
                                                 tokenString: tokenString,
                                                 type: .liveActivityStart)
                     await onToken(token)

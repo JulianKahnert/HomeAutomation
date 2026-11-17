@@ -67,7 +67,7 @@ extension AppDelegate: UIApplicationDelegate {
 
     public func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         logger.info("Registered for remote notifications")
-        let token = PushToken(deviceName: UIDevice.current.name,
+        let token = PushToken(deviceName: PushToken.currentDeviceName,
                               tokenString: deviceToken.hexadecimalString,
                               type: .pushNotification)
         Self.store.send(.registerPushToken(token))

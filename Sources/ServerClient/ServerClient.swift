@@ -274,6 +274,7 @@ extension EntityHistoryItem {
                   valveOpen: item.valveOpen,
                   targetTemperatureInC: item.targetTemperatureInC,
                   heatingMode: item.heatingMode.flatMap { HeatingMode(name: $0.rawValue) },
-                  valvePositionPercent: item.valvePositionPercent)
+                  valvePositionPercent: item.valvePositionPercent,
+                  temperatureCalibrationInC: item.temperatureCalibrationInC)
     }
 }

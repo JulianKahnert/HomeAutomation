@@ -78,6 +78,13 @@ struct OutdoorTemperatureJobTests {
         #expect(api.heatingMode?.rawValue == "auto")
         #expect(api.valvePositionPercent == 35)
     }
+
+    @Test func historyAndApiItemsExposeTemperatureCalibration() {
+        let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .temperatureCalibration)
+        let item = EntityStorageItem(entityId: id, temperatureCalibrationInC: -0.5)
+        #expect(EntityHistoryItem(item).temperatureCalibrationInC == -0.5)
+        #expect(Components.Schemas.EntityHistoryItem(item).temperatureCalibrationInC == -0.5)
+    }
 }
 
 private actor InMemoryHours: WeatherHourStoring {

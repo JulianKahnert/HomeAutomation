@@ -81,6 +81,9 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// Valve opening in percent (0-100), Eve custom characteristic
     public let valvePositionPercent: Int?
 
+    /// Thermostat temperature offset in Celsius, already included in the temperature it reports
+    public let temperatureCalibrationInC: Double?
+
     public var description: String {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -113,7 +116,8 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         valveOpen: Bool? = nil,
         targetTemperatureInC: Double? = nil,
         heatingMode: HeatingMode? = nil,
-        valvePositionPercent: Int? = nil
+        valvePositionPercent: Int? = nil,
+        temperatureCalibrationInC: Double? = nil
     ) {
         self.entityId = entityId
         self.timestamp = timestamp
@@ -136,6 +140,7 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         self.targetTemperatureInC = targetTemperatureInC
         self.heatingMode = heatingMode
         self.valvePositionPercent = valvePositionPercent
+        self.temperatureCalibrationInC = temperatureCalibrationInC
     }
 
     /// Retrieves a non-optional value for a given optional property key path

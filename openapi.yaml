@@ -677,6 +677,9 @@ components:
         valvePositionPercent:
           type: integer
           description: Valve opening in percent, 0 to 100 (characteristic type `valvePosition`, Eve custom characteristic).
+        temperatureCalibrationInC:
+          type: number
+          description: Thermostat temperature offset in Celsius, in steps of 0.1 (characteristic type `temperatureCalibration`, Matter LocalTemperatureCalibration). The thermostat's reported temperature already includes it, so the raw sensor reading is `temperatureInC` minus this offset.
         relativeHumidity:
           type: number
           description: Relative humidity percentage 0-100 (if applicable).

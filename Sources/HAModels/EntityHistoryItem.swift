@@ -32,6 +32,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     public let targetTemperatureInC: Double?
     public let heatingMode: HeatingMode?
     public let valvePositionPercent: Int?
+    public let temperatureCalibrationInC: Double?
 
     public init(
         id: UUID = UUID(),
@@ -56,7 +57,8 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         valveOpen: Bool? = nil,
         targetTemperatureInC: Double? = nil,
         heatingMode: HeatingMode? = nil,
-        valvePositionPercent: Int? = nil
+        valvePositionPercent: Int? = nil,
+        temperatureCalibrationInC: Double? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -81,6 +83,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         self.targetTemperatureInC = targetTemperatureInC
         self.heatingMode = heatingMode
         self.valvePositionPercent = valvePositionPercent
+        self.temperatureCalibrationInC = temperatureCalibrationInC
     }
 }
 
@@ -107,7 +110,8 @@ extension EntityHistoryItem {
                   valveOpen: item.valveOpen,
                   targetTemperatureInC: item.targetTemperatureInC,
                   heatingMode: item.heatingMode,
-                  valvePositionPercent: item.valvePositionPercent)
+                  valvePositionPercent: item.valvePositionPercent,
+                  temperatureCalibrationInC: item.temperatureCalibrationInC)
     }
 
     /// Human-readable description of the primary value
@@ -159,6 +163,9 @@ extension EntityHistoryItem {
         }
         if let valvePositionPercent {
             return "Valve \(valvePositionPercent)%"
+        }
+        if let temperatureCalibrationInC {
+            return "Offset \(String(format: "%+.1f", temperatureCalibrationInC))°C"
         }
         if let targetTemperatureInC {
             return "Target \(String(format: "%.1f", targetTemperatureInC))°C"

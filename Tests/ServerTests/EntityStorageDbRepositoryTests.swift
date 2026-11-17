@@ -272,7 +272,8 @@ final class EntityStorageDbRepositoryTests: XCTestCase {
             valveOpen: true,
             targetTemperatureInC: 19.5,
             heatingMode: .heat,
-            valvePositionPercent: 42
+            valvePositionPercent: 42,
+            temperatureCalibrationInC: -0.5
         )
     }
 
@@ -328,6 +329,7 @@ final class EntityStorageDbRepositoryTests: XCTestCase {
         XCTAssertEqual(lhs.targetTemperatureInC, rhs.targetTemperatureInC, message, file: file, line: line)
         XCTAssertEqual(lhs.heatingMode, rhs.heatingMode, message, file: file, line: line)
         XCTAssertEqual(lhs.valvePositionPercent, rhs.valvePositionPercent, message, file: file, line: line)
+        XCTAssertEqual(lhs.temperatureCalibrationInC, rhs.temperatureCalibrationInC, message, file: file, line: line)
 
         // Air Quality Sensors
         if let lhsTemp = lhs.temperatureInC, let rhsTemp = rhs.temperatureInC {

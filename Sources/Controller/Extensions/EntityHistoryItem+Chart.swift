@@ -83,6 +83,9 @@ extension EntityHistoryItem {
         if let valvePositionPercent {
             return Double(valvePositionPercent)
         }
+        if let temperatureCalibrationInC {
+            return temperatureCalibrationInC
+        }
         if let heatingMode {
             return Double(heatingMode.rawValue)
         }

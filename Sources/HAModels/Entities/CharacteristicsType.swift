@@ -18,6 +18,9 @@ public enum CharacteristicsType: String, Sendable, Codable, CaseIterable {
     case heatingMode
     /// Eve valve opening in percent, stored in `valvePositionPercent`.
     case valvePosition
+    /// Thermostat temperature offset in Celsius (Matter `LocalTemperatureCalibration`, the Eve app's
+    /// "Temperaturabweichung"), stored in `temperatureCalibrationInC`.
+    case temperatureCalibration
 }
 
 public extension CharacteristicsType {
@@ -29,17 +32,17 @@ public extension CharacteristicsType {
     var isSubscribed: Bool {
         switch self {
         case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId, .brightness, .colorTemperature, .color,
-             .heating, .targetTemperature, .heatingMode, .valvePosition:
+             .heating, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration:
             return true
         case .batterySensor, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor:
             return false
         }
     }
 
-    /// Whether this type belongs to a thermostat (on/off, target temperature, mode, valve position).
+    /// Whether this type belongs to a thermostat (on/off, target temperature, mode, valve position, temperature offset).
     var isHeatingRelated: Bool {
         switch self {
-        case .heating, .targetTemperature, .heatingMode, .valvePosition:
+        case .heating, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration:
             return true
         default:
             return false

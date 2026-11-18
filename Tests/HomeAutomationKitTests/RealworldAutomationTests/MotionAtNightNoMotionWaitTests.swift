@@ -8,8 +8,8 @@ import Foundation
 import HAModels
 import Testing
 
-/// Presence sensors hold "motion detected" without sending new events, so the automation must
-/// re-read the sensors instead of relying on a new trigger to extend the light.
+/// Presence sensors hold "motion detected" without sending new events, so the automation reads
+/// the sensors before it starts the noMotionWait countdown.
 @HomeManagerActor
 @Suite("MotionAtNight waits for the motion to end", .timeLimit(.minutes(1)))
 struct MotionAtNightNoMotionWaitTests {
@@ -73,8 +73,8 @@ struct MotionAtNightNoMotionWaitTests {
         let task = start(motionDetected: true)
         defer { task.cancel() }
 
-        try await pass(colorTemperatureDelay)
         setMotion(false)
+        try await pass(colorTemperatureDelay)
         try await pass(noMotionWait)
         try await pass(dimWait)
         try await finish(task)
@@ -82,61 +82,30 @@ struct MotionAtNightNoMotionWaitTests {
         #expect(homeManager.actionCount("turnOff") == 1)
     }
 
-    @Test("motion still detected after noMotionWait keeps the lights on until noMotionWait after it ended")
-    func keepsLightsOnWhileMotionIsHeld() async throws {
+    @Test("while motion is detected the sensors are polled, noMotionWait starts once the motion ended")
+    func keepsWaitingWhileMotionIsDetected() async throws {
         let task = start(motionDetected: true)
         defer { task.cancel() }
 
         try await pass(colorTemperatureDelay)
-        try await pass(noMotionWait)
 
         // the sensor still reports motion: neither dimmed nor turned off, but polled
-        let pollInterval = await sleeper.nextSleep()
-        try #require(pollInterval != dimWait)
-        #expect(homeManager.actionCount("setBrightness") == 1)
-        #expect(homeManager.actionCount("turnOff") == 0)
-        sleeper.wake()
-
-        // motion ends: the countdown starts again from here
-        #expect(await sleeper.nextSleep() == pollInterval)
-        setMotion(false)
-        sleeper.wake()
-        #expect(await sleeper.nextSleep() == noMotionWait)
+        try #require(await sleeper.nextSleep() == MotionAtNight.motionPollInterval)
         #expect(homeManager.actionCount("setBrightness") == 1)
         sleeper.wake()
 
-        #expect(await sleeper.nextSleep() == dimWait)
-        #expect(homeManager.actionCount("setBrightness") == 2)
-        sleeper.wake()
-        try await finish(task)
-
-        #expect(homeManager.actionCount("turnOff") == 1)
-    }
-
-    @Test("motion returning while dimmed restores the brightness instead of turning off")
-    func restoresBrightnessWhenMotionReturnsWhileDimmed() async throws {
-        let task = start(motionDetected: true)
-        defer { task.cancel() }
-
-        try await pass(colorTemperatureDelay)
+        try #require(await sleeper.nextSleep() == MotionAtNight.motionPollInterval)
         setMotion(false)
-        try await pass(noMotionWait)
-
-        // dimmed
-        try #require(await sleeper.nextSleep() == dimWait)
-        #expect(homeManager.actionCount("setBrightness") == 2)
-        setMotion(true)
         sleeper.wake()
 
-        // restored, and the countdown runs again
+        // motion ended: noMotionWait, dim, off
         try #require(await sleeper.nextSleep() == noMotionWait)
-        #expect(homeManager.actionCount("setBrightness") == 3)
+        #expect(homeManager.actionCount("setBrightness") == 1)
         #expect(homeManager.actionCount("turnOff") == 0)
-        setMotion(false)
         sleeper.wake()
 
         try #require(await sleeper.nextSleep() == dimWait)
-        #expect(homeManager.actionCount("setBrightness") == 4)
+        #expect(homeManager.actionCount("setBrightness") == 2)
         sleeper.wake()
         try await finish(task)
 

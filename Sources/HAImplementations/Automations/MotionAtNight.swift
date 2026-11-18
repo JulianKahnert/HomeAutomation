@@ -11,13 +11,13 @@ import HAModels
 public struct MotionAtNight: Automatable {
     public var isActive = true
     public let name: String
-    /// Time to wait after the motion sensors stopped reporting motion before starting the dim/off sequence
+    /// Time to wait after no motion sensor reports motion before starting the dim/off sequence
     public private(set) var noMotionWait: Duration = .seconds(60)
     /// Time to keep lights dimmed before turning them off completely
     public private(set) var dimWait: Duration = .seconds(10)
     /// Time to wait between turning on lights and setting color temperature to prevent flickering
     public private(set) var colorTemperatureDelay: Duration = .seconds(1)
-    /// How often the motion sensors are read again while they still report motion after `noMotionWait`.
+    /// How often the motion sensors are read while they report motion, before `noMotionWait` starts.
     static let motionPollInterval: Duration = .seconds(30)
     public let motionSensors: [MotionSensorDevice]
     public let lightSensor: MotionSensorDevice
@@ -146,22 +146,28 @@ public struct MotionAtNight: Automatable {
                 await group.waitForAll()
             }
 
-            // Wait until no motion is left, dim, and restore the brightness when motion returns while dimmed.
-            // A new trigger cancels this task, but presence sensors hold "motion detected" without sending
-            // new events, so the sensors are read again instead of waiting for one.
-            while true {
-                try await waitUntilNoMotion(using: homeManager, sleep: sleep)
-                await dimLights(to: brightnessValue, using: homeManager)
-                try await sleep(dimWait)
-
-                guard await isMotionDetected(using: homeManager) else { break }
-                log.info("Motion detected while dimmed - restoring brightness")
-                await setBrightnessOfLightsThatAreOn(to: brightnessValue, using: homeManager)
+            // Presence sensors hold "motion detected" without sending new events, so the countdown
+            // starts only once no sensor reports motion. A new motion trigger cancels this run.
+            while await isMotionDetected(using: homeManager) {
+                try await sleep(Self.motionPollInterval)
             }
-        } else {
-            await dimLights(to: brightnessValue, using: homeManager)
-            try await sleep(dimWait)
+            try await sleep(noMotionWait)
         }
+
+        // dim lights before turning them off
+        log.debug("Dimming lights before turning them off")
+        await withTaskGroup(of: Void.self) { group in
+            for light in lights {
+                group.addTask {
+                    // do not change the brightness, if it is currently turned off
+                    guard (try? await homeManager.getCurrentEntity(with: light.switchId).isDeviceOn ?? true) == true else { return }
+                    await light.setBrightness(to: min(0.05, brightnessValue), with: homeManager)
+                }
+            }
+
+            await group.waitForAll()
+        }
+        try await sleep(dimWait)
 
         // turn off lights in parallel
         await withTaskGroup(of: Void.self) { group in
@@ -176,19 +182,6 @@ public struct MotionAtNight: Automatable {
         }
     }
 
-    /// Waits `noMotionWait`, then as long as a motion sensor still reports motion, polls every
-    /// ``motionPollInterval`` until it ends and waits `noMotionWait` again from there.
-    private func waitUntilNoMotion(using homeManager: HomeManagable, sleep: @Sendable (Duration) async throws -> Void) async throws {
-        try await sleep(noMotionWait)
-        while await isMotionDetected(using: homeManager) {
-            log.info("Motion still detected after \(noMotionWait) - keeping lights on")
-            repeat {
-                try await sleep(Self.motionPollInterval)
-            } while await isMotionDetected(using: homeManager)
-            try await sleep(noMotionWait)
-        }
-    }
-
     /// Whether any motion sensor reports motion. A sensor that cannot be read counts as "no motion",
     /// so an unreachable or dead sensor cannot keep the lights on forever.
     private func isMotionDetected(using homeManager: HomeManagable) async -> Bool {
@@ -200,24 +193,5 @@ public struct MotionAtNight: Automatable {
                 return false
             }
         }).contains { $0 }
-    }
-
-    private func dimLights(to brightnessValue: Float, using homeManager: HomeManagable) async {
-        log.debug("Dimming lights before turning them off")
-        await setBrightnessOfLightsThatAreOn(to: min(0.05, brightnessValue), using: homeManager)
-    }
-
-    /// Lights that are off, e.g. turned off by hand, keep their state.
-    private func setBrightnessOfLightsThatAreOn(to value: Float, using homeManager: HomeManagable) async {
-        await withTaskGroup(of: Void.self) { group in
-            for light in lights {
-                group.addTask {
-                    guard (try? await homeManager.getCurrentEntity(with: light.switchId).isDeviceOn ?? true) == true else { return }
-                    await light.setBrightness(to: value, with: homeManager)
-                }
-            }
-
-            await group.waitForAll()
-        }
     }
 }

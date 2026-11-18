@@ -29,12 +29,15 @@ public extension CharacteristicsType {
     /// Only subscribed types reach the server's history: the adapter yields them on every refresh and
     /// change, the others never. HomeKit drops notifications (contact sensors first) when there are too
     /// many subscriptions, so sensors that change often or matter little stay unsubscribed.
+    /// Temperature and humidity are subscribed: without it, a standalone room sensor (an air quality
+    /// or temperature sensor) only reaches the history when another HomeKit client happens to read it.
     var isSubscribed: Bool {
         switch self {
         case .motionSensor, .lightSensor, .switcher, .contactSensor, .carbonDioxideSensorId, .brightness, .colorTemperature, .color,
+             .temperatureSensor, .relativeHumiditySensor,
              .heating, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration:
             return true
-        case .batterySensor, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor:
+        case .batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor:
             return false
         }
     }

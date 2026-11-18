@@ -79,8 +79,16 @@ struct HeatingControlCharacteristicTests {
         #expect(type.isHeatingRelated)
     }
 
+    @Test("Room temperature and humidity are subscribed, so standalone sensors reach the server", arguments: [
+        CharacteristicsType.temperatureSensor, .relativeHumiditySensor
+    ])
+    func roomClimateTypesAreSubscribed(type: CharacteristicsType) {
+        #expect(type.isSubscribed)
+        #expect(!type.isHeatingRelated)
+    }
+
     @Test("Sensors left out to keep HomeKit's subscription count down stay unsubscribed", arguments: [
-        CharacteristicsType.batterySensor, .valve, .lock, .temperatureSensor, .relativeHumiditySensor, .pmDensitySensor, .airQualitySensor
+        CharacteristicsType.batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor
     ])
     func otherTypesStayUnsubscribed(type: CharacteristicsType) {
         #expect(!type.isSubscribed)

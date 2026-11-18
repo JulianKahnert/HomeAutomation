@@ -11,12 +11,14 @@ import HAModels
 public struct MotionAtNight: Automatable {
     public var isActive = true
     public let name: String
-    /// Time to wait after last motion detection before starting the dim/off sequence
+    /// Time to wait after no motion sensor reports motion before starting the dim/off sequence
     public private(set) var noMotionWait: Duration = .seconds(60)
     /// Time to keep lights dimmed before turning them off completely
     public private(set) var dimWait: Duration = .seconds(10)
     /// Time to wait between turning on lights and setting color temperature to prevent flickering
     public private(set) var colorTemperatureDelay: Duration = .seconds(1)
+    /// How often the motion sensors are read while they report motion, before `noMotionWait` starts.
+    static let motionPollInterval: Duration = .seconds(30)
     public let motionSensors: [MotionSensorDevice]
     public let lightSensor: MotionSensorDevice
     public let windowContacts: [ContactSensorDevice]
@@ -54,15 +56,7 @@ public struct MotionAtNight: Automatable {
             return false
         }
 
-        // was any motion sensor triggered
-        let motionDetected = await motionSensors.asyncMap({ motionSensor in
-            do {
-                return try await motionSensor.motionDetectedState(with: hm)
-            } catch {
-                log.warning("Failed to get motion sensor data - \(error)")
-                return false
-            }
-        }).contains { $0 }
+        let motionDetected = await isMotionDetected(using: hm)
 
         var illuminance: Measurement<UnitIlluminance>?
         do {
@@ -99,12 +93,17 @@ public struct MotionAtNight: Automatable {
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        let location = await hm.getLocation()
+        try await execute(using: hm, sleep: { try await Task.sleep(for: $0) })
+    }
+
+    /// `sleep` stands in for `Task.sleep`, so tests can drive the waits without real time.
+    func execute(using homeManager: HomeManagable, sleep: @escaping @Sendable (Duration) async throws -> Void) async throws {
+        let location = await homeManager.getLocation()
         let isWindowOpen: Bool
         if shouldRespectWindowContacts(at: Date(), location: location) {
             isWindowOpen = await windowContacts.asyncMap({ windowSensor in
                 do {
-                    return try await windowSensor.isContactOpen(with: hm)
+                    return try await windowSensor.isContactOpen(with: homeManager)
                 } catch {
                     log.warning("Failed to get contact sensor - \(error)")
                     return false
@@ -128,17 +127,17 @@ public struct MotionAtNight: Automatable {
                     group.addTask {
                         // Turn on the light
                         if light.brightnessId != nil {
-                            await light.setBrightness(to: brightnessValue, with: hm)
+                            await light.setBrightness(to: brightnessValue, with: homeManager)
                         } else {
-                            await light.turnOn(with: hm)
+                            await light.turnOn(with: homeManager)
                         }
 
                         // Wait before adjusting color temperature to prevent flickering
-                        try? await Task.sleep(for: colorTemperatureDelay)
+                        try? await sleep(colorTemperatureDelay)
 
                         // Set color temperature if supported
                         if light.hasColorTemperatureSupport {
-                            await light.setColorTemperature(to: colorTemperatureValue, with: hm)
+                            await light.setColorTemperature(to: colorTemperatureValue, with: homeManager)
                         }
                     }
                 }
@@ -147,8 +146,12 @@ public struct MotionAtNight: Automatable {
                 await group.waitForAll()
             }
 
-            // wait for x seconds or until this task wil be suspended
-            try await Task.sleep(for: noMotionWait)
+            // Presence sensors hold "motion detected" without sending new events, so the countdown
+            // starts only once no sensor reports motion. A new motion trigger cancels this run.
+            while await isMotionDetected(using: homeManager) {
+                try await sleep(Self.motionPollInterval)
+            }
+            try await sleep(noMotionWait)
         }
 
         // dim lights before turning them off
@@ -157,25 +160,38 @@ public struct MotionAtNight: Automatable {
             for light in lights {
                 group.addTask {
                     // do not change the brightness, if it is currently turned off
-                    guard (try? await hm.getCurrentEntity(with: light.switchId).isDeviceOn ?? true) == true else { return }
-                    await light.setBrightness(to: min(0.05, brightnessValue), with: hm)
+                    guard (try? await homeManager.getCurrentEntity(with: light.switchId).isDeviceOn ?? true) == true else { return }
+                    await light.setBrightness(to: min(0.05, brightnessValue), with: homeManager)
                 }
             }
 
             await group.waitForAll()
         }
-        try await Task.sleep(for: dimWait)
+        try await sleep(dimWait)
 
         // turn off lights in parallel
         await withTaskGroup(of: Void.self) { group in
             for light in lights {
                 group.addTask {
                     log.debug("Turn off device \(light.switchId)")
-                    await light.turnOff(with: hm)
+                    await light.turnOff(with: homeManager)
                 }
             }
 
             await group.waitForAll()
         }
+    }
+
+    /// Whether any motion sensor reports motion. A sensor that cannot be read counts as "no motion",
+    /// so an unreachable or dead sensor cannot keep the lights on forever.
+    private func isMotionDetected(using homeManager: HomeManagable) async -> Bool {
+        await motionSensors.asyncMap({ motionSensor in
+            do {
+                return try await motionSensor.motionDetectedState(with: homeManager)
+            } catch {
+                log.warning("Failed to get motion sensor data, counting it as no motion - \(error)")
+                return false
+            }
+        }).contains { $0 }
     }
 }

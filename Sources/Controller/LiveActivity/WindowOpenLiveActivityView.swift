@@ -134,21 +134,28 @@ public struct WindowActivityRow: View {
                 }
             }
             .lineLimit(1)
-            .frame(width: 104, alignment: .leading)
+            .frame(width: 112, alignment: .leading)
 
-            if window.isOverdue {
-                // Full and red once the server marked the window überschritten.
-                ProgressView(value: 1)
-                    .tint(.red)
-            } else {
-                ProgressView(timerInterval: window.opened...window.closeBy, countsDown: false)
-                    .labelsHidden()
-                    .tint(.blue)
+            // The time column is right-aligned and has slack, so the bar can sit close to it.
+            HStack(spacing: 2) {
+                if window.isOverdue {
+                    // Full and red once the server marked the window überschritten.
+                    ProgressView(value: 1)
+                        .tint(.red)
+                } else {
+                    ProgressView(timerInterval: window.opened...window.closeBy, countsDown: false)
+                        .labelsHidden()
+                        .tint(.blue)
+                }
+
+                // Fixed width keeps the bars equally long; longer text ("+1:11:34", spelled-out minutes
+                // on the locked screen) shrinks instead of wrapping.
+                WindowActivityTimeLabel(window: window)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(width: 60, alignment: .trailing)
             }
-
-            WindowActivityTimeLabel(window: window)
-                .font(.subheadline.weight(.semibold))
-                .frame(width: 50, alignment: .trailing)
         }
     }
 }
@@ -183,6 +190,28 @@ public struct WindowActivityTimeLabel: View {
 
 #Preview("8 offen, stale") {
     WindowOpenLiveActivityView(contentState: .sample(overdueCount: 0), isStale: true)
+}
+
+#Preview("Überschritten, 21 Min") {
+    WindowOpenLiveActivityView(contentState: .overdueSample(overdueBy: 21 * 60 + 34))
+        .background(.black)
+}
+
+#Preview("Überschritten, 21 Min, gesperrt") {
+    WindowOpenLiveActivityView(contentState: .overdueSample(overdueBy: 21 * 60 + 34))
+        .background(.black)
+        .environment(\.isLuminanceReduced, true)
+}
+
+#Preview("Überschritten, über 1 Std") {
+    WindowOpenLiveActivityView(contentState: .overdueSample(overdueBy: 71 * 60 + 34))
+        .background(.black)
+}
+
+#Preview("Überschritten, 2 Fenster, 21 Min") {
+    WindowOpenLiveActivityView(contentState: .sample(overdueCount: 2))
+        .background(.black)
+        .environment(\.isLuminanceReduced, true)
 }
 
 #Preview("Watch, 8 offen") {

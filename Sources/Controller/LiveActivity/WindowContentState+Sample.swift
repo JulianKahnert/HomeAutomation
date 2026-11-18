@@ -22,5 +22,17 @@ extension WindowContentState {
         }
         return WindowContentState(sortedWindows: windows, outdoorTemperature: outdoorTemperature)
     }
+
+    /// One überschrittenes Fenster, `overdueBy` past its Fensterschließzeit, for previews of the "+m:ss" label.
+    static func overdueSample(overdueBy: TimeInterval, room: String = "Schlafzimmer", name: String = "Fenster links", now: Date = Date()) -> WindowContentState {
+        let closeBy = now.addingTimeInterval(-overdueBy)
+        let window = Window(id: Window.id(room: room, name: name),
+                            name: name,
+                            room: room,
+                            opened: closeBy.addingTimeInterval(-25 * 60),
+                            closeBy: closeBy,
+                            isOverdue: true)
+        return WindowContentState(sortedWindows: [window], outdoorTemperature: 6)
+    }
 }
 #endif

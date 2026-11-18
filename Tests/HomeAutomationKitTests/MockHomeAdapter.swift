@@ -88,6 +88,11 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         traceMap["setUsedEntityIds.count:\(entityIds.count)", default: 0] += 1
     }
 
+    /// How often `perform` ran an action, by the action's name, e.g. `"setBrightness"`.
+    func actionCount(_ actionName: String) -> Int {
+        traceMap["action.\(actionName)", default: 0]
+    }
+
     func getSortedTraceMap() -> Set<String> {
         let items = traceMap.sorted { $0.key < $1.key }
             .map { "\($0.key): \($0.value)" }

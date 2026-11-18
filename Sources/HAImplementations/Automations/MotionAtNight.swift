@@ -11,12 +11,14 @@ import HAModels
 public struct MotionAtNight: Automatable {
     public var isActive = true
     public let name: String
-    /// Time to wait after last motion detection before starting the dim/off sequence
+    /// Time to wait after the motion sensors stopped reporting motion before starting the dim/off sequence
     public private(set) var noMotionWait: Duration = .seconds(60)
     /// Time to keep lights dimmed before turning them off completely
     public private(set) var dimWait: Duration = .seconds(10)
     /// Time to wait between turning on lights and setting color temperature to prevent flickering
     public private(set) var colorTemperatureDelay: Duration = .seconds(1)
+    /// How often the motion sensors are read again while they still report motion after `noMotionWait`.
+    static let motionPollInterval: Duration = .seconds(30)
     public let motionSensors: [MotionSensorDevice]
     public let lightSensor: MotionSensorDevice
     public let windowContacts: [ContactSensorDevice]
@@ -54,15 +56,7 @@ public struct MotionAtNight: Automatable {
             return false
         }
 
-        // was any motion sensor triggered
-        let motionDetected = await motionSensors.asyncMap({ motionSensor in
-            do {
-                return try await motionSensor.motionDetectedState(with: hm)
-            } catch {
-                log.warning("Failed to get motion sensor data - \(error)")
-                return false
-            }
-        }).contains { $0 }
+        let motionDetected = await isMotionDetected(using: hm)
 
         var illuminance: Measurement<UnitIlluminance>?
         do {
@@ -99,12 +93,17 @@ public struct MotionAtNight: Automatable {
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        let location = await hm.getLocation()
+        try await execute(using: hm, sleep: { try await Task.sleep(for: $0) })
+    }
+
+    /// `sleep` stands in for `Task.sleep`, so tests can drive the waits without real time.
+    func execute(using homeManager: HomeManagable, sleep: @escaping @Sendable (Duration) async throws -> Void) async throws {
+        let location = await homeManager.getLocation()
         let isWindowOpen: Bool
         if shouldRespectWindowContacts(at: Date(), location: location) {
             isWindowOpen = await windowContacts.asyncMap({ windowSensor in
                 do {
-                    return try await windowSensor.isContactOpen(with: hm)
+                    return try await windowSensor.isContactOpen(with: homeManager)
                 } catch {
                     log.warning("Failed to get contact sensor - \(error)")
                     return false
@@ -128,17 +127,17 @@ public struct MotionAtNight: Automatable {
                     group.addTask {
                         // Turn on the light
                         if light.brightnessId != nil {
-                            await light.setBrightness(to: brightnessValue, with: hm)
+                            await light.setBrightness(to: brightnessValue, with: homeManager)
                         } else {
-                            await light.turnOn(with: hm)
+                            await light.turnOn(with: homeManager)
                         }
 
                         // Wait before adjusting color temperature to prevent flickering
-                        try? await Task.sleep(for: colorTemperatureDelay)
+                        try? await sleep(colorTemperatureDelay)
 
                         // Set color temperature if supported
                         if light.hasColorTemperatureSupport {
-                            await light.setColorTemperature(to: colorTemperatureValue, with: hm)
+                            await light.setColorTemperature(to: colorTemperatureValue, with: homeManager)
                         }
                     }
                 }
@@ -147,31 +146,74 @@ public struct MotionAtNight: Automatable {
                 await group.waitForAll()
             }
 
-            // wait for x seconds or until this task wil be suspended
-            try await Task.sleep(for: noMotionWait)
-        }
+            // Wait until no motion is left, dim, and restore the brightness when motion returns while dimmed.
+            // A new trigger cancels this task, but presence sensors hold "motion detected" without sending
+            // new events, so the sensors are read again instead of waiting for one.
+            while true {
+                try await waitUntilNoMotion(using: homeManager, sleep: sleep)
+                await dimLights(to: brightnessValue, using: homeManager)
+                try await sleep(dimWait)
 
-        // dim lights before turning them off
-        log.debug("Dimming lights before turning them off")
-        await withTaskGroup(of: Void.self) { group in
-            for light in lights {
-                group.addTask {
-                    // do not change the brightness, if it is currently turned off
-                    guard (try? await hm.getCurrentEntity(with: light.switchId).isDeviceOn ?? true) == true else { return }
-                    await light.setBrightness(to: min(0.05, brightnessValue), with: hm)
-                }
+                guard await isMotionDetected(using: homeManager) else { break }
+                log.info("Motion detected while dimmed - restoring brightness")
+                await setBrightnessOfLightsThatAreOn(to: brightnessValue, using: homeManager)
             }
-
-            await group.waitForAll()
+        } else {
+            await dimLights(to: brightnessValue, using: homeManager)
+            try await sleep(dimWait)
         }
-        try await Task.sleep(for: dimWait)
 
         // turn off lights in parallel
         await withTaskGroup(of: Void.self) { group in
             for light in lights {
                 group.addTask {
                     log.debug("Turn off device \(light.switchId)")
-                    await light.turnOff(with: hm)
+                    await light.turnOff(with: homeManager)
+                }
+            }
+
+            await group.waitForAll()
+        }
+    }
+
+    /// Waits `noMotionWait`, then as long as a motion sensor still reports motion, polls every
+    /// ``motionPollInterval`` until it ends and waits `noMotionWait` again from there.
+    private func waitUntilNoMotion(using homeManager: HomeManagable, sleep: @Sendable (Duration) async throws -> Void) async throws {
+        try await sleep(noMotionWait)
+        while await isMotionDetected(using: homeManager) {
+            log.info("Motion still detected after \(noMotionWait) - keeping lights on")
+            repeat {
+                try await sleep(Self.motionPollInterval)
+            } while await isMotionDetected(using: homeManager)
+            try await sleep(noMotionWait)
+        }
+    }
+
+    /// Whether any motion sensor reports motion. A sensor that cannot be read counts as "no motion",
+    /// so an unreachable or dead sensor cannot keep the lights on forever.
+    private func isMotionDetected(using homeManager: HomeManagable) async -> Bool {
+        await motionSensors.asyncMap({ motionSensor in
+            do {
+                return try await motionSensor.motionDetectedState(with: homeManager)
+            } catch {
+                log.warning("Failed to get motion sensor data, counting it as no motion - \(error)")
+                return false
+            }
+        }).contains { $0 }
+    }
+
+    private func dimLights(to brightnessValue: Float, using homeManager: HomeManagable) async {
+        log.debug("Dimming lights before turning them off")
+        await setBrightnessOfLightsThatAreOn(to: min(0.05, brightnessValue), using: homeManager)
+    }
+
+    /// Lights that are off, e.g. turned off by hand, keep their state.
+    private func setBrightnessOfLightsThatAreOn(to value: Float, using homeManager: HomeManagable) async {
+        await withTaskGroup(of: Void.self) { group in
+            for light in lights {
+                group.addTask {
+                    guard (try? await homeManager.getCurrentEntity(with: light.switchId).isDeviceOn ?? true) == true else { return }
+                    await light.setBrightness(to: value, with: homeManager)
                 }
             }
 

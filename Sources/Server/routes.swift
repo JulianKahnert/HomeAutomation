@@ -19,7 +19,7 @@ func routes(_ app: Application) throws {
         "It works!"
     }
 
-    // Adapter WebSocket transport for the StarActorSystem (see docs/adr-001)
+    // Adapter WebSocket transport for the StarActorSystem (see ADR-001 in the knowledge base)
     registerAdapterWebSocket(on: authenticatedRoutes, system: app.starActorSystem)
 
     authenticatedRoutes.get("health") { req async throws -> HTTPStatus in
@@ -27,6 +27,7 @@ func routes(_ app: Application) throws {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
         let system = req.application.starActorSystem
+        let homeManager = req.application.homeManager
 
         // Race the health checks against a hard timeout so the Docker healthcheck always gets a
         // fast, definitive answer (503 peer-not-up / 504 timeout) instead of hanging.
@@ -37,6 +38,11 @@ func routes(_ app: Application) throws {
                 let connectionStatus = system.latestConnectionStatus
                 guard connectionStatus == .up else {
                     throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(connectionStatus.rawValue)")
+                }
+
+                // The link can stay up while macOS has cut the adapter off from HomeKit.
+                if case .degraded(let reason) = await homeManager.homeKitHealth() {
+                    throw Abort(.serviceUnavailable, reason: "HomeKit degraded: \(reason)")
                 }
                 return .ok
             }
@@ -64,14 +70,20 @@ func routes(_ app: Application) throws {
         let configDTO = try req.content.decode(ConfigDTO.self)
         let skipValidation = req.query["skipValidation"] == "true"
 
-        if !skipValidation {
-            // validate if all automations are correct, e.g. contain existing entities
-            let configEntityIds = configDTO.automations
-                .map(\.automation)
-                .flatMap { $0.getEntityIds() }
-                .reduce(into: Set<EntityId>()) { partialResult, entityId in
-                    partialResult.insert(entityId)
-                }
+        // validate if all automations are correct, e.g. contain existing entities
+        let configEntityIds = configDTO.automations
+            .map(\.automation)
+            .flatMap { $0.getEntityIds() }
+            .reduce(into: Set<EntityId>()) { partialResult, entityId in
+                partialResult.insert(entityId)
+            }
+
+        if skipValidation {
+            // Deliberate escape hatch for deploying a config before all devices exist in
+            // HomeKit (or while the adapter is offline). It must never be silent: automations
+            // referencing unknown entities fail at runtime and flood the critical-log notifier.
+            req.logger.warning("⚠️ Accepting config with skipValidation=true - \(configEntityIds.count) referenced entities were NOT validated against HomeKit")
+        } else {
             let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
 
             let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))

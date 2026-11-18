@@ -17,6 +17,9 @@ public protocol NotificationSender: Sendable {
     /// delivered notification identified by `id` (matched via `threadIdentifier`).
     func clearNotification(id: String) async throws
 
-    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String) async
+    /// Starts the Live Activity or updates the running one, delivered as `options` say.
+    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
+                                                                       activityName: String,
+                                                                       options: LiveActivityOptions) async
     func endAllLiveActivities(ofActivityType activityType: String) async
 }

@@ -84,7 +84,7 @@ struct LogViewerView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(entry.level.uppercased())
-                    .font(isCritical ? .caption.bold() : .caption2.bold())
+                    .font(isCritical ? .caption : .caption2)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(levelColor(entry.level).opacity(isCritical ? 0.4 : 0.2))

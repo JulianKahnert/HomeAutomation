@@ -29,4 +29,19 @@ struct ConfigTests {
 
         #expect(entityIds == refEntityIds)
     }
+
+    @Test("triggerEntityIds omits a nil lightSensorId instead of trapping")
+    func triggerEntityIdsWithNilLightSensorId() throws {
+        let motionSensor = GenericMotionSensor(query: .init(placeId: "room1", name: "motion1"))
+        let light = GenericSwitch(query: .init(placeId: "room1", name: "switch1"))
+        let contact = WindowContactSensor(query: .init(placeId: "room1", name: "contact1"))
+        let automation = MotionAtNight("motion-at-night", noMotionWait: .milliseconds(50), motionSensors: [motionSensor], lightSensor: motionSensor, lights: [light], windowContacts: [contact], minBrightness: 0.1)
+
+        let refEntityIds = Set([
+            EntityId(placeId: "room1", name: "motion1", characteristicsName: nil, characteristic: .motionSensor),
+            EntityId(placeId: "room1", name: "contact1", characteristicsName: nil, characteristic: .contactSensor)
+        ])
+
+        #expect(automation.triggerEntityIds == refEntityIds)
+    }
 }

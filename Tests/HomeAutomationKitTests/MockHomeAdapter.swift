@@ -17,6 +17,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     let entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation
 
     var storageItems: [EntityStorageItem] = []
+    var health = HomeKitHealth.healthy
     private let log = Logger(label: "MockHomeAdapter")
     private var traceMap: [String: Int] = [:]
 
@@ -134,31 +135,36 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return didChange
     }
 
-    func maintenance() async throws {
-    }
-
-    func deleteStorageEntries(olderThan date: Date) async throws {
-    }
-
     func getLocation() async -> Location {
         return Location(latitude: 0, longitude: 0)
     }
 
-    func sendNotification(title: String, message: String, id: String) async {}
+    private(set) var sentNotificationTitles: [String] = []
+    private(set) var overdueWindowIds: [EntityId] = []
 
-    func clearWindowNotification(entityId: EntityId) async {}
+    func sendNotification(title: String, message: String, id: String) async {
+        sentNotificationTitles.append(title)
+    }
 
-    func getWindowStates() async -> [WindowOpenState] {
-        return []
+    func markWindowOverdue(entityId: EntityId) async {
+        overdueWindowIds.append(entityId)
+    }
+
+    func getWindowContentState() async -> WindowContentState {
+        .empty
     }
 
     func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
     }
 
-    func getActionLog(limit: Int?) async -> [ActionLogItem] {
+    func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {
         return []
     }
 
     func clearActionLog() async {
+    }
+
+    func homeKitHealth() async -> HomeKitHealth {
+        health
     }
 }

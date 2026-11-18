@@ -4,7 +4,7 @@
 //
 //  Created by Julian Kahnert on 26.07.26.
 //
-//  Server-side WebSocket transport for the StarActorSystem (see docs/adr-001).
+//  Server-side WebSocket transport for the StarActorSystem (see ADR-001 in the knowledge base).
 //  The adapter connects to `/adapter/v1` (authenticated); frames are pumped
 //  into the actor system, which handles hello handshake, calls and replies.
 

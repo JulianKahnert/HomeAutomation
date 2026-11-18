@@ -138,4 +138,35 @@ struct ActionLogManagerTests {
         // Dedup is gone (expired) → the command is a fresh miss again.
         #expect(await manager.log(action: action) == false)
     }
+
+    // MARK: - run id and status
+
+    @Test("Logged actions carry run id and status, filterable by run id")
+    func runIdAndStatus() async {
+        let manager = ActionLogManager()
+        let runId = UUID()
+        let action = HomeManagableAction.turnOn(switchId)
+
+        _ = await manager.log(action: action, runId: runId)
+        await manager.markExecuted(action)
+        _ = await manager.log(action: action, runId: runId)
+        _ = await manager.log(action: .setBrightness(brightnessId, 0.5))
+
+        let runActions = await manager.getActions(runId: runId)
+        #expect(runActions.map(\.status) == [.cacheHit, .executed])
+        #expect(runActions.allSatisfy { $0.runId == runId })
+        #expect(await manager.getActions().count == 3)
+    }
+
+    @Test("markFailed flags the newest executed entry of the action")
+    func markFailed() async {
+        let manager = ActionLogManager()
+        let action = HomeManagableAction.turnOn(switchId)
+
+        _ = await manager.log(action: action)
+        _ = await manager.log(action: action)
+        await manager.markFailed(action)
+
+        #expect(await manager.getActions().map(\.status) == [.failed, .executed])
+    }
 }

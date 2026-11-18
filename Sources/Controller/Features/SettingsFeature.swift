@@ -13,6 +13,15 @@ import Sharing
 import SwiftUI
 
 @Reducer
+enum SettingsPath {
+    case commandLog(ActionsFeature)
+    case logs(LogViewerFeature)
+}
+
+extension SettingsPath.State: Equatable, Sendable {}
+extension SettingsPath.Action: Sendable {}
+
+@Reducer
 struct SettingsFeature: Sendable {
 
     private static let logger = Logger(label: "SettingsFeature")
@@ -37,8 +46,7 @@ struct SettingsFeature: Sendable {
         var isPushAuthorized: Bool = false
         var deviceToken: Data?
 
-        // Log viewer
-        @Presents var logViewer: LogViewerFeature.State?
+        var path = StackState<SettingsPath.State>()
     }
 
     // MARK: - Action
@@ -51,11 +59,10 @@ struct SettingsFeature: Sendable {
         case cancelEditServerURL
         case toggleLiveActivities(Bool)
         case refreshWindowStates
-        case windowStatesResponse(Result<[WindowContentState.WindowState], Error>)
+        case windowStatesResponse(Result<WindowContentState, Error>)
         case requestPushAuthorization
         case dismissError
-        case showLogViewer
-        case logViewer(PresentationAction<LogViewerFeature.Action>)
+        case path(StackActionOf<SettingsPath>)
         case binding(BindingAction<State>)
     }
 
@@ -124,28 +131,28 @@ struct SettingsFeature: Sendable {
                 state.error = nil
                 return .run { send in
                     await send(.windowStatesResponse(
-                        Result { try await serverClient.getWindowStates() }
+                        Result { try await serverClient.getWindowContentState() }
                     ))
                 }
 
-            case let .windowStatesResponse(.success(windowStates)):
+            case let .windowStatesResponse(.success(contentState)):
                 state.isLoadingWindowStates = false
-                state.windowContentState = WindowContentState(windowStates: windowStates)
-                Self.logger.info("Received \(windowStates.count) window state(s)")
+                state.windowContentState = contentState
+                Self.logger.info("Received open windows", metadata: ["openCount": "\(contentState.openCount)"])
 
                 if state.liveActivitiesEnabled {
                     return .run { _ in
                         let hasActive = await liveActivity.hasActiveActivities()
 
-                        if windowStates.isEmpty {
+                        if contentState.windows.isEmpty {
                             Self.logger.info("No open windows, stopping Live Activities")
                             await liveActivity.stopActivity()
                         } else if hasActive {
-                            Self.logger.info("Updating existing Live Activity with \(windowStates.count) window(s)")
-                            await liveActivity.updateActivity(windowStates)
+                            Self.logger.info("Updating existing Live Activity", metadata: ["openCount": "\(contentState.openCount)"])
+                            await liveActivity.updateActivity(contentState)
                         } else {
-                            Self.logger.info("No active Live Activity, starting new one with \(windowStates.count) window(s)")
-                            try await liveActivity.startActivity(windowStates)
+                            Self.logger.info("No active Live Activity, starting a new one", metadata: ["openCount": "\(contentState.openCount)"])
+                            try await liveActivity.startActivity(contentState)
                         }
                     }
                 } else {
@@ -156,10 +163,10 @@ struct SettingsFeature: Sendable {
             case let .windowStatesResponse(.failure(error)):
                 state.isLoadingWindowStates = false
                 state.error = "Failed to load window states: \(error.localizedDescription)"
-                Self.logger.error("Failed to load window states: \(error)")
+                Self.logger.error("Failed to load window states", metadata: ["error": "\(error)"])
 
                 return .run { _ in
-                    await liveActivity.updateActivity([])
+                    await liveActivity.updateActivity(.empty)
                 }
 
             case .requestPushAuthorization:
@@ -171,20 +178,14 @@ struct SettingsFeature: Sendable {
                 state.error = nil
                 return .none
 
-            case .showLogViewer:
-                state.logViewer = LogViewerFeature.State()
-                return .none
-
-            case .logViewer:
+            case .path:
                 return .none
 
             case .binding:
                 return .none
             }
         }
-        .ifLet(\.$logViewer, action: \.logViewer) {
-            LogViewerFeature()
-        }
+        .forEach(\.path, action: \.path)
     }
 }
 
@@ -192,7 +193,7 @@ struct SettingsView: View {
     @Bindable var store: StoreOf<SettingsFeature>
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $store.scope(\.path, action: \.path)) {
             Form {
                 Section {
                     serverConfigSection
@@ -210,42 +211,30 @@ struct SettingsView: View {
                 } footer: {
                     Text("Show window states in Dynamic Island and Lock Screen")
                 }
-
-                if let windowState = store.windowContentState {
-                    Section {
-                        windowStatesSection(windowState)
-                    } header: {
-                        Text("Window States")
-                    }
-                }
                 #endif
 
-                Section {
-                    Button {
-                        store.send(.showLogViewer)
-                    } label: {
-                        HStack {
-                            Label("View Logs", systemImage: "doc.text.magnifyingglass")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.secondary)
-                        }
+                Section("Diagnostics") {
+                    NavigationLink(state: SettingsPath.State.commandLog(ActionsFeature.State())) {
+                        Label("Command Log", systemImage: "list.bullet.clipboard")
                     }
-                } header: {
-                    Text("Diagnostics")
+                    NavigationLink(state: SettingsPath.State.logs(LogViewerFeature.State())) {
+                        Label("App Logs", systemImage: "doc.text.magnifyingglass")
+                    }
                 }
             }
             .navigationTitle("Settings")
-            .navigationDestination(
-                item: $store.scope(state: \.logViewer, action: \.logViewer)
-            ) { logStore in
-                LogViewerFeatureView(store: logStore)
-            }
             .refreshable {
                 store.send(.refreshWindowStates)
             }
             .onAppear {
                 store.send(.onAppear)
+            }
+        } destination: { pathStore in
+            switch pathStore.case {
+            case let .commandLog(commandLogStore):
+                ActionsView(store: commandLogStore)
+            case let .logs(logStore):
+                LogViewerFeatureView(store: logStore)
             }
         }
     }
@@ -266,7 +255,7 @@ struct SettingsView: View {
 
             Text(store.serverURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
 
         if store.isEditingServerURL {
@@ -301,22 +290,6 @@ struct SettingsView: View {
             get: { store.liveActivitiesEnabled },
             set: { store.send(.toggleLiveActivities($0)) }
         ))
-    }
-
-    @ViewBuilder
-    private func windowStatesSection(_ windowState: WindowContentState) -> some View {
-        if windowState.windowStates.isEmpty {
-            Text("No open windows")
-                .foregroundColor(.secondary)
-        } else {
-            ForEach(windowState.windowStates, id: \.name) { window in
-                ProgressView(timerInterval: window.opened...window.end, countsDown: false) {
-                    Text(window.name)
-                }
-                .tint(Date() <= window.end ? Color.accentColor : Color.red)
-            }
-            .listRowSeparator(.hidden)
-        }
     }
     #endif
 }

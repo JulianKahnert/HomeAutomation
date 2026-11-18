@@ -28,17 +28,48 @@ public final class HomeManager: HomeManagable {
     /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
     /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
     /// replaying both would be contradictory.
-    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int)] = [:]
+    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int, runId: UUID?)] = [:]
+    /// Changed entity states on their way to the database. One task drains it in order, so a burst
+    /// of events (the adapter's full resync on every reconnect) uses one database connection at a
+    /// time instead of one query per event at once.
+    private let persistQueue: AsyncStream<EntityStorageItem>.Continuation
+    /// Far above one full resync (~200 entities); only reached while the database is stuck. The
+    /// oldest queued states are dropped first. An entity whose only queued state is dropped is
+    /// missing from the history until its next change, because a replay of that value is not queued.
+    nonisolated private static let persistQueueLimit = 5_000
+    /// States dropped since the queue last had room again; keeps a stuck database from flooding the log.
+    private var droppedPersistItems = 0
+    private var liveness = HomeKitLiveness(startedAt: Date())
 
-    /// - Parameter retryTicks: Cadence at which queued failed actions are retried. Pass a stream to
-    ///   drive the retries deterministically; the default is a 5s timer.
-    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?, storageRepo: StorageRepository, notificationSender: NotificationSender, location: Location, actionLogManager: ActionLogManager, retryTicks: AsyncStream<Void>? = nil) {
-        self.windowManager = WindowManager(notificationSender: notificationSender)
+    /// - Parameters:
+    ///   - retryTicks: Cadence at which queued failed actions are retried. Pass a stream to drive the
+    ///     retries deterministically; the default is a 5s timer.
+    ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
+    ///     than there are delays.
+    ///   - outdoorTemperature: The latest stored outdoor temperature reading in °C, `nil` without one;
+    ///     shown in the window Live Activity.
+    public init(getAdapter: @escaping () async -> (any EntityAdapterable)?,
+                storageRepo: StorageRepository,
+                notificationSender: NotificationSender,
+                location: Location,
+                actionLogManager: ActionLogManager,
+                retryTicks: AsyncStream<Void>? = nil,
+                persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
+                outdoorTemperature: @escaping @Sendable () async -> Double? = { nil }) {
+        self.windowManager = WindowManager(notificationSender: notificationSender, outdoorTemperature: outdoorTemperature)
         self.actionLogManager = actionLogManager
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
         self.notificationSender = notificationSender
         self.location = location
+
+        let (persistStream, persistQueue) = AsyncStream<EntityStorageItem>.makeStream(bufferingPolicy: .bufferingNewest(Self.persistQueueLimit))
+        self.persistQueue = persistQueue
+        Task.detached(priority: .background) { [storageRepo, log] in
+            for await item in persistStream {
+                await Self.persist(item, in: storageRepo, retryDelays: persistRetryDelays, log: log)
+            }
+        }
 
 //        Task {
 //            let adapter = await getAdapter()
@@ -54,9 +85,9 @@ public final class HomeManager: HomeManagable {
         Task.detached(priority: .low) {
             for await _ in ticks {
                 let queued = await self.popAllFailedActions()
-                for (action, attempt) in queued {
+                for (action, attempt, runId) in queued {
                     self.log.debug("Performing failed action again: \(action) [attempt \(attempt + 1)/\(Self.maxAttempts)]")
-                    await self.perform(action, attempt: attempt)
+                    await self.perform(action, attempt: attempt, runId: runId)
                 }
             }
         }
@@ -106,10 +137,12 @@ public final class HomeManager: HomeManagable {
     public func perform(_ action: HomeManagableAction) async {
         // Round values to prevent excessive HomeKit updates
         let roundedAction = action.rounded()
-        await perform(roundedAction, attempt: 0)
+        await perform(roundedAction, attempt: 0, runId: AutomationRunContext.runId)
     }
 
-    private func perform(_ action: HomeManagableAction, attempt: Int) async {
+    /// - Parameter runId: Passed explicitly because the retry loop runs detached, without the
+    ///   `AutomationRunContext` task local of the original run.
+    private func perform(_ action: HomeManagableAction, attempt: Int, runId: UUID?) async {
         // Cancellation is honoured at command boundaries only: a superseded automation run must not
         // start further commands, but a command that already started always runs to completion (see
         // the shield below). Checked before logging so a skipped command produces no log entry.
@@ -119,7 +152,7 @@ public final class HomeManager: HomeManagable {
         }
 
         // Log action and check if it's a duplicate (cache hit)
-        let hasCacheHit = await actionLogManager.log(action: action)
+        let hasCacheHit = await actionLogManager.log(action: action, runId: runId)
 
         if hasCacheHit {
             log.info("Skipping duplicate command: [\(action)]")
@@ -141,7 +174,10 @@ public final class HomeManager: HomeManagable {
 
             // Only a command that reached the device may deduplicate its successors.
             await actionLogManager.markExecuted(action)
+            liveness.recordCommandSuccess(at: Date())
         } catch {
+            liveness.recordCommandFailure(error, at: Date())
+            await actionLogManager.markFailed(action)
             let entityId = action.entityId
 
             if let entity = try? await getCurrentEntity(with: entityId) {
@@ -151,7 +187,7 @@ public final class HomeManager: HomeManagable {
 
             let nextAttempt = attempt + 1
             if nextAttempt < Self.maxAttempts {
-                failedActions[entityId] = (action, nextAttempt)
+                failedActions[entityId] = (action, nextAttempt, runId)
             } else {
                 log.critical("Giving up on action [\(action)] after \(Self.maxAttempts) attempts")
             }
@@ -168,9 +204,11 @@ public final class HomeManager: HomeManagable {
         let start = ContinuousClock.now
         do {
             try await getAdapter().get(with: log).trigger(scene: sceneName)
+            liveness.recordCommandSuccess(at: Date())
             let duration = start.duration(to: .now)
             log.info("Triggering scene '\(sceneName)' — completed in \(duration)")
         } catch {
+            liveness.recordCommandFailure(error, at: Date())
             let duration = start.duration(to: .now)
             log.error("Failed to trigger scene '\(sceneName)' after \(duration)\n\(error)")
         }
@@ -179,6 +217,8 @@ public final class HomeManager: HomeManagable {
     @discardableResult
     public func addEntityHistory(_ item: EntityStorageItem) async -> Bool {
         log.debug("Adding entity item to storage \(item.entityId)")
+        // Every change event counts, a value-identical replay too: it proves HomeKit still delivers.
+        liveness.recordEvent(at: Date())
 
         // `EntityStorageItem` is Equatable including its timestamp, so align it before comparing —
         // only the values decide whether this is new information. An unknown entity counts as a
@@ -211,37 +251,56 @@ public final class HomeManager: HomeManagable {
             log.info("Invalidated \(invalidatedActions.count) cached command(s) for \(item.entityId) due to state drift: \(invalidatedActions)")
         }
 
+        // A value-identical replay is already queued or stored: the cache only holds states that
+        // went through this queue.
+        guard didChange else { return false }
+
         // Persist item in the background to avoid blocking automation execution
-        Task.detached(priority: .background) {
-            do {
-                if var currentItem = try await self.storageRepo.getCurrent(item.entityId) {
-
-                    // found current item, save it when a change has happend
-                    // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
-                    currentItem.timestamp = item.timestamp
-                    guard item != currentItem else { return }
-
-                    try await self.storageRepo.add(item)
-                } else {
-                    // no current item found add it to the store directly
-                    try await self.storageRepo.add(item)
-                }
-            } catch {
-                self.log.critical("Failed to persist entity item \(error)")
+        switch persistQueue.yield(item) {
+        case .dropped(let dropped):
+            droppedPersistItems += 1
+            if droppedPersistItems == 1 || droppedPersistItems.isMultiple(of: 500) {
+                log.warning("Persist queue full, dropped \(droppedPersistItems) entity item(s) so far, last one \(dropped.entityId)")
             }
+        case .enqueued(let remaining) where droppedPersistItems > 0 && remaining >= Self.persistQueueLimit / 2:
+            log.notice("Persist queue draining again after dropping \(droppedPersistItems) entity item(s)")
+            droppedPersistItems = 0
+        default:
+            break
         }
 
         return didChange
     }
 
-    public func maintenance() async throws {
-        // delete storage entries older than 2 days
-        let date = Date().addingTimeInterval(-1 * 2 * 24 * 60 * 60)
-        try await storageRepo.deleteEntries(olderThan: date)
+    /// Retries inside the serial queue instead of clearing the cache entry: a cleared entry would make
+    /// the next identical replay count as a change and trigger automations again.
+    nonisolated private static func persist(_ item: EntityStorageItem, in storageRepo: StorageRepository, retryDelays: [Duration], log: Logger) async {
+        var attempt = 0
+        while true {
+            do {
+                try await persistOnce(item, in: storageRepo)
+                return
+            } catch {
+                guard attempt < retryDelays.count else {
+                    log.critical("Failed to persist entity item \(item.entityId) after \(attempt + 1) attempts: \(error)")
+                    return
+                }
+                log.warning("Failed to persist entity item \(item.entityId), retrying: \(error)")
+                try? await Task.sleep(for: retryDelays[attempt])
+                attempt += 1
+            }
+        }
     }
 
-    public func deleteStorageEntries(olderThan date: Date) async throws {
-        try await storageRepo.deleteEntries(olderThan: date)
+    nonisolated private static func persistOnce(_ item: EntityStorageItem, in storageRepo: StorageRepository) async throws {
+        // After a restart the cache is empty, so the adapter's resync counts as a change; skip the
+        // states the database already holds. This also keeps a retry from saving a state twice.
+        if var currentItem = try await storageRepo.getCurrent(item.entityId) {
+            // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
+            currentItem.timestamp = item.timestamp
+            guard item != currentItem else { return }
+        }
+        try await storageRepo.add(item)
     }
 
     public func getLocation() -> Location {
@@ -257,33 +316,32 @@ public final class HomeManager: HomeManagable {
         }
     }
 
-    public func clearWindowNotification(entityId: EntityId) async {
-        do {
-            let id = entityId.windowNotificationId
-            log.debug("Clearing window notification [id: \(id)]")
-            try await notificationSender.clearNotification(id: id)
-        } catch {
-            log.warning("Failed to clear window notification: \(error)")
-        }
+    public func markWindowOverdue(entityId: EntityId) async {
+        await windowManager.markWindowOverdue(entityId: entityId)
     }
 
-    public func getWindowStates() async -> [WindowOpenState] {
-        await windowManager.getWindowStates()
+    public func getWindowContentState() async -> WindowContentState {
+        await windowManager.contentState()
     }
 
     public func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
         await windowManager.setWindowOpenState(entityId: entityId, to: state)
     }
 
-    public func getActionLog(limit: Int?) async -> [ActionLogItem] {
-        await actionLogManager.getActions(limit: limit)
+    public func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {
+        await actionLogManager.getActions(limit: limit, runId: runId)
     }
 
     public func clearActionLog() async {
         await actionLogManager.clear()
     }
 
-    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int)] {
+    public func homeKitHealth() async -> HomeKitHealth {
+        let isConnected = await getAdapter() != nil
+        return liveness.evaluate(isConnected: isConnected, at: Date())
+    }
+
+    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?)] {
         let queued = Array(failedActions.values)
         failedActions.removeAll()
         return queued

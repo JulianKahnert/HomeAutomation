@@ -5,7 +5,7 @@
 //  Created by Julian Kahnert on 05.02.25.
 //
 
-public struct Location: Sendable, Codable {
+public struct Location: Sendable, Codable, Equatable {
     public let latitude: Double
     public let longitude: Double
 

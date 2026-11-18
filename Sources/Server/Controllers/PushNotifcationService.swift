@@ -20,11 +20,12 @@ private struct ClearNotificationPayload: Encodable, Sendable {
 actor PushNotifcationService: NotificationSender {
     private static let logger = Logger(label: "PushNotifcationService")
 
-    let database: any Database
+    /// Resolved per query, see `EntityStorageDbRepository.database`.
+    let database: @Sendable () -> any Database
     let apnsClient: any APNSClientProtocol & Sendable
     let notificationTopic: String
 
-    init(database: any Database, apnsClient: any APNSClientProtocol & Sendable, notificationTopic: String) {
+    init(database: @escaping @Sendable () -> any Database, apnsClient: any APNSClientProtocol & Sendable, notificationTopic: String) {
         self.database = database
         self.apnsClient = apnsClient
         self.notificationTopic = notificationTopic
@@ -36,7 +37,7 @@ actor PushNotifcationService: NotificationSender {
 
     func clearNotification(id: String) async throws {
         let deviceTokens = try await DeviceToken
-            .query(on: database)
+            .query(on: database())
             .filter(\.$tokenType == "pushNotification")
             .all()
 
@@ -55,7 +56,7 @@ actor PushNotifcationService: NotificationSender {
                     "Failed to send clear notification to \(deviceToken.deviceName): \(error.localizedDescription)"
                 )
                 do {
-                    try await DeviceToken.query(on: database)
+                    try await DeviceToken.query(on: database())
                         .filter(\.$tokenString == deviceToken.tokenString)
                         .delete()
                 } catch {
@@ -70,7 +71,7 @@ actor PushNotifcationService: NotificationSender {
     private func sendAlert(title: String, message: String, id: String?) async throws {
         let deviceTokens =
             try await DeviceToken
-            .query(on: database)
+            .query(on: database())
             .filter(\.$tokenType == "pushNotification")
             .all()
 
@@ -94,7 +95,7 @@ actor PushNotifcationService: NotificationSender {
                     "Failed to send push notification to \(deviceToken.deviceName) [\(deviceToken.tokenType)]: \(error.localizedDescription)"
                 )
                 do {
-                    try await DeviceToken.query(on: database)
+                    try await DeviceToken.query(on: database())
                         .filter(\.$tokenString == deviceToken.tokenString)
                         .delete()
                 } catch {
@@ -104,13 +105,18 @@ actor PushNotifcationService: NotificationSender {
         }
     }
 
-    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String) async {
+    func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
+                                                                       activityName: String,
+                                                                       options: LiveActivityOptions) async {
         Self.logger.debug("Start or update live activity")
+        let priority = APNSPriority(options.priority)
+        let staleDate = options.staleDate.map { Int($0.timeIntervalSince1970) }
+        let alert = options.alert.map(APNSAlertNotificationContent.init)
 
         do {
             let allDeviceTokens =
             try await DeviceToken
-                .query(on: database)
+                .query(on: database())
                 .filter(\.$tokenType != "pushNotification")
                 .all()
 
@@ -126,7 +132,7 @@ actor PushNotifcationService: NotificationSender {
 
                     // delete liveActivityUpdate tokens that are older than 4 hours
                     try await DeviceToken
-                        .query(on: database)
+                        .query(on: database())
                         .filter(\.$id == tokenId)
                         .delete()
                     expiredCount += 1
@@ -152,11 +158,13 @@ actor PushNotifcationService: NotificationSender {
                         Self.logger.info("Update LiveActivity (on: \(updateToken.deviceName)): \(contentState)")
                         let notification = APNSLiveActivityNotification<ContentState>(
                             expiration: .none,
-                            priority: .consideringDevicePower,
+                            priority: priority,
                             appID: notificationTopic,
                             contentState: contentState,
                             event: .update,
-                            timestamp: Int(Date().timeIntervalSince1970))
+                            alert: alert,
+                            timestamp: Int(Date().timeIntervalSince1970),
+                            staleDate: staleDate)
 
                         // if an update token was found, we assume a live activity was found, so we use this token
                         usedToken = updateToken
@@ -171,18 +179,18 @@ actor PushNotifcationService: NotificationSender {
                         // to be displayed on the device. Omitting or using an empty
                         // APNSAlertNotificationContent() causes iOS to silently drop the notification
                         // and the Live Activity will never appear.
-                        // No sound is set, so the start is silent (no ring, no vibration). Priority 5
-                        // is enough because the state is informative, not urgent; the "offen" alert
-                        // from sendAlert stays the only audible notification.
+                        // Without an alert in the options no sound is set, so the start is silent (no ring,
+                        // no vibration); the priority comes from the options.
                         let notification = APNSStartLiveActivityNotification<ContentState, ContentState>(
                             expiration: .none,
-                            priority: .consideringDevicePower,
+                            priority: priority,
                             appID: notificationTopic,
                             contentState: contentState,
                             timestamp: Int(Date().timeIntervalSince1970),
+                            staleDate: staleDate,
                             attributes: contentState,
                             attributesType: activityName,
-                            alert: APNSAlertNotificationContent(
+                            alert: alert ?? APNSAlertNotificationContent(
                                 title: .raw("empty"),
                                 body: .raw("empty"),
                                 sound: nil))
@@ -204,7 +212,7 @@ actor PushNotifcationService: NotificationSender {
                         // 4. If the app was not woken (force-quit / iOS budget), the token is
                         //    re-registered when the user next opens the app
                         do {
-                            try await DeviceToken.query(on: database)
+                            try await DeviceToken.query(on: database())
                                 .filter(\.$tokenString == startToken.tokenString)
                                 .delete()
                         } catch {
@@ -231,7 +239,7 @@ actor PushNotifcationService: NotificationSender {
                         "[startOrUpdateLiveActivity] Failed to send live activity push notification to \(usedToken?.deviceName ?? "") [\(usedToken?.tokenType ?? "")]: \(error.localizedDescription)"
                     )
                     do {
-                        try await DeviceToken.query(on: database)
+                        try await DeviceToken.query(on: database())
                             .filter(\.$tokenString == usedToken?.tokenString ?? "")
                             .delete()
                     } catch {
@@ -249,11 +257,11 @@ actor PushNotifcationService: NotificationSender {
     func endAllLiveActivities(ofActivityType activityType: String) async {
         do {
             let deviceTokens = try await DeviceToken
-                .query(on: database)
+                .query(on: database())
                 .filter(\.$activityType == activityType)
                 .all()
 
-            let contentState = WindowContentState(windowStates: [])
+            let contentState = WindowContentState.empty
             let notification = APNSLiveActivityNotification<WindowContentState>(
                 expiration: .immediately,
                 priority: .immediately,
@@ -271,7 +279,7 @@ actor PushNotifcationService: NotificationSender {
 
                     // delete token when ending the live activity
                     do {
-                        try await DeviceToken.query(on: database)
+                        try await DeviceToken.query(on: database())
                             .filter(\.$tokenString == deviceToken.tokenString)
                             .delete()
                     } catch {
@@ -288,7 +296,7 @@ actor PushNotifcationService: NotificationSender {
                         "[endAllLiveActivities] Failed to send live activity push notification to \(deviceToken.deviceName) [\(deviceToken.tokenType)]: \(error.localizedDescription)"
                     )
                     do {
-                        try await DeviceToken.query(on: database)
+                        try await DeviceToken.query(on: database())
                             .filter(\.$tokenString == deviceToken.tokenString)
                             .delete()
                     } catch {
@@ -302,11 +310,27 @@ actor PushNotifcationService: NotificationSender {
 
         do {
             try await DeviceToken
-                .query(on: database)
+                .query(on: database())
                 .filter(\.$activityType == activityType)
                 .delete()
         } catch {
             Self.logger.error("Failed to delete old token: \(error)")
         }
+    }
+}
+
+private extension APNSPriority {
+    init(_ priority: LiveActivityOptions.Priority) {
+        switch priority {
+        case .low: self = .consideringDevicePower
+        case .high: self = .immediately
+        }
+    }
+}
+
+private extension APNSAlertNotificationContent {
+    /// A Live Activity alert that expands the Dynamic Island and plays the default sound.
+    init(_ alert: LiveActivityOptions.Alert) {
+        self.init(title: .raw(alert.title), body: .raw(alert.body), sound: .default)
     }
 }

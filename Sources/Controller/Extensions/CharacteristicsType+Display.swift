@@ -44,6 +44,38 @@ extension CharacteristicsType {
             return "Lock"
         case .heating:
             return "Heating"
+        case .targetTemperature:
+            return "Target Temperature"
+        case .heatingMode:
+            return "Heating Mode"
+        case .valvePosition:
+            return "Valve Position"
+        case .temperatureCalibration:
+            return "Temperature Offset"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .motionSensor: return "figure.walk"
+        case .lightSensor: return "sun.max"
+        case .batterySensor: return "battery.75percent"
+        case .contactSensor: return "window.casement"
+        case .temperatureSensor: return "thermometer.medium"
+        case .relativeHumiditySensor: return "humidity"
+        case .carbonDioxideSensorId: return "carbon.dioxide.cloud"
+        case .pmDensitySensor, .airQualitySensor: return "aqi.medium"
+        case .switcher: return "lightbulb"
+        case .brightness: return "light.max"
+        case .colorTemperature: return "thermometer.sun"
+        case .color: return "paintpalette"
+        case .valve: return "spigot"
+        case .lock: return "lock"
+        case .heating: return "heater.vertical"
+        case .targetTemperature: return "target"
+        case .heatingMode: return "thermostat"
+        case .valvePosition: return "spigot"
+        case .temperatureCalibration: return "plusminus"
         }
     }
 }

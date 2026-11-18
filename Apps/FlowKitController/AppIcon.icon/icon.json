@@ -1,0 +1,48 @@
+{
+  "fill" : {
+    "solid" : "srgb:0.10588,0.56863,0.31373,1.00000"
+  },
+  "fill-specializations" : [
+    {
+      "value" : {
+        "solid" : "srgb:0.10588,0.56863,0.31373,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "srgb:0.10588,0.18824,0.14118,1.00000"
+      }
+    }
+  ],
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "fill-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:0.37255,0.81569,0.55294,1.00000"
+              }
+            }
+          ],
+          "glass" : true,
+          "image-name" : "house.svg",
+          "name" : "house"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

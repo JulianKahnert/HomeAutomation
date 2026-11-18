@@ -38,9 +38,11 @@ public actor ActionLogManager {
     /// never reached the device (cancelled, adapter error) must stay a cache miss so the next
     /// attempt is allowed through.
     ///
-    /// - Parameter action: The action to log
+    /// - Parameters:
+    ///   - action: The action to log
+    ///   - runId: The `AutomationRun` that sent the action, if any.
     /// - Returns: true if this was a duplicate action (cache hit), false if it's a new action that should be executed
-    public func log(action: HomeManagableAction) async -> Bool {
+    public func log(action: HomeManagableAction, runId: UUID? = nil) async -> Bool {
         let cacheKey = CommandCacheKey(action)
 
         // Check if action is in cache
@@ -56,7 +58,8 @@ public actor ActionLogManager {
         // Log the action
         let item = ActionLogItem(
             action: action,
-            hasCacheHit: hasCacheHit
+            hasCacheHit: hasCacheHit,
+            runId: runId
         )
 
         // Insert at beginning (newest first)
@@ -78,6 +81,13 @@ public actor ActionLogManager {
     /// - Parameter action: The action that was successfully performed.
     public func markExecuted(_ action: HomeManagableAction) async {
         await commandCache.insert(action, forKey: CommandCacheKey(action))
+    }
+
+    /// Marks the newest executed log entry of `action` as failed.
+    public func markFailed(_ action: HomeManagableAction) {
+        let detail = action.description
+        guard let index = actions.firstIndex(where: { $0.entityId == action.entityId && $0.detailDescription == detail && $0.status == .executed }) else { return }
+        actions[index].status = .failed
     }
 
     /// Reset cached commands for `item.entityId` that the freshly observed device state contradicts.
@@ -106,8 +116,11 @@ public actor ActionLogManager {
         return invalidatedActions
     }
 
-    public func getActions(limit: Int? = nil) -> [ActionLogItem] {
+    public func getActions(limit: Int? = nil, runId: UUID? = nil) -> [ActionLogItem] {
         var result = actions
+        if let runId {
+            result = result.filter { $0.runId == runId }
+        }
 
         // Apply limit if provided
         if let limit = limit {

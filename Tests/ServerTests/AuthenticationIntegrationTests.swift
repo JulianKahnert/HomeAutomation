@@ -27,7 +27,7 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
         // Mock homeAutomationConfigService for testing
         let mockLocation = Location(latitude: 52.52, longitude: 13.405)
-        app.homeAutomationConfigService = HomeAutomationConfigService(location: mockLocation, automations: [])
+        app.homeAutomationConfigService = HomeAutomationConfigService(location: mockLocation, automations: [], persist: { _ in })
 
         // The WebSocket route registration needs an actor system present
         app.starActorSystem = StarActorSystem(name: "server-tests")

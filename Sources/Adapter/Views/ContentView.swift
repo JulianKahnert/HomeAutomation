@@ -57,7 +57,7 @@ struct ConnectionStatusView: View {
     private var statusColor: Color {
         switch status {
         case .up:
-            return .green
+            return .accentColor
         case .connecting:
             return .yellow
         case .error:

@@ -23,11 +23,11 @@ struct LiveActivityDependencyTests {
             @Dependency(\.liveActivity) var liveActivity
 
             // Callback-based: testValue closure body is empty, returns immediately
-            var tokenCount = 0
+            let tokenCount = LockIsolated(0)
             await liveActivity.pushTokenUpdates { _ in
-                tokenCount += 1
+                tokenCount.withValue { $0 += 1 }
             }
-            #expect(tokenCount == 0)
+            #expect(tokenCount.value == 0)
 
             let hasActive = await liveActivity.hasActiveActivities()
             #expect(hasActive == false)
@@ -41,13 +41,13 @@ struct LiveActivityDependencyTests {
         } operation: {
             @Dependency(\.liveActivity) var liveActivity
 
-            var tokens: [PushToken] = []
+            let tokens = LockIsolated<[PushToken]>([])
             await liveActivity.pushTokenUpdates { token in
-                tokens.append(token)
+                tokens.withValue { $0.append(token) }
             }
-            #expect(tokens.count == 1)
-            #expect(tokens[0].deviceName == "preview")
-            #expect(tokens[0].tokenString == "1234")
+            #expect(tokens.value.count == 1)
+            #expect(tokens.value.first?.deviceName == "preview")
+            #expect(tokens.value.first?.tokenString == "1234")
 
             let hasActive = await liveActivity.hasActiveActivities()
             #expect(hasActive == true)
@@ -61,14 +61,19 @@ struct LiveActivityDependencyTests {
         } operation: {
             @Dependency(\.liveActivity) var liveActivity
 
-            let windowState = WindowContentState.WindowState(
-                name: "Test Window",
-                opened: Date(),
-                maxOpenDuration: 3600
+            let opened = Date()
+            let window = WindowContentState.Window(
+                id: WindowContentState.Window.id(room: "Test", name: "Window"),
+                name: "Window",
+                room: "Test",
+                opened: opened,
+                closeBy: opened.addingTimeInterval(3600),
+                isOverdue: false
             )
+            let contentState = WindowContentState(windows: [window], openCount: 1, overdueCount: 0)
 
-            try await liveActivity.startActivity([windowState])
-            await liveActivity.updateActivity([windowState])
+            try await liveActivity.startActivity(contentState)
+            await liveActivity.updateActivity(contentState)
             await liveActivity.stopActivity()
         }
     }

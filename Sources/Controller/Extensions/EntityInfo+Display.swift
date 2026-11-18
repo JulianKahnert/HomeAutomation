@@ -11,7 +11,7 @@ import HAModels
 extension EntityInfo {
     /// Human-readable display name for the entity
     public var displayName: String {
-        "\(entityId.name) (\(entityId.placeId))"
+        entityId.displayName
     }
 
     /// Formatted characteristic display name using the CharacteristicsType extension

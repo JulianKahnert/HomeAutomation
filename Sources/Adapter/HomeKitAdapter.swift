@@ -77,6 +77,15 @@ public final class HomeKitAdapter: HomeKitAdapterable {
     }
 
     public func perform(_ action: HomeManagableAction) async throws {
+        do {
+            try await performAction(action)
+        } catch {
+            await homeKitHomeManager.handleCommandFailure(error)
+            throw error
+        }
+    }
+
+    private func performAction(_ action: HomeManagableAction) async throws {
         let characteristics = await getCharacteristics()
         let filteredCharacteristics = characteristics.filter({ $0.entityId == action.entityId })
         guard filteredCharacteristics.count == 1,
@@ -184,6 +193,7 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             try await homeKitHomeManager.trigger(scene: sceneName)
         } catch {
             log.error("Failed to trigger scene '\(sceneName)': \(error)")
+            await homeKitHomeManager.handleCommandFailure(error)
             throw error
         }
     }

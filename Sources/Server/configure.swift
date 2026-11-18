@@ -95,23 +95,55 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - database setup
 
+    // The stock MySQL image ships an auto-generated self-signed certificate, so full
+    // verification cannot be the default without breaking every docker-compose deployment.
+    // Deployments that reach the database over anything but a private container network
+    // should set DATABASE_TLS_VERIFY=true (and provide a trusted certificate).
     var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
-    tlsConfiguration.certificateVerification = .none
+    if Environment.get("DATABASE_TLS_VERIFY") == "true" {
+        tlsConfiguration.certificateVerification = .fullVerification
+        app.logger.info("✅ Database TLS certificate verification enabled (DATABASE_TLS_VERIFY=true)")
+    } else {
+        tlsConfiguration.certificateVerification = .none
+        app.logger.warning("⚠️ Database TLS certificate verification is disabled - set DATABASE_TLS_VERIFY=true if the database is not on a private container network")
+    }
+
+    #if DEBUG
+    // Local development falls back to the docker-compose defaults.
+    let databasePassword = Environment.get("DATABASE_PASSWORD") ?? "vapor_password"
+    #else
+    // RELEASE: never silently connect with a well-known default password.
+    guard let databasePassword = Environment.get("DATABASE_PASSWORD"), !databasePassword.isEmpty else {
+        fatalError("❌ FATAL: DATABASE_PASSWORD environment variable is required in release builds.")
+    }
+    #endif
+
     app.databases.use(
         DatabaseConfigurationFactory.mysql(
             hostname: Environment.get("DATABASE_HOST") ?? "localhost",
             port: Environment.get("DATABASE_PORT").flatMap(Int.init(_:))
                 ?? MySQLConfiguration.ianaPortNumber,
             username: Environment.get("DATABASE_USERNAME") ?? "vapor_username",
-            password: Environment.get("DATABASE_PASSWORD") ?? "vapor_password",
+            password: databasePassword,
             database: Environment.get("DATABASE_NAME") ?? "vapor_database",
             tlsConfiguration: tlsConfiguration,
+            // The driver's default is a single connection per event loop. Every entity write,
+            // automation run record and HTTP request queues on it, and a burst of events then
+            // outlasts the pool timeout ("Connection request timed out").
+            maxConnectionsPerEventLoop: 4,
             connectionPoolTimeout: .seconds(10)
         ), as: .mysql)
 
     app.migrations.add(CreateEntityStorageDbItem())
     app.migrations.add(DeviceTokenItem())
     app.migrations.add(AddSensorFields())
+    app.migrations.add(CreateConfigItem())
+    app.migrations.add(CreateAutomationRun())
+    app.migrations.add(AddLookupIndexes())
+    app.migrations.add(AddHeatingControlFields())
+    app.migrations.add(CreateWeatherHour())
+    app.migrations.add(CreateEntityHourlyAggregate())
+    app.migrations.add(AddTemperatureCalibration())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -130,9 +162,9 @@ public func configure(_ app: Application) async throws {
 
         // Real APNS configuration (same as release)
         notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.HomeAutomation"
-        let notificationPrivateKey = String.fromBase64(Environment.get("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")!)!
-        let notificationKeyIdentifier = Environment.get("PUSH_NOTIFICATION_KEY_IDENTIFIER")!
-        let notificationTeamIdentifier = Environment.get("PUSH_NOTIFICATION_TEAM_IDENTIFIER")!
+        let notificationPrivateKey = requiredPushPrivateKey()
+        let notificationKeyIdentifier = requiredEnvironment("PUSH_NOTIFICATION_KEY_IDENTIFIER")
+        let notificationTeamIdentifier = requiredEnvironment("PUSH_NOTIFICATION_TEAM_IDENTIFIER")
 
         let apnsEnvironment: APNSEnvironment = app.environment == .production ? .production : .development
         app.logger.info("Using apns url \(apnsEnvironment.absoluteURL)")
@@ -164,9 +196,9 @@ public func configure(_ app: Application) async throws {
     #else
     // RELEASE: Always use real APNS
     let notificationTopic = Environment.get("PUSH_NOTIFICATION_TOPIC") ?? "de.juliankahnert.HomeAutomation"
-    let notificationPrivateKey = String.fromBase64(Environment.get("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")!)!
-    let notificationKeyIdentifier = Environment.get("PUSH_NOTIFICATION_KEY_IDENTIFIER")!
-    let notificationTeamIdentifier = Environment.get("PUSH_NOTIFICATION_TEAM_IDENTIFIER")!
+    let notificationPrivateKey = requiredPushPrivateKey()
+    let notificationKeyIdentifier = requiredEnvironment("PUSH_NOTIFICATION_KEY_IDENTIFIER")
+    let notificationTeamIdentifier = requiredEnvironment("PUSH_NOTIFICATION_TEAM_IDENTIFIER")
 
     let apnsEnvironment: APNSEnvironment = app.environment == .production ? .production : .development
     app.logger.info("Using apns url \(apnsEnvironment.absoluteURL)")
@@ -193,7 +225,7 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - actor system setup
 
-    // Star topology (see docs/adr-001): the server is the hub; the adapter connects to it via an
+    // Star topology (see ADR-001 in the knowledge base): the server is the hub; the adapter connects to it via an
     // authenticated WebSocket (/adapter/v1 on port 8080). Reconnects are handled entirely by the
     // adapter's transport loop — the server just accepts the latest connection and never terminates.
     let actorSystem = StarActorSystem(name: "server", logger: app.logger)
@@ -208,8 +240,8 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - home automation setup
 
-    app.homeAutomationConfigService = HomeAutomationConfigService.loadOrDefault()
-    let notificationSender = PushNotifcationService(database: app.db,
+    app.homeAutomationConfigService = await HomeAutomationConfigService.load(from: { app.db })
+    let notificationSender = PushNotifcationService(database: { app.db },
                                                     apnsClient: apnsClient,
                                                     notificationTopic: notificationTopic)
 
@@ -217,15 +249,29 @@ public func configure(_ app: Application) async throws {
     await CriticalLogNotifier.shared.configure(notificationSender: notificationSender)
 
     let actionLogManager = ActionLogManager()
+    let location = await app.homeAutomationConfigService.location
+    let weatherHours = WeatherHourDbRepository(database: { app.db })
     let homeManager = await HomeManager(getAdapter: {
         actorSystem.isConnected ? adapterProxy : nil
     },
                                         storageRepo: app.entityStorageDbRepository,
                                         notificationSender: notificationSender,
                                         location: app.homeAutomationConfigService.location,
-                                        actionLogManager: actionLogManager)
+                                        actionLogManager: actionLogManager,
+                                        outdoorTemperature: { [logger = app.logger] in
+        // The same rows the OutdoorTemperatureJob writes for this location.
+        do {
+            return try await weatherHours.latestTemperature(locationKey: OutdoorTemperatureJob.locationKey(for: location), at: Date())
+        } catch {
+            logger.error("Failed to read the outdoor temperature", metadata: ["error": "\(error)"])
+            return nil
+        }
+    })
     app.homeManager = homeManager
+    // Runs still marked `running` belong to a previous server process that died mid-run.
+    try await app.automationRunRepository.markRunningAsInterrupted()
     let automationService = try AutomationService(using: homeManager,
+                                                  runs: app.automationRunRepository,
                                                   getAutomations: {
         await app.homeAutomationConfigService.automations
     })
@@ -233,14 +279,17 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - register jobs
 
-    let location = await app.homeAutomationConfigService.location
     let jobs: [any Job] = [
         ClockJob(location: location,
                  homeEventsContinuation: app.homeEventsContinuation),
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
-        DatabaseCleanupJob(homeManager: app.homeManager)
+        OutdoorTemperatureJob(location: location, hours: weatherHours),
+        DatabaseCleanupJob(entities: app.entityStorageDbRepository,
+                           automationRuns: app.automationRunRepository,
+                           noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
+        EntityRollupJob(entities: app.entityStorageDbRepository)
     ]
 
     Task.detached {
@@ -260,4 +309,19 @@ public func configure(_ app: Application) async throws {
     try routes(app)
 
     app.logger.notice("StarActorSystem server ready, waiting for adapter on /adapter/v1")
+}
+
+/// The server cannot send pushes without these, so a missing value stops it at startup.
+private func requiredEnvironment(_ key: String) -> String {
+    guard let value = Environment.get(key) else {
+        fatalError("Missing environment variable \(key)")
+    }
+    return value
+}
+
+private func requiredPushPrivateKey() -> String {
+    guard let key = String.fromBase64(requiredEnvironment("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64")) else {
+        fatalError("PUSH_NOTIFICATION_PRIVATE_KEY_BASE64 is not valid base64")
+    }
+    return key
 }

@@ -37,15 +37,33 @@ public protocol Automatable: Sendable, Codable {
     /// - Parameter hm: An instance of HomeManagable providing the current state or context of the home system.
     /// - Throws: An error if something goes wrong during the execution.
     func execute(using hm: HomeManagable) async throws
+
+    /// Whether `AutomationService` records an `AutomationRun` per execution. Off for automations
+    /// that trigger every minute, which would flood the run history.
+    var recordsRuns: Bool { get }
+
+    /// Extra detail appended to the generic trigger summary, e.g. the sensor value that decided it.
+    func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String?
 }
 
 public extension Automatable {
+    var recordsRuns: Bool { true }
+
+    func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String? { nil }
+
     var log: Logger {
         Logger(label: String(describing: Self.self))
     }
 
     func getEntityIds() -> [EntityId] {
         findAllEntityIds(in: self, maxDepth: 20)
+    }
+
+    /// The entities worth showing for this automation: `getEntityIds()` without duplicates and
+    /// without battery sensors, which devices carry but no automation reads.
+    var involvedEntityIds: [EntityId] {
+        var seen = Set<EntityId>()
+        return getEntityIds().filter { $0.characteristicType != .batterySensor && seen.insert($0).inserted }
     }
 
     private func findAllEntityIds(in object: Any, maxDepth: Int) -> [EntityId] {
@@ -57,7 +75,16 @@ public extension Automatable {
         var entityIds: [EntityId] = []
         let mirror = Mirror(reflecting: object)
 
-        for child in mirror.children {
+        // Devices are subclasses (`EveMotion: MotionSensorDevice`) whose ids live in the base
+        // class, and `Mirror` lists those only via `superclassMirror`.
+        var children = Array(mirror.children)
+        var superclassMirror = mirror.superclassMirror
+        while let current = superclassMirror {
+            children.append(contentsOf: current.children)
+            superclassMirror = current.superclassMirror
+        }
+
+        for child in children {
             let reflectedChild = Mirror(reflecting: child.value)
 
             switch reflectedChild.displayStyle {

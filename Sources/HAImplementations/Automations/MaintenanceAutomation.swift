@@ -13,6 +13,7 @@ public struct MaintenanceAutomation: Automatable {
     public let name: String
     public private(set) var triggerEntityIds = Set<EntityId>()
     public let time: Time
+    public var recordsRuns: Bool { false }
 
     public init(_ name: String, at time: Time) {
         self.name = name
@@ -23,9 +24,7 @@ public struct MaintenanceAutomation: Automatable {
         return time.isEqual(event)
     }
 
-    public func execute(using hm: HomeManagable) async throws {
-        log.debug("Turning on devices")
-
-        try await hm.maintenance()
-    }
+    // Retention lives in the server's `DatabaseCleanupJob` only; the type stays so existing
+    // configs still decode.
+    public func execute(using hm: HomeManagable) async throws {}
 }

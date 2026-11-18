@@ -13,14 +13,19 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var serverAddress: ServerAddress
-    @AppStorage("ServerAuthToken") private var serverAuthToken = ""
+    @Environment(AdapterCredentialStore.self) private var credentials: AdapterCredentialStore?
 
     @State private var host = "localhost"
     @State private var port = 8080
+    @State private var useTLS = false
     @State private var token = ""
+    /// Draft of `storedDebugLogging`, written on Save like the other settings.
+    @State private var isDebugLoggingEnabled = false
+    /// The app reads this key once at launch (`DebugLogging`), so it lives in `UserDefaults`, not the keychain.
+    @AppStorage(DebugLogging.key) private var storedDebugLogging = false
 
     var newServerAddress: ServerAddress {
-        ServerAddress(host: host, port: port)
+        ServerAddress(host: host, port: port, useTLS: useTLS)
     }
 
     var body: some View {
@@ -28,28 +33,41 @@ struct SettingsView: View {
             Section {
                 TextField("Host", text: $host)
                 TextField("Port", value: $port, format: .number.grouping(.never))
+                Toggle("Use TLS (wss://)", isOn: $useTLS)
             } header: {
                 Text("Home Automation Server")
             } footer: {
-                Text("Websocket endpoint: \(newServerAddress.description)")
+                Text("Websocket endpoint: \(newServerAddress.description)\nWithout TLS the auth token and all HomeKit traffic cross the network unencrypted.")
             }
             Section {
                 SecureField("Auth Token", text: $token)
             } header: {
                 Text("Authentication")
             } footer: {
-                Text("Bearer token used when connecting to the server. Leave empty if authentication is disabled.")
+                Text("Bearer token used when connecting to the server. Stored in the keychain. Leave empty if authentication is disabled.")
+            }
+            Section {
+                Toggle("Debug Logs", isOn: $isDebugLoggingEnabled)
+            } header: {
+                Text("Logging")
+            } footer: {
+                Text("Writes debug logs, e.g. every thermostat value. Takes effect after restarting the app. The environment variable \(DebugLogging.key) overrides this setting.")
             }
         }
         .onAppear {
-            token = serverAuthToken
+            host = serverAddress.host
+            port = serverAddress.port
+            useTLS = serverAddress.useTLS
+            token = credentials?.authToken ?? ""
+            isDebugLoggingEnabled = storedDebugLogging
         }
         .navigationTitle("Settings")
         .toolbar {
             ToolbarItem {
                 Button("Save") {
                     serverAddress = newServerAddress
-                    serverAuthToken = token
+                    credentials?.update(authToken: token)
+                    storedDebugLogging = isDebugLoggingEnabled
                     dismiss()
                 }
             }
@@ -59,5 +77,6 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView(serverAddress: .constant(.init(host: "localhost", port: 8080)))
+        .environment(AdapterCredentialStore())
 }
 #endif

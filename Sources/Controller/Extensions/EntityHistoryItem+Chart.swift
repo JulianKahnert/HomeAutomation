@@ -12,24 +12,29 @@ import SwiftUI
 extension EntityHistoryItem {
     /// Returns a SwiftUI Color from RGB values if available
     public var color: Color? {
-        guard let r = colorRed,
-              let g = colorGreen,
-              let b = colorBlue else {
+        guard let red = colorRed,
+              let green = colorGreen,
+              let blue = colorBlue else {
             return nil
         }
-        return Color(red: Double(r), green: Double(g), blue: Double(b))
+        return Color(red: Double(red), green: Double(green), blue: Double(blue))
     }
 
     /// Returns the hue (color tone) in degrees (0-360°) from RGB values
     /// Uses the existing RGB.hue helper from HAModels
     private var hue: Double? {
-        guard let r = colorRed,
-              let g = colorGreen,
-              let b = colorBlue else {
+        guard let red = colorRed,
+              let green = colorGreen,
+              let blue = colorBlue else {
             return nil
         }
-        let rgb = RGB(red: r, green: g, blue: b)
+        let rgb = RGB(red: red, green: green, blue: blue)
         return Double(rgb.hue)
+    }
+
+    /// The on/open/detected state of boolean entities, `nil` for measurements.
+    var stateValue: Bool? {
+        isDeviceOn ?? motionDetected ?? isContactOpen ?? isDoorLocked ?? isHeaterActive ?? valveOpen
     }
 
     /// Returns the primary value for this history item based on available data
@@ -72,6 +77,18 @@ extension EntityHistoryItem {
         if let colorTemperature {
             return Double(colorTemperature)
         }
+        if let targetTemperatureInC {
+            return targetTemperatureInC
+        }
+        if let valvePositionPercent {
+            return Double(valvePositionPercent)
+        }
+        if let temperatureCalibrationInC {
+            return temperatureCalibrationInC
+        }
+        if let heatingMode {
+            return Double(heatingMode.rawValue)
+        }
         // Boolean sensors (lower priority)
         if let isDeviceOn {
             return isDeviceOn ? 1.0 : 0.0
@@ -96,59 +113,5 @@ extension EntityHistoryItem {
             return hue
         }
         return nil
-    }
-
-    /// Human-readable description of the primary value
-    public var valueDescription: String {
-        if let temperatureInC {
-            return "\(String(format: "%.1f", temperatureInC))°C"
-        }
-        if let relativeHumidity {
-            return "\(String(format: "%.1f", relativeHumidity))%"
-        }
-        if let carbonDioxideSensorId {
-            return "\(carbonDioxideSensorId) ppm"
-        }
-        if let airQuality {
-            return "AQI: \(airQuality)"
-        }
-        if let pmDensity {
-            return "\(String(format: "%.1f", pmDensity)) µg/m³"
-        }
-        if let illuminanceInLux {
-            return "\(String(format: "%.1f", illuminanceInLux)) lux"
-        }
-        if let brightness {
-            return "\(brightness)%"
-        }
-        if let stateOfCharge {
-            return "\(stateOfCharge)%"
-        }
-        if let colorTemperature {
-            return "CT: \(String(format: "%.2f", colorTemperature))"
-        }
-        if let isDeviceOn {
-            return isDeviceOn ? "On" : "Off"
-        }
-        if let motionDetected {
-            return motionDetected ? "Motion" : "No Motion"
-        }
-        if let isContactOpen {
-            return isContactOpen ? "Open" : "Closed"
-        }
-        if let isDoorLocked {
-            return isDoorLocked ? "Locked" : "Unlocked"
-        }
-        if let isHeaterActive {
-            return isHeaterActive ? "Active" : "Inactive"
-        }
-        if let valveOpen {
-            return valveOpen ? "Open" : "Closed"
-        }
-        // Color as hue
-        if let hue {
-            return "\(String(format: "%.0f", hue))° hue"
-        }
-        return "No data"
     }
 }

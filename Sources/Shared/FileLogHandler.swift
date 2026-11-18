@@ -12,31 +12,48 @@ import Logging
 extension FileLogHandler {
     actor FileHandlerOutputStream {
         private let url: URL
-        private var nextRotationDate: Date
-        private var fileHandle: FileHandle
+        private var nextRotationDate = Date.distantPast
+        private var fileHandle: FileHandle?
+        private var hasReportedFailure = false
 
         init(basePath url: URL) {
             self.url = url
-            self.fileHandle = Self.getNewFileHandle(basePath: url)
-            self.nextRotationDate = Calendar.current.nextDate(after: Date(),
-                                                              matching: DateComponents(hour: 0, minute: 0, second: 0),
-                                                              matchingPolicy: .nextTime)!
         }
 
         func write(_ string: String) {
-            if Date() > nextRotationDate {
-                self.fileHandle = Self.getNewFileHandle(basePath: url)
-                self.nextRotationDate = Calendar.current.nextDate(after: Date(),
-                                                                  matching: DateComponents(hour: 0, minute: 0, second: 0),
-                                                                  matchingPolicy: .nextTime)!
+            // Opened on the first write and reopened after a failure: before the first unlock the
+            // app can be woken in the background while its container is still unreadable.
+            if fileHandle == nil || Date() > nextRotationDate {
+                do {
+                    fileHandle = try Self.getNewFileHandle(basePath: url)
+                    nextRotationDate = Calendar.current.nextDate(after: Date(),
+                                                                 matching: DateComponents(hour: 0, minute: 0, second: 0),
+                                                                 matchingPolicy: .nextTime) ?? .distantPast
+                    hasReportedFailure = false
+                } catch {
+                    handleFailure(error)
+                }
             }
 
-            if let data = string.data(using: .utf8) {
-                fileHandle.write(data)
+            guard let fileHandle, let data = string.data(using: .utf8) else { return }
+            do {
+                try fileHandle.write(contentsOf: data)
+            } catch {
+                handleFailure(error)
             }
         }
 
-        private static func getNewFileHandle(basePath: URL) -> FileHandle {
+        /// Drops the handle so the next write reopens the file. Only the first failure in a row is
+        /// reported, because the report is a log entry itself and comes back through this stream.
+        private func handleFailure(_ error: any Error) {
+            fileHandle = nil
+            guard !hasReportedFailure else { return }
+            hasReportedFailure = true
+            Logger(label: "FileLogHandler").error("Log file unavailable, skipping file logging until it can be opened",
+                                                  metadata: ["path": "\(url.path)", "error": "\(error)"])
+        }
+
+        private static func getNewFileHandle(basePath: URL) throws -> FileHandle {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
             formatter.timeZone = .current
@@ -44,19 +61,14 @@ extension FileLogHandler {
             // format date to "path/to/2024-10-29.txt"
             let url = basePath.appendingPathComponent(formatter.string(from: date)).appendingPathExtension("txt")
 
+            try FileManager.default.createDirectory(at: basePath, withIntermediateDirectories: true)
             if !FileManager.default.fileExists(atPath: url.path) {
-                guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: nil) else {
-                    fatalError("Failed to create log file at \(url.path)")
-                }
+                try Data().write(to: url, options: .withoutOverwriting)
             }
 
-            do {
-                let fileHandle = try FileHandle(forWritingTo: url)
-                fileHandle.seekToEndOfFile()
-                return fileHandle
-            } catch {
-                fatalError("Failed to open log file at \(url.path): \(error)")
-            }
+            let fileHandle = try FileHandle(forWritingTo: url)
+            try fileHandle.seekToEnd()
+            return fileHandle
         }
     }
 }

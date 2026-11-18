@@ -29,6 +29,10 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     public let pmDensity: Double?
     public let airQuality: Int?
     public let valveOpen: Bool?
+    public let targetTemperatureInC: Double?
+    public let heatingMode: HeatingMode?
+    public let valvePositionPercent: Int?
+    public let temperatureCalibrationInC: Double?
 
     public init(
         id: UUID = UUID(),
@@ -50,7 +54,11 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         carbonDioxideSensorId: Int? = nil,
         pmDensity: Double? = nil,
         airQuality: Int? = nil,
-        valveOpen: Bool? = nil
+        valveOpen: Bool? = nil,
+        targetTemperatureInC: Double? = nil,
+        heatingMode: HeatingMode? = nil,
+        valvePositionPercent: Int? = nil,
+        temperatureCalibrationInC: Double? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -72,6 +80,117 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         self.pmDensity = pmDensity
         self.airQuality = airQuality
         self.valveOpen = valveOpen
+        self.targetTemperatureInC = targetTemperatureInC
+        self.heatingMode = heatingMode
+        self.valvePositionPercent = valvePositionPercent
+        self.temperatureCalibrationInC = temperatureCalibrationInC
+    }
+}
+
+extension EntityHistoryItem {
+    public init(_ item: EntityStorageItem) {
+        self.init(timestamp: item.timestamp,
+                  motionDetected: item.motionDetected,
+                  illuminanceInLux: item.illuminance?.value,
+                  isDeviceOn: item.isDeviceOn,
+                  brightness: item.brightness,
+                  colorTemperature: item.colorTemperature,
+                  colorRed: item.color?.red,
+                  colorGreen: item.color?.green,
+                  colorBlue: item.color?.blue,
+                  isContactOpen: item.isContactOpen,
+                  isDoorLocked: item.isDoorLocked,
+                  stateOfCharge: item.stateOfCharge,
+                  isHeaterActive: item.isHeaterActive,
+                  temperatureInC: item.temperatureInC?.value,
+                  relativeHumidity: item.relativeHumidity,
+                  carbonDioxideSensorId: item.carbonDioxideSensorId,
+                  pmDensity: item.pmDensity,
+                  airQuality: item.airQuality,
+                  valveOpen: item.valveOpen,
+                  targetTemperatureInC: item.targetTemperatureInC,
+                  heatingMode: item.heatingMode,
+                  valvePositionPercent: item.valvePositionPercent,
+                  temperatureCalibrationInC: item.temperatureCalibrationInC)
+    }
+
+    /// Human-readable description of the primary value
+    public var valueDescription: String {
+        if let temperatureInC {
+            return "\(String(format: "%.1f", temperatureInC))°C"
+        }
+        if let relativeHumidity {
+            return "\(String(format: "%.1f", relativeHumidity))%"
+        }
+        if let carbonDioxideSensorId {
+            return "\(carbonDioxideSensorId) ppm"
+        }
+        if let airQuality {
+            return "AQI: \(airQuality)"
+        }
+        if let pmDensity {
+            return "\(String(format: "%.1f", pmDensity)) µg/m³"
+        }
+        if let illuminanceInLux {
+            return "\(String(format: "%.1f", illuminanceInLux)) lux"
+        }
+        if let brightness {
+            return "\(brightness)%"
+        }
+        if let stateOfCharge {
+            return "\(stateOfCharge)%"
+        }
+        if let colorTemperature {
+            return "CT: \(String(format: "%.2f", colorTemperature))"
+        }
+        if let isDeviceOn {
+            return isDeviceOn ? "On" : "Off"
+        }
+        if let motionDetected {
+            return motionDetected ? "Motion" : "No Motion"
+        }
+        if let isContactOpen {
+            return isContactOpen ? "Open" : "Closed"
+        }
+        if let isDoorLocked {
+            return isDoorLocked ? "Locked" : "Unlocked"
+        }
+        if let isHeaterActive {
+            return isHeaterActive ? "Active" : "Inactive"
+        }
+        if let valveOpen {
+            return valveOpen ? "Open" : "Closed"
+        }
+        if let valvePositionPercent {
+            return "Valve \(valvePositionPercent)%"
+        }
+        if let temperatureCalibrationInC {
+            return "Offset \(String(format: "%+.1f", temperatureCalibrationInC))°C"
+        }
+        if let targetTemperatureInC {
+            return "Target \(String(format: "%.1f", targetTemperatureInC))°C"
+        }
+        if let heatingMode {
+            return "Mode \(heatingMode.name)"
+        }
+        // Color as hue
+        if let colorRed, let colorGreen, let colorBlue {
+            let hue = Double(RGB(red: colorRed, green: colorGreen, blue: colorBlue).hue)
+            return "\(String(format: "%.0f", hue))° hue"
+        }
+        return "No data"
+    }
+}
+
+/// The history of one entity, as returned per entity of a room.
+public struct EntityHistory: Sendable, Equatable {
+    public let entityId: EntityId
+    /// Newest first.
+    public let items: [EntityHistoryItem]
+
+    public init(entityId: EntityId, items: [EntityHistoryItem]) {
+        self.entityId = entityId
+        self.items = items
     }
 }
 

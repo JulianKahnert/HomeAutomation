@@ -11,7 +11,7 @@ public enum LogReader {
     /// Read log entries from JSONL files within a time window.
     /// - Parameters:
     ///   - since: Only return entries at or after this date.
-    ///   - basePath: Directory containing the log files (defaults to Documents).
+    ///   - basePath: Directory containing the log files, usually `logFileDirectory()`.
     ///   - maxEntries: Maximum number of entries to return.
     /// - Returns: Entries sorted newest-first, capped at `maxEntries`.
     public static func readEntries(since: Date, basePath: URL, maxEntries: Int = 5000) -> [LogEntry] {

@@ -27,10 +27,6 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
         items.append(item)
     }
 
-    func deleteEntries(olderThan date: Date) async throws {
-        fatalError()
-    }
-
     func getHistory(
         for entityId: EntityId,
         startDate: Date?,
@@ -45,7 +41,7 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
         }
 
         if let endDate {
-            filtered = filtered.filter { $0.timestamp <= endDate }
+            filtered = filtered.filter { $0.timestamp < endDate }
         }
 
         if let cursor {
@@ -59,11 +55,9 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
         var seen = Set<EntityId>()
         var uniqueEntityIds: [EntityId] = []
 
-        for item in items {
-            if !seen.contains(item.entityId) {
-                seen.insert(item.entityId)
-                uniqueEntityIds.append(item.entityId)
-            }
+        for item in items where !seen.contains(item.entityId) {
+            seen.insert(item.entityId)
+            uniqueEntityIds.append(item.entityId)
         }
 
         return uniqueEntityIds

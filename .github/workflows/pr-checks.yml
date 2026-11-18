@@ -1,13 +1,18 @@
 name: PR Checks
 
 on:
+  # Only on ready for review: every push to a PR started three macOS jobs, about 300 of
+  # 528 Actions minutes in October 2026. A draft is checked locally instead.
+  # A PR opened as non-draft gets no run: switch it to draft and back to ready
+  # (`gh pr ready <n> --undo && gh pr ready <n>`). `gh workflow run "PR Checks"` also
+  # runs the checks, but the PR's required checks don't count those runs.
   pull_request:
+    types: [ready_for_review]
     branches:
       - main
       - develop
-  # Allow the renovate-package-resolved workflow to dispatch these checks after
-  # it commits a regenerated Package.resolved (that commit is pushed with
-  # GITHUB_TOKEN and therefore cannot trigger pull_request runs itself).
+  # Manual runs only. Renovate PRs open as drafts (renovate.json) and get their
+  # counted run on ready_for_review, after renovate-package-resolved.yaml committed.
   workflow_dispatch:
 
 concurrency:
@@ -18,6 +23,9 @@ jobs:
   swift-package:
     name: Swift Package Build & Test
     runs-on: macos-26
+    # The draft guard holds even if more pull_request types are added above; a
+    # dispatched run has no pull_request, so draft is falsy and it runs.
+    if: ${{ !github.event.pull_request.draft }}
 
     steps:
       - name: Checkout repository
@@ -31,7 +39,12 @@ jobs:
 
   ios-apps:
     name: iOS Apps Build
-    runs-on: macos-26
+    # xcode-27, not macos-26: Xcode Cloud archives on "Latest Release" (Xcode 27),
+    # whose resolver pins swift-issue-reporting separately from xctest-dynamic-overlay.
+    # macos-26 tops out at Xcode 26.6 and would rewrite Package.resolved without it.
+    runs-on: xcode-27
+    # See swift-package above.
+    if: ${{ !github.event.pull_request.draft }}
     strategy:
       fail-fast: false
       matrix:
@@ -88,10 +101,10 @@ jobs:
         working-directory: ${{ matrix.app.path }}
         run: |
           set -euo pipefail
-          # Build swift-syntax from source instead of the downloaded macro prebuilt: on
-          # Xcode 26 the prebuilt only ships macOS slices, so building macros (e.g.
-          # PerceptionMacros, via TCA) for the iOS simulator fails with "could not find
-          # module 'SwiftSyntax' for target arm64-apple-ios-simulator".
+          # Build swift-syntax from source instead of the downloaded macro prebuilt:
+          # at least through Xcode 26 the prebuilt only ships macOS slices, so building
+          # macros (e.g. PerceptionMacros, via TCA) for the iOS simulator fails with
+          # "could not find module 'SwiftSyntax' for target arm64-apple-ios-simulator".
           defaults write com.apple.dt.Xcode IDEPackageEnablePrebuilts -bool NO
           # Use -destination, not -sdk iphonesimulator: -sdk forces *every* target onto the
           # simulator SDK, including the OpenAPIGenerator build-tool plugin's host executable
@@ -110,6 +123,8 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
+    # See swift-package above.
+    if: ${{ !github.event.pull_request.draft }}
 
     steps:
       - name: Checkout repository

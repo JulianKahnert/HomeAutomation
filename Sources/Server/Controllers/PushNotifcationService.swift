@@ -171,9 +171,12 @@ actor PushNotifcationService: NotificationSender {
                         // to be displayed on the device. Omitting or using an empty
                         // APNSAlertNotificationContent() causes iOS to silently drop the notification
                         // and the Live Activity will never appear.
+                        // No sound is set, so the start is silent (no ring, no vibration). Priority 5
+                        // is enough because the state is informative, not urgent; the "offen" alert
+                        // from sendAlert stays the only audible notification.
                         let notification = APNSStartLiveActivityNotification<ContentState, ContentState>(
                             expiration: .none,
-                            priority: .immediately,
+                            priority: .consideringDevicePower,
                             appID: notificationTopic,
                             contentState: contentState,
                             timestamp: Int(Date().timeIntervalSince1970),
@@ -181,7 +184,8 @@ actor PushNotifcationService: NotificationSender {
                             attributesType: activityName,
                             alert: APNSAlertNotificationContent(
                                 title: .raw("empty"),
-                                body: .raw("empty")))
+                                body: .raw("empty"),
+                                sound: nil))
 
                         // start a new live activity
                         usedToken = startToken

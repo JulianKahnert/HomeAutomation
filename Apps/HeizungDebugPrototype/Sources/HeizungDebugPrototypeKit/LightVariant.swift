@@ -13,6 +13,13 @@ struct LightVariant: View {
     @State var pinID: String?
     @State var crosshair: Date?
     @State var heatmapCellID: String?
+    /// Fireplace switch candidates (H-A…H-D); nil keeps G as it was.
+    var fireplace: FireplacePlacement?
+    @State var fireplaceOn = true
+
+    private func fireplaceRoom(_ id: String) -> FRoom {
+        FData.room(id).fireplace(fireplace == nil || fireplaceOn)
+    }
 
     var body: some View {
         switch loadState {
@@ -49,12 +56,15 @@ struct LightVariant: View {
 
     @ViewBuilder
     private var loaded: some View {
-        GScreen {
+        GScreen(
+            navTrailing: fireplace == .toolbar ? AnyView(GFireplaceToolbarButton(isOn: $fireplaceOn)) : nil,
+            hint: fireplace == .toolbar && fireplaceOn ? "Kamin an · \(FireplaceInfo.endText)" : nil
+        ) {
             switch layout {
             case .compact:
                 VStack(alignment: .leading, spacing: 16) {
                     overviewCard
-                    if let room = selectedRoomID.map(FData.room) {
+                    if let room = selectedRoomID.map(fireplaceRoom) {
                         detailCard(room)
                     }
                     heatmapCard
@@ -66,7 +76,7 @@ struct LightVariant: View {
                         heatmapCard
                     }
                     .frame(width: FLayout.leftColumnWidth)
-                    if let room = selectedRoomID.map(FData.room) {
+                    if let room = selectedRoomID.map(fireplaceRoom) {
                         detailCard(room)
                     } else {
                         FCard {
@@ -79,11 +89,16 @@ struct LightVariant: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .environment(\.fireplaceOn, fireplace == nil ? nil : fireplaceOn)
     }
 
     private var overviewCard: some View {
         FCard {
-            GDeltaBars(selectedRoomID: selection, hoveredRoomID: $hoveredRoomID)
+            GDeltaBars(
+                selectedRoomID: selection, hoveredRoomID: $hoveredRoomID,
+                headlineTrailing: fireplace == .headlineButton ? AnyView(GFireplaceButton(isOn: $fireplaceOn)) : nil,
+                accessory: fireplace == .row ? AnyView(GFireplaceRow(isOn: $fireplaceOn)) : nil
+            )
         }
     }
 
@@ -98,6 +113,7 @@ struct LightVariant: View {
         FCard {
             GRoomDetail(
                 room: room, layout: layout, range: $range, pinID: $pinID, crosshair: $crosshair,
+                fireplaceOn: fireplace == .detailHeader && room.hasFireplace ? $fireplaceOn : nil,
                 onClose: layout == .compact ? { selection.wrappedValue = nil } : nil
             )
         }
@@ -112,12 +128,20 @@ struct LightVariant: View {
 }
 
 struct GScreen<Content: View>: View {
+    var navTrailing: AnyView?
+    var hint: String?
     @ViewBuilder var content: Content
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Heizung").font(.largeTitle.bold())
+                if let navTrailing {
+                    HStack { Spacer(); navTrailing }
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Heizung").font(.largeTitle.bold())
+                    if let hint { Text(hint).font(.subheadline).foregroundStyle(.secondary) }
+                }
                 content
             }
             .padding(16)
@@ -140,7 +164,10 @@ enum GStyle {
 struct GDeltaBars: View {
     @Binding var selectedRoomID: String?
     @Binding var hoveredRoomID: String?
+    var headlineTrailing: AnyView?
+    var accessory: AnyView?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.fireplaceOn) private var fireplaceOn
 
     private let rooms = FData.sortedRooms
     /// The clipped end fades into the card instead of carrying an extra marker.
@@ -157,6 +184,7 @@ struct GDeltaBars: View {
             headline
                 // Health pattern: the selection callout takes the headline's place.
                 .opacity(highlighted == nil ? 1 : 0)
+            accessory
             chart
                 .frame(height: 200)
         }
@@ -178,12 +206,24 @@ struct GDeltaBars: View {
                 Text(detail).font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
             }
             Spacer()
-            Text(Fmt.time(FData.now)).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+            if let headlineTrailing {
+                headlineTrailing
+            } else {
+                Text(Fmt.time(FData.now)).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+            }
         }
     }
 
     private var chart: some View {
         Chart {
+            // Fireplace on: a soft warm column behind the bars of the rooms it switches to Modus Aus.
+            if fireplaceOn == true {
+                ForEach(rooms.filter(\.hasFireplace)) { room in
+                    RectangleMark(x: .value("Raum", room.short), yStart: .value("Δ", -(limit + 0.5)), yEnd: .value("Δ", limit + 0.5), width: .ratio(0.9))
+                        .foregroundStyle(Color.orange.opacity(0.14))
+                        .clipShape(.rect(cornerRadius: 8))
+                }
+            }
             RectangleMark(yStart: .value("Δ", -FColor.comfort), yEnd: .value("Δ", FColor.comfort))
                 .foregroundStyle(FColor.ok.opacity(0.08))
             RuleMark(y: .value("Δ", 0))
@@ -213,13 +253,22 @@ struct GDeltaBars: View {
                     if let short = value.as(String.self) {
                         let isSelected = rooms.first { $0.short == short }?.id == selectedRoomID
                         // Selection as a soft tinted pill; bars keep their full colour.
-                        Text(short)
-                            .font(.caption)
-                            .fontWeight(isSelected ? .semibold : .regular)
-                            .foregroundStyle(isSelected ? .primary : .secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(isSelected ? GStyle.soft : .clear, in: .capsule)
+                        VStack(spacing: 2) {
+                            Text(short)
+                                .font(.caption)
+                                .fontWeight(isSelected ? .semibold : .regular)
+                                .foregroundStyle(isSelected ? .primary : .secondary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(isSelected ? GStyle.soft : .clear, in: .capsule)
+                            if let fireplaceOn {
+                                // Always reserves the line, so the plot does not jump with the switch.
+                                Image(systemName: "flame.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                                    .opacity(fireplaceOn && rooms.first { $0.short == short }?.hasFireplace == true ? 1 : 0)
+                            }
+                        }
                     }
                 }
             }
@@ -342,6 +391,8 @@ struct GRoomDetail: View {
     @Binding var range: FRange
     @Binding var pinID: String?
     @Binding var crosshair: Date?
+    /// C: the fireplace switch as the head of the Kaminzimmer detail.
+    var fireplaceOn: Binding<Bool>?
     let onClose: (() -> Void)?
 
     private var domain: ClosedRange<Date> { range.domain }
@@ -377,6 +428,9 @@ struct GRoomDetail: View {
                         .foregroundStyle(.tertiary)
                         .buttonStyle(.plain)
                 }
+            }
+            if let fireplaceOn {
+                GFireplaceRow(isOn: fireplaceOn).padding(.vertical, 4)
             }
             Picker("Zeitraum", selection: $range) {
                 ForEach(FRange.allCases) { Text($0.rawValue).tag($0) }
@@ -652,12 +706,19 @@ struct GSollIstChart: View {
 /// A quiet pin: the symbol alone in secondary, primary while selected; "+n" for a group.
 struct GPin: View {
     let slot: FPinSlot
+    @Environment(\.fireplaceOn) private var fireplaceOn
     var isSelected = false
 
     var body: some View {
         Group {
             if slot.events.count > 1 {
-                Text("+\(slot.events.count)").font(.caption2.weight(.semibold)).monospacedDigit()
+                // H: a group holding the running fireplace keeps the flame visible.
+                HStack(spacing: 2) {
+                    if fireplaceOn == true, slot.events.contains(where: { $0.kind == .fireplace }) {
+                        Image(systemName: "flame.fill").font(.caption2).foregroundStyle(.orange)
+                    }
+                    Text("+\(slot.events.count)").font(.caption2.weight(.semibold)).monospacedDigit()
+                }
             } else {
                 Image(systemName: slot.events[0].kind.symbol).font(.caption)
             }
@@ -908,6 +969,49 @@ private enum GScenario {
 
     static func noData(_ layout: FLayout) -> LightVariant { LightVariant(layout: layout, selectedRoomID: "kaminzimmer", range: .day) }
 }
+
+// H: fireplace switch placement. Esszimmer selected (it has data) so overview marks and detail pin show together.
+private enum HScenario {
+    static func view(_ placement: FireplacePlacement, _ layout: FLayout, on: Bool) -> LightVariant {
+        LightVariant(layout: layout, selectedRoomID: "esszimmer", range: .day, fireplace: placement, fireplaceOn: on)
+    }
+}
+
+#Preview("H-A Zeile iphone hell an") { HScenario.view(.row, .compact, on: true).gPreview(.compact, .light) }
+#Preview("H-A Zeile iphone dunkel an") { HScenario.view(.row, .compact, on: true).gPreview(.compact, .dark) }
+#Preview("H-A Zeile mac hell an") { HScenario.view(.row, .regular, on: true).gPreview(.regular, .light) }
+#Preview("H-A Zeile mac dunkel an") { HScenario.view(.row, .regular, on: true).gPreview(.regular, .dark) }
+#Preview("H-A Zeile iphone hell aus") { HScenario.view(.row, .compact, on: false).gPreview(.compact, .light) }
+#Preview("H-A Zeile iphone dunkel aus") { HScenario.view(.row, .compact, on: false).gPreview(.compact, .dark) }
+#Preview("H-A Zeile mac hell aus") { HScenario.view(.row, .regular, on: false).gPreview(.regular, .light) }
+#Preview("H-A Zeile mac dunkel aus") { HScenario.view(.row, .regular, on: false).gPreview(.regular, .dark) }
+
+#Preview("H-B Flamme iphone hell an") { HScenario.view(.headlineButton, .compact, on: true).gPreview(.compact, .light) }
+#Preview("H-B Flamme iphone dunkel an") { HScenario.view(.headlineButton, .compact, on: true).gPreview(.compact, .dark) }
+#Preview("H-B Flamme mac hell an") { HScenario.view(.headlineButton, .regular, on: true).gPreview(.regular, .light) }
+#Preview("H-B Flamme mac dunkel an") { HScenario.view(.headlineButton, .regular, on: true).gPreview(.regular, .dark) }
+#Preview("H-B Flamme iphone hell aus") { HScenario.view(.headlineButton, .compact, on: false).gPreview(.compact, .light) }
+#Preview("H-B Flamme iphone dunkel aus") { HScenario.view(.headlineButton, .compact, on: false).gPreview(.compact, .dark) }
+#Preview("H-B Flamme mac hell aus") { HScenario.view(.headlineButton, .regular, on: false).gPreview(.regular, .light) }
+#Preview("H-B Flamme mac dunkel aus") { HScenario.view(.headlineButton, .regular, on: false).gPreview(.regular, .dark) }
+
+#Preview("H-C Detailkopf iphone hell an") { HScenario.view(.detailHeader, .compact, on: true).gPreview(.compact, .light) }
+#Preview("H-C Detailkopf iphone dunkel an") { HScenario.view(.detailHeader, .compact, on: true).gPreview(.compact, .dark) }
+#Preview("H-C Detailkopf mac hell an") { HScenario.view(.detailHeader, .regular, on: true).gPreview(.regular, .light) }
+#Preview("H-C Detailkopf mac dunkel an") { HScenario.view(.detailHeader, .regular, on: true).gPreview(.regular, .dark) }
+#Preview("H-C Detailkopf iphone hell aus") { HScenario.view(.detailHeader, .compact, on: false).gPreview(.compact, .light) }
+#Preview("H-C Detailkopf iphone dunkel aus") { HScenario.view(.detailHeader, .compact, on: false).gPreview(.compact, .dark) }
+#Preview("H-C Detailkopf mac hell aus") { HScenario.view(.detailHeader, .regular, on: false).gPreview(.regular, .light) }
+#Preview("H-C Detailkopf mac dunkel aus") { HScenario.view(.detailHeader, .regular, on: false).gPreview(.regular, .dark) }
+
+#Preview("H-D Toolbar iphone hell an") { HScenario.view(.toolbar, .compact, on: true).gPreview(.compact, .light) }
+#Preview("H-D Toolbar iphone dunkel an") { HScenario.view(.toolbar, .compact, on: true).gPreview(.compact, .dark) }
+#Preview("H-D Toolbar mac hell an") { HScenario.view(.toolbar, .regular, on: true).gPreview(.regular, .light) }
+#Preview("H-D Toolbar mac dunkel an") { HScenario.view(.toolbar, .regular, on: true).gPreview(.regular, .dark) }
+#Preview("H-D Toolbar iphone hell aus") { HScenario.view(.toolbar, .compact, on: false).gPreview(.compact, .light) }
+#Preview("H-D Toolbar iphone dunkel aus") { HScenario.view(.toolbar, .compact, on: false).gPreview(.compact, .dark) }
+#Preview("H-D Toolbar mac hell aus") { HScenario.view(.toolbar, .regular, on: false).gPreview(.regular, .light) }
+#Preview("H-D Toolbar mac dunkel aus") { HScenario.view(.toolbar, .regular, on: false).gPreview(.regular, .dark) }
 
 #Preview("G iphone hell uebersicht") { GScenario.overview(.compact).gPreview(.compact, .light) }
 #Preview("G iphone dunkel uebersicht") { GScenario.overview(.compact).gPreview(.compact, .dark) }

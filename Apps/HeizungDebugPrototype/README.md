@@ -69,3 +69,14 @@ the variant is chosen.
 - Snapshots: jk:prototyper's `verify-snapshots.sh Apps/HeizungDebugPrototype` renders every
   `#Preview` to `snapshots/`. Needs the GUI session (from SSH it renders nothing).
 - iOS: open `Package.swift` in Xcode and use Previews on the Kit target.
+
+## Kamin-Schalter (Candidates H-A…H-D)
+
+Question: where does the fireplace switch (on/off, state, "endet in x h" while on) sit in the quiet G Heizung tab. G with a switch, Esszimmer preselected; the state acts on the fireplace rooms (Esszimmer, Kaminzimmer): flame under the bar name and a warm column behind the bar in the overview, flame pin and area in the detail.
+
+- **H-A** row under the headline inside the overview card.
+- **H-B** round flame button at the trailing end of the headline, hint under it while on.
+- **H-C** row at the head of the detail card of a fireplace room (only after selecting one).
+- **H-D** toolbar button (stand-in bar in the snapshots, real toolbars do not snapshot), hint as subtitle under the title.
+
+Snapshots: `snapshots/*LightVariant.swift_H-*` (iPhone and Mac, hell/dunkel, an/aus).

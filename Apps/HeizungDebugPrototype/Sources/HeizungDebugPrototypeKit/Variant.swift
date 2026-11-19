@@ -10,6 +10,10 @@ public enum Variant: String, CaseIterable, Identifiable, Sendable {
     case skizzeV3
     case final
     case light
+    case fireplaceRow
+    case fireplaceButton
+    case fireplaceDetail
+    case fireplaceToolbar
 
     public var id: String { rawValue }
 
@@ -23,6 +27,10 @@ public enum Variant: String, CaseIterable, Identifiable, Sendable {
         case .skizzeV3: "E Skizze v3"
         case .final: "F Final"
         case .light: "G Leicht"
+        case .fireplaceRow: "H-A Kamin: Zeile unter Schlagzeile"
+        case .fireplaceButton: "H-B Kamin: Flamme an der Schlagzeile"
+        case .fireplaceDetail: "H-C Kamin: Kopf des Kaminzimmer-Details"
+        case .fireplaceToolbar: "H-D Kamin: Toolbar-Knopf"
         }
     }
 }

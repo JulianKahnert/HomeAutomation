@@ -35,9 +35,26 @@ public struct PrototypeView: View {
                         regular: geo.size.width >= 700
                     )
                 }
+            case .fireplaceRow:
+                fireplace(.row)
+            case .fireplaceButton:
+                fireplace(.headlineButton)
+            case .fireplaceDetail:
+                fireplace(.detailHeader)
+            case .fireplaceToolbar:
+                fireplace(.toolbar)
             }
         }
         .environment(\.locale, Fmt.de)
+    }
+}
+
+extension PrototypeView {
+    /// G with the fireplace switch at one of the candidate places; Esszimmer preselected.
+    func fireplace(_ placement: FireplacePlacement) -> some View {
+        GeometryReader { geo in
+            LightVariant(layout: geo.size.width >= 700 ? .regular : .compact, selectedRoomID: "esszimmer", range: .day, fireplace: placement)
+        }
     }
 }
 

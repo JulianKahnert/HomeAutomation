@@ -23,12 +23,13 @@ public final class HomeManager: HomeManagable {
     private let location: Location
     private let storageRepo: StorageRepository
     private let notificationSender: NotificationSender
+    private let heatingWrites: (any HeatingWriteRepository)?
     private let entityCache = Cache<EntityId, EntityStorageItem>(entryLifetime: .hours(2))
     /// One retry slot per entity: a newer failed action replaces an older queued one, so the newest
     /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
     /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
     /// replaying both would be contradictory.
-    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int, runId: UUID?)] = [:]
+    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?)] = [:]
     /// Changed entity states on their way to the database. One task drains it in order, so a burst
     /// of events (the adapter's full resync on every reconnect) uses one database connection at a
     /// time instead of one query per event at once.
@@ -44,6 +45,7 @@ public final class HomeManager: HomeManagable {
     /// - Parameters:
     ///   - retryTicks: Cadence at which queued failed actions are retried. Pass a stream to drive the
     ///     retries deterministically; the default is a 5s timer.
+    ///   - heatingWrites: Where the writes to radiators are recorded with their reason; `nil` records none.
     ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
     ///     than there are delays.
     ///   - outdoorTemperature: The latest stored outdoor temperature reading in °C, `nil` without one;
@@ -53,11 +55,13 @@ public final class HomeManager: HomeManagable {
                 notificationSender: NotificationSender,
                 location: Location,
                 actionLogManager: ActionLogManager,
+                heatingWrites: (any HeatingWriteRepository)? = nil,
                 retryTicks: AsyncStream<Void>? = nil,
                 persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
                 outdoorTemperature: @escaping @Sendable () async -> Double? = { nil }) {
         self.windowManager = WindowManager(notificationSender: notificationSender, outdoorTemperature: outdoorTemperature)
         self.actionLogManager = actionLogManager
+        self.heatingWrites = heatingWrites
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
         self.notificationSender = notificationSender
@@ -85,9 +89,9 @@ public final class HomeManager: HomeManagable {
         Task.detached(priority: .low) {
             for await _ in ticks {
                 let queued = await self.popAllFailedActions()
-                for (action, attempt, runId) in queued {
+                for (action, attempt, runId, heating) in queued {
                     self.log.debug("Performing failed action again: \(action) [attempt \(attempt + 1)/\(Self.maxAttempts)]")
-                    await self.perform(action, attempt: attempt, runId: runId)
+                    await self.perform(action, attempt: attempt, runId: runId, heating: heating)
                 }
             }
         }
@@ -137,12 +141,12 @@ public final class HomeManager: HomeManagable {
     public func perform(_ action: HomeManagableAction) async {
         // Round values to prevent excessive HomeKit updates
         let roundedAction = action.rounded()
-        await perform(roundedAction, attempt: 0, runId: AutomationRunContext.runId)
+        await perform(roundedAction, attempt: 0, runId: AutomationRunContext.runId, heating: HeatingWriteContext.current)
     }
 
     /// - Parameter runId: Passed explicitly because the retry loop runs detached, without the
-    ///   `AutomationRunContext` task local of the original run.
-    private func perform(_ action: HomeManagableAction, attempt: Int, runId: UUID?) async {
+    ///   `AutomationRunContext` task local of the original run; `heating` likewise for `HeatingWriteContext`.
+    private func perform(_ action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?) async {
         // Cancellation is honoured at command boundaries only: a superseded automation run must not
         // start further commands, but a command that already started always runs to completion (see
         // the shield below). Checked before logging so a skipped command produces no log entry.
@@ -152,7 +156,7 @@ public final class HomeManager: HomeManagable {
         }
 
         // Log action and check if it's a duplicate (cache hit)
-        let hasCacheHit = await actionLogManager.log(action: action, runId: runId)
+        let hasCacheHit = await actionLogManager.log(action: action, runId: runId, heating: heating)
 
         if hasCacheHit {
             log.info("Skipping duplicate command: [\(action)]")
@@ -175,6 +179,7 @@ public final class HomeManager: HomeManagable {
             // Only a command that reached the device may deduplicate its successors.
             await actionLogManager.markExecuted(action)
             liveness.recordCommandSuccess(at: Date())
+            await recordHeatingWrite(of: action, context: heating)
         } catch {
             liveness.recordCommandFailure(error, at: Date())
             await actionLogManager.markFailed(action)
@@ -187,10 +192,20 @@ public final class HomeManager: HomeManagable {
 
             let nextAttempt = attempt + 1
             if nextAttempt < Self.maxAttempts {
-                failedActions[entityId] = (action, nextAttempt, runId)
+                failedActions[entityId] = (action, nextAttempt, runId, heating)
             } else {
                 log.critical("Giving up on action [\(action)] after \(Self.maxAttempts) attempts")
             }
+        }
+    }
+
+    /// Persists a radiator write that reached the device; a failing database must not fail the command.
+    private func recordHeatingWrite(of action: HomeManagableAction, context: HeatingWriteContext.Context?) async {
+        guard let heatingWrites, let context, let write = HeatingWrite(action: action, context: context) else { return }
+        do {
+            try await heatingWrites.add(write)
+        } catch {
+            log.error("Failed to record heating write [\(action)]: \(error)")
         }
     }
 
@@ -341,7 +356,7 @@ public final class HomeManager: HomeManagable {
         return liveness.evaluate(isConnected: isConnected, at: Date())
     }
 
-    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?)] {
+    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?)] {
         let queued = Array(failedActions.values)
         failedActions.removeAll()
         return queued

@@ -189,7 +189,9 @@ struct OpenAPIController: APIProtocol {
                                              detailDescription: item.detailDescription,
                                              hasCacheHit: item.hasCacheHit,
                                              runId: item.runId?.uuidString,
-                                             status: item.status.flatMap { .init(rawValue: $0.rawValue) })
+                                             status: item.status.flatMap { .init(rawValue: $0.rawValue) },
+                                             reason: item.reason.flatMap { .init(rawValue: $0.rawValue) },
+                                             planTargetInC: item.planTargetInC)
         }
 
         return .ok(.init(body: .json(schemaItems)))

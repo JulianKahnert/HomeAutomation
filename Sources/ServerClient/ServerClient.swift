@@ -140,7 +140,9 @@ public struct ServerClient {
                                  detailDescription: item.detailDescription,
                                  hasCacheHit: item.hasCacheHit,
                                  runId: item.runId.flatMap(UUID.init(uuidString:)),
-                                 status: item.status.flatMap { ActionLogItem.Status(rawValue: $0.rawValue) })
+                                 status: item.status.flatMap { ActionLogItem.Status(rawValue: $0.rawValue) },
+                                 reason: item.reason.flatMap { HeatingWriteReason(rawValue: $0.rawValue) },
+                                 planTargetInC: item.planTargetInC)
         }
     }
 

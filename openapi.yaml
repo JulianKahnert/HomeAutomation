@@ -555,6 +555,14 @@ components:
           type: string
           enum: [executed, cacheHit, failed]
           description: Whether the action was sent, skipped as a duplicate, or failed.
+        reason:
+          type: string
+          enum: [plan, window, fireplace, system]
+          description: Why the server wrote a radiator. Absent for other commands and for entries that predate it.
+        planTargetInC:
+          type: number
+          format: double
+          description: The plan target at the time of a plan write.
       required:
         - id
         - timestamp

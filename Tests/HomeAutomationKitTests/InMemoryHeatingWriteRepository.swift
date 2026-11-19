@@ -14,7 +14,7 @@ actor InMemoryHeatingWriteRepository: HeatingWriteRepository {
     }
 
     func writes(placeId: String, startDate: Date?, endDate: Date?) -> [HeatingWrite] {
-        all.filter { $0.placeId == placeId && (startDate == nil || $0.timestamp >= startDate!) && (endDate == nil || $0.timestamp < endDate!) }
+        all.filter { $0.placeId == placeId && $0.timestamp >= (startDate ?? .distantPast) && $0.timestamp < (endDate ?? .distantFuture) }
             .sorted { $0.timestamp < $1.timestamp }
     }
 

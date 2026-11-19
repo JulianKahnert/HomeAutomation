@@ -10,7 +10,7 @@ import Testing
 struct HeatingPlanTests {
     private static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
+        calendar.timeZone = TimeZone(identifier: "Europe/Berlin") ?? .gmt
         return calendar
     }()
 
@@ -23,7 +23,7 @@ struct HeatingPlanTests {
 
     /// 2026-11-16 is a Monday.
     private func date(day: Int, hour: Int, minute: Int = 0) -> Date {
-        Self.calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))!
+        Self.calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute)) ?? .distantPast
     }
 
     @Test("Each weekday group has its own switch points")

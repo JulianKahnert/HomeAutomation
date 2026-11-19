@@ -16,6 +16,7 @@ extension AutomationInfo {
         "MaintenanceAutomation": ("System", "wrench.and.screwdriver", "Schedule"),
         "MotionAtNight": ("Motion", "figure.walk", "Motion sensor"),
         "RestartSystem": ("System", "arrow.clockwise", "Schedule"),
+        "RoomHeating": ("Heating", "thermometer.medium", "Plan"),
         "SetLightProperties": ("Light", "lightbulb", "Light change"),
         "TriggerScene": ("Schedule", "clock", "Schedule"),
         "Turn": ("Schedule", "clock", "Schedule"),

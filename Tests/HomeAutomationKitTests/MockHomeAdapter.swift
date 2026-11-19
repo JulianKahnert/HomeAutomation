@@ -57,6 +57,8 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
             break
         case .setValve:
             break
+        case .setTargetTemperature:
+            break
         }
 
         let actionString: String
@@ -79,6 +81,8 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
             actionString = "setHeating"
         case .setValve:
             actionString = "setValve"
+        case .setTargetTemperature:
+            actionString = "setTargetTemperature"
         }
 
         traceMap["action.\(actionString)", default: 0] += 1

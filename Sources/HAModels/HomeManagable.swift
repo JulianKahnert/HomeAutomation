@@ -57,6 +57,8 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equ
     case addEntityToScene(EntityId, sceneName: String, targetValue: SceneEntityAction)
     case setHeating(EntityId, active: Bool)
     case setValve(EntityId, active: Bool)
+    /// Writes the heating threshold of a radiator (`.targetTemperature`); rounded to 0.5 °C, the step of the Eve Thermo.
+    case setTargetTemperature(EntityId, celsius: Double)
 
     public var description: String {
         switch self {
@@ -78,6 +80,8 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equ
             return "setHeating(active: \(active))"
         case .setValve(_, let active):
             return "setValve(active: \(active))"
+        case .setTargetTemperature(_, let celsius):
+            return "setTargetTemperature(celsius: \(celsius))"
         }
     }
 
@@ -100,6 +104,8 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equ
         case .setHeating(let entityId, _):
             return entityId
         case .setValve(let entityId, _):
+            return entityId
+        case .setTargetTemperature(let entityId, _):
             return entityId
         }
     }
@@ -124,6 +130,8 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equ
             return "setHeating"
         case .setValve:
             return "setValve"
+        case .setTargetTemperature:
+            return "setTargetTemperature"
         }
     }
 }

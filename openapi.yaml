@@ -465,7 +465,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [entityChange, time, sunrise, sunset]
+          enum: [entityChange, time, sunrise, sunset, serverStart, configDeploy]
         entityId:
           $ref: "#/components/schemas/EntityId"
         summary:

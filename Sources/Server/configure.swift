@@ -306,6 +306,9 @@ public func configure(_ app: Application) async throws {
         }
     }
 
+    // Once per process start; the stream buffers it until the event processing job runs.
+    app.homeEventsContinuation.yield(.serverStarted)
+
     // MARK: - register routes
 
     // register routes

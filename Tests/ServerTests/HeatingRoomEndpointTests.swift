@@ -54,4 +54,9 @@ final class HeatingRoomEndpointTests: XCTestCase {
         let status = try await get("/heating/rooms/Bad%20-%20OG")
         XCTAssertEqual(status, .unauthorized)
     }
+
+    func testOverviewRequiresAuthentication() async throws {
+        let status = try await get("/heating/overview")
+        XCTAssertEqual(status, .unauthorized)
+    }
 }

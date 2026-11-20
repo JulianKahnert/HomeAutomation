@@ -2,7 +2,7 @@
 //  HeatingFeature.swift
 //  ControllerFeatures
 //
-//  The Heizung tab: rooms with their heating automation and the detail of the selected room
+//  The Heizung tab: the overview of all rooms and the detail of the selected room
 //
 
 import ComposableArchitecture
@@ -12,23 +12,14 @@ import HAModels
 @Reducer
 struct HeatingFeature: Sendable {
 
-    /// A room with a heating automation.
-    struct Room: Equatable, Sendable, Identifiable {
-        let placeId: String
-        let name: String
-        var id: String { placeId }
-    }
-
     private enum CancelID {
         case detail
     }
 
-    /// The type name the server reports for `RoomHeating` automations.
-    static let automationType = "RoomHeating"
-
     @ObservableState
     struct State: Equatable, Sendable {
-        var rooms: [Room] = []
+        /// Coldest first; rooms without an actual value last.
+        var rooms: [HeatingOverviewRoom] = []
         var selectedPlaceId: String?
         var range: HeatingRange = .day
         var detail: HeatingRoomDetail?
@@ -38,14 +29,17 @@ struct HeatingFeature: Sendable {
         /// Set when the detail of the selected room could not be loaded.
         var detailError: String?
 
-        var selectedRoom: Room? { rooms.first { $0.placeId == selectedPlaceId } }
+        var selectedRoom: HeatingOverviewRoom? { rooms.first { $0.placeId == selectedPlaceId } }
+
+        /// One line about the room that deviates most; `nil` while no room has a Δ.
+        var headline: String? { HeatingFeature.headline(for: rooms) }
     }
 
     enum Action: BindableAction, Sendable {
         case binding(BindingAction<State>)
         case detailResponse(Result<HeatingRoomDetail, Error>)
+        case overviewResponse(Result<HeatingOverview, Error>)
         case refresh
-        case roomsResponse(Result<[Room], Error>)
         case selectRoom(String?)
         case task
     }
@@ -59,20 +53,20 @@ struct HeatingFeature: Sendable {
             case .task, .refresh:
                 state.isLoading = true
                 return .run { send in
-                    await send(.roomsResponse(Result { Self.rooms(in: try await serverClient.getAutomations()) }))
+                    await send(.overviewResponse(Result { try await serverClient.getHeatingOverview() }))
                 }
 
-            case let .roomsResponse(.success(rooms)):
+            case let .overviewResponse(.success(overview)):
                 state.isLoading = false
                 state.error = nil
-                state.rooms = rooms
+                state.rooms = Self.sorted(overview.rooms)
                 if state.selectedRoom == nil {
-                    state.selectedPlaceId = rooms.first?.placeId
+                    state.selectedPlaceId = nil
                     state.detail = nil
                 }
                 return loadDetail(&state)
 
-            case let .roomsResponse(.failure(error)):
+            case let .overviewResponse(.failure(error)):
                 state.isLoading = false
                 state.error = error.localizedDescription
                 state.rooms = []
@@ -117,13 +111,27 @@ struct HeatingFeature: Sendable {
         .cancellable(id: CancelID.detail, cancelInFlight: true)
     }
 
-    /// The rooms of the heating automations; the place comes from the radiators' entities.
-    static func rooms(in automations: [AutomationInfo]) -> [Room] {
-        var seen = Set<String>()
-        return automations
-            .filter { $0.type == automationType }
-            .compactMap { $0.entities.first?.placeId }
-            .filter { seen.insert($0).inserted }
-            .map { Room(placeId: $0, name: $0) }
+    /// Coldest first (smallest Δ), rooms without a Δ last; equal Δ keep the server's order.
+    static func sorted(_ rooms: [HeatingOverviewRoom]) -> [HeatingOverviewRoom] {
+        let indexed = rooms.enumerated().sorted { lhs, rhs in
+            switch (lhs.element.delta, rhs.element.delta) {
+            case let (left?, right?): left == right ? lhs.offset < rhs.offset : left < right
+            case (.some, .none): true
+            case (.none, .some): false
+            case (.none, .none): lhs.offset < rhs.offset
+            }
+        }
+        return indexed.map(\.element)
+    }
+
+    /// "Bad OG am kältesten · 3,7 K unter Plan", "… am wärmsten · 2,0 K über Plan" or "Alle Räume im Plan".
+    static func headline(for rooms: [HeatingOverviewRoom]) -> String? {
+        let deviating = rooms.compactMap { room in room.delta.map { (room, $0) } }
+        guard let worst = deviating.max(by: { abs($0.1) < abs($1.1) }) else { return nil }
+        switch HeatingComfort(delta: worst.1) {
+        case .ok: return "Alle Räume im Plan"
+        case .tooCold: return "\(worst.0.name) am kältesten · \(HeatingFormat.kelvinAmount(worst.1)) unter Plan"
+        case .tooWarm: return "\(worst.0.name) am wärmsten · \(HeatingFormat.kelvinAmount(worst.1)) über Plan"
+        }
     }
 }

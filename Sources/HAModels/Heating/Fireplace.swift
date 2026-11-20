@@ -41,6 +41,8 @@ public enum Fireplace {
     public static let notificationCategory = "FIREPLACE_ASK"
     /// The action of that category that switches the fireplace on.
     public static let switchOnActionId = "FIREPLACE_ON"
+    /// Collapse id of the reminder "Kamin an?"; apart from `notificationId` so the end push does not count against its rate limit.
+    public static let reminderNotificationId = "fireplace-reminder"
     /// Collapse id of the fireplace pushes, so a newer one replaces an older.
     public static let notificationId = "fireplace"
 

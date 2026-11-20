@@ -168,6 +168,17 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     func sendNotification(title: String, message: String, id: String, category: String?) async {
         sentNotificationTitles.append(title)
         sentNotifications.append((title, message, id, category))
+        notificationDates[id] = Date()
+    }
+
+    private var notificationDates: [String: Date] = [:]
+
+    func lastNotificationDate(id: String) async -> Date? {
+        notificationDates[id]
+    }
+
+    func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] {
+        storageItems.filter { $0.entityId == entityId && $0.timestamp >= since }.sorted { $0.timestamp > $1.timestamp }
     }
 
     func markWindowOverdue(entityId: EntityId) async {

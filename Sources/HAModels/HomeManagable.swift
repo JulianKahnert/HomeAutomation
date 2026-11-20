@@ -24,6 +24,10 @@ public protocol HomeManagable: EntityValidator, Sendable {
     /// adapter's resync refreshes the cache with a new timestamp; only the database still knows since
     /// when the state really holds. `nil` when the database has none.
     func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem?
+    /// The stored states of the entity since `since`, newest first; empty when the database has none.
+    func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem]
+    /// When a notification with this id was last sent by this server process; `nil` if none was since the start.
+    func lastNotificationDate(id: String) async -> Date?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
     /// - Returns: Whether the item carries new information, i.e. differs in value — not just in
     ///   timestamp — from the last known state of that entity.
@@ -47,6 +51,10 @@ public protocol HomeManagable: EntityValidator, Sendable {
 }
 
 extension HomeManagable {
+    public func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] { [] }
+
+    public func lastNotificationDate(id: String) async -> Date? { nil }
+
     public func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
         try? await getCurrentEntity(with: entityId)
     }

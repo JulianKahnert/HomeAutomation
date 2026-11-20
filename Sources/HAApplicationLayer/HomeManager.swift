@@ -40,6 +40,8 @@ public final class HomeManager: HomeManagable {
     nonisolated private static let persistQueueLimit = 5_000
     /// States dropped since the queue last had room again; keeps a stuck database from flooding the log.
     private var droppedPersistItems = 0
+    /// When each notification id was last sent, for rate limits of automations.
+    private var notificationDates: [String: Date] = [:]
     private var liveness = HomeKitLiveness(startedAt: Date())
 
     /// - Parameters:
@@ -326,10 +328,19 @@ public final class HomeManager: HomeManagable {
         (try? await storageRepo.getCurrent(entityId)) ?? nil
     }
 
+    public func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] {
+        (try? await storageRepo.getHistory(for: entityId, startDate: since, endDate: nil, cursor: nil, limit: 1000)) ?? []
+    }
+
+    public func lastNotificationDate(id: String) async -> Date? {
+        notificationDates[id]
+    }
+
     public func sendNotification(title: String, message: String, id: String, category: String?) async {
         do {
             log.debug("Sending notification \(title): \(message) [id: \(id)]")
             try await notificationSender.sendNotification(title: title, message: message, id: id, category: category)
+            notificationDates[id] = Date()
         } catch {
             log.warning("Failed to send notification: \(error)")
         }

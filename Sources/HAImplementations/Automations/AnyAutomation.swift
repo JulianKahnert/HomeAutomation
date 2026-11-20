@@ -10,6 +10,7 @@ import HAModels
 public enum AnyAutomation: Codable, Sendable {
     case createScene(CreateScene)
     case energyLowPrice(EnergyLowPrice)
+    case fireplaceReminder(FireplaceReminder)
     case fireplaceTimeout(FireplaceTimeout)
     #if canImport(WeatherKit)
     case gardenWatering(GardenWatering)
@@ -30,6 +31,7 @@ public enum AnyAutomation: Codable, Sendable {
         switch self {
         case .createScene(let createScene): return createScene
         case .energyLowPrice(let energyLowPrice): return energyLowPrice
+        case .fireplaceReminder(let fireplaceReminder): return fireplaceReminder
         case .fireplaceTimeout(let fireplaceTimeout): return fireplaceTimeout
         case .motionAtNight(let motionAtNight): return motionAtNight
         case .turnOnForDuration(let turnOnForDuration): return turnOnForDuration
@@ -52,6 +54,7 @@ public enum AnyAutomation: Codable, Sendable {
         var tmp: [Automatable.Type] = [
             CreateScene.self,
             EnergyLowPrice.self,
+            FireplaceReminder.self,
             FireplaceTimeout.self,
             HealthCheck.self,
             MaintenanceAutomation.self,
@@ -77,6 +80,8 @@ public enum AnyAutomation: Codable, Sendable {
             return .createScene(createScene)
         } else if let energyLowPrice = automation as? EnergyLowPrice {
             return .energyLowPrice(energyLowPrice)
+        } else if let fireplaceReminder = automation as? FireplaceReminder {
+            return .fireplaceReminder(fireplaceReminder)
         } else if let fireplaceTimeout = automation as? FireplaceTimeout {
             return .fireplaceTimeout(fireplaceTimeout)
         } else if let healthCheck = automation as? HealthCheck {

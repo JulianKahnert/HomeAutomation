@@ -36,6 +36,9 @@ A sensor of a room that switches its radiators off while it is open: a window co
 **Fireplace mode** (Kamin-Modus)
 The configured radiators are off while the fireplace is on. The fireplace is the persistent Homebridge switch `Keller_Kamin_switcher` and counts like an open window contact, but without the window delay. Only rooms that list it as a contact follow it. It is switched from the Heizung tab (toolbar button), from the push action "Kamin an?", from Siri or the Home app. The server switches it through `PUT /heating/fireplace`; `GET /heating/fireplace` says whether it is on, since when and when it ends. A repeated "on" does not restart the eight hours.
 
+**Fireplace reminder** (Kamin-Erinnerung)
+The push "Kamin an? Heizkörper ausschalten" (`FireplaceReminder`), sent when the temperature of the fireplace room's sensor has risen by the *rise* (default 1,0 K) within the *window* (default 30 minutes), measured against the lowest reading in the window. It is not sent while the fireplace is on, and not again within the *minimum interval* (default 2 hours, counted from the last reminder of this server process). It carries the fireplace category, whose action switches the fireplace on; the server never switches it by itself.
+
 **Unreachable fireplace** (Kamin nicht erreichbar)
 A switch whose state the server cannot read counts as off, so the plan keeps running and nothing freezes. The server keeps the last known value when HomeKit cannot be read, so the eight-hour end bounds the damage of a wrongly "on" switch.
 

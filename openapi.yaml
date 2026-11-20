@@ -840,6 +840,33 @@ components:
           type: string
           format: date-time
           description: When the room last had an actual value, also before the range; missing when it never had one.
+        events:
+          type: array
+          description: Events of the range sorted by pin; one that began before the range keeps its real start and pins at the range start.
+          items:
+            $ref: "#/components/schemas/HeatingEvent"
+    HeatingEvent:
+      type: object
+      required: [source, title, reason, start, pin]
+      properties:
+        source:
+          type: string
+          description: plan, window, fireplace, observed or system
+        title:
+          type: string
+        reason:
+          type: string
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+          description: Missing for a moment and while the event lasts.
+        pin:
+          type: string
+          format: date-time
+          description: Pin position inside the range.
     Fireplace:
       type: object
       required: [isOn]

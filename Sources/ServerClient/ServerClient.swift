@@ -246,7 +246,12 @@ public struct ServerClient {
                                  istSource: source,
                                  radiators: body.radiators,
                                  samples: body.samples.map { HeatingSample(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) },
-                                 lastIst: body.lastIst)
+                                 lastIst: body.lastIst,
+                                 events: (body.events ?? []).compactMap { event in
+                                     HeatingEventSource(rawValue: event.source).map {
+                                         HeatingEvent(source: $0, title: event.title, reason: event.reason, start: event.start, end: event.end, pin: event.pin)
+                                     }
+                                 })
     }
 }
 

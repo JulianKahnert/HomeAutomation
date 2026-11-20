@@ -66,9 +66,12 @@ public struct HeatingRoomDetail: Sendable, Codable, Equatable {
     public let samples: [HeatingSample]
     /// When the room last had an actual value, also before the range; `nil` when it never had one.
     public let lastIst: Date?
+    /// What happened in the range, sorted by pin position (glossary: heating event).
+    public let events: [HeatingEvent]
 
     public init(placeId: String, name: String, range: HeatingRange, istSource: HeatingIstSource, radiators: [String], samples: [HeatingSample],
-                lastIst: Date? = nil) {
+                lastIst: Date? = nil, events: [HeatingEvent] = []) {
+        self.events = events
         self.placeId = placeId
         self.name = name
         self.range = range

@@ -314,6 +314,15 @@ struct OpenAPIController: APIProtocol {
         return .ok(.init(body: .json(body)))
     }
 
+    func getHeatingOverview(_ input: Operations.GetHeatingOverview.Input) async throws -> Operations.GetHeatingOverview.Output {
+        let automations = await request.application.homeAutomationConfigService.automations
+        let rooms = automations.compactMap { ($0 as? RoomHeating)?.heatingSources }
+        let detail = HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
+                                              writes: request.application.heatingWriteRepository)
+        let overview = try await HeatingOverviewBuilder(detail: detail).overview(for: rooms)
+        return .ok(.init(body: .json(.init(overview))))
+    }
+
     func getHeatingRoom(_ input: Operations.GetHeatingRoom.Input) async throws -> Operations.GetHeatingRoom.Output {
         guard let range = HeatingRange(rawValue: input.query.range ?? HeatingRange.day.rawValue) else {
             return .badRequest(.init())
@@ -381,13 +390,26 @@ extension Components.Schemas.EntityHistoryItem {
     }
 }
 
+extension Components.Schemas.HeatingIstSource {
+    init(_ source: HeatingIstSource) {
+        switch source {
+        case .roomSensor(let name): self.init(kind: "roomSensor", names: [name])
+        case .thermostats(let names): self.init(kind: "thermostats", names: names)
+        }
+    }
+}
+
+extension Components.Schemas.HeatingOverview {
+    init(_ overview: HeatingOverview) {
+        self.init(rooms: overview.rooms.map {
+            .init(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, istSource: .init($0.istSource))
+        })
+    }
+}
+
 extension Components.Schemas.HeatingRoomDetail {
     init(_ detail: HeatingRoomDetail) {
-        let source: Components.Schemas.HeatingIstSource
-        switch detail.istSource {
-        case .roomSensor(let name): source = .init(kind: "roomSensor", names: [name])
-        case .thermostats(let names): source = .init(kind: "thermostats", names: names)
-        }
+        let source = Components.Schemas.HeatingIstSource(detail.istSource)
         self.init(placeId: detail.placeId,
                   name: detail.name,
                   range: detail.range.rawValue,

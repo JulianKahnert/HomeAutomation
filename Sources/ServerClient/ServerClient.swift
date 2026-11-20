@@ -209,6 +209,16 @@ public struct ServerClient {
         }
     }
 
+    /// The rooms of the heating overview: actual, plan target and source of the actual value per room.
+    public func getHeatingOverview() async throws -> HeatingOverview {
+        let response = try await client.getHeatingOverview()
+        let body = try response.ok.body.json
+        return HeatingOverview(rooms: body.rooms.map {
+            HeatingOverviewRoom(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan,
+                                istSource: HeatingIstSource($0.istSource))
+        })
+    }
+
     /// The time grid of a heating room (glossary: actual, plan target, Δ). Throws when the server answers
     /// 400 (unknown range) or 404 (no heating automation for the room).
     public func getHeatingRoom(placeId: String, range: HeatingRange) async throws -> HeatingRoomDetail {
@@ -217,15 +227,19 @@ public struct ServerClient {
         guard let detailRange = HeatingRange(rawValue: body.range) else {
             throw InvalidResponseError(reason: "Unknown heating range \(body.range)")
         }
-        let source: HeatingIstSource = body.istSource.kind == "roomSensor"
-            ? .roomSensor(body.istSource.names.first ?? "")
-            : .thermostats(body.istSource.names)
+        let source = HeatingIstSource(body.istSource)
         return HeatingRoomDetail(placeId: body.placeId,
                                  name: body.name,
                                  range: detailRange,
                                  istSource: source,
                                  radiators: body.radiators,
                                  samples: body.samples.map { HeatingSample(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) })
+    }
+}
+
+extension HeatingIstSource {
+    init(_ source: Components.Schemas.HeatingIstSource) {
+        self = source.kind == "roomSensor" ? .roomSensor(source.names.first ?? "") : .thermostats(source.names)
     }
 }
 

@@ -46,7 +46,11 @@ enum HeatingChartData {
 
     static func istRuns(_ samples: [HeatingSample]) -> [[Point]] { runs(samples) { $0.ist } }
 
-    static func planRuns(_ samples: [HeatingSample]) -> [[Point]] { runs(samples) { $0.sollPlan } }
+    /// The plan line is only drawn next to an actual value; a room without any has no plan line.
+    static func planRuns(_ samples: [HeatingSample]) -> [[Point]] {
+        guard samples.contains(where: { $0.ist != nil }) else { return [] }
+        return runs(samples) { $0.sollPlan }
+    }
 
     static func valveRuns(_ samples: [HeatingSample], radiator: Int) -> [[Point]] {
         runs(samples) { $0.valves.indices.contains(radiator) ? $0.valves[radiator] : nil }
@@ -88,6 +92,12 @@ enum HeatingChartData {
     /// The sample closest to `date`.
     static func nearest(to date: Date, in samples: [HeatingSample]) -> HeatingSample? {
         samples.min { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) }
+    }
+
+    /// The x range of both charts: first to last sample.
+    static func timeDomain(_ samples: [HeatingSample]) -> ClosedRange<Date> {
+        guard let first = samples.first?.date, let last = samples.last?.date else { return Date.now...Date.now.addingTimeInterval(1) }
+        return first...max(last, first.addingTimeInterval(1))
     }
 
     /// The y range of the temperature chart: the data with a margin, at least 2 K high.

@@ -43,6 +43,20 @@ struct HeatingChartDataTests {
         #expect(HeatingChartData.gapSegments(samples).count == 2)
     }
 
+    @Test("a room without any actual value draws no plan line")
+    func noPlanWithoutIst() {
+        #expect(HeatingChartData.planRuns([sample(0, ist: nil), sample(5, ist: nil)]).isEmpty)
+        #expect(HeatingChartData.planRuns([sample(0, ist: 20), sample(5, ist: nil)]).count == 1)
+    }
+
+    @Test("weekday labels are short German names")
+    func weekday() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
+        let monday = calendar.date(from: DateComponents(year: 2026, month: 11, day: 16, hour: 0))!
+        #expect(HeatingFormat.weekday(monday, calendar: calendar) == "Mo.")
+    }
+
     @Test("the crosshair snaps to the nearest sample")
     func nearest() {
         let samples = [sample(0, ist: 20), sample(5, ist: 21)]

@@ -94,11 +94,17 @@ enum HeatingPreviewData {
         }
     }
 
+    /// The heatmap cells of the overview endpoint: mean Δ per room, local day and six-hour segment of the last seven days.
+    static var heatmap: [HeatingHeatmapCell] {
+        rooms.flatMap { HeatingOverviewBuilder.heatmap(for: $0.detail(.week), calendar: calendar) }
+    }
+
     /// A store state with the overview loaded and `selected` open (none: only the overview).
     static func state(_ placeId: String? = nil, range: HeatingRange = .day) -> HeatingFeature.State {
         var state = HeatingFeature.State()
         state.rooms = HeatingFeature.sorted(overviewRooms)
         state.updatedAt = now
+        state.heatmap = heatmap
         state.selectedPlaceId = placeId
         state.range = range
         state.detail = placeId.flatMap { id in rooms.first { $0.id == id }?.detail(range) }

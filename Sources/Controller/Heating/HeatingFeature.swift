@@ -20,6 +20,8 @@ struct HeatingFeature: Sendable {
     struct State: Equatable, Sendable {
         /// Coldest first; rooms without an actual value last.
         var rooms: [HeatingOverviewRoom] = []
+        /// The week heatmap of the overview endpoint.
+        var heatmap: [HeatingHeatmapCell] = []
         var selectedPlaceId: String?
         var range: HeatingRange = .day
         var detail: HeatingRoomDetail?
@@ -66,6 +68,7 @@ struct HeatingFeature: Sendable {
                 state.error = nil
                 state.updatedAt = date.now
                 state.rooms = Self.sorted(overview.rooms)
+                state.heatmap = overview.heatmap
                 if state.selectedRoom == nil {
                     state.selectedPlaceId = nil
                     state.detail = nil
@@ -76,6 +79,7 @@ struct HeatingFeature: Sendable {
                 state.isLoading = false
                 state.error = error.localizedDescription
                 state.rooms = []
+                state.heatmap = []
                 state.selectedPlaceId = nil
                 state.detail = nil
                 return .cancel(id: CancelID.detail)

@@ -80,4 +80,70 @@ struct HeatingOverviewTests {
         #expect(result.rooms.first?.shortName == "Bad OG")
         #expect(result.rooms.first?.name == "Bad - OG")
     }
+
+    // MARK: - Week heatmap
+
+    private var berlin: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
+        return calendar
+    }
+
+    private func berlinDate(_ day: Int, _ hour: Int, _ minute: Int = 0, month: Int = 11) -> Date {
+        berlin.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour, minute: minute))!
+    }
+
+    private func heatmap(now: Date, sensor: EntityId, items: [EntityStorageItem], plan target: Double = 21) async throws -> [HeatingHeatmapCell] {
+        let detail = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items),
+                                              writes: InMemoryHeatingWriteRepository([HeatingWrite(timestamp: now.addingTimeInterval(-8 * 86_400), entityId: id("Bad", "Thermo", .heating), reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: target, planTargetInC: target)]),
+                                              now: { now }, calendar: berlin)
+        let result = try await HeatingOverviewBuilder(detail: detail, calendar: berlin).overview(for: [room("Bad", sensor: sensor)])
+        return result.heatmap
+    }
+
+    private func reading(_ entity: EntityId, _ celsius: Double, at date: Date) -> EntityStorageItem {
+        EntityStorageItem(entityId: entity, timestamp: date, temperatureInC: .init(value: celsius, unit: .celsius))
+    }
+
+    @Test("a heatmap cell is the mean delta of its six-hour segment on the local day")
+    func segmentMean() async throws {
+        let sensor = id("Bad", "Sensor")
+        let now = berlinDate(18, 12)
+        // 12-18 on the 17th: 19 degrees for three hours, then 20 degrees: mean delta -1.5 against 21.
+        let items = [reading(sensor, 19, at: berlinDate(17, 0)), reading(sensor, 19, at: berlinDate(17, 12)), reading(sensor, 20, at: berlinDate(17, 15))]
+        let cells = try await heatmap(now: now, sensor: sensor, items: items)
+        let cell = try #require(cells.first { $0.placeId == "Bad" && $0.day == berlinDate(17, 0) && $0.segment == 2 })
+        #expect(try #require(cell.delta) == -1.5)
+        #expect(cells.first { $0.day == berlinDate(17, 0) && $0.segment == 0 }?.delta == -2)
+    }
+
+    @Test("a segment with more than half of its samples missing is null, exactly half is not")
+    func moreThanHalfMissing() async throws {
+        let sensor = id("Bad", "Sensor")
+        let now = berlinDate(18, 12)
+        // A reading at 12:00 holds for the 6 h failure limit: until 18:00. Segment 3 (18-24) is silent, segment 2 complete.
+        let items = [reading(sensor, 21, at: berlinDate(17, 12))]
+        let cells = try await heatmap(now: now, sensor: sensor, items: items)
+        #expect(cells.first { $0.day == berlinDate(17, 0) && $0.segment == 2 }?.delta == 0)
+        #expect(cells.first { $0.day == berlinDate(17, 0) && $0.segment == 3 }?.delta == nil)
+        // Reading at 14:30: valid until 20:30; of the 12 samples of 18-24, 6 have a value: exactly half missing.
+        let half = try await heatmap(now: now, sensor: sensor, items: [reading(sensor, 21, at: berlinDate(17, 14, 30))])
+        #expect(half.first { $0.day == berlinDate(17, 0) && $0.segment == 3 }?.delta == 0)
+        // Reading at 14:00: valid until 20:00, 5 of 12 samples have a value: more than half missing.
+        let less = try await heatmap(now: now, sensor: sensor, items: [reading(sensor, 21, at: berlinDate(17, 14))])
+        #expect(less.first { $0.day == berlinDate(17, 0) && $0.segment == 3 }?.delta == nil)
+    }
+
+    @Test("days and segments follow the local clock across the end of daylight saving time")
+    func daylightSaving() async throws {
+        let sensor = id("Bad", "Sensor")
+        // 25 October 2026: clocks go back, the day has 25 hours; 0-6 holds 7 hours.
+        let now = berlinDate(26, 12, month: 10)
+        let items = [reading(sensor, 22, at: berlinDate(25, 0, month: 10))]
+        let cells = try await heatmap(now: now, sensor: sensor, items: items)
+        let day = berlinDate(25, 0, month: 10)
+        #expect(cells.filter { $0.day == day }.map(\.segment).sorted() == [0, 1, 2, 3])
+        #expect(cells.first { $0.day == day && $0.segment == 0 }?.delta == 1)
+        #expect(Set(cells.map(\.day)).count == 7)
+    }
 }

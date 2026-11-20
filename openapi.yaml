@@ -807,12 +807,34 @@ components:
           description: When the room last had an actual value, also before the range; missing when it never had one.
     HeatingOverview:
       type: object
-      required: [rooms]
+      required: [rooms, heatmap]
       properties:
         rooms:
           type: array
           items:
             $ref: "#/components/schemas/HeatingOverviewRoom"
+        heatmap:
+          type: array
+          description: Room x day x six-hour segment for the last seven local days (Europe/Berlin), today included.
+          items:
+            $ref: "#/components/schemas/HeatingHeatmapCell"
+    HeatingHeatmapCell:
+      type: object
+      required: [placeId, day, segment]
+      properties:
+        placeId:
+          type: string
+        day:
+          type: string
+          format: date-time
+          description: Start of the local day.
+        segment:
+          type: integer
+          description: 0 = 0-6, 1 = 6-12, 2 = 12-18, 3 = 18-24 o'clock local time.
+        delta:
+          type: [number, "null"]
+          format: double
+          description: Mean delta of the segment; null when more than half of it has no actual value.
     HeatingOverviewRoom:
       type: object
       required: [placeId, name, shortName, istSource]

@@ -7,9 +7,11 @@
 
 import Foundation
 import HAModels
+import Logging
 import OpenAPIURLSession
 
 public struct ServerClient {
+    private static let logger = Logger(label: "ServerClient")
     private let client: Client
     private let url: URL
     private let session: URLSession
@@ -213,8 +215,8 @@ public struct ServerClient {
     public func getHeatingOverview() async throws -> HeatingOverview {
         let response = try await client.getHeatingOverview()
         let body = try response.ok.body.json
-        return HeatingOverview(rooms: body.rooms.map {
-            HeatingOverviewRoom(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, delta: $0.delta,
+        return try HeatingOverview(rooms: body.rooms.map {
+            try HeatingOverviewRoom(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, delta: $0.delta,
                                 istSource: HeatingIstSource($0.istSource), followsFireplace: $0.followsFireplace)
         }, heatmap: body.heatmap.map {
             HeatingHeatmapCell(placeId: $0.placeId, day: $0.day, segment: $0.segment, delta: $0.delta)
@@ -239,7 +241,7 @@ public struct ServerClient {
         guard let detailRange = HeatingRange(rawValue: body.range) else {
             throw InvalidResponseError(reason: "Unknown heating range \(body.range)")
         }
-        let source = HeatingIstSource(body.istSource)
+        let source = try HeatingIstSource(body.istSource)
         return HeatingRoomDetail(placeId: body.placeId,
                                  name: body.name,
                                  range: detailRange,
@@ -248,9 +250,12 @@ public struct ServerClient {
                                  samples: body.samples.map { HeatingSample(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) },
                                  lastIst: body.lastIst,
                                  events: (body.events ?? []).compactMap { event in
-                                     HeatingEventSource(rawValue: event.source).map {
-                                         HeatingEvent(source: $0, title: event.title, reason: event.reason, start: event.start, end: event.end, pin: event.pin)
+                                     guard let source = HeatingEventSource(rawValue: event.source) else {
+                                         // A source this app does not know is a newer server or a bug: never drop it silently.
+                                         Self.logger.warning("Dropped a heating event of an unknown source", metadata: ["source": "\(event.source)", "placeId": "\(body.placeId)"])
+                                         return nil
                                      }
+                                     return HeatingEvent(source: source, title: event.title, reason: event.reason, start: event.start, end: event.end, pin: event.pin)
                                  })
     }
 }
@@ -262,8 +267,17 @@ extension FireplaceState {
 }
 
 extension HeatingIstSource {
-    init(_ source: Components.Schemas.HeatingIstSource) {
-        self = source.kind == "roomSensor" ? .roomSensor(source.names.first ?? "") : .thermostats(source.names)
+    /// Throws when the server names a room sensor without its name: that is a server bug, not an empty name.
+    init(_ source: Components.Schemas.HeatingIstSource) throws {
+        switch source.kind {
+        case .roomSensor:
+            guard let name = source.names.first else {
+                throw InvalidResponseError(reason: "A room sensor without a name")
+            }
+            self = .roomSensor(name)
+        case .thermostats:
+            self = .thermostats(source.names)
+        }
     }
 }
 

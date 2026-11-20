@@ -412,8 +412,8 @@ extension Components.Schemas.EntityHistoryItem {
 extension Components.Schemas.HeatingIstSource {
     init(_ source: HeatingIstSource) {
         switch source {
-        case .roomSensor(let name): self.init(kind: "roomSensor", names: [name])
-        case .thermostats(let names): self.init(kind: "thermostats", names: names)
+        case .roomSensor(let name): self.init(kind: .roomSensor, names: [name])
+        case .thermostats(let names): self.init(kind: .thermostats, names: names)
         }
     }
 }

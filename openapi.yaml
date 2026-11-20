@@ -951,7 +951,8 @@ components:
       properties:
         kind:
           type: string
-          description: roomSensor or thermostats
+          enum: [roomSensor, thermostats]
+          description: Where the actual value comes from.
         names:
           type: array
           items:

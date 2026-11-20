@@ -32,4 +32,10 @@ struct HeatingOverviewMappingTests {
         #expect(mapped.delta == nil)
         #expect(mapped.sollPlan == 17)
     }
+
+    @Test("The source of the actual value is an enum in the spec")
+    func istSourceKind() {
+        #expect(Components.Schemas.HeatingIstSource(.roomSensor("Eve Room")).kind == .roomSensor)
+        #expect(Components.Schemas.HeatingIstSource(.thermostats(["A", "B"])).kind == .thermostats)
+    }
 }

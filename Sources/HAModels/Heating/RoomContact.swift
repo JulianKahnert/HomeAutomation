@@ -9,15 +9,28 @@ import Foundation
 /// contact or the fireplace switch (switch on = open). One rule for all of them; only how "open" is read differs.
 public enum RoomContact: Codable, Sendable {
     case window(ContactSensorDevice)
-    /// The fireplace switch; on counts as open (glossary: fireplace mode).
-    case fireplace(SwitchDevice)
+    /// The fireplace switch; on counts as open (glossary: fireplace mode). `radiators` are the radiators of the
+    /// room it switches off; `nil` for all of them.
+    case fireplace(SwitchDevice, radiators: [RadiatorDevice]? = nil)
 
     public var entityId: EntityId {
         switch self {
         case .window(let sensor):
             return sensor.contactSensorId
-        case .fireplace(let device):
+        case .fireplace(let device, _):
             return device.switchId
+        }
+    }
+
+    /// Whether this contact switches `radiator` off while it is open: a window all radiators of the room,
+    /// the fireplace the radiators it lists (all when it lists none).
+    public func affects(_ radiator: RadiatorDevice) -> Bool {
+        switch self {
+        case .window:
+            return true
+        case .fireplace(_, let radiators):
+            guard let radiators else { return true }
+            return radiators.contains { $0.heatingId == radiator.heatingId }
         }
     }
 
@@ -52,7 +65,7 @@ public enum RoomContact: Codable, Sendable {
     /// `nil` as closed ("unreachable = closed"). The fireplace counts since the switch-on time stored in
     /// the database.
     public func currentState(with hm: HomeManagable) async -> (isOpen: Bool, since: Date)? {
-        if case .fireplace(let device) = self {
+        if case .fireplace(let device, _) = self {
             guard let current = try? await hm.getCurrentEntity(with: device.switchId) else { return nil }
             let state = await Fireplace.state(of: device.switchId, with: hm)
             return (state.isOn, state.since ?? current.timestamp)

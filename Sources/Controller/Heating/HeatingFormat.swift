@@ -23,6 +23,11 @@ enum HeatingFormat {
         return "\(sign)\(number(abs(rounded))) K"
     }
 
+    /// "3,7 K": the size of a deviation without its sign.
+    static func kelvinAmount(_ value: Double) -> String {
+        "\(number(abs((value * 10).rounded() / 10))) K"
+    }
+
     /// "15.11. 22:40" for ranges over a day, "22:40" otherwise.
     static func time(_ date: Date, includingDay: Bool, calendar: Calendar = .current) -> String {
         var style = Date.FormatStyle(date: .omitted, time: .omitted, locale: locale, calendar: calendar, timeZone: calendar.timeZone)

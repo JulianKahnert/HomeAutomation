@@ -60,3 +60,9 @@ Two meanings, kept apart. In the data: a stretch of the time grid without an act
 
 **Room detail** (Raumdetail)
 What `GET /heating/rooms/{placeId}?range=2h|24h|7d` answers and the Heizung tab draws for one room: actual, plan target, Δ and one valve percentage per radiator on the time grid. The plan target comes from the plan targets of the heating writes and falls back to the room's plan before the first write in the range.
+
+**Overview** (Übersicht)
+The first view of the Heizung tab: a headline and one Δ bar per room, coldest first, rooms without an actual value last. Per room the server answers actual, plan target and the source of the actual value (`GET /heating/overview`); Δ, sorting and headline are derived in the Controller. The bars run on a fixed scale of ±3 K; a bar beyond it runs off the end of the plot instead of rescaling it.
+
+**Headline** (Schlagzeile)
+One line above the bars naming the room whose Δ is furthest from zero ("Bad OG am kältesten · 3,7 K unter Plan", "… am wärmsten …"), or "Alle Räume im Plan" when every room is inside the comfort band. Rooms without Δ do not count.

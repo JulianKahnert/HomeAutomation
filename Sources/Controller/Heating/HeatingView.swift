@@ -2,7 +2,7 @@
 //  HeatingView.swift
 //  ControllerFeatures
 //
-//  The Heizung tab: one column on iPhone, two columns on Mac and iPad
+//  The Heizung tab: one column on iPhone, two columns on Mac and iPad (bars left, detail or placeholder right)
 //
 
 import ComposableArchitecture
@@ -52,8 +52,10 @@ struct HeatingScreen: View {
         } else if layout == .compact {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HeatingRoomPicker(rooms: store.rooms, selectedPlaceId: store.selectedPlaceId) { store.send(.selectRoom($0)) }
-                    detail
+                    overview
+                    if store.selectedPlaceId != nil {
+                        detail
+                    }
                 }
                 .padding(16)
             }
@@ -61,56 +63,40 @@ struct HeatingScreen: View {
         } else {
             HStack(alignment: .top, spacing: 16) {
                 ScrollView {
-                    HeatingRoomPicker(rooms: store.rooms, selectedPlaceId: store.selectedPlaceId, vertical: true) { store.send(.selectRoom($0)) }
-                        .padding(16)
+                    overview.padding(16)
                 }
-                .frame(width: 320)
+                .frame(width: 420)
                 ScrollView {
-                    detail.padding(16)
+                    Group {
+                        if store.selectedPlaceId == nil {
+                            Text("Wähle links einen Raum.")
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, minHeight: 200)
+                        } else {
+                            detail
+                        }
+                    }
+                    .padding(16)
                 }
             }
+        }
+    }
+
+    private var overview: some View {
+        HeatingOverviewView(rooms: store.rooms, headline: store.headline, selectedPlaceId: store.selectedPlaceId) {
+            store.send(.selectRoom($0))
         }
     }
 
     @ViewBuilder
     private var detail: some View {
         if let detail = store.detail {
-            HeatingRoomDetailView(detail: detail, range: $store.range)
+            HeatingRoomDetailView(detail: detail, range: $store.range, onClose: layout == .compact ? { store.send(.selectRoom(nil)) } : nil)
         } else if store.detailError != nil {
             ContentUnavailableView("Raum nicht ladbar", systemImage: "exclamationmark.triangle",
                                    description: Text("Der Server hat keine Daten für diesen Raum geliefert."))
-        } else if store.selectedPlaceId == nil {
-            ContentUnavailableView("Raum wählen", systemImage: "heater.vertical",
-                                   description: Text("Wähle einen Raum."))
         } else {
             ProgressView().frame(maxWidth: .infinity, minHeight: 200)
-        }
-    }
-}
-
-/// Rooms as pills in a row (iPhone) or a column (Mac, iPad); T3 replaces it with the overview bars.
-struct HeatingRoomPicker: View {
-    let rooms: [HeatingFeature.Room]
-    let selectedPlaceId: String?
-    var vertical = false
-    let onSelect: (String?) -> Void
-
-    var body: some View {
-        let layout = vertical ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
-        let content = layout {
-            ForEach(rooms) { room in
-                Button(room.name) { onSelect(room.placeId) }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(room.placeId == selectedPlaceId ? Color.primary.opacity(0.12) : .clear))
-                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15)))
-            }
-        }
-        if vertical {
-            content
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) { content }
         }
     }
 }
@@ -132,6 +118,7 @@ private struct HeatingPreview: View {
 }
 
 private enum HeatingPreviewState {
+    static var overview: HeatingFeature.State { HeatingPreviewData.state() }
     static var day: HeatingFeature.State { HeatingPreviewData.state("Bad OG") }
     static var week: HeatingFeature.State { HeatingPreviewData.state("Küche", range: .week) }
     static var noData: HeatingFeature.State { HeatingPreviewData.state("Kaminzimmer") }
@@ -143,6 +130,10 @@ private enum HeatingPreviewState {
     static var noRooms: HeatingFeature.State { HeatingFeature.State() }
 }
 
+#Preview("iPhone hell Übersicht") { HeatingPreview(state: HeatingPreviewState.overview, layout: .compact, scheme: .light) }
+#Preview("iPhone dunkel Übersicht") { HeatingPreview(state: HeatingPreviewState.overview, layout: .compact, scheme: .dark) }
+#Preview("Mac hell Übersicht") { HeatingPreview(state: HeatingPreviewState.overview, layout: .regular, scheme: .light) }
+#Preview("Mac dunkel Übersicht") { HeatingPreview(state: HeatingPreviewState.overview, layout: .regular, scheme: .dark) }
 #Preview("iPhone hell 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .compact, scheme: .light) }
 #Preview("iPhone dunkel 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .compact, scheme: .dark) }
 #Preview("iPhone hell 7 T") { HeatingPreview(state: HeatingPreviewState.week, layout: .compact, scheme: .light) }

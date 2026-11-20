@@ -400,6 +400,21 @@ paths:
                 items:
                   $ref: "#/components/schemas/EntityHistory"
 
+  /heating/overview:
+    get:
+      summary: Get the heating overview
+      description: |
+        Per room with a heating automation: actual value, plan target and the source of the actual value.
+        Δ is actual minus plan target. Empty when no room is configured.
+      operationId: getHeatingOverview
+      responses:
+        "200":
+          description: The rooms of the overview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HeatingOverview"
+
   /heating/rooms/{placeId}:
     get:
       summary: Get the detail of a heating room
@@ -786,6 +801,35 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/HeatingSample"
+    HeatingOverview:
+      type: object
+      required: [rooms]
+      properties:
+        rooms:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeatingOverviewRoom"
+    HeatingOverviewRoom:
+      type: object
+      required: [placeId, name, shortName, istSource]
+      properties:
+        placeId:
+          type: string
+        name:
+          type: string
+        shortName:
+          type: string
+          description: The label under the bar.
+        ist:
+          type: number
+          format: double
+          description: Actual value now; missing while there is none.
+        sollPlan:
+          type: number
+          format: double
+          description: Plan target now; missing when unknown.
+        istSource:
+          $ref: "#/components/schemas/HeatingIstSource"
     HeatingIstSource:
       type: object
       required: [kind, names]

@@ -30,6 +30,9 @@ A radiator that is not heating, written as `Active = 0`; frost and valve protect
 **Window-off** (Fenster-aus)
 All radiators of a room are off while any of its window contacts has been open for the configured delay; when the last one closes, the room returns to its plan target at once.
 
+**Contact** (Kontakt)
+A sensor of a room that switches its radiators off while it is open: the window contacts, and later the fireplace switch. A room names its contacts explicitly (`RoomContact`); an unreachable contact counts as closed. The room goes off when the earliest open contact has been open for the window delay (counted from that contact's last state change, so a restart does not restart the delay) and returns to its plan target at once when the last one closes, but only if it had gone off: a contact that closes within the delay, or re-sent as closed after a restart, writes nothing. The return is recorded with reason `window`; a switch point or deploy while a contact is open leaves the radiators off.
+
 **Fireplace mode** (Kamin-Modus)
 The configured radiators are off while the fireplace is on. The fireplace counts like an open window contact. It ends automatically after eight hours, with a push notification.
 

@@ -400,6 +400,88 @@ paths:
                 items:
                   $ref: "#/components/schemas/EntityHistory"
 
+  /heating/overview:
+    get:
+      summary: Get the heating overview
+      description: |
+        Per room with a heating automation: actual value, plan target and the source of the actual value.
+        Δ is actual minus plan target. Empty when no room is configured.
+      operationId: getHeatingOverview
+      responses:
+        "200":
+          description: The rooms of the overview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HeatingOverview"
+
+  /heating/rooms/{placeId}:
+    get:
+      summary: Get the detail of a heating room
+      description: |
+        The time grid of one room: actual value, plan target and one valve percentage per radiator.
+        The grid has 5 minute steps (30 minutes for 7d) and ends now.
+      operationId: getHeatingRoom
+      parameters:
+        - name: placeId
+          in: path
+          description: The place identifier of the room
+          required: true
+          schema:
+            type: string
+        - name: range
+          in: query
+          description: "One of 2h, 24h or 7d; 24h when omitted. Any other value answers 400."
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The detail of the room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HeatingRoomDetail"
+        "400":
+          description: Unknown range.
+        "404":
+          description: The room has no heating automation.
+
+  /heating/fireplace:
+    get:
+      summary: Get the state of the fireplace
+      description: |
+        The fireplace is the switch `Keller_Kamin_switcher`. An unreachable switch counts as off.
+        `since` is when it went on, `endsAt` when the server switches it off (eight hours after `since`).
+      operationId: getFireplace
+      responses:
+        "200":
+          description: The state of the fireplace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fireplace"
+    put:
+      summary: Switch the fireplace on or off
+      description: |
+        Used by the Heizung tab and the push action "Kamin an?". Asking for the state it already has changes
+        nothing, so a second "on" does not restart the eight hours. The answer is the state the switch will
+        have; HomeKit reports the change a moment later.
+      operationId: setFireplace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FireplaceRequest"
+      responses:
+        "200":
+          description: The state of the fireplace after the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fireplace"
+
 components:
   schemas:
     Automation:
@@ -465,7 +547,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [entityChange, time, sunrise, sunset]
+          enum: [entityChange, time, sunrise, sunset, serverStart, configDeploy]
         entityId:
           $ref: "#/components/schemas/EntityId"
         summary:
@@ -555,6 +637,14 @@ components:
           type: string
           enum: [executed, cacheHit, failed]
           description: Whether the action was sent, skipped as a duplicate, or failed.
+        reason:
+          type: string
+          enum: [plan, window, fireplace, system]
+          description: Why the server wrote a radiator. Absent for other commands and for entries that predate it.
+        planTargetInC:
+          type: number
+          format: double
+          description: The plan target at the time of a plan write.
       required:
         - id
         - timestamp
@@ -724,3 +814,167 @@ components:
       required:
         - id
         - entityId
+    HeatingRoomDetail:
+      type: object
+      required: [placeId, name, range, istSource, radiators, samples]
+      properties:
+        placeId:
+          type: string
+        name:
+          type: string
+        range:
+          type: string
+          description: 2h, 24h or 7d
+        istSource:
+          $ref: "#/components/schemas/HeatingIstSource"
+        radiators:
+          type: array
+          description: Radiator names in a stable order; the valves of a sample follow it.
+          items:
+            type: string
+        samples:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeatingSample"
+        lastIst:
+          type: string
+          format: date-time
+          description: When the room last had an actual value, also before the range; missing when it never had one.
+        events:
+          type: array
+          description: Events of the range sorted by pin; one that began before the range keeps its real start and pins at the range start.
+          items:
+            $ref: "#/components/schemas/HeatingEvent"
+    HeatingEvent:
+      type: object
+      required: [source, title, reason, start, pin]
+      properties:
+        source:
+          type: string
+          description: plan, window, fireplace, observed or system
+        title:
+          type: string
+        reason:
+          type: string
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+          description: Missing for a moment and while the event lasts.
+        pin:
+          type: string
+          format: date-time
+          description: Pin position inside the range.
+    Fireplace:
+      type: object
+      required: [isOn]
+      properties:
+        isOn:
+          type: boolean
+        since:
+          type: string
+          format: date-time
+          description: When the fireplace went on; missing while it is off.
+        endsAt:
+          type: string
+          format: date-time
+          description: When the server switches it off; missing while it is off.
+    FireplaceRequest:
+      type: object
+      required: [isOn]
+      properties:
+        isOn:
+          type: boolean
+    HeatingOverview:
+      type: object
+      required: [rooms, heatmap]
+      properties:
+        rooms:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeatingOverviewRoom"
+        heatmap:
+          type: array
+          description: Room x day x six-hour segment for the last seven local days (Europe/Berlin), today included.
+          items:
+            $ref: "#/components/schemas/HeatingHeatmapCell"
+    HeatingHeatmapCell:
+      type: object
+      required: [placeId, day, segment]
+      properties:
+        placeId:
+          type: string
+        day:
+          type: string
+          format: date-time
+          description: Start of the local day.
+        segment:
+          type: integer
+          description: 0 = 0-6, 1 = 6-12, 2 = 12-18, 3 = 18-24 o'clock local time.
+        delta:
+          type: [number, "null"]
+          format: double
+          description: Mean delta of the segment; null when more than half of it has no actual value.
+    HeatingOverviewRoom:
+      type: object
+      required: [placeId, name, shortName, istSource, followsFireplace]
+      properties:
+        placeId:
+          type: string
+        name:
+          type: string
+        shortName:
+          type: string
+          description: The label under the bar.
+        ist:
+          type: [number, "null"]
+          format: double
+          description: Actual value now; null or missing while there is none (the generated Swift server omits it).
+        sollPlan:
+          type: [number, "null"]
+          format: double
+          description: Plan target now; null when unknown.
+        delta:
+          type: [number, "null"]
+          format: double
+          description: Actual minus plan target; null when one of them is null.
+        istSource:
+          $ref: "#/components/schemas/HeatingIstSource"
+        followsFireplace:
+          type: boolean
+          description: Whether the room follows the fireplace (flame and orange area while it burns).
+    HeatingIstSource:
+      type: object
+      required: [kind, names]
+      properties:
+        kind:
+          type: string
+          enum: [roomSensor, thermostats]
+          description: Where the actual value comes from.
+        names:
+          type: array
+          items:
+            type: string
+    HeatingSample:
+      type: object
+      required: [date, valves]
+      properties:
+        date:
+          type: string
+          format: date-time
+        ist:
+          type: [number, "null"]
+          format: double
+          description: Actual value; null while there is none.
+        sollPlan:
+          type: [number, "null"]
+          format: double
+          description: Plan target; null when unknown.
+        valves:
+          type: array
+          description: Valve opening in percent per radiator; null while silent.
+          items:
+            type: [number, "null"]
+            format: double

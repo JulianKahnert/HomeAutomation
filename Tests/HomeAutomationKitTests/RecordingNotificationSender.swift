@@ -17,7 +17,7 @@ actor RecordingNotificationSender: NotificationSender {
     enum Event: Equatable {
         case liveActivity(Update)
         case end(activityType: String)
-        case notification(title: String, message: String)
+        case notification(title: String, message: String, category: String?)
     }
 
     private(set) var events: [Event] = []
@@ -35,8 +35,8 @@ actor RecordingNotificationSender: NotificationSender {
         updates.map(\.contentState)
     }
 
-    func sendNotification(title: String, message: String, id: String) async throws {
-        events.append(.notification(title: title, message: message))
+    func sendNotification(title: String, message: String, id: String, category: String?) async throws {
+        events.append(.notification(title: title, message: message, category: category))
     }
 
     nonisolated func clearNotification(id: String) async throws {}

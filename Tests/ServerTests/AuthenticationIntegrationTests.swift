@@ -232,4 +232,28 @@ final class AuthenticationIntegrationTests: XCTestCase {
             XCTAssertEqual(res.status, .ok)
         })
     }
+
+    // MARK: - Config deploy hook
+
+    func testPostingAConfigYieldsAConfigDeployedEvent() async throws {
+        let (stream, continuation) = AsyncStream.makeStream(of: HomeEvent.self)
+        app.homeEventsStream = stream
+        app.homeEventsContinuation = continuation
+        let body = try JSONEncoder().encode(ConfigDTO(location: Location(latitude: 1, longitude: 2), automations: []))
+
+        try await app.test(.POST, "/config?skipValidation=true", beforeRequest: { req in
+            req.headers.add(name: .authorization, value: "Bearer test-integration-token-123")
+            req.headers.contentType = .json
+            req.body = ByteBuffer(data: body)
+        }, afterResponse: { res async in
+            XCTAssertEqual(res.status, .ok)
+        })
+
+        continuation.finish()
+        var events: [HomeEvent] = []
+        for await event in stream {
+            events.append(event)
+        }
+        XCTAssertEqual(events, [.configDeployed])
+    }
 }

@@ -56,10 +56,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
 }
 
 extension HomeManagable {
-    public func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] { [] }
-
-    public func lastNotificationDate(id: String) async -> Date? { nil }
-
     public func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
         try? await getCurrentEntity(with: entityId)
     }

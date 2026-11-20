@@ -12,6 +12,9 @@ import HAModels
 @Reducer
 struct HeatingFeature: Sendable {
 
+    /// Shown when the server knows no heating room.
+    static let noRoomsHint = "Es ist keine Heizungsautomatik eingerichtet. Lege in der Konfiguration eine RoomHeating-Automation an."
+
     private enum CancelID {
         case detail
     }

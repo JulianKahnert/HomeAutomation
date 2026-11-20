@@ -208,6 +208,12 @@ struct HeatingFeatureTests {
         #expect(requests.all.isEmpty)
     }
 
+    @Test("the empty state points to the configuration")
+    func noRoomsHint() {
+        #expect(HeatingFeature.noRoomsHint.contains("RoomHeating"))
+        #expect(HeatingFeature.noRoomsHint.contains("Konfiguration"))
+    }
+
     @Test("an unreachable server is an error state without rooms")
     func serverNotReachable() async {
         let store = TestStore(initialState: HeatingFeature.State()) {

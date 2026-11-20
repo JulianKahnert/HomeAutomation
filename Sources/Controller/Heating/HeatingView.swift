@@ -62,7 +62,7 @@ struct HeatingScreen: View {
             }
         } else if store.rooms.isEmpty, !store.isLoading {
             ContentUnavailableView("Keine Räume", systemImage: "heater.vertical",
-                                   description: Text("Es ist keine Heizungsautomatik eingerichtet."))
+                                   description: Text(HeatingFeature.noRoomsHint))
         } else if layout == .compact {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {

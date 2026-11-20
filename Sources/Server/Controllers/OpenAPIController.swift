@@ -7,6 +7,7 @@
 
 import Dependencies
 import Fluent
+import HAImplementations
 import HAModels
 import OpenAPIRuntime
 import Vapor
@@ -313,6 +314,20 @@ struct OpenAPIController: APIProtocol {
         return .ok(.init(body: .json(body)))
     }
 
+    func getHeatingRoom(_ input: Operations.GetHeatingRoom.Input) async throws -> Operations.GetHeatingRoom.Output {
+        guard let range = HeatingRange(rawValue: input.query.range ?? HeatingRange.day.rawValue) else {
+            return .badRequest(.init())
+        }
+        let placeId = input.path.placeId
+        let automations = await request.application.homeAutomationConfigService.automations
+        guard let room = automations.compactMap({ $0 as? RoomHeating }).first(where: { $0.placeId == placeId }) else {
+            return .notFound(.init())
+        }
+        let builder = HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
+                                               writes: request.application.heatingWriteRepository)
+        let detail = try await builder.detail(for: room.heatingSources, range: range)
+        return .ok(.init(body: .json(.init(detail))))
+    }
 }
 
 extension Components.Schemas.EntityId {
@@ -363,5 +378,21 @@ extension Components.Schemas.EntityHistoryItem {
                   pmDensity: item.pmDensity,
                   airQuality: item.airQuality,
                   valveOpen: item.valveOpen)
+    }
+}
+
+extension Components.Schemas.HeatingRoomDetail {
+    init(_ detail: HeatingRoomDetail) {
+        let source: Components.Schemas.HeatingIstSource
+        switch detail.istSource {
+        case .roomSensor(let name): source = .init(kind: "roomSensor", names: [name])
+        case .thermostats(let names): source = .init(kind: "thermostats", names: names)
+        }
+        self.init(placeId: detail.placeId,
+                  name: detail.name,
+                  range: detail.range.rawValue,
+                  istSource: source,
+                  radiators: detail.radiators,
+                  samples: detail.samples.map { .init(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) })
     }
 }

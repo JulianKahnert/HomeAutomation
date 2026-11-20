@@ -51,3 +51,12 @@ The values every room shares unless it overrides them: the standard plan and the
 **Server start / config deploy** (Serverstart / Konfigurations-Deploy)
 Two separate events for automations (`HomeEvent.serverStarted`, `.configDeployed`). A server start re-applies nothing in T1, so manual changes at a radiator survive it; a deploy makes every room write its current plan target once, with reason `system`.
 
+
+**Time grid** (Zeitraster)
+The samples of a room detail: one every 5 minutes (30 minutes for 7 days), ending now. Each sample holds the last stored value at or before its time, because values are only stored when they change. Actual value and valves are `null` when the last reading is older than the sensor failure limit (6 hours unless configured otherwise) or when there is none yet.
+
+**Gap** (Lücke)
+Two meanings, kept apart. In the data: a stretch of the time grid without an actual value; lines are not drawn across it. In the chart: the area between the actual line and the plan line, coloured by Δ (blue too cold, grey in the comfort band, orange too warm).
+
+**Room detail** (Raumdetail)
+What `GET /heating/rooms/{placeId}?range=2h|24h|7d` answers and the Heizung tab draws for one room: actual, plan target, Δ and one valve percentage per radiator on the time grid. The plan target comes from the plan targets of the heating writes and falls back to the room's plan before the first write in the range.

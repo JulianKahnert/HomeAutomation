@@ -208,6 +208,25 @@ public struct ServerClient {
             return EntityHistory(entityId: entityId, items: history.items.map(EntityHistoryItem.init))
         }
     }
+
+    /// The time grid of a heating room (glossary: actual, plan target, Δ). Throws when the server answers
+    /// 400 (unknown range) or 404 (no heating automation for the room).
+    public func getHeatingRoom(placeId: String, range: HeatingRange) async throws -> HeatingRoomDetail {
+        let response = try await client.getHeatingRoom(path: .init(placeId: placeId), query: .init(range: range.rawValue))
+        let body = try response.ok.body.json
+        guard let detailRange = HeatingRange(rawValue: body.range) else {
+            throw InvalidResponseError(reason: "Unknown heating range \(body.range)")
+        }
+        let source: HeatingIstSource = body.istSource.kind == "roomSensor"
+            ? .roomSensor(body.istSource.names.first ?? "")
+            : .thermostats(body.istSource.names)
+        return HeatingRoomDetail(placeId: body.placeId,
+                                 name: body.name,
+                                 range: detailRange,
+                                 istSource: source,
+                                 radiators: body.radiators,
+                                 samples: body.samples.map { HeatingSample(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) })
+    }
 }
 
 extension Components.Schemas.PushDevice.TokenTypePayload {

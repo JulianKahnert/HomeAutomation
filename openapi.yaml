@@ -400,6 +400,38 @@ paths:
                 items:
                   $ref: "#/components/schemas/EntityHistory"
 
+  /heating/rooms/{placeId}:
+    get:
+      summary: Get the detail of a heating room
+      description: |
+        The time grid of one room: actual value, plan target and one valve percentage per radiator.
+        The grid has 5 minute steps (30 minutes for 7d) and ends now.
+      operationId: getHeatingRoom
+      parameters:
+        - name: placeId
+          in: path
+          description: The place identifier of the room
+          required: true
+          schema:
+            type: string
+        - name: range
+          in: query
+          description: "One of 2h, 24h or 7d; 24h when omitted. Any other value answers 400."
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The detail of the room.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HeatingRoomDetail"
+        "400":
+          description: Unknown range.
+        "404":
+          description: The room has no heating automation.
+
 components:
   schemas:
     Automation:
@@ -732,3 +764,57 @@ components:
       required:
         - id
         - entityId
+    HeatingRoomDetail:
+      type: object
+      required: [placeId, name, range, istSource, radiators, samples]
+      properties:
+        placeId:
+          type: string
+        name:
+          type: string
+        range:
+          type: string
+          description: 2h, 24h or 7d
+        istSource:
+          $ref: "#/components/schemas/HeatingIstSource"
+        radiators:
+          type: array
+          description: Radiator names in a stable order; the valves of a sample follow it.
+          items:
+            type: string
+        samples:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeatingSample"
+    HeatingIstSource:
+      type: object
+      required: [kind, names]
+      properties:
+        kind:
+          type: string
+          description: roomSensor or thermostats
+        names:
+          type: array
+          items:
+            type: string
+    HeatingSample:
+      type: object
+      required: [date, valves]
+      properties:
+        date:
+          type: string
+          format: date-time
+        ist:
+          type: number
+          format: double
+          description: Actual value; missing while there is none.
+        sollPlan:
+          type: number
+          format: double
+          description: Plan target; missing when unknown.
+        valves:
+          type: array
+          description: Valve opening in percent per radiator; null while silent.
+          items:
+            type: [number, "null"]
+            format: double

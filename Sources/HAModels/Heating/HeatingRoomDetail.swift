@@ -13,9 +13,9 @@ public enum HeatingRange: String, Sendable, Codable, CaseIterable, Equatable {
 
     public var duration: TimeInterval {
         switch self {
-        case .twoHours: 2 * 3_600
-        case .day: 24 * 3_600
-        case .week: 7 * 24 * 3_600
+        case .twoHours: return 2 * 3_600
+        case .day: return 24 * 3_600
+        case .week: return 7 * 24 * 3_600
         }
     }
 

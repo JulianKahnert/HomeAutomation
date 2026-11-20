@@ -11,21 +11,21 @@ import SwiftUI
 extension HeatingEventSource {
     var symbol: String {
         switch self {
-        case .plan: "calendar"
-        case .window: "window.vertical.open"
-        case .fireplace: "flame"
-        case .observed: "hand.raised"
-        case .system: "gearshape"
+        case .plan: return "calendar"
+        case .window: return "window.vertical.open"
+        case .fireplace: return "flame"
+        case .observed: return "hand.raised"
+        case .system: return "gearshape"
         }
     }
 
     var label: String {
         switch self {
-        case .plan: "Plan"
-        case .window: "Fenster"
-        case .fireplace: "Kamin"
-        case .observed: "Von Hand"
-        case .system: "System"
+        case .plan: return "Plan"
+        case .window: return "Fenster"
+        case .fireplace: return "Kamin"
+        case .observed: return "Von Hand"
+        case .system: return "System"
         }
     }
 }
@@ -86,4 +86,20 @@ struct HeatingPinCard: View {
         if let end = event.end { text += " – \(HeatingFormat.time(end, includingDay: false))" } else if event.hasDuration { text += " – jetzt" }
         return text
     }
+}
+
+// MARK: - Previews
+
+#Preview("Pins") {
+    HStack(spacing: 12) {
+        ForEach(HeatingEventSource.allCases, id: \.self) { source in
+            HeatingPinBadge(slot: .init(x: 0, row: 0, events: [HeatingEvent(source: source, title: source.label, reason: "", start: HeatingPreviewData.now)]))
+        }
+        HeatingPinBadge(slot: .init(x: 0, row: 0, events: HeatingPreviewData.kitchenEvents), isSelected: true)
+    }
+    .padding(16)
+}
+
+#Preview("Pin-Karte") {
+    HeatingPinCard(events: Array(HeatingPreviewData.kitchenEvents.prefix(2))).padding(16).frame(width: 402)
 }

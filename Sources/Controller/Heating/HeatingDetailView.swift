@@ -143,15 +143,15 @@ struct HeatingRoomDetailView: View {
 
     private var sourceSymbol: String {
         switch detail.istSource {
-        case .roomSensor: "thermometer.medium"
-        case .thermostats: "heater.vertical"
+        case .roomSensor: return "thermometer.medium"
+        case .thermostats: return "heater.vertical"
         }
     }
 
     private var sourceText: String {
         switch detail.istSource {
-        case .roomSensor(let name): "Raumsensor „\(name)“"
-        case .thermostats: "Mittel der Thermostate"
+        case .roomSensor(let name): return "Raumsensor „\(name)“"
+        case .thermostats: return "Mittel der Thermostate"
         }
     }
 
@@ -173,9 +173,16 @@ struct HeatingRoomDetailView: View {
     }
 }
 
-/// Trailing labels of one width in both charts, so the plots and the crosshair line up.
+/// Trailing labels of one width in both charts, so the plots and the crosshair line up. The width is the
+/// widest label's own, measured with an invisible template, so it follows the text size.
 private func heatingYLabel(_ text: String) -> some View {
-    Text(text).font(.caption2.monospacedDigit()).lineLimit(1).fixedSize().frame(width: 36, alignment: .leading)
+    ZStack(alignment: .leading) {
+        Text("100 %").hidden()
+        Text(text)
+    }
+    .font(.caption2.monospacedDigit())
+    .lineLimit(1)
+    .fixedSize()
 }
 
 private let heatingGrid = Color.secondary.opacity(0.12)
@@ -212,7 +219,7 @@ struct HeatingSollIstChart: View {
 
     /// Light: strong at the actual line, fading towards the plan. Dark: a flat, higher opacity, so
     /// the peach orange does not turn brown on the dark card.
-    private func gapStyle(_ band: HeatingPalette.Band) -> AnyShapeStyle {
+    private func gapStyle(_ band: HeatingComfort) -> AnyShapeStyle {
         let color = HeatingPalette.color(band, scheme: scheme)
         if scheme == .dark {
             // A lighter blue than the bars, so the thin fill does not turn navy.
@@ -386,14 +393,18 @@ struct HeatingValveChart: View {
 }
 
 enum HeatingTimeAxis {
+    private static func stride(for range: HeatingRange) -> (component: Calendar.Component, count: Int) {
+        switch range {
+        case .twoHours: return (.minute, 30)
+        case .day: return (.hour, 6)
+        case .week: return (.day, 1)
+        }
+    }
+
     @AxisContentBuilder
     static func marks(range: HeatingRange) -> some AxisContent {
-        let (component, count): (Calendar.Component, Int) = switch range {
-        case .twoHours: (.minute, 30)
-        case .day: (.hour, 6)
-        case .week: (.day, 1)
-        }
-        AxisMarks(values: .stride(by: component, count: count)) { value in
+        let step = stride(for: range)
+        AxisMarks(values: .stride(by: step.component, count: step.count)) { value in
             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(heatingGrid)
             AxisValueLabel(centered: range == .week) {
                 if let date = value.as(Date.self) {
@@ -466,4 +477,56 @@ struct HeatingRangePicker: View {
         .background(HeatingPalette.softFill, in: .rect(cornerRadius: 9))
         .frame(maxWidth: 190, alignment: .leading)
     }
+}
+
+// MARK: - Previews
+
+private extension HeatingRoomDetail {
+    static var preview: HeatingRoomDetail {
+        guard let detail = HeatingPreviewData.state("Bad OG").detail else { fatalError("The preview data has the room Bad OG") }
+        return detail
+    }
+}
+
+#Preview("Card") {
+    HeatingCard { Text("Inhalt der Karte") }.padding(16)
+}
+
+#Preview("Raumdetail") {
+    @Previewable @State var range = HeatingRange.day
+    HeatingRoomDetailView(detail: .preview, range: $range, selectedPinId: nil)
+        .padding(16)
+        .frame(width: 402)
+}
+
+#Preview("Soll-Ist-Diagramm") {
+    @Previewable @State var crosshair: Date?
+    let detail = HeatingRoomDetail.preview
+    HeatingSollIstChart(samples: detail.samples, events: detail.events, crosshair: $crosshair)
+        .frame(width: 402, height: 260)
+        .padding(16)
+}
+
+#Preview("Ventil-Diagramm") {
+    @Previewable @State var crosshair: Date?
+    let detail = HeatingRoomDetail.preview
+    HeatingValveChart(samples: detail.samples, events: detail.events, radiators: detail.radiators, crosshair: $crosshair)
+        .frame(width: 402, height: 120)
+        .padding(16)
+}
+
+#Preview("Fadenkreuz") {
+    @Previewable @State var crosshair: Date?
+    let detail = HeatingRoomDetail.preview
+    Chart(detail.samples, id: \.date) { sample in
+        LineMark(x: .value("Zeit", sample.date), y: .value("Ist", sample.ist ?? 0))
+    }
+    .chartOverlay { proxy in HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair) }
+    .frame(width: 402, height: 160)
+    .padding(16)
+}
+
+#Preview("Zeitraum") {
+    @Previewable @State var range = HeatingRange.day
+    HeatingRangePicker(range: $range).padding(16)
 }

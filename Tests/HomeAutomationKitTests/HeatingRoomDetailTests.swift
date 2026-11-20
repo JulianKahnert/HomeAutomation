@@ -129,6 +129,31 @@ struct HeatingRoomDetailTests {
         #expect(fallback.samples.first?.sollPlan == 18)
     }
 
+    @Test("the room detail never loads the whole write history, yet the plan target before the range still holds")
+    func boundedWriteHistory() async throws {
+        let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)
+        let old = HeatingWrite(timestamp: now.addingTimeInterval(-30 * 86_400), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 19, planTargetInC: 19)
+        let repository = InMemoryHeatingWriteRepository([old])
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: [temp(thermoA, 30, 20)]), writes: repository, now: { now })
+
+        let detail = try await builder.detail(for: sources, range: .twoHours)
+
+        #expect(detail.samples.first?.sollPlan == 19)
+        #expect(!(await repository.requestedStarts).contains { $0 == nil })
+    }
+
+    @Test("a plan target recorded while the room was off still moves the plan line")
+    func unsentPlanWriteMovesPlan() async throws {
+        let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)
+        let off = HeatingWrite(timestamp: now.addingTimeInterval(-7_200), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 21, planTargetInC: 21)
+        let unsent = HeatingWrite(timestamp: now.addingTimeInterval(-3_600), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 17, planTargetInC: 17, sentToDevice: false)
+
+        let detail = try await builder([temp(thermoA, 30, 20)], writes: [off, unsent]).detail(for: sources, range: .day)
+
+        #expect(detail.samples.last?.sollPlan == 17)
+        #expect(detail.samples.last?.delta == 3)
+    }
+
     @Test("a write without a plan target does not change the plan history")
     func nonPlanWrites() async throws {
         let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .heating)

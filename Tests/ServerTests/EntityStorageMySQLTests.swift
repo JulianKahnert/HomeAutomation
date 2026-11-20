@@ -290,9 +290,5 @@ final class EntityStorageMySQLTests: XCTestCase {
         let ranged = try await repository.writes(placeId: "Kitchen", startDate: Date(timeIntervalSince1970: 1_500), endDate: Date(timeIntervalSince1970: 3_000))
         XCTAssertEqual(ranged.map(\.reason), [.window])
         XCTAssertNil(ranged.first?.planTargetInC)
-
-        try await repository.deleteWrites(olderThan: Date(timeIntervalSince1970: 2_500))
-        let remaining = try await repository.writes(placeId: "Kitchen", startDate: nil, endDate: nil)
-        XCTAssertEqual(remaining.map(\.reason), [.system])
     }
 }

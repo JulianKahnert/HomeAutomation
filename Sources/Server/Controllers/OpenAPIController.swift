@@ -315,12 +315,8 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getHeatingOverview(_ input: Operations.GetHeatingOverview.Input) async throws -> Operations.GetHeatingOverview.Output {
-        let automations = await request.application.homeAutomationConfigService.automations
-        let rooms = automations.compactMap { ($0 as? RoomHeating)?.heatingSources }
-        let detail = HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
-                                              writes: request.application.heatingWriteRepository,
-                                              calendar: HeatingOverviewBuilder.berlin)
-        let overview = try await HeatingOverviewBuilder(detail: detail).overview(for: rooms)
+        let rooms = await heatingRooms().map(\.heatingSources)
+        let overview = try await HeatingOverviewBuilder(detail: heatingDetailBuilder()).overview(for: rooms)
         return .ok(.init(body: .json(.init(overview))))
     }
 
@@ -329,15 +325,25 @@ struct OpenAPIController: APIProtocol {
             return .badRequest(.init())
         }
         let placeId = input.path.placeId
-        let automations = await request.application.homeAutomationConfigService.automations
-        guard let room = automations.compactMap({ $0 as? RoomHeating }).first(where: { $0.placeId == placeId }) else {
+        guard let room = await heatingRooms().first(where: { $0.placeId == placeId }) else {
             return .notFound(.init())
         }
-        let builder = HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
-                                               writes: request.application.heatingWriteRepository)
-        let detail = try await builder.detail(for: room.heatingSources, range: range)
+        let detail = try await heatingDetailBuilder().detail(for: room.heatingSources, range: range)
         return .ok(.init(body: .json(.init(detail))))
     }
+
+    /// The heating automations of the deployed configuration.
+    private func heatingRooms() async -> [RoomHeating] {
+        await request.application.homeAutomationConfigService.automations.compactMap { $0 as? RoomHeating }
+    }
+
+    /// Both heating endpoints cut the days by the local clock of the house, Europe/Berlin.
+    private func heatingDetailBuilder() -> HeatingRoomDetailBuilder {
+        HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
+                                 writes: request.application.heatingWriteRepository,
+                                 calendar: HeatingOverviewBuilder.berlin)
+    }
+
     // MARK: - /heating/fireplace
 
     func getFireplace(_ input: Operations.GetFireplace.Input) async throws -> Operations.GetFireplace.Output {
@@ -412,8 +418,8 @@ extension Components.Schemas.EntityHistoryItem {
 extension Components.Schemas.HeatingIstSource {
     init(_ source: HeatingIstSource) {
         switch source {
-        case .roomSensor(let name): self.init(kind: "roomSensor", names: [name])
-        case .thermostats(let names): self.init(kind: "thermostats", names: names)
+        case .roomSensor(let name): self.init(kind: .roomSensor, names: [name])
+        case .thermostats(let names): self.init(kind: .thermostats, names: names)
         }
     }
 }
@@ -421,7 +427,7 @@ extension Components.Schemas.HeatingIstSource {
 extension Components.Schemas.HeatingOverview {
     init(_ overview: HeatingOverview) {
         self.init(rooms: overview.rooms.map {
-            .init(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, istSource: .init($0.istSource),
+            .init(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, delta: $0.delta, istSource: .init($0.istSource),
                   followsFireplace: $0.followsFireplace)
         }, heatmap: overview.heatmap.map {
             .init(placeId: $0.placeId, day: $0.day, segment: $0.segment, delta: $0.delta)

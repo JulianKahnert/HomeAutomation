@@ -70,3 +70,11 @@ enum FireplaceNotification {
         actionIdentifier == Fireplace.switchOnActionId ? true : nil
     }
 }
+
+#Preview("Kamin-Knopf") {
+    HStack(spacing: 24) {
+        FireplaceToolbarButton(isOn: false) {}
+        FireplaceToolbarButton(isOn: true) {}
+    }
+    .padding(24)
+}

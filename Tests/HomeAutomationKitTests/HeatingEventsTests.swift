@@ -51,6 +51,24 @@ struct HeatingEventsTests {
         #expect(!found[0].reason.isEmpty)
     }
 
+    @Test("a plan target recorded without sending it is no event and no manual change")
+    func unsentPlanWrite() async throws {
+        let unsent = HeatingWrite(timestamp: ago(60), entityId: target, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 17, planTargetInC: 17, sentToDevice: false)
+        let items = [EntityStorageItem(entityId: target, timestamp: ago(120), targetTemperatureInC: 21)]   // the radiator was not told
+
+        #expect(try await events(items, writes: [unsent]).isEmpty)
+    }
+
+    @Test("two events of one source in the same second do not share an id")
+    func idsAreUnique() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = HeatingEvent(source: .observed, title: "Von Hand: 25,0 °C", reason: "Thermo A steht auf 25,0 °C", start: start)
+        let second = HeatingEvent(source: .observed, title: "Von Hand: 25,0 °C", reason: "Thermo B steht auf 25,0 °C", start: start.addingTimeInterval(0.4))
+
+        #expect(first.id != second.id)
+        #expect(first.id == HeatingEvent(source: .observed, title: first.title, reason: first.reason, start: start).id)
+    }
+
     @Test("a system write becomes a system event")
     func system() async throws {
         let found = try await events(writes: [write(.system, 30, target: 19, plan: 19)])

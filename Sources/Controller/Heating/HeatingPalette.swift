@@ -9,32 +9,20 @@ import HAModels
 import SwiftUI
 
 enum HeatingPalette {
-    /// Comfort band of ±0.5 K (glossary: Δ).
-    static let comfortBand = 0.5
     /// Bars run off the end beyond ±3 K.
     static let barScale = 3.0
 
-    enum Band: Equatable, Sendable {
-        case tooCold, ok, tooWarm
-    }
-
-    static func band(forDelta delta: Double) -> Band {
-        if delta < -comfortBand { return .tooCold }
-        if delta > comfortBand { return .tooWarm }
-        return .ok
-    }
-
-    static func color(_ band: Band, scheme: ColorScheme) -> Color {
-        switch band {
-        case .tooCold: .blue
-        case .ok: .gray
+    static func color(_ comfort: HeatingComfort, scheme: ColorScheme) -> Color {
+        switch comfort {
+        case .tooCold: return .blue
+        case .ok: return .gray
         // Dark mode: a peach tone instead of a brown orange; tune against real data.
-        case .tooWarm: scheme == .dark ? Color(red: 1.0, green: 0.62, blue: 0.4) : .orange
+        case .tooWarm: return scheme == .dark ? Color(red: 1.0, green: 0.62, blue: 0.4) : .orange
         }
     }
 
     static func color(forDelta delta: Double, scheme: ColorScheme) -> Color {
-        color(band(forDelta: delta), scheme: scheme)
+        color(HeatingComfort(delta: delta), scheme: scheme)
     }
 
     /// The soft grey of the actual-value line.

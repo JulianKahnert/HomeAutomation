@@ -74,6 +74,17 @@ struct HeatingOverviewSnapshotTests {
         }
     }
 
+    @Test("two rooms with the same short label keep their own bar and selection")
+    func sameShortLabel() {
+        let rooms = [HeatingOverviewRoom(placeId: "Bad - OG", name: "Bad OG", shortName: "Bad", ist: 19, sollPlan: 21, istSource: .roomSensor("Eve Room")),
+                     HeatingOverviewRoom(placeId: "Bad - EG", name: "Bad EG", shortName: "Bad", ist: 22, sollPlan: 21, istSource: .roomSensor("Eve Room"))]
+        for scheme in [ColorScheme.light, .dark] {
+            let view = HeatingOverviewView(rooms: rooms, headline: HeatingFeature.headlineParts(for: rooms), updatedAt: HeatingPreviewData.now, selectedPlaceId: "Bad - EG") { _ in }
+                .padding(16)
+            render(view, CGSize(width: 402, height: 340), scheme, name: "iPhone", test: "overview-sameShortLabel")
+        }
+    }
+
     @Test("info bubble, a bar beyond 3 K running off the end and a hatched bar")
     func bubbleAndRunOff() {
         let rooms = HeatingFeature.sorted([room("Bad OG", ist: 16.5), room("Küche", ist: 22.4), room("Büro", ist: 20.7),

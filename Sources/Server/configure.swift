@@ -145,6 +145,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateEntityHourlyAggregate())
     app.migrations.add(AddTemperatureCalibration())
     app.migrations.add(CreateHeatingWrite())
+    app.migrations.add(AddHeatingWriteSentToDevice())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -290,7 +291,6 @@ public func configure(_ app: Application) async throws {
         OutdoorTemperatureJob(location: location, hours: weatherHours),
         DatabaseCleanupJob(entities: app.entityStorageDbRepository,
                            automationRuns: app.automationRunRepository,
-                           heatingWrites: app.heatingWriteRepository,
                            noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
         EntityRollupJob(entities: app.entityStorageDbRepository)
     ]

@@ -43,6 +43,9 @@ final class HeatingWriteDbItem: Model, @unchecked Sendable {
     @OptionalField(key: "planTargetInC")
     var planTargetInC: Double?
 
+    @Field(key: "sentToDevice")
+    var sentToDevice: Bool
+
     init() { }
 
     init(_ write: HeatingWrite) {
@@ -57,6 +60,7 @@ final class HeatingWriteDbItem: Model, @unchecked Sendable {
         isActive = write.isActive
         targetTemperatureInC = write.targetTemperatureInC
         planTargetInC = write.planTargetInC
+        sentToDevice = write.sentToDevice
     }
 
     func toWrite() throws -> HeatingWrite {
@@ -72,7 +76,8 @@ final class HeatingWriteDbItem: Model, @unchecked Sendable {
                             actionName: actionName,
                             isActive: isActive,
                             targetTemperatureInC: targetTemperatureInC,
-                            planTargetInC: planTargetInC)
+                            planTargetInC: planTargetInC,
+                            sentToDevice: sentToDevice)
     }
 }
 
@@ -99,9 +104,23 @@ struct HeatingWriteDbRepository: HeatingWriteRepository {
             .map { try $0.toWrite() }
     }
 
-    func deleteWrites(olderThan date: Date) async throws {
+    func lastPlanWrite(placeId: String, before date: Date) async throws -> HeatingWrite? {
         try await HeatingWriteDbItem.query(on: database())
+            .filter(\.$placeId == placeId)
             .filter(\.$timestamp < date)
-            .delete()
+            .filter(\.$planTargetInC != nil)
+            .sort(\.$timestamp, .descending)
+            .first()
+            .map { try $0.toWrite() }
+    }
+
+    func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite? {
+        try await HeatingWriteDbItem.query(on: database())
+            .filter(\.$placeId == placeId)
+            .filter(\.$name == radiatorName)
+            .filter(\.$sentToDevice == true)
+            .sort(\.$timestamp, .descending)
+            .first()
+            .map { try $0.toWrite() }
     }
 }

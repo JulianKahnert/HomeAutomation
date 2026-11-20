@@ -123,6 +123,16 @@ public final class HomeManager: HomeManagable {
         return try await storageRepo.getPrevious(entityId).get(with: log)
     }
 
+    public func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
+        guard let heatingWrites else { return nil }
+        do {
+            return try await heatingWrites.lastWrite(placeId: radiator.placeId, radiatorName: radiator.name)
+        } catch {
+            log.error("Failed to read the last heating write", metadata: ["radiator": "\(radiator.name)", "error": "\(error)"])
+            return nil
+        }
+    }
+
     public func getAllEntitiesLive() async throws -> [EntityStorageItem] {
         log.info("getAllEntitiesLive() — starting distributed actor call")
         let start = ContinuousClock.now
@@ -181,7 +191,9 @@ public final class HomeManager: HomeManagable {
             // Only a command that reached the device may deduplicate its successors.
             await actionLogManager.markExecuted(action)
             liveness.recordCommandSuccess(at: Date())
-            await recordHeatingWrite(of: action, context: heating)
+            if let heating, let write = HeatingWrite(action: action, context: heating) {
+                await record(write)
+            }
         } catch {
             liveness.recordCommandFailure(error, at: Date())
             await actionLogManager.markFailed(action)
@@ -201,13 +213,13 @@ public final class HomeManager: HomeManagable {
         }
     }
 
-    /// Persists a radiator write that reached the device; a failing database must not fail the command.
-    private func recordHeatingWrite(of action: HomeManagableAction, context: HeatingWriteContext.Context?) async {
-        guard let heatingWrites, let context, let write = HeatingWrite(action: action, context: context) else { return }
+    /// Persists a radiator write; a failing database must not fail the command.
+    public func record(_ write: HeatingWrite) async {
+        guard let heatingWrites else { return }
         do {
             try await heatingWrites.add(write)
         } catch {
-            log.error("Failed to record heating write [\(action)]: \(error)")
+            log.error("Failed to record heating write", metadata: ["action": "\(write.actionName)", "radiator": "\(write.entityId.name)", "error": "\(error)"])
         }
     }
 
@@ -325,11 +337,21 @@ public final class HomeManager: HomeManagable {
     }
 
     public func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
-        (try? await storageRepo.getCurrent(entityId)) ?? nil
+        do {
+            return try await storageRepo.getCurrent(entityId)
+        } catch {
+            log.error("Failed to read the stored entity", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
+            return nil
+        }
     }
 
     public func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] {
-        (try? await storageRepo.getHistory(for: entityId, startDate: since, endDate: nil, cursor: nil, limit: 1000)) ?? []
+        do {
+            return try await storageRepo.getHistory(for: entityId, startDate: since, endDate: nil, cursor: nil, limit: 1000)
+        } catch {
+            log.error("Failed to read the entity history", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
+            return []
+        }
     }
 
     public func lastNotificationDate(id: String) async -> Date? {

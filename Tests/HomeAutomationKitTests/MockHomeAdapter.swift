@@ -33,6 +33,9 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
         let item = storageItems.first(where: { $0.entityId == action.entityId })
         performedActions.append((action, HeatingWriteContext.current))
+        if let context = HeatingWriteContext.current, let write = HeatingWrite(action: action, context: context) {
+            heatingWrites.append(write)
+        }
 
         switch action {
         case .turnOn:
@@ -137,6 +140,17 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         storedItems[entityId] ?? storageItems.last(where: { $0.entityId == entityId })
     }
 
+    /// The writes the server made to radiators: seeded by a test, and every action `perform` ran in a heating context.
+    var heatingWrites: [HeatingWrite] = []
+
+    func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
+        heatingWrites.last { $0.sentToDevice && $0.placeId == radiator.placeId && $0.entityId.name == radiator.name }
+    }
+
+    func record(_ write: HeatingWrite) async {
+        heatingWrites.append(write)
+    }
+
     func getAllEntitiesLive() async throws -> [EntityStorageItem] {
         return storageItems
     }
@@ -171,7 +185,8 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         notificationDates[id] = Date()
     }
 
-    private var notificationDates: [String: Date] = [:]
+    /// When a notification with this id was last sent; a test sets it to place a push in the past.
+    var notificationDates: [String: Date] = [:]
 
     func lastNotificationDate(id: String) async -> Date? {
         notificationDates[id]

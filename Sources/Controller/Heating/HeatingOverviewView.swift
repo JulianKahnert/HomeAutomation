@@ -73,12 +73,12 @@ struct HeatingOverviewView: View {
             // The fireplace burns: a soft warm column behind the bars of the rooms that follow it.
             if fireplaceOn {
                 ForEach(rooms.filter(\.followsFireplace)) { room in
-                    RectangleMark(x: .value("Raum", room.shortName), yStart: .value("Δ", -(limit + 0.5)), yEnd: .value("Δ", limit + 0.5), width: .ratio(0.9))
+                    RectangleMark(x: .value("Raum", room.placeId), yStart: .value("Δ", -(limit + 0.5)), yEnd: .value("Δ", limit + 0.5), width: .ratio(0.9))
                         .foregroundStyle(Color.orange.opacity(0.14))
                         .clipShape(.rect(cornerRadius: 8))
                 }
             }
-            RectangleMark(yStart: .value("Δ", -HeatingPalette.comfortBand), yEnd: .value("Δ", HeatingPalette.comfortBand))
+            RectangleMark(yStart: .value("Δ", -HeatingComfort.band), yEnd: .value("Δ", HeatingComfort.band))
                 .foregroundStyle(Color.gray.opacity(0.1))
             RuleMark(y: .value("Δ", 0))
                 .foregroundStyle(Color.secondary.opacity(0.5))
@@ -86,28 +86,28 @@ struct HeatingOverviewView: View {
             ForEach(rooms) { room in
                 if let delta = room.delta {
                     let extent = HeatingChartData.barExtent(forDelta: delta)
-                    BarMark(x: .value("Raum", room.shortName), yStart: .value("Δ", extent.lowerBound), yEnd: .value("Δ", extent.upperBound), width: .ratio(0.55))
+                    BarMark(x: .value("Raum", room.placeId), yStart: .value("Δ", extent.lowerBound), yEnd: .value("Δ", extent.upperBound), width: .ratio(0.55))
                         .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
                         .clipShape(.rect(cornerRadius: 6))
                 } else {
                     // Keeps the category on the axis; the hatched box is drawn in the overlay.
-                    BarMark(x: .value("Raum", room.shortName), yStart: .value("Δ", -0.6), yEnd: .value("Δ", 0.6), width: .ratio(0.55))
+                    BarMark(x: .value("Raum", room.placeId), yStart: .value("Δ", -0.6), yEnd: .value("Δ", 0.6), width: .ratio(0.55))
                         .foregroundStyle(Color.clear)
                 }
             }
         }
         // The fireplace columns come first in the chart; without a fixed domain they would move their rooms to the left.
-        .chartXScale(domain: rooms.map(\.shortName))
+        .chartXScale(domain: rooms.map(\.placeId))
         .chartYScale(domain: -(limit + 0.5)...(limit + 0.5))
         .chartYAxis(.hidden)
         .chartXAxis {
             AxisMarks { value in
                 AxisValueLabel {
-                    if let short = value.as(String.self) {
-                        let isSelected = rooms.first { $0.shortName == short }?.placeId == selectedPlaceId
+                    if let placeId = value.as(String.self), let axisRoom = rooms.first(where: { $0.placeId == placeId }) {
+                        let isSelected = placeId == selectedPlaceId
                         VStack(spacing: 2) {
                             // Selection as a soft tinted pill; the bars keep their full colour.
-                            Text(short)
+                            Text(axisRoom.shortName)
                                 .font(.caption)
                                 .fontWeight(isSelected ? .semibold : .regular)
                                 .foregroundStyle(isSelected ? .primary : .secondary)
@@ -119,7 +119,7 @@ struct HeatingOverviewView: View {
                                 Image(systemName: "flame.fill")
                                     .font(.caption2)
                                     .foregroundStyle(.orange)
-                                    .opacity(fireplaceOn && rooms.first { $0.shortName == short }?.followsFireplace == true ? 1 : 0)
+                                    .opacity(fireplaceOn && axisRoom.followsFireplace ? 1 : 0)
                             }
                         }
                     }
@@ -158,13 +158,13 @@ struct HeatingOverviewView: View {
     }
 
     private func room(at x: CGFloat, proxy: ChartProxy, geo: GeometryProxy) -> HeatingOverviewRoom? {
-        guard let plot = proxy.plotFrame, let short: String = proxy.value(atX: x - geo[plot].minX) else { return nil }
-        return rooms.first { $0.shortName == short }
+        guard let plot = proxy.plotFrame, let placeId: String = proxy.value(atX: x - geo[plot].minX) else { return nil }
+        return rooms.first { $0.placeId == placeId }
     }
 
     @ViewBuilder
     private func bubble(proxy: ChartProxy, geo: GeometryProxy) -> some View {
-        if let room = hovered, let plot = proxy.plotFrame, let x = proxy.position(forX: room.shortName) {
+        if let room = hovered, let plot = proxy.plotFrame, let x = proxy.position(forX: room.placeId) {
             let frame = geo[plot]
             // A bottom-aligned box puts the bubble's bottom edge on the plot top.
             HeatingInfoBubble(room: room)
@@ -182,7 +182,7 @@ struct HeatingOverviewView: View {
             let width = frame.width / CGFloat(max(rooms.count, 1)) * 0.55
             let card = HeatingPalette.card(scheme)
             ForEach(rooms) { room in
-                if let x = proxy.position(forX: room.shortName) {
+                if let x = proxy.position(forX: room.placeId) {
                     if let delta = room.delta {
                         if abs(delta) > limit, let tip = proxy.position(forY: delta < 0 ? -limit : limit) {
                             LinearGradient(colors: [card.opacity(0), card.opacity(0.75)],
@@ -234,15 +234,30 @@ struct HeatingInfoBubble: View {
 
     private var sourceText: String {
         switch room.istSource {
-        case .roomSensor(let name): "Raumsensor \(name)"
-        case .thermostats(let names): names.count == 1 ? "Thermostat" : "Mittel von \(names.count) Thermostaten"
+        case .roomSensor(let name): return "Raumsensor \(name)"
+        case .thermostats(let names): return names.count == 1 ? "Thermostat" : "Mittel von \(names.count) Thermostaten"
         }
     }
 
     private var sourceSymbol: String {
         switch room.istSource {
-        case .roomSensor: "thermometer.medium"
-        case .thermostats: "heater.vertical"
+        case .roomSensor: return "thermometer.medium"
+        case .thermostats: return "heater.vertical"
         }
+    }
+}
+
+// MARK: - Previews
+
+#Preview("Übersicht") {
+    let rooms = HeatingFeature.sorted(HeatingPreviewData.overviewRooms)
+    HeatingOverviewView(rooms: rooms, headline: HeatingFeature.headlineParts(for: rooms), updatedAt: HeatingPreviewData.now, selectedPlaceId: nil) { _ in }
+        .padding(16)
+        .frame(width: 402)
+}
+
+#Preview("Info-Blase") {
+    if let room = HeatingPreviewData.overviewRooms.first {
+        HeatingInfoBubble(room: room).padding(16)
     }
 }

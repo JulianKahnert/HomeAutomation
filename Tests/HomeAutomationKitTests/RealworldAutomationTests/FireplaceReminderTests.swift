@@ -105,6 +105,29 @@ struct FireplaceReminderTests {
         #expect(try await !automation.shouldTrigger(with: event, using: homeManager))
     }
 
+    @Test("A second push within two hours of the last one is blocked, one after two hours is sent")
+    func rateLimitIsTwoHours() async throws {
+        let automation = reminder()
+        let event = feed([reading(18.0, minutesAgo: 25), reading(20.0, minutesAgo: 0)])
+
+        homeManager.notificationDates[Fireplace.reminderNotificationId] = now.addingTimeInterval(-119 * minute)
+        #expect(try await !automation.shouldTrigger(with: event, using: homeManager))
+
+        homeManager.notificationDates[Fireplace.reminderNotificationId] = now.addingTimeInterval(-121 * minute)
+        #expect(try await automation.shouldTrigger(with: event, using: homeManager))
+    }
+
+    @Test("The rate limit follows the configured interval")
+    func rateLimitFollowsConfiguration() async throws {
+        let automation = FireplaceReminder(roomSensor: sensor, minInterval: 600)
+        let event = feed([reading(18.0, minutesAgo: 25), reading(20.0, minutesAgo: 0)])
+
+        homeManager.notificationDates[Fireplace.reminderNotificationId] = now.addingTimeInterval(-9 * minute)
+        #expect(try await !automation.shouldTrigger(with: event, using: homeManager))
+        homeManager.notificationDates[Fireplace.reminderNotificationId] = now.addingTimeInterval(-11 * minute)
+        #expect(try await automation.shouldTrigger(with: event, using: homeManager))
+    }
+
     @Test("The end push of the fireplace does not count against the rate limit")
     func otherPushIgnored() async throws {
         await homeManager.sendNotification(title: "Kamin aus", message: "", id: Fireplace.notificationId)

@@ -143,6 +143,20 @@ struct RoomHeatingTests {
         homeManager.storageItems.append(EntityStorageItem(entityId: window.contactSensorId, timestamp: date, isContactOpen: open))
     }
 
+    /// The server switched both radiators off for `reason` at `date`.
+    private func seedOffWrites(reason: HeatingWriteReason = .window, at date: Date) {
+        for radiator in [left, right] {
+            homeManager.heatingWrites.append(HeatingWrite(timestamp: date, entityId: radiator.heatingId, reason: reason, actionName: "setHeating", isActive: false))
+        }
+    }
+
+    /// The server returned both radiators to the plan target at `date`.
+    private func seedPlanWrites(reason: HeatingWriteReason = .window, at date: Date, target: Double = 21) {
+        for radiator in [left, right] {
+            homeManager.heatingWrites.append(HeatingWrite(timestamp: date, entityId: radiator.targetTemperatureId, reason: reason, actionName: "setTargetTemperature", targetTemperatureInC: target, planTargetInC: target))
+        }
+    }
+
     private func change(_ window: WindowContactSensor) -> HomeEvent {
         .change(entity: homeManager.storageItems.last { $0.entityId == window.contactSensorId }!)
     }
@@ -205,6 +219,7 @@ struct RoomHeatingTests {
         setWindow(windowA, open: true, at: noon)
         setWindow(windowB, open: true, at: noon.addingTimeInterval(3))
         setWindow(windowA, open: false, at: noon.addingTimeInterval(60))   // B is still open
+        seedOffWrites(at: noon.addingTimeInterval(13))
         let afterA = noon.addingTimeInterval(60)
 
         #expect(try await room.shouldTrigger(with: change(windowA), using: homeManager))
@@ -226,6 +241,7 @@ struct RoomHeatingTests {
         homeManager.storageItems = [EntityStorageItem(entityId: left.targetTemperatureId, targetTemperatureInC: 25)]  // manual value before
         setWindow(windowA, open: true, at: noon)
         setWindow(windowA, open: false, at: noon.addingTimeInterval(600))
+        seedOffWrites(at: noon.addingTimeInterval(10))
         let now = noon.addingTimeInterval(600)
 
         try await room().execute(using: homeManager, now: now, sleep: { _ in })
@@ -244,6 +260,31 @@ struct RoomHeatingTests {
 
         #expect(targets().isEmpty)
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false), .setHeating(right.heatingId, active: false)])
+    }
+
+    @Test("A switch point while the room is off records the new plan target for the history without sending it")
+    func switchPointWhileOffRecordsPlan() async throws {
+        let switchPoint = date(day: 18, hour: 22)
+        setWindow(windowA, open: true, at: switchPoint.addingTimeInterval(-3600))
+
+        try await room().execute(using: homeManager, now: switchPoint, sleep: { _ in })
+
+        let recorded = homeManager.heatingWrites.filter { !$0.sentToDevice }
+        #expect(recorded.count == 2)
+        #expect(recorded.allSatisfy { $0.reason == .plan && $0.planTargetInC == 17 && $0.timestamp == switchPoint })
+        #expect(Set(recorded.map(\.entityId.name)) == ["Left", "Right"])
+        // nothing but the off writes went to the adapter, and the last write that reached a radiator is still the off write
+        #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false), .setHeating(right.heatingId, active: false)])
+        #expect(await homeManager.lastHeatingWrite(of: left.heatingId)?.isActive == false)
+    }
+
+    @Test("A deploy or a window change while the room is off records no plan target")
+    func onlySwitchPointsRecordPlan() async throws {
+        setWindow(windowA, open: true, at: noon.addingTimeInterval(-3600))
+
+        try await room().execute(using: homeManager, now: noon, sleep: { _ in })
+
+        #expect(homeManager.heatingWrites.allSatisfy { $0.sentToDevice })
     }
 
     @Test("Another room's window does not trigger the room")
@@ -276,6 +317,63 @@ struct RoomHeatingTests {
         #expect(try await !room().shouldTrigger(with: .serverStarted, using: homeManager))
         #expect(try await !room().shouldTrigger(with: change(windowA), using: homeManager), "the adapter's re-sent closed contact")
         #expect(homeManager.performedActions.isEmpty)
+    }
+
+    @Test("A re-sent closed contact after a restart writes nothing, although an older open row is stored")
+    func resentClosedAfterRestart() async throws {
+        let room = room()
+        setWindow(windowA, open: true, at: noon.addingTimeInterval(-7200))
+        setWindow(windowA, open: false, at: noon.addingTimeInterval(-7000))
+        seedOffWrites(at: noon.addingTimeInterval(-7190))
+        seedPlanWrites(at: noon.addingTimeInterval(-7000))   // the room went back to the plan then
+        homeManager.heatingWrites += [HeatingWrite(timestamp: noon.addingTimeInterval(-600), entityId: left.targetTemperatureId, reason: .system, actionName: "setTargetTemperature", targetTemperatureInC: 25)]
+        // the adapter's resync after the restart: the state did not change, so it is not stored, but it is an event
+        let resync = HomeEvent.change(entity: EntityStorageItem(entityId: windowA.contactSensorId, timestamp: noon, isContactOpen: false))
+
+        #expect(try await !room.shouldTrigger(with: resync, using: homeManager))
+        #expect(homeManager.performedActions.isEmpty)
+    }
+
+    @Test("A re-sent closed contact after the cache expired writes nothing in a room that never went off")
+    func resentClosedAfterCacheExpiry() async throws {
+        let room = room()
+        setWindow(windowA, open: true, at: noon.addingTimeInterval(-3600))   // open for a while, then closed again
+        setWindow(windowA, open: false, at: noon.addingTimeInterval(-3590))  // within the delay: the room never went off
+        let resync = HomeEvent.change(entity: EntityStorageItem(entityId: windowA.contactSensorId, timestamp: noon, isContactOpen: false))   // the resync two hours later
+
+        #expect(try await !room.shouldTrigger(with: resync, using: homeManager))
+        #expect(homeManager.performedActions.isEmpty)
+    }
+
+    @Test("Closing the window of a room the server switched off for it triggers the return to the plan")
+    func closingEndsWhatTheServerDid() async throws {
+        let room = room()
+        setWindow(windowA, open: true, at: noon)
+        seedOffWrites(at: noon.addingTimeInterval(10))
+        setWindow(windowA, open: false, at: noon.addingTimeInterval(600))
+
+        #expect(try await room.shouldTrigger(with: change(windowA), using: homeManager))
+    }
+
+    @Test("The overview names the room by its display name and short label, and falls back to the place")
+    func displayNames() {
+        let plain = room().heatingSources
+        #expect(plain.name == "Kitchen")
+        #expect(plain.shortName == nil)
+
+        let named = RoomHeating("heating-kitchen", placeId: "Kitchen", radiators: [left], displayName: "Küche unten", shortLabel: "Küche",
+                                configuration: HeatingConfiguration(standardPlan: standardPlan)).heatingSources
+        #expect(named.placeId == "Kitchen")
+        #expect(named.name == "Küche unten")
+        #expect(named.shortName == "Küche")
+    }
+
+    @Test("A room configured before the display names existed still decodes")
+    func displayNamesAreOptionalInJSON() throws {
+        let encoded = try JSONEncoder().encode(AnyAutomation.create(from: room()))
+        let decodedRoom = try #require(JSONDecoder().decode(AnyAutomation.self, from: encoded).automation as? RoomHeating)
+        #expect(decodedRoom.displayName == nil)
+        #expect(decodedRoom.shortLabel == nil)
     }
 
     @Test("Window contacts survive the configuration JSON and name their entities")

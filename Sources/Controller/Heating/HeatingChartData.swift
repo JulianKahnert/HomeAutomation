@@ -23,7 +23,7 @@ enum HeatingChartData {
         }
 
         let id: Int
-        let band: HeatingPalette.Band
+        let band: HeatingComfort
         let points: [Point]
     }
 
@@ -77,7 +77,7 @@ enum HeatingChartData {
     static func gapSegments(_ samples: [HeatingSample]) -> [GapSegment] {
         var result: [GapSegment] = []
         var points: [GapSegment.Point] = []
-        var band: HeatingPalette.Band?
+        var band: HeatingComfort?
         let close = {
             if let band, points.count > 1 {
                 result.append(GapSegment(id: result.count, band: band, points: points))
@@ -91,7 +91,7 @@ enum HeatingChartData {
                 continue
             }
             let point = GapSegment.Point(date: sample.date, ist: ist, plan: plan)
-            let sampleBand = HeatingPalette.band(forDelta: ist - plan)
+            let sampleBand = HeatingComfort(delta: ist - plan)
             if let current = band, current != sampleBand {
                 points.append(point)
                 close()

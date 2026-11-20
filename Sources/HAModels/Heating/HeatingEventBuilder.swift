@@ -53,7 +53,7 @@ struct HeatingEventBuilder {
             if let event = intervalEvent(contact, from: opened, to: closedAt) { result.append(event) }
         }
         for item in items {
-            let isOpen = contact.source == .window ? (item.isContactOpen ?? false) : (item.isDeviceOn ?? false)
+            let isOpen = contact.source.isOpen(item)
             if isOpen, openedAt == nil { openedAt = item.timestamp } else if !isOpen { close(at: item.timestamp) }
         }
         close(at: nil)

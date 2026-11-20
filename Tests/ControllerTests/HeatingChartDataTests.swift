@@ -85,10 +85,10 @@ struct HeatingChartDataTests {
 
     @Test("the comfort band is plus minus half a kelvin, edges included")
     func bandEdges() {
-        #expect(HeatingPalette.band(forDelta: -0.5) == .ok)
-        #expect(HeatingPalette.band(forDelta: 0.5) == .ok)
-        #expect(HeatingPalette.band(forDelta: -0.51) == .tooCold)
-        #expect(HeatingPalette.band(forDelta: 0.51) == .tooWarm)
+        #expect(HeatingComfort(delta: -0.5) == .ok)
+        #expect(HeatingComfort(delta: 0.5) == .ok)
+        #expect(HeatingComfort(delta: -0.51) == .tooCold)
+        #expect(HeatingComfort(delta: 0.51) == .tooWarm)
     }
 
     @Test("numbers use the decimal comma and a real minus")

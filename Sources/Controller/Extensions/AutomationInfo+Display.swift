@@ -11,6 +11,7 @@ extension AutomationInfo {
     private static let typeDisplay: [String: (label: String, systemImage: String, trigger: String)] = [
         "CreateScene": ("Scene", "sparkles", "Manual"),
         "EnergyLowPrice": ("Energy Price", "bolt", "Electricity price"),
+        "FireplaceTimeout": ("Fireplace", "flame", "Every minute"),
         "GardenWatering": ("Garden", "drop", "Schedule"),
         "HealthCheck": ("System", "stethoscope", "Every minute"),
         "MaintenanceAutomation": ("System", "wrench.and.screwdriver", "Schedule"),

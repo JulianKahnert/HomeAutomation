@@ -25,8 +25,22 @@ struct HeatingView: View {
 
     var body: some View {
         NavigationStack {
-            HeatingScreen(store: store, layout: layout)
-                .navigationTitle("Heizung")
+            TimelineView(.everyMinute) { context in
+                HeatingScreen(store: store, layout: layout)
+                    .navigationTitle("Heizung")
+                    .heatingSubtitle(HeatingFormat.fireplaceHint(store.fireplace, now: context.date) ?? "")
+            }
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    FireplaceToolbarButton(isOn: store.fireplace.isOn) { store.send(.setFireplace(!store.fireplace.isOn)) }
+                }
+            }
+            .alert("Kamin nicht geschaltet", isPresented: Binding(get: { store.fireplaceError != nil },
+                                                                   set: { if !$0 { store.send(.dismissFireplaceError) } })) {
+                Button("OK") {}
+            } message: {
+                Text(store.fireplaceError ?? "")
+            }
         }
         .task { await store.send(.task).finish() }
     }
@@ -88,7 +102,7 @@ struct HeatingScreen: View {
     }
 
     private var overview: some View {
-        HeatingOverviewView(rooms: store.rooms, headline: store.headline, selectedPlaceId: store.selectedPlaceId) {
+        HeatingOverviewView(rooms: store.rooms, headline: store.headline, selectedPlaceId: store.selectedPlaceId, fireplaceOn: store.fireplace.isOn) {
             store.send(.selectRoom($0))
         }
     }

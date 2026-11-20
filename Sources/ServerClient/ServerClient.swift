@@ -215,10 +215,20 @@ public struct ServerClient {
         let body = try response.ok.body.json
         return HeatingOverview(rooms: body.rooms.map {
             HeatingOverviewRoom(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan,
-                                istSource: HeatingIstSource($0.istSource))
+                                istSource: HeatingIstSource($0.istSource), followsFireplace: $0.followsFireplace)
         }, heatmap: body.heatmap.map {
             HeatingHeatmapCell(placeId: $0.placeId, day: $0.day, segment: $0.segment, delta: $0.delta)
         })
+    }
+
+    /// The state of the fireplace switch (glossary: fireplace mode).
+    public func getFireplace() async throws -> FireplaceState {
+        FireplaceState(try await client.getFireplace().ok.body.json)
+    }
+
+    /// Switches the fireplace on or off; answers the state it will have.
+    public func setFireplace(isOn: Bool) async throws -> FireplaceState {
+        FireplaceState(try await client.setFireplace(body: .json(.init(isOn: isOn))).ok.body.json)
     }
 
     /// The time grid of a heating room (glossary: actual, plan target, Δ). Throws when the server answers
@@ -236,6 +246,12 @@ public struct ServerClient {
                                  istSource: source,
                                  radiators: body.radiators,
                                  samples: body.samples.map { HeatingSample(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) })
+    }
+}
+
+extension FireplaceState {
+    init(_ body: Components.Schemas.Fireplace) {
+        self.init(isOn: body.isOn, since: body.since)
     }
 }
 

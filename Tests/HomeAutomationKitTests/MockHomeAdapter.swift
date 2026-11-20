@@ -129,6 +129,14 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return matching.count > 1 ? matching[matching.count - 2] : nil
     }
 
+    /// What the database holds per entity, when it differs from the world in `storageItems` (the cache
+    /// after a restart carries the timestamp of the adapter's resync, the database the real one).
+    var storedItems: [EntityId: EntityStorageItem] = [:]
+
+    func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
+        storedItems[entityId] ?? storageItems.last(where: { $0.entityId == entityId })
+    }
+
     func getAllEntitiesLive() async throws -> [EntityStorageItem] {
         return storageItems
     }
@@ -154,8 +162,12 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     private(set) var sentNotificationTitles: [String] = []
     private(set) var overdueWindowIds: [EntityId] = []
 
-    func sendNotification(title: String, message: String, id: String) async {
+    /// The notifications `sendNotification` was asked to send.
+    private(set) var sentNotifications: [(title: String, message: String, id: String, category: String?)] = []
+
+    func sendNotification(title: String, message: String, id: String, category: String?) async {
         sentNotificationTitles.append(title)
+        sentNotifications.append((title, message, id, category))
     }
 
     func markWindowOverdue(entityId: EntityId) async {

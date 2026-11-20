@@ -30,6 +30,10 @@ struct HeatingFeature: Sendable {
         var error: String?
         /// Set when the detail of the selected room could not be loaded.
         var detailError: String?
+        /// The fireplace switch (glossary: fireplace mode); off until the server says otherwise.
+        var fireplace: FireplaceState = .off
+        /// Set when switching the fireplace failed.
+        var fireplaceError: String?
 
         var selectedRoom: HeatingOverviewRoom? { rooms.first { $0.placeId == selectedPlaceId } }
 
@@ -40,13 +44,19 @@ struct HeatingFeature: Sendable {
     enum Action: BindableAction, Sendable {
         case binding(BindingAction<State>)
         case detailResponse(Result<HeatingRoomDetail, Error>)
+        case dismissFireplaceError
+        case fireplaceLoaded(Result<FireplaceState, Error>)
+        case fireplaceSwitched(Result<FireplaceState, Error>)
         case overviewResponse(Result<HeatingOverview, Error>)
         case refresh
         case selectRoom(String?)
+        /// The toolbar button, the push action "Kamin an?" and later the reminder push: switches the fireplace.
+        case setFireplace(Bool)
         case task
     }
 
     @Dependency(\.serverClient) var serverClient
+    @Dependency(\.date.now) var now
 
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -54,9 +64,47 @@ struct HeatingFeature: Sendable {
             switch action {
             case .task, .refresh:
                 state.isLoading = true
+                return .merge(
+                    .run { send in
+                        await send(.overviewResponse(Result { try await serverClient.getHeatingOverview() }))
+                    },
+                    .run { send in
+                        await send(.fireplaceLoaded(Result { try await serverClient.getFireplace() }))
+                    }
+                )
+
+            case let .fireplaceLoaded(.success(fireplace)):
+                state.fireplace = fireplace
+                return .none
+
+            case .fireplaceLoaded(.failure):
+                // The tab keeps what it knows; the overview shows the error when the server is away.
+                return .none
+
+            case let .setFireplace(isOn):
+                // Always asks the server, even for the state the tab shows: the tab may be stale (the push action
+                // runs in a freshly started app) and the server ignores a repeated request. Shows the new state at
+                // once; the server's answer replaces it.
+                state.fireplace = isOn ? FireplaceState(isOn: true, since: now) : .off
+                state.fireplaceError = nil
                 return .run { send in
-                    await send(.overviewResponse(Result { try await serverClient.getHeatingOverview() }))
+                    await send(.fireplaceSwitched(Result { try await serverClient.setFireplace(isOn) }))
                 }
+
+            case let .fireplaceSwitched(.success(fireplace)):
+                state.fireplace = fireplace
+                return .none
+
+            case let .fireplaceSwitched(.failure(error)):
+                state.fireplaceError = error.localizedDescription
+                // Back to what the switch really says.
+                return .run { send in
+                    await send(.fireplaceLoaded(Result { try await serverClient.getFireplace() }))
+                }
+
+            case .dismissFireplaceError:
+                state.fireplaceError = nil
+                return .none
 
             case let .overviewResponse(.success(overview)):
                 state.isLoading = false

@@ -175,7 +175,7 @@ private actor RecordingNotificationSender: NotificationSender {
     private(set) var ids: [String] = []
     private(set) var messages: [String] = []
 
-    func sendNotification(title: String, message: String, id: String) async throws {
+    func sendNotification(title: String, message: String, id: String, category: String?) async throws {
         ids.append(id)
         messages.append(message)
     }

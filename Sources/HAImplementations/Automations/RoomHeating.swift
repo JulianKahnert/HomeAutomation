@@ -9,13 +9,15 @@ import HAModels
 /// Heats one room (glossary: room) after its plan. It is the only writer of the room's radiators.
 ///
 /// It writes the plan target at each switch point and once after a configuration deploy. A plain server
-/// start writes nothing, so a manual change at a radiator stays until the next switch point.
+/// start re-applies only the overrides (an open window, the fireplace on) and writes no plan target, so a
+/// manual change at a radiator stays until the next switch point.
 public struct RoomHeating: Automatable {
     public var isActive = true
     public let name: String
     public let placeId: PlaceId
     public let radiators: [Radiator]
-    /// Contacts that switch the room off while open (glossary: contact): the window contacts of the room.
+    /// Contacts that switch the room off while open (glossary: contact): the window contacts of the room and
+    /// the fireplace switch when the room follows it.
     public let contacts: [RoomContact]
     /// `nil` for a room without a plan of its own: it follows the standard plan.
     public let plan: HeatingPlan?
@@ -44,7 +46,8 @@ public struct RoomHeating: Automatable {
                            name: placeId,
                            radiators: radiators.map { .init(name: $0.heatingId.name, temperatureId: $0.temperatureId, valvePositionId: $0.valvePositionId) },
                            roomSensor: roomSensor,
-                           plan: effectivePlan)
+                           plan: effectivePlan,
+                           followsFireplace: contacts.contains { if case .fireplace = $0 { true } else { false } })
     }
 
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
@@ -59,7 +62,11 @@ public struct RoomHeating: Automatable {
             // the re-sent closed contacts after a restart must not write the plan over a manual change.
             if contact.isOpen(item) { return true }
             return await endedOffState(of: contact, closedAt: item.timestamp, using: hm)
-        case .serverStarted, .sunrise, .sunset:
+        case .serverStarted:
+            // Re-apply the overrides from the stored contact states, without waiting for the adapter to
+            // re-send them. All closed: nothing to do, the radiators keep their manual values.
+            return await firstOff(using: hm) != nil
+        case .sunrise, .sunset:
             return false
         }
     }
@@ -78,14 +85,14 @@ public struct RoomHeating: Automatable {
     ///   old manual value) and `system` otherwise, i.e. after a deploy. A switch point or a deploy while a
     ///   contact is open leaves the radiators off.
     func execute(using hm: HomeManagable, now: Date, sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) async throws {
-        if let openSince = await earliestOpen(using: hm) {
-            let remaining = configuration.windowDelay - now.timeIntervalSince(openSince)
+        if let off = await firstOff(using: hm) {
+            let remaining = off.at.timeIntervalSince(now)
             if remaining > 0 {
                 try await sleep(.seconds(remaining))
                 // the contacts may have changed while waiting: look again
-                guard await earliestOpen(using: hm) != nil else { return }
+                guard await firstOff(using: hm) != nil else { return }
             }
-            await HeatingWriteContext.withReason(.window) {
+            await HeatingWriteContext.withReason(off.contact.reason) {
                 for radiator in radiators {
                     await radiator.turnOff(with: hm)
                 }
@@ -101,8 +108,8 @@ public struct RoomHeating: Automatable {
         let reason: HeatingWriteReason
         if plan.switchPoint(at: now) != nil {
             reason = .plan
-        } else if await contactJustEndedOffState(now: now, using: hm) {
-            reason = .window
+        } else if let ended = await contactJustEndedOffState(now: now, using: hm) {
+            reason = ended.reason
         } else {
             reason = .system
         }
@@ -114,28 +121,33 @@ public struct RoomHeating: Automatable {
         }
     }
 
-    /// Since when the earliest of the open contacts is open; `nil` when none is. An unreachable contact counts as closed.
-    private func earliestOpen(using hm: HomeManagable) async -> Date? {
-        var earliest: Date?
+    /// The open contact that takes the room off first, and when: its open time plus its own delay (window
+    /// delay for a window, none for the fireplace). `nil` when no contact is open; an unreachable contact
+    /// counts as closed.
+    private func firstOff(using hm: HomeManagable) async -> (contact: RoomContact, at: Date)? {
+        var first: (contact: RoomContact, at: Date)?
         for contact in contacts {
             guard let state = await contact.currentState(with: hm), state.isOpen else { continue }
-            earliest = min(earliest ?? state.since, state.since)
+            let at = state.since.addingTimeInterval(contact.delay(in: configuration))
+            if first == nil || at < first!.at {
+                first = (contact, at)
+            }
         }
-        return earliest
+        return first
     }
 
     /// Whether `contact` was open before and long enough for the room to have gone off.
     private func endedOffState(of contact: RoomContact, closedAt: Date, using hm: HomeManagable) async -> Bool {
         guard let previous = await contact.previousState(with: hm), previous.isOpen else { return false }
-        return closedAt.timeIntervalSince(previous.since) >= configuration.windowDelay
+        return closedAt.timeIntervalSince(previous.since) >= contact.delay(in: configuration)
     }
 
-    /// Whether a contact closed within the last minute, ending a state the room went off for.
-    private func contactJustEndedOffState(now: Date, using hm: HomeManagable) async -> Bool {
+    /// The contact that closed within the last minute, ending a state the room went off for.
+    private func contactJustEndedOffState(now: Date, using hm: HomeManagable) async -> RoomContact? {
         for contact in contacts {
-            guard let current = await contact.currentState(with: hm), now.timeIntervalSince(current.since) < 60 else { continue }
-            if await endedOffState(of: contact, closedAt: current.since, using: hm) { return true }
+            guard let current = await contact.currentState(with: hm), !current.isOpen, now.timeIntervalSince(current.since) < 60 else { continue }
+            if await endedOffState(of: contact, closedAt: current.since, using: hm) { return contact }
         }
-        return false
+        return nil
     }
 }

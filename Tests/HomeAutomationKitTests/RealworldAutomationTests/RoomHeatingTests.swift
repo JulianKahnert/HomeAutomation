@@ -253,20 +253,29 @@ struct RoomHeatingTests {
         #expect(try await !room().shouldTrigger(with: .change(entity: EntityStorageItem(entityId: otherWindow.contactSensorId, timestamp: noon, isContactOpen: true)), using: homeManager))
     }
 
-    @Test("A restart with an open window switches the room off at once; a restart with closed windows writes nothing")
+    @Test("A restart with an open window switches the room off by itself; a restart with closed windows writes nothing")
     func restart() async throws {
         let room = room()
         setWindow(windowA, open: true, at: noon.addingTimeInterval(-3600))   // opened long before the restart
         setWindow(windowB, open: false, at: noon.addingTimeInterval(-7200))
 
-        #expect(try await !room.shouldTrigger(with: .serverStarted, using: homeManager))
-        // the adapter re-sends every contact after the handshake
-        #expect(try await room.shouldTrigger(with: change(windowA), using: homeManager))
-        #expect(try await !room.shouldTrigger(with: change(windowB), using: homeManager))
+        // no contact re-sent by the adapter: the room reads its own contacts
+        #expect(try await room.shouldTrigger(with: .serverStarted, using: homeManager))
         try await room.execute(using: homeManager, now: noon, sleep: { _ in Issue.record("must not wait"); })
 
-        #expect(homeManager.actionCount("setHeating") == 2)
+        #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false), .setHeating(right.heatingId, active: false)])
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .window) })
         #expect(targets().isEmpty)
+    }
+
+    @Test("A restart with every window closed triggers nothing, so a manual value stays")
+    func restartAllClosed() async throws {
+        setWindow(windowA, open: false, at: noon.addingTimeInterval(-3600))
+        setWindow(windowB, open: false, at: noon.addingTimeInterval(-7200))
+
+        #expect(try await !room().shouldTrigger(with: .serverStarted, using: homeManager))
+        #expect(try await !room().shouldTrigger(with: change(windowA), using: homeManager), "the adapter's re-sent closed contact")
+        #expect(homeManager.performedActions.isEmpty)
     }
 
     @Test("Window contacts survive the configuration JSON and name their entities")

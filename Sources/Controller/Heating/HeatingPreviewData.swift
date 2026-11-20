@@ -75,17 +75,31 @@ enum HeatingPreviewData {
     private static let shortNames = ["Schlafzimmer": "Schlafen", "Kaminzimmer": "Kamin"]
 
     /// The rooms of the overview endpoint's response, as the server would sort them (any order).
-    static var overviewRooms: [HeatingOverviewRoom] {
+    static var overviewRooms: [HeatingOverviewRoom] { overviewRooms(following: []) }
+
+    /// The overview rooms, those named in `following` follow the fireplace.
+    static func overviewRooms(following: Set<String>) -> [HeatingOverviewRoom] {
         rooms.map { room in
             let latest = room.detail(.twoHours).latest
             return HeatingOverviewRoom(placeId: room.id, name: room.id, shortName: shortNames[room.id] ?? room.id, ist: latest?.ist, sollPlan: latest?.sollPlan,
-                                       istSource: .thermostats(room.radiators))
+                                       istSource: .thermostats(room.radiators), followsFireplace: following.contains(room.id))
         }
     }
 
     /// The heatmap cells of the overview endpoint: mean Δ per room, local day and six-hour segment of the last seven days.
     static var heatmap: [HeatingHeatmapCell] {
         rooms.flatMap { HeatingOverviewBuilder.heatmap(for: $0.detail(.week), calendar: calendar) }
+    }
+
+    /// The rooms that follow the fireplace in the fireplace previews.
+    static let fireplaceRooms: Set<String> = ["Küche", "Kaminzimmer"]
+
+    /// A store state with the fireplace rooms marked; the fireplace burns since two hours (ends in six).
+    static func fireplaceState(on isOn: Bool, selected placeId: String? = nil) -> HeatingFeature.State {
+        var state = state(placeId)
+        state.rooms = HeatingFeature.sorted(overviewRooms(following: fireplaceRooms))
+        state.fireplace = isOn ? FireplaceState(isOn: true, since: now.addingTimeInterval(-2 * 3_600)) : .off
+        return state
     }
 
     /// A store state with the overview loaded and `selected` open (none: only the overview).

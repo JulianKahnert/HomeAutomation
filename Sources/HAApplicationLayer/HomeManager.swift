@@ -322,10 +322,14 @@ public final class HomeManager: HomeManagable {
         return location
     }
 
-    public func sendNotification(title: String, message: String, id: String) async {
+    public func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
+        (try? await storageRepo.getCurrent(entityId)) ?? nil
+    }
+
+    public func sendNotification(title: String, message: String, id: String, category: String?) async {
         do {
             log.debug("Sending notification \(title): \(message) [id: \(id)]")
-            try await notificationSender.sendNotification(title: title, message: message, id: id)
+            try await notificationSender.sendNotification(title: title, message: message, id: id, category: category)
         } catch {
             log.warning("Failed to send notification: \(error)")
         }

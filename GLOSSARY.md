@@ -31,10 +31,19 @@ A radiator that is not heating, written as `Active = 0`; frost and valve protect
 All radiators of a room are off while any of its window contacts has been open for the configured delay; when the last one closes, the room returns to its plan target at once.
 
 **Contact** (Kontakt)
-A sensor of a room that switches its radiators off while it is open: the window contacts, and later the fireplace switch. A room names its contacts explicitly (`RoomContact`); an unreachable contact counts as closed. The room goes off when the earliest open contact has been open for the window delay (counted from that contact's last state change, so a restart does not restart the delay) and returns to its plan target at once when the last one closes, but only if it had gone off: a contact that closes within the delay, or re-sent as closed after a restart, writes nothing. The return is recorded with reason `window`; a switch point or deploy while a contact is open leaves the radiators off.
+A sensor of a room that switches its radiators off while it is open: a window contact or the fireplace switch (`RoomContact.window`, `RoomContact.fireplace`). A room names its contacts explicitly; an unreachable contact counts as closed. Any open contact means off, whatever the cause: the room goes off when the first open contact has reached its own delay (the window delay for a window, counted from that contact's last state change so a restart does not restart it; none for the fireplace) and returns to its plan target at once when the last one closes, but only if it had gone off: a contact that closes within the delay, or re-sent as closed after a restart, writes nothing. If one cause ends while another is still active the radiators stay off. The off write carries the reason of the contact that took the room off (`window` or `fireplace`); the return to the plan carries the reason of the contact that just closed. A switch point or deploy while a contact is open leaves the radiators off.
 
 **Fireplace mode** (Kamin-Modus)
-The configured radiators are off while the fireplace is on. The fireplace counts like an open window contact. It ends automatically after eight hours, with a push notification.
+The configured radiators are off while the fireplace is on. The fireplace is the persistent Homebridge switch `Keller_Kamin_switcher` and counts like an open window contact, but without the window delay. Only rooms that list it as a contact follow it. It is switched from the Heizung tab (toolbar button), from the push action "Kamin an?", from Siri or the Home app. The server switches it through `PUT /heating/fireplace`; `GET /heating/fireplace` says whether it is on, since when and when it ends. A repeated "on" does not restart the eight hours.
+
+**Unreachable fireplace** (Kamin nicht erreichbar)
+A switch whose state the server cannot read counts as off, so the plan keeps running and nothing freezes. The server keeps the last known value when HomeKit cannot be read, so the eight-hour end bounds the damage of a wrongly "on" switch.
+
+**Fireplace end** (Kamin-Ende)
+Eight hours after the switch went on the `FireplaceTimeout` automation switches it off and sends a push. The eight hours are measured from the switch-on time stored in the database (the current state of the switch there), not from the cache: after a restart the adapter re-sends every state and the cache then carries the time of that resync.
+
+**Restart and deploy** (Neustart und Deploy)
+On a server start each room re-applies only its overrides (a window open, the fireplace on) from the stored contact states, without waiting for the adapter to re-send them, and writes no plan target: manual values survive. After a configuration deploy each room writes its current plan target once (reason `system`).
 
 **Reason** (Grund)
 Why the server wrote a radiator target: `plan`, `window`, `fireplace` or `system`. Stored with each write in the action log.

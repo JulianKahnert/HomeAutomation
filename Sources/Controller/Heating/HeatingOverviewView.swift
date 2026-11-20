@@ -14,14 +14,17 @@ struct HeatingOverviewView: View {
     let rooms: [HeatingOverviewRoom]
     let headline: String?
     let selectedPlaceId: String?
+    /// The fireplace burns: the rooms that follow it show the flame and a soft orange area.
+    let fireplaceOn: Bool
     /// The room the info bubble shows; driven by hover or drag, preset in previews.
     @State var hoveredPlaceId: String?
     let onSelect: (String?) -> Void
 
     @Environment(\.colorScheme) private var scheme
 
-    init(rooms: [HeatingOverviewRoom], headline: String?, selectedPlaceId: String?, hoveredPlaceId: String? = nil,
+    init(rooms: [HeatingOverviewRoom], headline: String?, selectedPlaceId: String?, fireplaceOn: Bool = false, hoveredPlaceId: String? = nil,
          onSelect: @escaping (String?) -> Void) {
+        self.fireplaceOn = fireplaceOn
         self.rooms = rooms
         self.headline = headline
         self.selectedPlaceId = selectedPlaceId
@@ -48,6 +51,14 @@ struct HeatingOverviewView: View {
 
     private var chart: some View {
         Chart {
+            // The fireplace burns: a soft warm column behind the bars of the rooms that follow it.
+            if fireplaceOn {
+                ForEach(rooms.filter(\.followsFireplace)) { room in
+                    RectangleMark(x: .value("Raum", room.shortName), yStart: .value("Δ", -(limit + 0.5)), yEnd: .value("Δ", limit + 0.5), width: .ratio(0.9))
+                        .foregroundStyle(Color.orange.opacity(0.14))
+                        .clipShape(.rect(cornerRadius: 8))
+                }
+            }
             RectangleMark(yStart: .value("Δ", -HeatingPalette.comfortBand), yEnd: .value("Δ", HeatingPalette.comfortBand))
                 .foregroundStyle(Color.gray.opacity(0.1))
             RuleMark(y: .value("Δ", 0))
@@ -65,6 +76,8 @@ struct HeatingOverviewView: View {
                 }
             }
         }
+        // The fireplace columns come first in the chart; without a fixed domain they would move their rooms to the left.
+        .chartXScale(domain: rooms.map(\.shortName))
         .chartYScale(domain: -(limit + 0.5)...(limit + 0.5))
         .chartYAxis(.hidden)
         .chartXAxis {
@@ -72,14 +85,23 @@ struct HeatingOverviewView: View {
                 AxisValueLabel {
                     if let short = value.as(String.self) {
                         let isSelected = rooms.first { $0.shortName == short }?.placeId == selectedPlaceId
-                        // Selection as a soft tinted pill; the bars keep their full colour.
-                        Text(short)
-                            .font(.caption)
-                            .fontWeight(isSelected ? .semibold : .regular)
-                            .foregroundStyle(isSelected ? .primary : .secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(isSelected ? Color.accentColor.opacity(0.18) : .clear, in: .capsule)
+                        VStack(spacing: 2) {
+                            // Selection as a soft tinted pill; the bars keep their full colour.
+                            Text(short)
+                                .font(.caption)
+                                .fontWeight(isSelected ? .semibold : .regular)
+                                .foregroundStyle(isSelected ? .primary : .secondary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(isSelected ? Color.accentColor.opacity(0.18) : .clear, in: .capsule)
+                            if rooms.contains(where: \.followsFireplace) {
+                                // Always reserves the line, so the plot does not jump with the switch.
+                                Image(systemName: "flame.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                                    .opacity(fireplaceOn && rooms.first { $0.shortName == short }?.followsFireplace == true ? 1 : 0)
+                            }
+                        }
                     }
                 }
             }

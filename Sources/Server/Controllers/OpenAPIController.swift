@@ -421,7 +421,7 @@ extension Components.Schemas.HeatingIstSource {
 extension Components.Schemas.HeatingOverview {
     init(_ overview: HeatingOverview) {
         self.init(rooms: overview.rooms.map {
-            .init(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, istSource: .init($0.istSource),
+            .init(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, delta: $0.delta, istSource: .init($0.istSource),
                   followsFireplace: $0.followsFireplace)
         }, heatmap: overview.heatmap.map {
             .init(placeId: $0.placeId, day: $0.day, segment: $0.segment, delta: $0.delta)

@@ -81,6 +81,24 @@ struct HeatingOverviewTests {
         #expect(result.rooms.first?.name == "Bad - OG")
     }
 
+    @Test("a configured short label wins over the derived one")
+    func configuredShortName() async throws {
+        var bad = room("Bad - OG", name: "Bad Obergeschoss")
+        bad.shortName = "Bad"
+        let result = try await overview([bad], items: [], writes: [])
+        #expect(result.rooms.first?.name == "Bad Obergeschoss")
+        #expect(result.rooms.first?.shortName == "Bad")
+    }
+
+    @Test("the delta is a field of the room, and travels through JSON")
+    func explicitDelta() throws {
+        let room = HeatingOverviewRoom(placeId: "R", name: "R", shortName: "R", ist: 19, sollPlan: 21, istSource: .thermostats([]))
+        #expect(room.delta == -2)
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(room)) as? [String: Any]
+        #expect(json?["delta"] as? Double == -2)
+        #expect(try JSONDecoder().decode(HeatingOverviewRoom.self, from: JSONEncoder().encode(room)) == room)
+    }
+
     // MARK: - Week heatmap
 
     private var berlin: Calendar {

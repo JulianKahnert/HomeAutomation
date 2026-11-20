@@ -929,13 +929,17 @@ components:
           type: string
           description: The label under the bar.
         ist:
-          type: number
+          type: [number, "null"]
           format: double
-          description: Actual value now; missing while there is none.
+          description: Actual value now; null or missing while there is none (the generated Swift server omits it).
         sollPlan:
-          type: number
+          type: [number, "null"]
           format: double
-          description: Plan target now; missing when unknown.
+          description: Plan target now; null when unknown.
+        delta:
+          type: [number, "null"]
+          format: double
+          description: Actual minus plan target; null when one of them is null.
         istSource:
           $ref: "#/components/schemas/HeatingIstSource"
         followsFireplace:
@@ -960,13 +964,13 @@ components:
           type: string
           format: date-time
         ist:
-          type: number
+          type: [number, "null"]
           format: double
-          description: Actual value; missing while there is none.
+          description: Actual value; null while there is none.
         sollPlan:
-          type: number
+          type: [number, "null"]
           format: double
-          description: Plan target; missing when unknown.
+          description: Plan target; null when unknown.
         valves:
           type: array
           description: Valve opening in percent per radiator; null while silent.

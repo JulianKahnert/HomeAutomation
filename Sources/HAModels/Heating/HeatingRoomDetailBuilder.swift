@@ -39,6 +39,8 @@ public struct HeatingRoomSources: Sendable, Equatable {
 
     public let placeId: String
     public let name: String
+    /// The label under the room's bar in the overview; `nil` derives it from `name`.
+    public var shortName: String?
     public let radiators: [Radiator]
     public var roomSensor: EntityId?
     /// Fallback for plan targets before the first plan write in a range.

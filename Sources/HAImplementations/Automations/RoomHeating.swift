@@ -24,13 +24,19 @@ public struct RoomHeating: Automatable {
     public let configuration: HeatingConfiguration
     /// The room's own temperature sensor; `nil` when the actual value is the mean of the radiators.
     public let roomSensor: EntityId?
+    /// The name of the room in the Heizung tab; `nil` shows the `placeId`.
+    public let displayName: String?
+    /// The label under the room's bar in the overview; `nil` derives it from the name.
+    public let shortLabel: String?
 
     public var triggerEntityIds: Set<EntityId> { Set(contacts.map(\.entityId)) }
 
     /// The plan this room follows.
     public var effectivePlan: HeatingPlan { plan ?? configuration.standardPlan }
 
-    public init(_ name: String, placeId: PlaceId, radiators: [Radiator], contacts: [RoomContact] = [], plan: HeatingPlan? = nil, roomSensor: EntityId? = nil, configuration: HeatingConfiguration) {
+    public init(_ name: String, placeId: PlaceId, radiators: [Radiator], contacts: [RoomContact] = [], plan: HeatingPlan? = nil, roomSensor: EntityId? = nil, displayName: String? = nil, shortLabel: String? = nil, configuration: HeatingConfiguration) {
+        self.displayName = displayName
+        self.shortLabel = shortLabel
         self.roomSensor = roomSensor
         self.name = name
         self.placeId = placeId
@@ -42,8 +48,8 @@ public struct RoomHeating: Automatable {
 
     /// What the room endpoint needs to build the detail of this room.
     public var heatingSources: HeatingRoomSources {
-        HeatingRoomSources(placeId: placeId,
-                           name: placeId,
+        var sources = HeatingRoomSources(placeId: placeId,
+                           name: displayName ?? placeId,
                            radiators: radiators.map { .init(name: $0.heatingId.name, temperatureId: $0.temperatureId, valvePositionId: $0.valvePositionId, targetTemperatureId: $0.targetTemperatureId) },
                            roomSensor: roomSensor,
                            plan: effectivePlan,
@@ -54,6 +60,8 @@ public struct RoomHeating: Automatable {
                                case .fireplace(let device, _): .init(source: .fireplace, name: "Kamin", entityId: device.switchId)
                                }
                            })
+        sources.shortName = shortLabel
+        return sources
     }
 
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {

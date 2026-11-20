@@ -40,20 +40,28 @@ public struct HeatingOverviewRoom: Sendable, Codable, Equatable, Identifiable {
     public var id: String { placeId }
 
     /// Actual minus plan target; `nil` when one of them is missing.
-    public var delta: Double? {
-        guard let ist, let sollPlan else { return nil }
-        return ist - sollPlan
-    }
+    public let delta: Double?
 
     /// `nil` when the room has no Δ.
     public var comfort: HeatingComfort? { delta.map(HeatingComfort.init(delta:)) }
 
+    /// The room with its Δ derived from `ist` and `sollPlan`.
     public init(placeId: String, name: String, shortName: String, ist: Double?, sollPlan: Double?, istSource: HeatingIstSource, followsFireplace: Bool = false) {
+        var delta: Double?
+        if let ist, let sollPlan {
+            delta = ist - sollPlan
+        }
+        self.init(placeId: placeId, name: name, shortName: shortName, ist: ist, sollPlan: sollPlan, delta: delta, istSource: istSource, followsFireplace: followsFireplace)
+    }
+
+    /// The room as the server sent it, with its Δ.
+    public init(placeId: String, name: String, shortName: String, ist: Double?, sollPlan: Double?, delta: Double?, istSource: HeatingIstSource, followsFireplace: Bool = false) {
         self.placeId = placeId
         self.name = name
         self.shortName = shortName
         self.ist = ist
         self.sollPlan = sollPlan
+        self.delta = delta
         self.istSource = istSource
         self.followsFireplace = followsFireplace
     }
@@ -117,7 +125,7 @@ public struct HeatingOverviewBuilder: Sendable {
                                          radiators: week.radiators, samples: Array(week.samples.suffix(1)))
             result.append(HeatingOverviewRoom(placeId: room.placeId,
                                               name: room.name,
-                                              shortName: Self.shortName(room.name),
+                                              shortName: room.shortName ?? Self.shortName(room.name),
                                               ist: grid.latest?.ist,
                                               sollPlan: grid.latest?.sollPlan,
                                               istSource: grid.istSource,

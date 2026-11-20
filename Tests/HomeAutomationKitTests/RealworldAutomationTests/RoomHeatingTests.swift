@@ -355,6 +355,27 @@ struct RoomHeatingTests {
         #expect(try await room.shouldTrigger(with: change(windowA), using: homeManager))
     }
 
+    @Test("The overview names the room by its display name and short label, and falls back to the place")
+    func displayNames() {
+        let plain = room().heatingSources
+        #expect(plain.name == "Kitchen")
+        #expect(plain.shortName == nil)
+
+        let named = RoomHeating("heating-kitchen", placeId: "Kitchen", radiators: [left], displayName: "Küche unten", shortLabel: "Küche",
+                                configuration: HeatingConfiguration(standardPlan: standardPlan)).heatingSources
+        #expect(named.placeId == "Kitchen")
+        #expect(named.name == "Küche unten")
+        #expect(named.shortName == "Küche")
+    }
+
+    @Test("A room configured before the display names existed still decodes")
+    func displayNamesAreOptionalInJSON() throws {
+        let encoded = try JSONEncoder().encode(AnyAutomation.create(from: room()))
+        let decodedRoom = try #require(JSONDecoder().decode(AnyAutomation.self, from: encoded).automation as? RoomHeating)
+        #expect(decodedRoom.displayName == nil)
+        #expect(decodedRoom.shortLabel == nil)
+    }
+
     @Test("Window contacts survive the configuration JSON and name their entities")
     func contactsCodable() throws {
         let decoded = try JSONDecoder().decode(AnyAutomation.self, from: JSONEncoder().encode(AnyAutomation.create(from: room())))

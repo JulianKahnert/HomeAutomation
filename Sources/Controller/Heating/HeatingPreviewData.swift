@@ -17,6 +17,8 @@ enum HeatingPreviewData {
         let delta: Double?
         /// A daily heat-up after the morning plan switch, so the gap shows orange and blue.
         var bursts = false
+        /// Events of the last seven days; `detail` keeps those inside the range, like the server.
+        var events: [HeatingEvent] = []
 
         /// The grid of this room for `range`, ending at `HeatingPreviewData.now`.
         func detail(_ range: HeatingRange) -> HeatingRoomDetail {
@@ -26,7 +28,15 @@ enum HeatingPreviewData {
                 sample(at: date)
             }
             return HeatingRoomDetail(placeId: id, name: id, range: range, istSource: .thermostats(radiators), radiators: radiators, samples: samples,
-                                     lastIst: delta == nil ? HeatingPreviewData.lastIstOfSilentRoom : end)
+                                     lastIst: delta == nil ? HeatingPreviewData.lastIstOfSilentRoom : end,
+                                     events: clipped(events, to: start...end))
+        }
+
+        /// Drops what lies outside the range and pins what began before it at the range start.
+        private func clipped(_ events: [HeatingEvent], to range: ClosedRange<Date>) -> [HeatingEvent] {
+            events.filter { ($0.end ?? $0.start) >= range.lowerBound && $0.start <= range.upperBound }
+                .map { HeatingEvent(source: $0.source, title: $0.title, reason: $0.reason, start: $0.start, end: $0.end, pin: max($0.start, range.lowerBound)) }
+                .sorted { $0.pin < $1.pin }
         }
 
         private func sample(at date: Date) -> HeatingSample {
@@ -68,11 +78,39 @@ enum HeatingPreviewData {
     /// Esszimmer warm, Kaminzimmer without an actual value.
     static let rooms: [Room] = [
         Room(id: "Bad OG", radiators: ["Eve Thermo"], delta: -3.7),
-        Room(id: "Küche", radiators: ["Eve Thermo links", "Eve Thermo rechts"], delta: -1.0),
-        Room(id: "Schlafzimmer", radiators: ["Eve Thermo"], delta: 0.2, bursts: true),
+        Room(id: "Küche", radiators: ["Eve Thermo links", "Eve Thermo rechts"], delta: -1.0, events: kitchenEvents),
+        Room(id: "Schlafzimmer", radiators: ["Eve Thermo"], delta: 0.2, bursts: true, events: bedroomEvents),
         Room(id: "Arbeitszimmer", radiators: ["Eve Thermo"], delta: 0.8),
         Room(id: "Esszimmer", radiators: ["Eve Thermo"], delta: 2.1),
         Room(id: "Kaminzimmer", radiators: ["Eve Thermo"], delta: nil)
+    ]
+
+    /// A moment of the last days: `day` of November 2026, `hour:minute` local.
+    static func moment(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))!
+    }
+
+    private static func event(_ source: HeatingEventSource, _ title: String, _ reason: String, _ start: Date, until end: Date? = nil) -> HeatingEvent {
+        HeatingEvent(source: source, title: title, reason: reason, start: start, end: end)
+    }
+
+    /// Every source, a window and a fireplace area, and a crowd of four events around 13 o'clock that folds into "+3".
+    static let kitchenEvents: [HeatingEvent] = [
+        event(.plan, "Plan 17,5 °C", "Planwechsel: Eve Thermo links, Eve Thermo rechts auf 17,5 °C gesetzt.", moment(14, 23)),
+        event(.plan, "Plan 21,0 °C", "Planwechsel: Eve Thermo links, Eve Thermo rechts auf 21,0 °C gesetzt.", moment(15, 6)),
+        event(.observed, "Von Hand: 23,0 °C", "Eve Thermo links steht auf 23,0 °C statt 21,0 °C, dem Wert, den der Server zuletzt geschrieben hat. Der Server greift nicht ein.", moment(15, 8, 10)),
+        event(.window, "Fenster offen", "Fenster „Küche Fenster“ war 25 min offen, die Heizkörper waren aus.", moment(15, 9, 30), until: moment(15, 9, 55)),
+        event(.plan, "Plan 21,0 °C", "Planwechsel: Eve Thermo links, Eve Thermo rechts auf 21,0 °C gesetzt.", moment(15, 12, 55)),
+        event(.system, "System", "Der Server hat Eve Thermo links, Eve Thermo rechts auf 21,0 °C gesetzt (Deploy oder Zeitablauf).", moment(15, 13, 0)),
+        event(.observed, "Von Hand: 19,0 °C", "Eve Thermo rechts steht auf 19,0 °C statt 21,0 °C. Der Server greift nicht ein.", moment(15, 13, 5)),
+        event(.observed, "Von Hand: 21,0 °C", "Eve Thermo links steht wieder auf 21,0 °C.", moment(15, 13, 8)),
+        event(.fireplace, "Kamin an", "Kamin war 3 h an: die Heizkörper waren aus.", moment(15, 17, 30), until: moment(15, 20, 30))
+    ]
+
+    static let bedroomEvents: [HeatingEvent] = [
+        event(.window, "Fenster offen", "Fenster „Schlafzimmer Fenster“ war 40 min offen, die Heizkörper waren aus.", moment(13, 7), until: moment(13, 7, 40)),
+        event(.observed, "Von Hand: 22,0 °C", "Eve Thermo steht auf 22,0 °C statt 17,5 °C. Der Server greift nicht ein.", moment(14, 21)),
+        event(.fireplace, "Kamin an", "Der Kamin wurde nach 8 h 0 min per Zeitablauf ausgeschaltet; dazu kam die Benachrichtigung „Kamin aus“.", moment(14, 12), until: moment(14, 20))
     ]
 
     /// 10.11.2026 14:40: the last actual value of the room without data.

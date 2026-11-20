@@ -11,7 +11,7 @@ import HAModels
 
 enum HeatingPreviewData {
     struct Room: Identifiable {
-        enum Kind { case normal, cold, noData }
+        enum Kind { case normal, cold, warm, noData }
 
         let id: String
         let radiators: [String]
@@ -35,7 +35,11 @@ enum HeatingPreviewData {
             let hours = date.timeIntervalSince1970 / 3_600
             let hourOfDay = HeatingPreviewData.calendar.component(.hour, from: date)
             let isSilent = (2..<5).contains(hourOfDay) && HeatingPreviewData.calendar.component(.day, from: date).isMultiple(of: 2)
-            let offset = kind == .cold ? -1.6 + 0.9 * sin(hours / 3) : 0.35 * sin(hours / 2.2) + 0.15
+            let offset: Double = switch kind {
+            case .cold: -1.6 + 0.9 * sin(hours / 3)
+            case .warm: 1.3 + 0.4 * sin(hours / 3)
+            default: 0.35 * sin(hours / 2.2) + 0.15
+            }
             let ist = isSilent ? nil : ((plan + offset) * 10).rounded() / 10
             let valves = radiators.indices.map { index -> Double? in
                 guard !isSilent else { return nil }
@@ -58,7 +62,9 @@ enum HeatingPreviewData {
     static let rooms: [Room] = [
         Room(id: "Bad OG", radiators: ["Eve Thermo"], kind: .cold),
         Room(id: "Küche", radiators: ["Eve Thermo links", "Eve Thermo rechts"], kind: .normal),
-        Room(id: "Kaminzimmer", radiators: ["Eve Thermo"], kind: .noData)
+        Room(id: "Kaminzimmer", radiators: ["Eve Thermo"], kind: .noData),
+        Room(id: "Schlafzimmer", radiators: ["Eve Thermo"], kind: .warm),
+        Room(id: "Flur", radiators: ["Eve Thermo"], kind: .normal)
     ]
 
     /// The plan target: 21 ° from 6 to 22 o'clock, 17,5 ° at night.
@@ -66,17 +72,22 @@ enum HeatingPreviewData {
         (6..<22).contains(calendar.component(.hour, from: date)) ? 21 : 17.5
     }
 
-    static var heatingRooms: [HeatingFeature.Room] {
-        rooms.map { HeatingFeature.Room(placeId: $0.id, name: $0.id) }
+    /// The rooms of the overview endpoint's response, as the server would sort them (any order).
+    static var overviewRooms: [HeatingOverviewRoom] {
+        rooms.map { room in
+            let latest = room.detail(.twoHours).latest
+            return HeatingOverviewRoom(placeId: room.id, name: room.id, shortName: room.id, ist: latest?.ist, sollPlan: latest?.sollPlan,
+                                       istSource: .thermostats(room.radiators))
+        }
     }
 
-    /// A store state with `placeId` selected and its detail loaded.
-    static func state(_ placeId: String = "Bad OG", range: HeatingRange = .day) -> HeatingFeature.State {
+    /// A store state with the overview loaded and `selected` open (none: only the overview).
+    static func state(selected placeId: String?, range: HeatingRange = .day) -> HeatingFeature.State {
         var state = HeatingFeature.State()
-        state.rooms = heatingRooms
+        state.rooms = HeatingFeature.sorted(overviewRooms)
         state.selectedPlaceId = placeId
         state.range = range
-        state.detail = rooms.first { $0.id == placeId }?.detail(range)
+        state.detail = placeId.flatMap { id in rooms.first { $0.id == id }?.detail(range) }
         return state
     }
 }

@@ -38,115 +38,146 @@ struct HeatingRoomDetailView: View {
     private var includesDay: Bool { range == .week }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HeatingCard {
-                VStack(alignment: .leading, spacing: 16) {
-                    header
-                    Picker("Zeitraum", selection: $range) {
-                        Text("2 h").tag(HeatingRange.twoHours)
-                        Text("24 h").tag(HeatingRange.day)
-                        Text("7 T").tag(HeatingRange.week)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    HeatingSollIstChart(samples: detail.samples, crosshair: $crosshair, includesDay: includesDay)
-                        .frame(height: 220)
-                        .overlay {
-                            if detail.hasNoData {
-                                Text("Keine Daten im Zeitraum")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    Text(sourceText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        HeatingCard {
+            VStack(alignment: .leading, spacing: 8) {
+                header
+                Picker("Zeitraum", selection: $range) {
+                    Text("2 h").tag(HeatingRange.twoHours)
+                    Text("24 h").tag(HeatingRange.day)
+                    Text("7 T").tag(HeatingRange.week)
                 }
-            }
-            if !detail.radiators.isEmpty {
-                HeatingCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Ventile")
-                            .font(.headline)
-                        HeatingValveChart(samples: detail.samples, radiators: detail.radiators, crosshair: $crosshair)
-                            .frame(height: 80)
-                        valveCaption
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.bottom, 8)
+                HeatingSollIstChart(samples: detail.samples, crosshair: $crosshair, range: range)
+                    .frame(height: 210)
+                    .overlay {
+                        if detail.hasNoData {
+                            Text("Keine Daten im Zeitraum")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                if !detail.radiators.isEmpty, !detail.hasNoData {
+                    valveHeader
+                        .padding(.top, 8)
+                    HeatingValveChart(samples: detail.samples, radiators: detail.radiators, crosshair: $crosshair, range: range)
+                        .frame(height: 56)
                 }
             }
         }
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(detail.name)
-                    .font(.headline)
-                if let sample = shown, let ist = sample.ist {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                if crosshair != nil, let sample = shown {
+                    Text("\(detail.name) · \(HeatingFormat.time(sample.date, includingDay: includesDay))")
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(detail.name)
+                        .font(.headline)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if let ist = shown?.ist {
                         Text(HeatingFormat.degrees(ist))
                             .font(.largeTitle.weight(.semibold).monospacedDigit())
-                        if let plan = sample.sollPlan {
-                            Text("Plan \(HeatingFormat.degrees(plan))")
-                                .font(.subheadline.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                        if let delta = sample.delta {
-                            Text(HeatingFormat.kelvin(delta))
-                                .font(.subheadline.weight(.semibold).monospacedDigit())
-                                .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
-                        }
-                    }
-                    if crosshair != nil {
-                        Text(HeatingFormat.time(sample.date, includingDay: includesDay))
-                            .font(.caption.monospacedDigit())
+                    } else {
+                        Text("Kein Ist-Wert")
+                            .font(.title2.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
-                } else {
-                    Text("Kein Ist-Wert")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                    if let plan = shown?.sollPlan {
+                        Text("Plan \(HeatingFormat.degrees(plan))")
+                            .font(.title3.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    if let delta = shown?.delta {
+                        Text(HeatingFormat.kelvin(delta))
+                            .font(.title3.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
+                    }
                 }
+                Label(sourceText, systemImage: sourceSymbol)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             if let onClose {
                 Button("Schließen", systemImage: "xmark.circle.fill", action: onClose)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .font(.title2)
+                    .foregroundStyle(.tertiary)
+                    .font(.title3)
             }
+        }
+    }
+
+    private var sourceSymbol: String {
+        switch detail.istSource {
+        case .roomSensor: "thermometer.medium"
+        case .thermostats: "heater.vertical"
         }
     }
 
     private var sourceText: String {
         switch detail.istSource {
-        case .roomSensor(let name): "Ist vom Raumsensor \(name)"
-        case .thermostats: "Ist: Mittel der Thermostate"
+        case .roomSensor(let name): "Raumsensor „\(name)“"
+        case .thermostats: "Mittel der Thermostate"
         }
     }
 
-    @ViewBuilder
-    private var valveCaption: some View {
-        if let sample = shown {
-            let parts = detail.radiators.enumerated().map { index, name -> String in
-                let value = sample.valves.indices.contains(index) ? sample.valves[index] : nil
-                return "\(name) \(value.map(HeatingFormat.percent) ?? "–")"
+    /// "Ventil", on hover the radiators with their values at that moment.
+    private var valveHeader: some View {
+        Group {
+            if crosshair != nil, let sample = shown {
+                let parts = detail.radiators.enumerated().map { index, name -> String in
+                    let value = sample.valves.indices.contains(index) ? sample.valves[index] : nil
+                    return "\(name) \(value.map(HeatingFormat.percent) ?? "–")"
+                }
+                Text("Ventil · " + parts.joined(separator: " · "))
+            } else {
+                Text("Ventil")
             }
-            Text(parts.joined(separator: " · "))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
         }
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.secondary)
     }
 }
+
+/// Trailing labels of one width in both charts, so the plots and the crosshair line up.
+private func heatingYLabel(_ text: String) -> some View {
+    Text(text).font(.caption2.monospacedDigit()).lineLimit(1).fixedSize().frame(width: 36, alignment: .leading)
+}
+
+private let heatingGrid = Color.secondary.opacity(0.12)
 
 /// Soft grey actual line, dashed plan line, colour only in the gap between them.
 struct HeatingSollIstChart: View {
     let samples: [HeatingSample]
     @Binding var crosshair: Date?
-    var includesDay = false
+    var range: HeatingRange = .day
 
     @Environment(\.colorScheme) private var scheme
+
+    /// Light: strong at the actual line, fading towards the plan. Dark: a flat, higher opacity, so
+    /// the peach orange does not turn brown on the dark card.
+    private func gapStyle(_ band: HeatingPalette.Band) -> AnyShapeStyle {
+        let color = HeatingPalette.color(band, scheme: scheme)
+        if scheme == .dark {
+            // A lighter blue than the bars, so the thin fill does not turn navy.
+            let tint = band == .tooCold ? Color(red: 0.45, green: 0.7, blue: 1.0) : color
+            return AnyShapeStyle(tint.opacity(band == .ok ? 0.2 : band == .tooWarm ? 0.4 : 0.3))
+        }
+        let opacity = band == .ok ? 0.12 : 0.2
+        guard band != .ok else { return AnyShapeStyle(color.opacity(opacity)) }
+        return AnyShapeStyle(LinearGradient(
+            colors: [color.opacity(opacity * 2), color.opacity(opacity * 0.4)],
+            startPoint: band == .tooWarm ? .top : .bottom,
+            endPoint: band == .tooWarm ? .bottom : .top
+        ))
+    }
 
     var body: some View {
         let selected = crosshair.flatMap { HeatingChartData.nearest(to: $0, in: samples) }
@@ -156,21 +187,21 @@ struct HeatingSollIstChart: View {
                     AreaMark(x: .value("Zeit", point.date),
                              yStart: .value("Ist", point.ist),
                              yEnd: .value("Plan", point.plan),
-                             series: .value("Abweichung", segment.id))
-                        .foregroundStyle(HeatingPalette.color(segment.band, scheme: scheme).opacity(scheme == .dark ? 0.5 : 0.3))
+                             series: .value("Abweichung", "gap-\(segment.id)"))
+                        .foregroundStyle(gapStyle(segment.band))
                 }
             }
             ForEach(Array(HeatingChartData.planRuns(samples).enumerated()), id: \.offset) { index, run in
                 ForEach(Array(run.enumerated()), id: \.offset) { _, point in
-                    LineMark(x: .value("Zeit", point.date), y: .value("Plan", point.value), series: .value("Planlinie", index))
+                    LineMark(x: .value("Zeit", point.date), y: .value("Plan", point.value), series: .value("Serie", "plan-\(index)"))
                         .interpolationMethod(.stepEnd)
-                        .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                        .foregroundStyle(HeatingPalette.istLine(scheme: scheme).opacity(0.55))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        .foregroundStyle(Color.secondary.opacity(0.55))
                 }
             }
             ForEach(Array(HeatingChartData.istRuns(samples).enumerated()), id: \.offset) { index, run in
                 ForEach(Array(run.enumerated()), id: \.offset) { _, point in
-                    LineMark(x: .value("Zeit", point.date), y: .value("Ist", point.value), series: .value("Istlinie", index))
+                    LineMark(x: .value("Zeit", point.date), y: .value("Ist", point.value), series: .value("Serie", "ist-\(index)"))
                         .interpolationMethod(.monotone)
                         .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                         .foregroundStyle(HeatingPalette.istLine(scheme: scheme))
@@ -178,16 +209,26 @@ struct HeatingSollIstChart: View {
             }
             if let selected {
                 RuleMark(x: .value("Zeit", selected.date))
-                    .foregroundStyle(.gray.opacity(0.5))
+                    .foregroundStyle(Color.secondary.opacity(0.45))
                 if let ist = selected.ist {
                     PointMark(x: .value("Zeit", selected.date), y: .value("Ist", ist))
                         .foregroundStyle(HeatingPalette.istLine(scheme: scheme))
                 }
             }
         }
+        .chartXScale(domain: HeatingChartData.timeDomain(samples))
         .chartYScale(domain: HeatingChartData.temperatureDomain(samples))
-        .chartYAxis(.hidden)
-        .chartXAxis { HeatingTimeAxis.marks(includesDay: includesDay) }
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(heatingGrid)
+                AxisValueLabel {
+                    if let degrees = value.as(Double.self) {
+                        heatingYLabel("\(Int(degrees.rounded()))°")
+                    }
+                }
+            }
+        }
+        .chartXAxis { HeatingTimeAxis.marks(range: range) }
         .chartPlotStyle { $0.clipped() }
         .chartOverlay { proxy in
             HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair)
@@ -195,11 +236,12 @@ struct HeatingSollIstChart: View {
     }
 }
 
-/// Slim valve chart: one stepped area per radiator, only 0 and 100 % on the axis.
+/// Slim valve chart: one quiet line per radiator, only 0 and 100 % marked, names only on hover.
 struct HeatingValveChart: View {
     let samples: [HeatingSample]
     let radiators: [String]
     @Binding var crosshair: Date?
+    var range: HeatingRange = .day
 
     var body: some View {
         let selected = crosshair.flatMap { HeatingChartData.nearest(to: $0, in: samples) }
@@ -207,21 +249,25 @@ struct HeatingValveChart: View {
             ForEach(radiators.indices, id: \.self) { index in
                 ForEach(Array(HeatingChartData.valveRuns(samples, radiator: index).enumerated()), id: \.offset) { run, points in
                     ForEach(Array(points.enumerated()), id: \.offset) { _, point in
-                        AreaMark(x: .value("Zeit", point.date), y: .value("Ventil", point.value), series: .value("Ventil", "\(index)-\(run)"))
+                        LineMark(x: .value("Zeit", point.date), y: .value("Ventil", point.value), series: .value("Ventil", "\(index)-\(run)"))
                             .interpolationMethod(.stepEnd)
-                            .foregroundStyle(HeatingPalette.valveColors[index % HeatingPalette.valveColors.count].opacity(0.35))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, lineJoin: .round))
+                            .foregroundStyle(HeatingPalette.valveLine)
                     }
                 }
             }
             if let selected {
                 RuleMark(x: .value("Zeit", selected.date))
-                    .foregroundStyle(.gray.opacity(0.5))
+                    .foregroundStyle(Color.secondary.opacity(0.45))
             }
         }
+        .chartXScale(domain: HeatingChartData.timeDomain(samples))
         .chartYScale(domain: 0...100)
+        .chartLegend(.hidden)
         .chartYAxis {
             AxisMarks(position: .trailing, values: [0, 100]) { value in
-                AxisValueLabel { Text("\(value.as(Int.self) ?? 0) %").font(.caption2) }
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(heatingGrid)
+                AxisValueLabel { heatingYLabel("\(value.as(Int.self) ?? 0) %") }
             }
         }
         .chartXAxis(.hidden)
@@ -234,11 +280,17 @@ struct HeatingValveChart: View {
 
 enum HeatingTimeAxis {
     @AxisContentBuilder
-    static func marks(includesDay: Bool) -> some AxisContent {
-        AxisMarks(preset: .aligned, values: .automatic(desiredCount: 4)) { value in
-            AxisValueLabel {
+    static func marks(range: HeatingRange) -> some AxisContent {
+        let (component, count): (Calendar.Component, Int) = switch range {
+        case .twoHours: (.minute, 30)
+        case .day: (.hour, 6)
+        case .week: (.day, 1)
+        }
+        AxisMarks(values: .stride(by: component, count: count)) { value in
+            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(heatingGrid)
+            AxisValueLabel(centered: range == .week) {
                 if let date = value.as(Date.self) {
-                    Text(HeatingFormat.time(date, includingDay: includesDay))
+                    Text(range == .week ? HeatingFormat.weekday(date) : HeatingFormat.time(date, includingDay: false))
                         .font(.caption2.monospacedDigit())
                 }
             }

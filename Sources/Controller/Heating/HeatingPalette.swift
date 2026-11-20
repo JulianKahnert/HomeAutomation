@@ -42,7 +42,8 @@ enum HeatingPalette {
         Color(white: scheme == .dark ? 0.68 : 0.38)
     }
 
-    static let valveColors: [Color] = [.green, .mint, .teal]
+    /// All radiators share one quiet tone; the name shows on hover.
+    static let valveLine = Color.green.opacity(0.7)
 
     static func card(_ scheme: ColorScheme) -> Color {
         #if canImport(UIKit)

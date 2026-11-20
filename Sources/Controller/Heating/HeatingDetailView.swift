@@ -312,22 +312,33 @@ struct HeatingSollIstChart: View {
                 let plot = geometry[frame]
                 ForEach(slots) { slot in
                     if let x = proxy.position(forX: slot.events[0].pin) {
-                        Button { onSelectPin(slot.id) } label: {
-                            HeatingPinBadge(slot: slot, isSelected: slot.contains(selectedPinId))
-                                .frame(width: Self.pinWidth, height: Self.pinRowHeight)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .popover(isPresented: popoverBinding(for: slot), arrowEdge: .top) {
-                            HeatingPinCard(events: slot.events, inPopover: true)
-                                .frame(width: 260)
-                        }
-                        .position(x: plot.minX + min(max(x, Self.pinWidth / 2), plot.width - Self.pinWidth / 2),
-                                  y: plot.minY - Self.pinRowHeight / 2 - 2 - CGFloat(slot.row) * Self.pinRowHeight)
+                        pinButton(slot)
+                            .position(Self.pinCenter(x: x, row: slot.row, in: plot))
                     }
                 }
             }
         }
+    }
+
+    private func pinButton(_ slot: HeatingPinLayout.Slot) -> some View {
+        Button { onSelectPin(slot.id) } label: {
+            HeatingPinBadge(slot: slot, isSelected: slot.contains(selectedPinId))
+                .frame(width: Self.pinWidth, height: Self.pinRowHeight)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: popoverBinding(for: slot), arrowEdge: .top) {
+            HeatingPinCard(events: slot.events, inPopover: true)
+                .frame(width: 260)
+        }
+    }
+
+    /// Clamped so a pin at the edge stays fully inside the plot; each row sits one pin height higher.
+    private static func pinCenter(x: CGFloat, row: Int, in plot: CGRect) -> CGPoint {
+        let halfWidth: CGFloat = pinWidth / 2
+        let clampedX: CGFloat = min(max(x, halfWidth), plot.width - halfWidth)
+        let rowOffset: CGFloat = CGFloat(row) * pinRowHeight
+        return CGPoint(x: plot.minX + clampedX, y: plot.minY - pinRowHeight / 2 - 2 - rowOffset)
     }
 
     /// Regular layout: the popover belongs to the selected pin. Compact shows an inline card instead.

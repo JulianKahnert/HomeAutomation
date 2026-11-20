@@ -59,6 +59,16 @@ struct HeatingEventsTests {
         #expect(try await events(items, writes: [unsent]).isEmpty)
     }
 
+    @Test("two events of one source in the same second do not share an id")
+    func idsAreUnique() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = HeatingEvent(source: .observed, title: "Von Hand: 25,0 °C", reason: "Thermo A steht auf 25,0 °C", start: start)
+        let second = HeatingEvent(source: .observed, title: "Von Hand: 25,0 °C", reason: "Thermo B steht auf 25,0 °C", start: start.addingTimeInterval(0.4))
+
+        #expect(first.id != second.id)
+        #expect(first.id == HeatingEvent(source: .observed, title: first.title, reason: first.reason, start: start).id)
+    }
+
     @Test("a system write becomes a system event")
     func system() async throws {
         let found = try await events(writes: [write(.system, 30, target: 19, plan: 19)])

@@ -23,7 +23,8 @@ public struct HeatingEvent: Identifiable, Sendable, Codable, Equatable {
     /// Where the pin sits: the start, or the start of the range when the event began before it.
     public let pin: Date
 
-    public var id: String { "\(source.rawValue)-\(Int(start.timeIntervalSince1970))" }
+    /// Source, start and reason: two radiators changed by hand in the same second are two events.
+    public var id: String { "\(source.rawValue)-\(Int(start.timeIntervalSince1970))-\(reason)" }
 
     /// Whether the event is drawn as an area: window and fireplace with a duration.
     public var hasDuration: Bool { source == .window || source == .fireplace }

@@ -33,8 +33,4 @@ actor InMemoryHeatingWriteRepository: HeatingWriteRepository {
     func lastWrite(placeId: String, radiatorName: String) -> HeatingWrite? {
         all.filter { $0.sentToDevice && $0.placeId == placeId && $0.entityId.name == radiatorName }.max { $0.timestamp < $1.timestamp }
     }
-
-    func deleteWrites(olderThan date: Date) {
-        all.removeAll { $0.timestamp < date }
-    }
 }

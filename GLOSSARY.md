@@ -58,7 +58,7 @@ Why the server wrote a radiator target: `plan`, `window`, `fireplace` or `system
 A radiator's target differs from the value the server wrote last. Derived for display; the server does not react to it.
 
 **Heating write** (Heizungs-Schreibvorgang)
-One write of the server to a radiator, persisted with its reason, the written value and, when the write follows the plan, the plan target. The plan history and the events of the Heizung tab are built from these records; the in-memory action log carries the same reason. Written by `HomeManager` for every executed radiator command that runs inside a `HeatingWriteContext`; kept for 90 days.
+One write of the server to a radiator, persisted with its reason, the written value and, when the write follows the plan, the plan target. The plan history and the events of the Heizung tab are built from these records; the in-memory action log carries the same reason. Written by `HomeManager` for every executed radiator command that runs inside a `HeatingWriteContext`; kept for good (the rows are small, and SQL queries over the long term are the point), no cleanup job deletes them.
 
 **Global configuration** (globale Konfiguration)
 The values every room shares unless it overrides them: the standard plan and the window delay. Built once in the configuration repository and handed to each room automation.

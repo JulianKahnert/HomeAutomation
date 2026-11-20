@@ -14,17 +14,17 @@ import Shared
 /// Once a day: deletes raw entity rows past their type's retention in ``StoragePolicy``, old
 /// automation runs, and warns about entities that store too many rows.
 ///
+/// Heating writes are deliberately kept for good as well: the rows are small and SQL queries over the long
+/// term are the point of recording them.
+///
 /// `weatherHours` are deliberately not touched here or by any other job: they are kept
 /// indefinitely for now.
 struct DatabaseCleanupJob: Job, Log {
     private static let runRetentionDays = 30
-    /// The Heizung tab shows 7 days; the rest is for SQL only.
-    private static let heatingWriteRetentionDays = 90
     private static let cleanupInterval: Duration = .hours(24) // Run once per day
 
     let entities: any EntityRetentionStore
     let automationRuns: any AutomationRunRepository
-    var heatingWrites: (any HeatingWriteRepository)?
     let noisyEntityWarner: NoisyEntityWarner
 
     func run() async {
@@ -46,7 +46,6 @@ struct DatabaseCleanupJob: Job, Log {
                 try await entities.deleteEntries(ofType: type, olderThan: cutoff)
             }
             try await automationRuns.deleteRuns(olderThan: now.addingTimeInterval(-1 * Duration.days(Self.runRetentionDays).timeInterval))
-            try await heatingWrites?.deleteWrites(olderThan: now.addingTimeInterval(-1 * Duration.days(Self.heatingWriteRetentionDays).timeInterval))
             log.info("Database cleanup completed successfully")
         } catch {
             log.error("Database cleanup failed: \(error)")

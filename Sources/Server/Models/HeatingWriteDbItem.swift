@@ -123,10 +123,4 @@ struct HeatingWriteDbRepository: HeatingWriteRepository {
             .first()
             .map { try $0.toWrite() }
     }
-
-    func deleteWrites(olderThan date: Date) async throws {
-        try await HeatingWriteDbItem.query(on: database())
-            .filter(\.$timestamp < date)
-            .delete()
-    }
 }

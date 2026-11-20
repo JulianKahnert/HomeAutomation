@@ -27,6 +27,15 @@ public final class AppDelegate: NSObject {
 }
 
 #if os(iOS)
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    /// The action "Heizkörper ausschalten" of the push "Kamin an?": switches the fireplace on through the
+    /// server. It does not open the app; the call finishes before the system suspends it again.
+    public nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard let isOn = FireplaceNotification.requestedState(forAction: response.actionIdentifier) else { return }
+        await Self.store.send(.heating(.setFireplace(isOn))).finish()
+    }
+}
+
 extension AppDelegate: UIApplicationDelegate {
     public func application(_ application: UIApplication,
                            didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
@@ -39,6 +48,10 @@ extension AppDelegate: UIApplicationDelegate {
         // no view is created. By starting observation here, we ensure tokens are registered
         // regardless of how the app was launched.
         Self.store.send(.startMonitoringLiveActivities)
+
+        // The push "Kamin an?" brings an action along; the category has to be known before it arrives.
+        UNUserNotificationCenter.current().setNotificationCategories([FireplaceNotification.category])
+        UNUserNotificationCenter.current().delegate = self
 
         return true
     }

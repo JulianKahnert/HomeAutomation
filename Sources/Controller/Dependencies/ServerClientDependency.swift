@@ -71,6 +71,12 @@ struct ServerClientDependency: Sendable {
     /// The time grid of one heating room for a range
     var getHeatingRoom: @Sendable (_ placeId: String, _ range: HeatingRange) async throws -> HeatingRoomDetail
 
+    /// The state of the fireplace switch
+    var getFireplace: @Sendable () async throws -> FireplaceState
+
+    /// Switches the fireplace on or off; answers the state it will have
+    var setFireplace: @Sendable (_ isOn: Bool) async throws -> FireplaceState
+
     /// The server's location, used for sunrise and sunset
     var getLocation: @Sendable () async throws -> Location
 }
@@ -95,6 +101,8 @@ extension ServerClientDependency: TestDependencyKey {
         getRoomHistory: { _, _, _, _ in [] },
         getHeatingOverview: { HeatingOverview(rooms: []) },
         getHeatingRoom: { placeId, range in HeatingRoomDetail(placeId: placeId, name: placeId, range: range, istSource: .thermostats([]), radiators: [], samples: []) },
+        getFireplace: { .off },
+        setFireplace: { isOn in isOn ? FireplaceState(isOn: true, since: Date()) : .off },
         getLocation: { Location(latitude: 52.5, longitude: 13.4) }
     )
 
@@ -220,6 +228,8 @@ extension ServerClientDependency: TestDependencyKey {
         getHeatingRoom: { placeId, range in
             HeatingPreviewData.rooms.first { $0.id == placeId }?.detail(range) ?? HeatingPreviewData.rooms[0].detail(range)
         },
+        getFireplace: { .off },
+        setFireplace: { isOn in isOn ? FireplaceState(isOn: true, since: Date()) : .off },
         getLocation: { Location(latitude: 52.5, longitude: 13.4) }
     )
 
@@ -306,6 +316,12 @@ extension ServerClientDependency: DependencyKey {
         },
         getHeatingRoom: { placeId, range in
             try await client.getHeatingRoom(placeId: placeId, range: range)
+        },
+        getFireplace: {
+            try await client.getFireplace()
+        },
+        setFireplace: { isOn in
+            try await client.setFireplace(isOn: isOn)
         },
         getLocation: {
             try await client.getLocation()

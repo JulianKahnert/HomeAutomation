@@ -216,6 +216,8 @@ public struct ServerClient {
         return HeatingOverview(rooms: body.rooms.map {
             HeatingOverviewRoom(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan,
                                 istSource: HeatingIstSource($0.istSource))
+        }, heatmap: body.heatmap.map {
+            HeatingHeatmapCell(placeId: $0.placeId, day: $0.day, segment: $0.segment, delta: $0.delta)
         })
     }
 

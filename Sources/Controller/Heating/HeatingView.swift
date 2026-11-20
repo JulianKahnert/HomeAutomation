@@ -56,6 +56,7 @@ struct HeatingScreen: View {
                     if store.selectedPlaceId != nil {
                         detail
                     }
+                    heatmap
                 }
                 .padding(16)
             }
@@ -63,7 +64,11 @@ struct HeatingScreen: View {
         } else {
             HStack(alignment: .top, spacing: 16) {
                 ScrollView {
-                    overview.padding(16)
+                    VStack(alignment: .leading, spacing: 16) {
+                        overview
+                        heatmap
+                    }
+                    .padding(16)
                 }
                 .frame(width: 420)
                 ScrollView {
@@ -86,6 +91,10 @@ struct HeatingScreen: View {
         HeatingOverviewView(rooms: store.rooms, headline: store.headline, selectedPlaceId: store.selectedPlaceId) {
             store.send(.selectRoom($0))
         }
+    }
+
+    private var heatmap: some View {
+        HeatingHeatmapView(rooms: store.rooms, cells: store.heatmap, selectedPlaceId: store.selectedPlaceId)
     }
 
     @ViewBuilder

@@ -30,6 +30,12 @@ enum HeatingFormat {
         return date.formatted(style)
     }
 
+    /// "Mo.", "Di." for the 7 d axis.
+    static func weekday(_ date: Date, calendar: Calendar = .current) -> String {
+        let name = date.formatted(Date.FormatStyle(date: .omitted, time: .omitted, locale: locale, calendar: calendar, timeZone: calendar.timeZone).weekday(.abbreviated))
+        return name.hasSuffix(".") ? name : name + "."
+    }
+
     static func percent(_ value: Double) -> String {
         "\(Int(value.rounded())) %"
     }

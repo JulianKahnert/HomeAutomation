@@ -60,10 +60,4 @@ public enum RoomContact: Codable, Sendable {
         guard let item = try? await hm.getCurrentEntity(with: entityId) else { return nil }
         return (isOpen(item), item.timestamp)
     }
-
-    /// The state before the current one, `nil` when there is none.
-    public func previousState(with hm: HomeManagable) async -> (isOpen: Bool, since: Date)? {
-        guard let item = try? await hm.getPreviousEntity(with: entityId) else { return nil }
-        return (isOpen(item), item.timestamp)
-    }
 }

@@ -123,6 +123,16 @@ public final class HomeManager: HomeManagable {
         return try await storageRepo.getPrevious(entityId).get(with: log)
     }
 
+    public func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
+        guard let heatingWrites else { return nil }
+        do {
+            return try await heatingWrites.lastWrite(placeId: radiator.placeId, radiatorName: radiator.name)
+        } catch {
+            log.error("Failed to read the last heating write", metadata: ["radiator": "\(radiator.name)", "error": "\(error)"])
+            return nil
+        }
+    }
+
     public func getAllEntitiesLive() async throws -> [EntityStorageItem] {
         log.info("getAllEntitiesLive() — starting distributed actor call")
         let start = ContinuousClock.now

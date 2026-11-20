@@ -33,6 +33,9 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
         let item = storageItems.first(where: { $0.entityId == action.entityId })
         performedActions.append((action, HeatingWriteContext.current))
+        if let context = HeatingWriteContext.current, let write = HeatingWrite(action: action, context: context) {
+            heatingWrites.append(write)
+        }
 
         switch action {
         case .turnOn:
@@ -135,6 +138,13 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
         storedItems[entityId] ?? storageItems.last(where: { $0.entityId == entityId })
+    }
+
+    /// The writes the server made to radiators: seeded by a test, and every action `perform` ran in a heating context.
+    var heatingWrites: [HeatingWrite] = []
+
+    func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
+        heatingWrites.last { $0.placeId == radiator.placeId && $0.entityId.name == radiator.name }
     }
 
     func getAllEntitiesLive() async throws -> [EntityStorageItem] {

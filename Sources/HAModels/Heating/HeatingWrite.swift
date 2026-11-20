@@ -98,5 +98,7 @@ public protocol HeatingWriteRepository: Sendable {
     /// The writes to the radiators of room `placeId` in `startDate ..< endDate` (open ends allowed),
     /// oldest first.
     func writes(placeId: String, startDate: Date?, endDate: Date?) async throws -> [HeatingWrite]
+    /// The newest write to the radiator `radiatorName` of room `placeId`, whatever its characteristic.
+    func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite?
     func deleteWrites(olderThan date: Date) async throws
 }

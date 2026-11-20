@@ -34,6 +34,11 @@ struct RoomHeatingFireplaceTests {
         homeManager.storageItems.append(EntityStorageItem(entityId: window.contactSensorId, timestamp: date, isContactOpen: open))
     }
 
+    /// The server switched the radiator off for `reason` at `date`.
+    private func seedOff(reason: HeatingWriteReason, at date: Date) {
+        homeManager.heatingWrites.append(HeatingWrite(timestamp: date, entityId: left.heatingId, reason: reason, actionName: "setHeating", isActive: false))
+    }
+
     private func change(_ id: EntityId) -> HomeEvent {
         .change(entity: homeManager.storageItems.last { $0.entityId == id }!)
     }
@@ -59,6 +64,7 @@ struct RoomHeatingFireplaceTests {
     @Test("The fireplace going off returns the room to its plan at once, with reason fireplace")
     func fireplaceOffReturnsToPlan() async throws {
         setFireplace(on: true, at: noon)
+        seedOff(reason: .fireplace, at: noon)
         let end = noon.addingTimeInterval(3600)
         setFireplace(on: false, at: end)
 
@@ -101,6 +107,7 @@ struct RoomHeatingFireplaceTests {
         setWindow(open: true, at: noon)
         setFireplace(on: true, at: noon.addingTimeInterval(30))
         setFireplace(on: false, at: noon.addingTimeInterval(600))
+        seedOff(reason: .window, at: noon.addingTimeInterval(10))
         let last = noon.addingTimeInterval(900)
         setWindow(open: false, at: last)
 

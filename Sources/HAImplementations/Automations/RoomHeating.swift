@@ -65,9 +65,10 @@ public struct RoomHeating: Automatable {
         case .change(let item):
             guard let contact = contacts.first(where: { $0.entityId == item.entityId }) else { return false }
             // An opening starts the delay. A closing matters only when it ends a state the server acted on:
-            // the re-sent closed contacts after a restart must not write the plan over a manual change.
+            // the re-sent closed contacts after a restart or a cache expiry must not write the plan over a
+            // manual change.
             if contact.isOpen(item) { return true }
-            return await endedOffState(of: contact, closedAt: item.timestamp, using: hm)
+            return await endedOffState(of: contact, using: hm)
         case .serverStarted:
             // Re-apply the overrides from the stored contact states, without waiting for the adapter to
             // re-send them. All closed: nothing to do, the radiators keep their manual values.
@@ -142,17 +143,24 @@ public struct RoomHeating: Automatable {
         return first
     }
 
-    /// Whether `contact` was open before and long enough for the room to have gone off.
-    private func endedOffState(of contact: RoomContact, closedAt: Date, using hm: HomeManagable) async -> Bool {
-        guard let previous = await contact.previousState(with: hm), previous.isOpen else { return false }
-        return closedAt.timeIntervalSince(previous.since) >= contact.delay(in: configuration)
+    /// Whether the server switched a radiator of this room off because of `contact` and has not written it
+    /// since. It reads what the server wrote, not the history of the contact: a closed contact the adapter
+    /// re-sends says nothing about what the room did.
+    private func endedOffState(of contact: RoomContact, using hm: HomeManagable) async -> Bool {
+        for radiator in radiators {
+            guard let last = await hm.lastHeatingWrite(of: radiator.heatingId),
+                  last.isActive == false,
+                  last.reason == contact.reason else { continue }
+            return true
+        }
+        return false
     }
 
     /// The contact that closed within the last minute, ending a state the room went off for.
     private func contactJustEndedOffState(now: Date, using hm: HomeManagable) async -> RoomContact? {
         for contact in contacts {
             guard let current = await contact.currentState(with: hm), !current.isOpen, now.timeIntervalSince(current.since) < 60 else { continue }
-            if await endedOffState(of: contact, closedAt: current.since, using: hm) { return contact }
+            if await endedOffState(of: contact, using: hm) { return contact }
         }
         return nil
     }

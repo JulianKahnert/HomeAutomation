@@ -99,6 +99,15 @@ struct HeatingWriteDbRepository: HeatingWriteRepository {
             .map { try $0.toWrite() }
     }
 
+    func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite? {
+        try await HeatingWriteDbItem.query(on: database())
+            .filter(\.$placeId == placeId)
+            .filter(\.$name == radiatorName)
+            .sort(\.$timestamp, .descending)
+            .first()
+            .map { try $0.toWrite() }
+    }
+
     func deleteWrites(olderThan date: Date) async throws {
         try await HeatingWriteDbItem.query(on: database())
             .filter(\.$timestamp < date)

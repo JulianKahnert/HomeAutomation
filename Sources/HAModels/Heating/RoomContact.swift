@@ -53,11 +53,16 @@ public enum RoomContact: Codable, Sendable {
 
     /// Whether `item`, a state of this contact's entity, says open. An item without the value counts as closed.
     public func isOpen(_ item: EntityStorageItem) -> Bool {
+        source.isOpen(item)
+    }
+
+    /// The event source of this contact.
+    public var source: HeatingEventSource {
         switch self {
         case .window:
-            return item.isContactOpen ?? false
+            return .window
         case .fireplace:
-            return item.isDeviceOn ?? false
+            return .fireplace
         }
     }
 

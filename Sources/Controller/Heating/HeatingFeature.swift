@@ -185,10 +185,10 @@ struct HeatingFeature: Sendable {
     static func sorted(_ rooms: [HeatingOverviewRoom]) -> [HeatingOverviewRoom] {
         let indexed = rooms.enumerated().sorted { lhs, rhs in
             switch (lhs.element.delta, rhs.element.delta) {
-            case let (left?, right?): left == right ? lhs.offset < rhs.offset : left < right
-            case (.some, .none): true
-            case (.none, .some): false
-            case (.none, .none): lhs.offset < rhs.offset
+            case let (left?, right?): return left == right ? lhs.offset < rhs.offset : left < right
+            case (.some, .none): return true
+            case (.none, .some): return false
+            case (.none, .none): return lhs.offset < rhs.offset
             }
         }
         return indexed.map(\.element)

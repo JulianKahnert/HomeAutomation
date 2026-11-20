@@ -143,15 +143,15 @@ struct HeatingRoomDetailView: View {
 
     private var sourceSymbol: String {
         switch detail.istSource {
-        case .roomSensor: "thermometer.medium"
-        case .thermostats: "heater.vertical"
+        case .roomSensor: return "thermometer.medium"
+        case .thermostats: return "heater.vertical"
         }
     }
 
     private var sourceText: String {
         switch detail.istSource {
-        case .roomSensor(let name): "Raumsensor „\(name)“"
-        case .thermostats: "Mittel der Thermostate"
+        case .roomSensor(let name): return "Raumsensor „\(name)“"
+        case .thermostats: return "Mittel der Thermostate"
         }
     }
 
@@ -386,14 +386,18 @@ struct HeatingValveChart: View {
 }
 
 enum HeatingTimeAxis {
+    private static func stride(for range: HeatingRange) -> (component: Calendar.Component, count: Int) {
+        switch range {
+        case .twoHours: return (.minute, 30)
+        case .day: return (.hour, 6)
+        case .week: return (.day, 1)
+        }
+    }
+
     @AxisContentBuilder
     static func marks(range: HeatingRange) -> some AxisContent {
-        let (component, count): (Calendar.Component, Int) = switch range {
-        case .twoHours: (.minute, 30)
-        case .day: (.hour, 6)
-        case .week: (.day, 1)
-        }
-        AxisMarks(values: .stride(by: component, count: count)) { value in
+        let step = stride(for: range)
+        AxisMarks(values: .stride(by: step.component, count: step.count)) { value in
             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(heatingGrid)
             AxisValueLabel(centered: range == .week) {
                 if let date = value.as(Date.self) {

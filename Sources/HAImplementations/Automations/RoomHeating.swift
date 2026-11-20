@@ -53,15 +53,19 @@ public struct RoomHeating: Automatable {
                            radiators: radiators.map { .init(name: $0.heatingId.name, temperatureId: $0.temperatureId, valvePositionId: $0.valvePositionId, targetTemperatureId: $0.targetTemperatureId) },
                            roomSensor: roomSensor,
                            plan: effectivePlan,
-                           followsFireplace: contacts.contains { if case .fireplace = $0 { true } else { false } },
-                           contacts: contacts.map { contact in
-                               switch contact {
-                               case .window(let sensor): .init(source: .window, name: sensor.contactSensorId.name, entityId: sensor.contactSensorId)
-                               case .fireplace(let device, _): .init(source: .fireplace, name: "Kamin", entityId: device.switchId)
-                               }
-                           })
+                           followsFireplace: contacts.contains { $0.source == .fireplace },
+                           contacts: contacts.map(Self.sourceContact))
         sources.shortName = shortLabel
         return sources
+    }
+
+    private static func sourceContact(_ contact: RoomContact) -> HeatingRoomSources.Contact {
+        switch contact {
+        case .window(let sensor):
+            return .init(source: .window, name: sensor.contactSensorId.name, entityId: sensor.contactSensorId)
+        case .fireplace(let device, _):
+            return .init(source: .fireplace, name: "Kamin", entityId: device.switchId)
+        }
     }
 
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {

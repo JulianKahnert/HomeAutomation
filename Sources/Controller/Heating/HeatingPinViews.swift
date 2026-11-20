@@ -11,21 +11,21 @@ import SwiftUI
 extension HeatingEventSource {
     var symbol: String {
         switch self {
-        case .plan: "calendar"
-        case .window: "window.vertical.open"
-        case .fireplace: "flame"
-        case .observed: "hand.raised"
-        case .system: "gearshape"
+        case .plan: return "calendar"
+        case .window: return "window.vertical.open"
+        case .fireplace: return "flame"
+        case .observed: return "hand.raised"
+        case .system: return "gearshape"
         }
     }
 
     var label: String {
         switch self {
-        case .plan: "Plan"
-        case .window: "Fenster"
-        case .fireplace: "Kamin"
-        case .observed: "Von Hand"
-        case .system: "System"
+        case .plan: return "Plan"
+        case .window: return "Fenster"
+        case .fireplace: return "Kamin"
+        case .observed: return "Von Hand"
+        case .system: return "System"
         }
     }
 }

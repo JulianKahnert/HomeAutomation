@@ -234,15 +234,15 @@ struct HeatingInfoBubble: View {
 
     private var sourceText: String {
         switch room.istSource {
-        case .roomSensor(let name): "Raumsensor \(name)"
-        case .thermostats(let names): names.count == 1 ? "Thermostat" : "Mittel von \(names.count) Thermostaten"
+        case .roomSensor(let name): return "Raumsensor \(name)"
+        case .thermostats(let names): return names.count == 1 ? "Thermostat" : "Mittel von \(names.count) Thermostaten"
         }
     }
 
     private var sourceSymbol: String {
         switch room.istSource {
-        case .roomSensor: "thermometer.medium"
-        case .thermostats: "heater.vertical"
+        case .roomSensor: return "thermometer.medium"
+        case .thermostats: return "heater.vertical"
         }
     }
 }

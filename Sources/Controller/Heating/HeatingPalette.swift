@@ -14,10 +14,10 @@ enum HeatingPalette {
 
     static func color(_ comfort: HeatingComfort, scheme: ColorScheme) -> Color {
         switch comfort {
-        case .tooCold: .blue
-        case .ok: .gray
+        case .tooCold: return .blue
+        case .ok: return .gray
         // Dark mode: a peach tone instead of a brown orange; tune against real data.
-        case .tooWarm: scheme == .dark ? Color(red: 1.0, green: 0.62, blue: 0.4) : .orange
+        case .tooWarm: return scheme == .dark ? Color(red: 1.0, green: 0.62, blue: 0.4) : .orange
         }
     }
 

@@ -173,9 +173,16 @@ struct HeatingRoomDetailView: View {
     }
 }
 
-/// Trailing labels of one width in both charts, so the plots and the crosshair line up.
+/// Trailing labels of one width in both charts, so the plots and the crosshair line up. The width is the
+/// widest label's own, measured with an invisible template, so it follows the text size.
 private func heatingYLabel(_ text: String) -> some View {
-    Text(text).font(.caption2.monospacedDigit()).lineLimit(1).fixedSize().frame(width: 36, alignment: .leading)
+    ZStack(alignment: .leading) {
+        Text("100 %").hidden()
+        Text(text)
+    }
+    .font(.caption2.monospacedDigit())
+    .lineLimit(1)
+    .fixedSize()
 }
 
 private let heatingGrid = Color.secondary.opacity(0.12)

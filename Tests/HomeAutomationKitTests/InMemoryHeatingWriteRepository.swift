@@ -18,8 +18,16 @@ actor InMemoryHeatingWriteRepository: HeatingWriteRepository {
     }
 
     func writes(placeId: String, startDate: Date?, endDate: Date?) -> [HeatingWrite] {
-        all.filter { $0.placeId == placeId && $0.timestamp >= (startDate ?? .distantPast) && $0.timestamp < (endDate ?? .distantFuture) }
+        requestedStarts.append(startDate)
+        return all.filter { $0.placeId == placeId && $0.timestamp >= (startDate ?? .distantPast) && $0.timestamp < (endDate ?? .distantFuture) }
             .sorted { $0.timestamp < $1.timestamp }
+    }
+
+    /// The `startDate` of every `writes` call, `nil` for an open start.
+    private(set) var requestedStarts: [Date?] = []
+
+    func lastPlanWrite(placeId: String, before date: Date) -> HeatingWrite? {
+        all.filter { $0.placeId == placeId && $0.timestamp < date && $0.planTargetInC != nil }.max { $0.timestamp < $1.timestamp }
     }
 
     func lastWrite(placeId: String, radiatorName: String) -> HeatingWrite? {

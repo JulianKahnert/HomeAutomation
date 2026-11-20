@@ -92,10 +92,13 @@ public struct HeatingRoomDetailBuilder: Sendable {
         let thermostatTemps = try await room.radiators.asyncMap { try await series($0.temperatureId, from: start, to: end) { $0.temperatureInC?.value } }
         let valves = try await room.radiators.asyncMap { try await series($0.valvePositionId, from: start, to: end) { $0.valvePositionPercent.map(Double.init) } }
         let sensorTemps = try await room.roomSensor.asyncFlatMap { try await series($0, from: start, to: end) { $0.temperatureInC?.value } }
-        let planWrites = try await writes.writes(placeId: room.placeId, startDate: nil, endDate: end)
+        // The plan target at the range start is the one of the latest plan write before it, so a target set
+        // yesterday holds without loading the whole history.
+        let rangeWrites = try await writes.writes(placeId: room.placeId, startDate: start, endDate: end)
+        let before = try await writes.lastPlanWrite(placeId: room.placeId, before: start)
+        let planWrites = (before.map { [$0] } ?? []) + rangeWrites
             .filter { $0.planTargetInC != nil }
             .sorted { $0.timestamp < $1.timestamp }
-        // `startDate: nil` also returns what was written before the window, so a target set yesterday holds.
 
         let samples = grid.map { date -> HeatingSample in
             let ist: Double?
@@ -122,8 +125,11 @@ public struct HeatingRoomDetailBuilder: Sendable {
         for radiator in room.radiators {
             if let id = radiator.targetTemperatureId { targetItems[radiator.name] = try await items(id, from: start, to: end) }
         }
-        // Only what reached a radiator is an event: a plan target recorded while the room was off is not.
-        let sentWrites = try await writes.writes(placeId: room.placeId, startDate: nil, endDate: end).filter(\.sentToDevice)
+        // Events need the writes from the earliest state they look at: an interval that began before the range
+        // starts with the stored state before it. Only what reached a radiator is an event: a plan target
+        // recorded while the room was off is not.
+        let earliest = (contactItems.values.flatMap { $0 } + targetItems.values.flatMap { $0 }).map(\.timestamp).min() ?? start
+        let sentWrites = try await writes.writes(placeId: room.placeId, startDate: min(start, earliest), endDate: end).filter(\.sentToDevice)
         let events = HeatingEventBuilder(room: room, writes: sentWrites, contactItems: contactItems, targetItems: targetItems, start: start, end: end).events()
 
         let istSeries = sensorTemps.map { [$0] } ?? thermostatTemps

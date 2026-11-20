@@ -129,6 +129,19 @@ struct HeatingRoomDetailTests {
         #expect(fallback.samples.first?.sollPlan == 18)
     }
 
+    @Test("the room detail never loads the whole write history, yet the plan target before the range still holds")
+    func boundedWriteHistory() async throws {
+        let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)
+        let old = HeatingWrite(timestamp: now.addingTimeInterval(-30 * 86_400), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 19, planTargetInC: 19)
+        let repository = InMemoryHeatingWriteRepository([old])
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: [temp(thermoA, 30, 20)]), writes: repository, now: { now })
+
+        let detail = try await builder.detail(for: sources, range: .twoHours)
+
+        #expect(detail.samples.first?.sollPlan == 19)
+        #expect(!(await repository.requestedStarts).contains { $0 == nil })
+    }
+
     @Test("a plan target recorded while the room was off still moves the plan line")
     func unsentPlanWriteMovesPlan() async throws {
         let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)

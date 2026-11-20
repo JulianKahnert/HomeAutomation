@@ -1,0 +1,100 @@
+//
+//  HeatingChartData.swift
+//  ControllerFeatures
+//
+//  Pure preparation of the grid for the charts: runs split at gaps, gap segments per colour
+//
+
+import Foundation
+import HAModels
+
+enum HeatingChartData {
+    struct Point: Equatable, Sendable {
+        let date: Date
+        let value: Double
+    }
+
+    /// The gap between actual value and plan target over a stretch of one colour.
+    struct GapSegment: Equatable, Sendable, Identifiable {
+        struct Point: Equatable, Sendable {
+            let date: Date
+            let ist: Double
+            let plan: Double
+        }
+
+        let id: Int
+        let band: HeatingPalette.Band
+        let points: [Point]
+    }
+
+    /// Contiguous stretches where `value` is not `nil`. A `nil` sample ends a run, so a line is not drawn
+    /// across a gap (silence stays visible).
+    static func runs(_ samples: [HeatingSample], value: (HeatingSample) -> Double?) -> [[Point]] {
+        var result: [[Point]] = []
+        var current: [Point] = []
+        for sample in samples {
+            if let v = value(sample) {
+                current.append(Point(date: sample.date, value: v))
+            } else if !current.isEmpty {
+                result.append(current)
+                current = []
+            }
+        }
+        if !current.isEmpty { result.append(current) }
+        return result
+    }
+
+    static func istRuns(_ samples: [HeatingSample]) -> [[Point]] { runs(samples) { $0.ist } }
+
+    static func planRuns(_ samples: [HeatingSample]) -> [[Point]] { runs(samples) { $0.sollPlan } }
+
+    static func valveRuns(_ samples: [HeatingSample], radiator: Int) -> [[Point]] {
+        runs(samples) { $0.valves.indices.contains(radiator) ? $0.valves[radiator] : nil }
+    }
+
+    /// Stretches where both values exist, cut where the colour changes; the first sample of the next
+    /// colour closes the previous segment, so no hole shows between two colours.
+    static func gapSegments(_ samples: [HeatingSample]) -> [GapSegment] {
+        var result: [GapSegment] = []
+        var points: [GapSegment.Point] = []
+        var band: HeatingPalette.Band?
+        let close = {
+            if let band, points.count > 1 {
+                result.append(GapSegment(id: result.count, band: band, points: points))
+            }
+        }
+        for sample in samples {
+            guard let ist = sample.ist, let plan = sample.sollPlan else {
+                close()
+                points = []
+                band = nil
+                continue
+            }
+            let point = GapSegment.Point(date: sample.date, ist: ist, plan: plan)
+            let sampleBand = HeatingPalette.band(forDelta: ist - plan)
+            if let current = band, current != sampleBand {
+                points.append(point)
+                close()
+                points = [point]
+            } else {
+                points.append(point)
+            }
+            band = sampleBand
+        }
+        close()
+        return result
+    }
+
+    /// The sample closest to `date`.
+    static func nearest(to date: Date, in samples: [HeatingSample]) -> HeatingSample? {
+        samples.min { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) }
+    }
+
+    /// The y range of the temperature chart: the data with a margin, at least 2 K high.
+    static func temperatureDomain(_ samples: [HeatingSample]) -> ClosedRange<Double> {
+        let values = samples.flatMap { [$0.ist, $0.sollPlan].compactMap { $0 } }
+        guard let low = values.min(), let high = values.max() else { return 16...24 }
+        let margin = max((2 - (high - low)) / 2, 0.5)
+        return (low - margin)...(high + margin)
+    }
+}

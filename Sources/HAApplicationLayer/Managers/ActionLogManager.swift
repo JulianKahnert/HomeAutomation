@@ -41,8 +41,9 @@ public actor ActionLogManager {
     /// - Parameters:
     ///   - action: The action to log
     ///   - runId: The `AutomationRun` that sent the action, if any.
+    ///   - heating: Why a radiator is written, `nil` for every other command.
     /// - Returns: true if this was a duplicate action (cache hit), false if it's a new action that should be executed
-    public func log(action: HomeManagableAction, runId: UUID? = nil) async -> Bool {
+    public func log(action: HomeManagableAction, runId: UUID? = nil, heating: HeatingWriteContext.Context? = nil) async -> Bool {
         let cacheKey = CommandCacheKey(action)
 
         // Check if action is in cache
@@ -59,7 +60,9 @@ public actor ActionLogManager {
         let item = ActionLogItem(
             action: action,
             hasCacheHit: hasCacheHit,
-            runId: runId
+            runId: runId,
+            reason: heating?.reason,
+            planTargetInC: heating?.planTargetInC
         )
 
         // Insert at beginning (newest first)

@@ -12,6 +12,10 @@ public enum HomeEvent: Codable, Sendable {
     case time(date: Date)
     case sunrise
     case sunset
+    /// The server process started. Fires once per start, before the adapter has connected.
+    case serverStarted
+    /// A configuration was deployed through `POST /config`. Fires once per deploy, after it is stored.
+    case configDeployed
 }
 
 extension HomeEvent: CustomStringConvertible, Equatable {
@@ -26,6 +30,10 @@ extension HomeEvent: CustomStringConvertible, Equatable {
             return "sunrise"
         case .sunset:
             return "sunset"
+        case .serverStarted:
+            return "serverStarted"
+        case .configDeployed:
+            return "configDeployed"
         }
     }
 

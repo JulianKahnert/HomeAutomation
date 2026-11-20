@@ -96,14 +96,17 @@ struct HomeManagerTests {
     ///   in the tests that drive them.
     private func makeHomeManager(probe: AdapterProbe,
                                  storageRepo: any StorageRepository = MockStorageRepository(),
+                                 heatingWrites: (any HeatingWriteRepository)? = nil,
                                  retryTicks: AsyncStream<Void> = AsyncStream { _ in },
-                                 persistRetryDelays: [Duration] = [.zero, .zero]) async -> HomeManager {
+                                 persistRetryDelays: [Duration] = [.zero, .zero],
+                                 actionLogManager: ActionLogManager = ActionLogManager()) async -> HomeManager {
         let adapter = FakeEntityAdapter(actorSystem: LocalTestingDistributedActorSystem(), probe: probe)
         return await HomeManager(getAdapter: { adapter },
                                  storageRepo: storageRepo,
                                  notificationSender: MockNotificationSender(),
                                  location: Location(latitude: 0, longitude: 0),
-                                 actionLogManager: ActionLogManager(),
+                                 actionLogManager: actionLogManager,
+                                 heatingWrites: heatingWrites,
                                  retryTicks: retryTicks,
                                  persistRetryDelays: persistRetryDelays)
     }
@@ -166,6 +169,68 @@ struct HomeManagerTests {
         // the command counts as executed, so an identical one is still deduplicated
         await homeManager.perform(.turnOn(switchId))
         #expect(await probe.startedPerforms == 1)
+    }
+
+    // MARK: - heating writes
+
+    private let radiator = EntityId(placeId: "Kitchen", name: "Radiator", characteristicsName: nil, characteristic: .targetTemperature)
+
+    @Test("A radiator write with a reason lands in the action log and the heating write record")
+    func heatingWriteIsRecorded() async throws {
+        let writes = InMemoryHeatingWriteRepository()
+        let actionLog = ActionLogManager()
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), heatingWrites: writes, actionLogManager: actionLog)
+
+        await HeatingWriteContext.withReason(.plan, planTargetInC: 21) {
+            await homeManager.perform(.setTargetTemperature(radiator, celsius: 21.2))
+        }
+
+        let logged = try #require(await actionLog.getActions().first)
+        #expect(logged.reason == .plan)
+        #expect(logged.planTargetInC == 21)
+        let recorded = try #require(await writes.all.first)
+        #expect(recorded.reason == .plan)
+        #expect(recorded.targetTemperatureInC == 21.0)
+        #expect(recorded.planTargetInC == 21)
+    }
+
+    @Test("A command without a reason, a duplicate and a failed write are not recorded")
+    func onlyExecutedWritesWithReasonAreRecorded() async {
+        let writes = InMemoryHeatingWriteRepository()
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), heatingWrites: writes)
+
+        await homeManager.perform(.setTargetTemperature(radiator, celsius: 20))
+        #expect(await writes.all.isEmpty)
+
+        await HeatingWriteContext.withReason(.system) {
+            await homeManager.perform(.setHeating(radiator, active: true))
+            await homeManager.perform(.setHeating(radiator, active: true))
+        }
+        #expect(await writes.all.count == 1)
+
+        let failing = InMemoryHeatingWriteRepository()
+        let failingManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), heatingWrites: failing)
+        await HeatingWriteContext.withReason(.system) {
+            await failingManager.perform(.setHeating(radiator, active: true))
+        }
+        #expect(await failing.all.isEmpty)
+    }
+
+    @Test("A retried radiator write keeps its reason")
+    func retryKeepsHeatingReason() async {
+        let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
+        let writes = InMemoryHeatingWriteRepository()
+        let actionLog = ActionLogManager()
+        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), heatingWrites: writes, retryTicks: ticks, actionLogManager: actionLog)
+
+        await HeatingWriteContext.withReason(.plan, planTargetInC: 19) {
+            await homeManager.perform(.setTargetTemperature(radiator, celsius: 19))
+        }
+        tickContinuation.yield(())
+        try? await Task.sleep(for: .milliseconds(200))
+
+        let reasons = await actionLog.getActions().map(\.reason)
+        #expect(reasons == [.plan, .plan])
     }
 
     // MARK: - retries

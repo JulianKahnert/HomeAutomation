@@ -169,6 +169,15 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             newValue = NSNumber(value: active)
         case .setValve(_, let active):
             newValue = NSNumber(value: active)
+        case .setTargetTemperature(_, let celsius):
+            var clamped = celsius
+            if let minimumValue = characteristic.metadata?.minimumValue?.doubleValue {
+                clamped = max(clamped, minimumValue)
+            }
+            if let maximumValue = characteristic.metadata?.maximumValue?.doubleValue {
+                clamped = min(clamped, maximumValue)
+            }
+            newValue = NSNumber(value: clamped)
         }
 
         do {

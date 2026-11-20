@@ -20,6 +20,8 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     var health = HomeKitHealth.healthy
     private let log = Logger(label: "MockHomeAdapter")
     private var traceMap: [String: Int] = [:]
+    /// Every action `perform` ran, with the heating context it ran in.
+    private(set) var performedActions: [(action: HomeManagableAction, heating: HeatingWriteContext.Context?)] = []
 
     init() {
         let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(of: EntityStorageItem.self, bufferingPolicy: .unbounded)
@@ -30,6 +32,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     func perform(_ action: HomeManagableAction) async {
 
         let item = storageItems.first(where: { $0.entityId == action.entityId })
+        performedActions.append((action, HeatingWriteContext.current))
 
         switch action {
         case .turnOn:
@@ -53,10 +56,12 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
             storageItems.append(newItem)
         case .addEntityToScene:
             break
-        case .setHeating:
-            break
+        case .setHeating(let id, let active):
+            storageItems.append(EntityStorageItem(entityId: id, isHeaterActive: active))
         case .setValve:
             break
+        case .setTargetTemperature(let id, let celsius):
+            storageItems.append(EntityStorageItem(entityId: id, targetTemperatureInC: celsius))
         }
 
         let actionString: String
@@ -79,6 +84,8 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
             actionString = "setHeating"
         case .setValve:
             actionString = "setValve"
+        case .setTargetTemperature:
+            actionString = "setTargetTemperature"
         }
 
         traceMap["action.\(actionString)", default: 0] += 1

@@ -54,6 +54,10 @@ extension HomeManagableAction {
             guard let isOpen = item.valveOpen else { return false }
             return isOpen != active
 
+        case .setTargetTemperature(_, let celsius):
+            guard let target = item.targetTemperatureInC else { return false }
+            return abs(target - celsius) > 0.01
+
         case .setBrightness(_, let value):
             // The action value is normalized `0...1`; the stored brightness is an `Int` percentage
             // `0...100`. The adapter truncates when writing to the device, so allow a 1-point band.

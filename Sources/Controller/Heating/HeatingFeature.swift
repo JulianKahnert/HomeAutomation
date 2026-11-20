@@ -24,6 +24,8 @@ struct HeatingFeature: Sendable {
         var range: HeatingRange = .day
         var detail: HeatingRoomDetail?
         var isLoading = false
+        /// When the overview was loaded; the headline shows the time.
+        var updatedAt: Date?
         /// Set when the rooms could not be loaded: the server is not reachable.
         var error: String?
         /// Set when the detail of the selected room could not be loaded.
@@ -33,6 +35,8 @@ struct HeatingFeature: Sendable {
 
         /// One line about the room that deviates most; `nil` while no room has a Δ.
         var headline: String? { HeatingFeature.headline(for: rooms) }
+        /// The headline as bold title and grey subtitle.
+        var headlineParts: HeatingHeadline? { HeatingFeature.headlineParts(for: rooms) }
     }
 
     enum Action: BindableAction, Sendable {
@@ -44,6 +48,7 @@ struct HeatingFeature: Sendable {
         case task
     }
 
+    @Dependency(\.date) var date
     @Dependency(\.serverClient) var serverClient
 
     var body: some ReducerOf<Self> {
@@ -59,6 +64,7 @@ struct HeatingFeature: Sendable {
             case let .overviewResponse(.success(overview)):
                 state.isLoading = false
                 state.error = nil
+                state.updatedAt = date.now
                 state.rooms = Self.sorted(overview.rooms)
                 if state.selectedRoom == nil {
                     state.selectedPlaceId = nil
@@ -126,12 +132,24 @@ struct HeatingFeature: Sendable {
 
     /// "Bad OG am kältesten · 3,7 K unter Plan", "… am wärmsten · 2,0 K über Plan" or "Alle Räume im Plan".
     static func headline(for rooms: [HeatingOverviewRoom]) -> String? {
+        guard let parts = headlineParts(for: rooms) else { return nil }
+        return parts.isAllInPlan ? parts.title : "\(parts.title) · \(parts.subtitle)"
+    }
+
+    static func headlineParts(for rooms: [HeatingOverviewRoom]) -> HeatingHeadline? {
         let deviating = rooms.compactMap { room in room.delta.map { (room, $0) } }
         guard let worst = deviating.max(by: { abs($0.1) < abs($1.1) }) else { return nil }
         switch HeatingComfort(delta: worst.1) {
-        case .ok: return "Alle Räume im Plan"
-        case .tooCold: return "\(worst.0.name) am kältesten · \(HeatingFormat.kelvinAmount(worst.1)) unter Plan"
-        case .tooWarm: return "\(worst.0.name) am wärmsten · \(HeatingFormat.kelvinAmount(worst.1)) über Plan"
+        case .ok: return HeatingHeadline(title: "Alle Räume im Plan", subtitle: "jeder Raum innerhalb ±0,5 K")
+        case .tooCold: return HeatingHeadline(title: "\(worst.0.name) am kältesten", subtitle: "\(HeatingFormat.kelvinAmount(worst.1)) unter Plan")
+        case .tooWarm: return HeatingHeadline(title: "\(worst.0.name) am wärmsten", subtitle: "\(HeatingFormat.kelvinAmount(worst.1)) über Plan")
         }
     }
+}
+
+/// The overview's headline: a bold title and a grey subtitle.
+struct HeatingHeadline: Equatable, Sendable {
+    let title: String
+    let subtitle: String
+    var isAllInPlan: Bool { title == "Alle Räume im Plan" }
 }

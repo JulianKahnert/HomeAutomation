@@ -42,8 +42,16 @@ enum HeatingPalette {
         Color(white: scheme == .dark ? 0.68 : 0.38)
     }
 
-    /// All radiators share one quiet tone; the name shows on hover.
-    static let valveLine = Color.green.opacity(0.7)
+    /// The neutral grey of a selection: the pill on a room name, the range segment.
+    static let softFill = Color.secondary.opacity(0.14)
+
+    /// The selected segment of the range switch: a step above the soft track.
+    static let selectedSegment = Color.secondary.opacity(0.24)
+
+    /// The filled area of a radiator's valve chart: green, the first radiator the strongest.
+    static func valveFill(radiator: Int) -> Color {
+        Color.green.opacity(radiator == 0 ? 0.35 : 0.2)
+    }
 
     static func card(_ scheme: ColorScheme) -> Color {
         #if canImport(UIKit)

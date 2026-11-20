@@ -43,10 +43,24 @@ struct HeatingChartDataTests {
         #expect(HeatingChartData.gapSegments(samples).count == 2)
     }
 
-    @Test("a room without any actual value draws no plan line")
-    func noPlanWithoutIst() {
-        #expect(HeatingChartData.planRuns([sample(0, ist: nil), sample(5, ist: nil)]).isEmpty)
+    @Test("a room without any actual value still draws its plan line")
+    func planWithoutIst() {
+        #expect(HeatingChartData.planRuns([sample(0, ist: nil), sample(5, ist: nil)]).count == 1)
         #expect(HeatingChartData.planRuns([sample(0, ist: 20), sample(5, ist: nil)]).count == 1)
+    }
+
+    @Test("a bar near zero is at least a pill high, clipped at the scale, and keeps its sign")
+    func barExtent() {
+        let zero = HeatingChartData.barExtent(forDelta: 0)
+        #expect(zero.upperBound - zero.lowerBound >= HeatingChartData.minimumBarHeight)
+        #expect(zero.lowerBound < 0 && zero.upperBound > 0)
+        let small = HeatingChartData.barExtent(forDelta: 0.2)
+        #expect(small.lowerBound == 0 || small.lowerBound < 0.2)
+        #expect(small.upperBound >= 0.2)
+        #expect(small.upperBound - small.lowerBound >= HeatingChartData.minimumBarHeight)
+        #expect(HeatingChartData.barExtent(forDelta: -3.7) == -3.0...0)
+        #expect(HeatingChartData.barExtent(forDelta: 5) == 0...3.0)
+        #expect(HeatingChartData.barExtent(forDelta: -1.2) == -1.2...0)
     }
 
     @Test("weekday labels are short German names")

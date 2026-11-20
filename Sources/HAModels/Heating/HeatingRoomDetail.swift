@@ -84,4 +84,6 @@ public struct HeatingRoomDetail: Sendable, Codable, Equatable {
     public var latest: HeatingSample? { samples.last }
     /// `true` when no sample has an actual value ("Keine Daten im Zeitraum").
     public var hasNoData: Bool { samples.allSatisfy { $0.ist == nil } }
+    /// `true` when any radiator reported a valve value in the range.
+    public var hasValues: Bool { samples.contains { $0.valves.contains { $0 != nil } } }
 }

@@ -83,7 +83,7 @@ struct HeatingScreen: View {
     }
 
     private var overview: some View {
-        HeatingOverviewView(rooms: store.rooms, headline: store.headline, selectedPlaceId: store.selectedPlaceId) {
+        HeatingOverviewView(rooms: store.rooms, headline: store.headlineParts, updatedAt: store.updatedAt, selectedPlaceId: store.selectedPlaceId) {
             store.send(.selectRoom($0))
         }
     }
@@ -120,7 +120,7 @@ private struct HeatingPreview: View {
 private enum HeatingPreviewState {
     static var overview: HeatingFeature.State { HeatingPreviewData.state() }
     static var day: HeatingFeature.State { HeatingPreviewData.state("Bad OG") }
-    static var week: HeatingFeature.State { HeatingPreviewData.state("Küche", range: .week) }
+    static var week: HeatingFeature.State { HeatingPreviewData.state("Schlafzimmer", range: .week) }
     static var noData: HeatingFeature.State { HeatingPreviewData.state("Kaminzimmer") }
     static var offline: HeatingFeature.State {
         var state = HeatingFeature.State()

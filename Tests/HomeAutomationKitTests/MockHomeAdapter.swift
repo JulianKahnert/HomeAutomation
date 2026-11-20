@@ -21,7 +21,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     private let log = Logger(label: "MockHomeAdapter")
     private var traceMap: [String: Int] = [:]
     /// Every action `perform` ran, with the heating context it ran in.
-    private(set) var performedActions: [(action: HomeManagableAction, heating: HeatingWriteContext.Context?)] = []
+    var performedActions: [(action: HomeManagableAction, heating: HeatingWriteContext.Context?)] = []
 
     init() {
         let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(of: EntityStorageItem.self, bufferingPolicy: .unbounded)

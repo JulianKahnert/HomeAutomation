@@ -471,3 +471,55 @@ struct HeatingRangePicker: View {
         .frame(maxWidth: 190, alignment: .leading)
     }
 }
+
+// MARK: - Previews
+
+private extension HeatingRoomDetail {
+    static var preview: HeatingRoomDetail {
+        guard let detail = HeatingPreviewData.state("Bad OG").detail else { fatalError("The preview data has the room Bad OG") }
+        return detail
+    }
+}
+
+#Preview("Card") {
+    HeatingCard { Text("Inhalt der Karte") }.padding(16)
+}
+
+#Preview("Raumdetail") {
+    @Previewable @State var range = HeatingRange.day
+    HeatingRoomDetailView(detail: .preview, range: $range, selectedPinId: nil)
+        .padding(16)
+        .frame(width: 402)
+}
+
+#Preview("Soll-Ist-Diagramm") {
+    @Previewable @State var crosshair: Date?
+    let detail = HeatingRoomDetail.preview
+    HeatingSollIstChart(samples: detail.samples, events: detail.events, crosshair: $crosshair)
+        .frame(width: 402, height: 260)
+        .padding(16)
+}
+
+#Preview("Ventil-Diagramm") {
+    @Previewable @State var crosshair: Date?
+    let detail = HeatingRoomDetail.preview
+    HeatingValveChart(samples: detail.samples, events: detail.events, radiators: detail.radiators, crosshair: $crosshair)
+        .frame(width: 402, height: 120)
+        .padding(16)
+}
+
+#Preview("Fadenkreuz") {
+    @Previewable @State var crosshair: Date?
+    let detail = HeatingRoomDetail.preview
+    Chart(detail.samples, id: \.date) { sample in
+        LineMark(x: .value("Zeit", sample.date), y: .value("Ist", sample.ist ?? 0))
+    }
+    .chartOverlay { proxy in HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair) }
+    .frame(width: 402, height: 160)
+    .padding(16)
+}
+
+#Preview("Zeitraum") {
+    @Previewable @State var range = HeatingRange.day
+    HeatingRangePicker(range: $range).padding(16)
+}

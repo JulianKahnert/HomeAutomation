@@ -246,3 +246,18 @@ struct HeatingInfoBubble: View {
         }
     }
 }
+
+// MARK: - Previews
+
+#Preview("Übersicht") {
+    let rooms = HeatingFeature.sorted(HeatingPreviewData.overviewRooms)
+    HeatingOverviewView(rooms: rooms, headline: HeatingFeature.headlineParts(for: rooms), updatedAt: HeatingPreviewData.now, selectedPlaceId: nil) { _ in }
+        .padding(16)
+        .frame(width: 402)
+}
+
+#Preview("Info-Blase") {
+    if let room = HeatingPreviewData.overviewRooms.first {
+        HeatingInfoBubble(room: room).padding(16)
+    }
+}

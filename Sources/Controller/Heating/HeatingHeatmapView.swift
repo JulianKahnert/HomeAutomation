@@ -131,3 +131,9 @@ struct HeatingHeatmapView: View {
         return text.hasSuffix(".") ? text : text + "."
     }
 }
+
+#Preview("Wochen-Heatmap") {
+    HeatingHeatmapView(rooms: HeatingFeature.sorted(HeatingPreviewData.overviewRooms), cells: HeatingPreviewData.heatmap, selectedPlaceId: nil)
+        .padding(16)
+        .frame(width: 402)
+}

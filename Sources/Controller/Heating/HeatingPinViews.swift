@@ -87,3 +87,19 @@ struct HeatingPinCard: View {
         return text
     }
 }
+
+// MARK: - Previews
+
+#Preview("Pins") {
+    HStack(spacing: 12) {
+        ForEach(HeatingEventSource.allCases, id: \.self) { source in
+            HeatingPinBadge(slot: .init(x: 0, row: 0, events: [HeatingEvent(source: source, title: source.label, reason: "", start: HeatingPreviewData.now)]))
+        }
+        HeatingPinBadge(slot: .init(x: 0, row: 0, events: HeatingPreviewData.kitchenEvents), isSelected: true)
+    }
+    .padding(16)
+}
+
+#Preview("Pin-Karte") {
+    HeatingPinCard(events: Array(HeatingPreviewData.kitchenEvents.prefix(2))).padding(16).frame(width: 402)
+}

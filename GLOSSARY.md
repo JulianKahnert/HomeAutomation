@@ -66,3 +66,9 @@ The first view of the Heizung tab: a headline and one Δ bar per room, coldest f
 
 **Headline** (Schlagzeile)
 One line above the bars naming the room whose Δ is furthest from zero ("Bad OG am kältesten · 3,7 K unter Plan", "… am wärmsten …"), or "Alle Räume im Plan" when every room is inside the comfort band. Rooms without Δ do not count.
+
+**Heatmap cell** (Heatmap-Zelle)
+One cell of the week heatmap: the mean Δ of one room over one six-hour segment (0–6, 6–12, 12–18, 18–24 o'clock) of a local day in Europe/Berlin, computed from the 30-minute grid of the room detail. A cell is `null` (hatched in the app) when more than half of the samples of its segment have no actual value (exactly half still counts). Days and segments follow the local clock, so a day with 23 or 25 hours has shorter or longer segments. The overview endpoint carries the cells of the last seven local days, today included; the current segment counts only the samples up to now.
+
+**Week heatmap** (Wochen-Heatmap)
+The card "Woche" of the Heizung tab: rooms × days × four segments as rounded cells, coloured like the bars (blue too cold, grey in the comfort band, orange too warm, deeper tint for a larger Δ), hatched without actual value. The value appears only on tap or hover; there is no legend.

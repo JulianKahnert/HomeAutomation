@@ -20,6 +20,10 @@ public protocol EntityValidator {
 public protocol HomeManagable: EntityValidator, Sendable {
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem
     func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem?
+    /// The last state of the entity the database holds, past the in-memory cache. After a restart the
+    /// adapter's resync refreshes the cache with a new timestamp; only the database still knows since
+    /// when the state really holds. `nil` when the database has none.
+    func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
     /// - Returns: Whether the item carries new information, i.e. differs in value — not just in
     ///   timestamp — from the last known state of that entity.
@@ -29,7 +33,8 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async
     func getLocation() async -> Location
-    func sendNotification(title: String, message: String, id: String) async
+    /// - Parameter category: The notification category of the app, which gives the push its actions; `nil` for none.
+    func sendNotification(title: String, message: String, id: String, category: String?) async
     /// Marks an offenes Fenster überschritten once its Fensterschließzeit has passed; the Live Activity alerts once.
     func markWindowOverdue(entityId: EntityId) async
     /// The window Live Activity's content state, as the server last built it.
@@ -39,6 +44,16 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func clearActionLog() async
     /// Whether HomeKit works end to end; shared by `/health` and the `HealthCheck` automation.
     func homeKitHealth() async -> HomeKitHealth
+}
+
+extension HomeManagable {
+    public func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
+        try? await getCurrentEntity(with: entityId)
+    }
+
+    public func sendNotification(title: String, message: String, id: String) async {
+        await sendNotification(title: title, message: message, id: id, category: nil)
+    }
 }
 
 public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equatable {

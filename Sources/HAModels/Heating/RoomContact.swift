@@ -6,14 +6,35 @@
 import Foundation
 
 /// A contact that switches the radiators of a room off while it is open (glossary: contact): a window
-/// contact today, the fireplace switch later. One rule for all of them; only how "open" is read differs.
+/// contact or the fireplace switch (switch on = open). One rule for all of them; only how "open" is read differs.
 public enum RoomContact: Codable, Sendable {
     case window(ContactSensorDevice)
+    /// The fireplace switch; on counts as open (glossary: fireplace mode).
+    case fireplace(SwitchDevice)
 
     public var entityId: EntityId {
         switch self {
         case .window(let sensor):
             return sensor.contactSensorId
+        case .fireplace(let device):
+            return device.switchId
+        }
+    }
+
+    /// The reason of the radiator writes this contact causes.
+    public var reason: HeatingWriteReason {
+        switch self {
+        case .window: return .window
+        case .fireplace: return .fireplace
+        }
+    }
+
+    /// How long the contact has to stay open before the room goes off: the window delay for a window,
+    /// none for the fireplace, which the owner switched on on purpose.
+    public func delay(in configuration: HeatingConfiguration) -> TimeInterval {
+        switch self {
+        case .window: return configuration.windowDelay
+        case .fireplace: return 0
         }
     }
 
@@ -22,12 +43,20 @@ public enum RoomContact: Codable, Sendable {
         switch self {
         case .window:
             return item.isContactOpen ?? false
+        case .fireplace:
+            return item.isDeviceOn ?? false
         }
     }
 
     /// The current state of the contact, or `nil` when it is unreachable or unknown. The caller treats
-    /// `nil` as closed ("unreachable = closed").
+    /// `nil` as closed ("unreachable = closed"). The fireplace counts since the switch-on time stored in
+    /// the database.
     public func currentState(with hm: HomeManagable) async -> (isOpen: Bool, since: Date)? {
+        if case .fireplace(let device) = self {
+            guard let current = try? await hm.getCurrentEntity(with: device.switchId) else { return nil }
+            let state = await Fireplace.state(of: device.switchId, with: hm)
+            return (state.isOn, state.since ?? current.timestamp)
+        }
         guard let item = try? await hm.getCurrentEntity(with: entityId) else { return nil }
         return (isOpen(item), item.timestamp)
     }

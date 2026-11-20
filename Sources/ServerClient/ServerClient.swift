@@ -233,7 +233,8 @@ public struct ServerClient {
                                  range: detailRange,
                                  istSource: source,
                                  radiators: body.radiators,
-                                 samples: body.samples.map { HeatingSample(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) })
+                                 samples: body.samples.map { HeatingSample(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) },
+                                 lastIst: body.lastIst)
     }
 }
 

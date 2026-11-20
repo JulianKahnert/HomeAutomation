@@ -64,14 +64,18 @@ public struct HeatingRoomDetail: Sendable, Codable, Equatable {
     /// Radiator names in a stable order; `HeatingSample.valves` follows it.
     public let radiators: [String]
     public let samples: [HeatingSample]
+    /// When the room last had an actual value, also before the range; `nil` when it never had one.
+    public let lastIst: Date?
 
-    public init(placeId: String, name: String, range: HeatingRange, istSource: HeatingIstSource, radiators: [String], samples: [HeatingSample]) {
+    public init(placeId: String, name: String, range: HeatingRange, istSource: HeatingIstSource, radiators: [String], samples: [HeatingSample],
+                lastIst: Date? = nil) {
         self.placeId = placeId
         self.name = name
         self.range = range
         self.istSource = istSource
         self.radiators = radiators
         self.samples = samples
+        self.lastIst = lastIst
     }
 
     public var start: Date? { samples.first?.date }

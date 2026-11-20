@@ -801,6 +801,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/HeatingSample"
+        lastIst:
+          type: string
+          format: date-time
+          description: When the room last had an actual value, also before the range; missing when it never had one.
     HeatingOverview:
       type: object
       required: [rooms]

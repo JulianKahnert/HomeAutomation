@@ -72,17 +72,19 @@ enum HeatingPreviewData {
         (6..<22).contains(calendar.component(.hour, from: date)) ? 21 : 17.5
     }
 
+    private static let shortNames = ["Schlafzimmer": "Schlafen", "Kaminzimmer": "Kamin"]
+
     /// The rooms of the overview endpoint's response, as the server would sort them (any order).
     static var overviewRooms: [HeatingOverviewRoom] {
         rooms.map { room in
             let latest = room.detail(.twoHours).latest
-            return HeatingOverviewRoom(placeId: room.id, name: room.id, shortName: room.id, ist: latest?.ist, sollPlan: latest?.sollPlan,
+            return HeatingOverviewRoom(placeId: room.id, name: room.id, shortName: shortNames[room.id] ?? room.id, ist: latest?.ist, sollPlan: latest?.sollPlan,
                                        istSource: .thermostats(room.radiators))
         }
     }
 
     /// A store state with the overview loaded and `selected` open (none: only the overview).
-    static func state(selected placeId: String?, range: HeatingRange = .day) -> HeatingFeature.State {
+    static func state(_ placeId: String? = nil, range: HeatingRange = .day) -> HeatingFeature.State {
         var state = HeatingFeature.State()
         state.rooms = HeatingFeature.sorted(overviewRooms)
         state.selectedPlaceId = placeId

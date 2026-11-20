@@ -118,10 +118,10 @@ private struct HeatingPreview: View {
 }
 
 private enum HeatingPreviewState {
-    static var overview: HeatingFeature.State { HeatingPreviewData.state(selected: nil) }
-    static var day: HeatingFeature.State { HeatingPreviewData.state(selected: "Bad OG") }
-    static var week: HeatingFeature.State { HeatingPreviewData.state(selected: "Küche", range: .week) }
-    static var noData: HeatingFeature.State { HeatingPreviewData.state(selected: "Kaminzimmer") }
+    static var overview: HeatingFeature.State { HeatingPreviewData.state() }
+    static var day: HeatingFeature.State { HeatingPreviewData.state("Bad OG") }
+    static var week: HeatingFeature.State { HeatingPreviewData.state("Küche", range: .week) }
+    static var noData: HeatingFeature.State { HeatingPreviewData.state("Kaminzimmer") }
     static var offline: HeatingFeature.State {
         var state = HeatingFeature.State()
         state.error = "offline"

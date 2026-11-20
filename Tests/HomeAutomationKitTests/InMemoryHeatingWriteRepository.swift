@@ -9,6 +9,10 @@ import HAModels
 actor InMemoryHeatingWriteRepository: HeatingWriteRepository {
     private(set) var all: [HeatingWrite] = []
 
+    init(_ writes: [HeatingWrite] = []) {
+        all = writes
+    }
+
     func add(_ write: HeatingWrite) {
         all.append(write)
     }

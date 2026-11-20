@@ -185,7 +185,8 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         notificationDates[id] = Date()
     }
 
-    private var notificationDates: [String: Date] = [:]
+    /// When a notification with this id was last sent; a test sets it to place a push in the past.
+    var notificationDates: [String: Date] = [:]
 
     func lastNotificationDate(id: String) async -> Date? {
         notificationDates[id]

@@ -337,11 +337,21 @@ public final class HomeManager: HomeManagable {
     }
 
     public func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
-        (try? await storageRepo.getCurrent(entityId)) ?? nil
+        do {
+            return try await storageRepo.getCurrent(entityId)
+        } catch {
+            log.error("Failed to read the stored entity", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
+            return nil
+        }
     }
 
     public func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] {
-        (try? await storageRepo.getHistory(for: entityId, startDate: since, endDate: nil, cursor: nil, limit: 1000)) ?? []
+        do {
+            return try await storageRepo.getHistory(for: entityId, startDate: since, endDate: nil, cursor: nil, limit: 1000)
+        } catch {
+            log.error("Failed to read the entity history", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
+            return []
+        }
     }
 
     public func lastNotificationDate(id: String) async -> Date? {

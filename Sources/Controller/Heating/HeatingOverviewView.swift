@@ -12,7 +12,9 @@ import SwiftUI
 /// Headline and bars of all rooms. Selecting a room is reported through `onSelect`.
 struct HeatingOverviewView: View {
     let rooms: [HeatingOverviewRoom]
-    let headline: String?
+    let headline: HeatingHeadline?
+    /// The time at the top right of the headline.
+    let updatedAt: Date?
     let selectedPlaceId: String?
     /// The fireplace burns: the rooms that follow it show the flame and a soft orange area.
     let fireplaceOn: Bool
@@ -22,11 +24,13 @@ struct HeatingOverviewView: View {
 
     @Environment(\.colorScheme) private var scheme
 
-    init(rooms: [HeatingOverviewRoom], headline: String?, selectedPlaceId: String?, fireplaceOn: Bool = false, hoveredPlaceId: String? = nil,
+    init(rooms: [HeatingOverviewRoom], headline: HeatingHeadline?, updatedAt: Date? = nil, selectedPlaceId: String?, fireplaceOn: Bool = false,
+         hoveredPlaceId: String? = nil,
          onSelect: @escaping (String?) -> Void) {
         self.fireplaceOn = fireplaceOn
         self.rooms = rooms
         self.headline = headline
+        self.updatedAt = updatedAt
         self.selectedPlaceId = selectedPlaceId
         self._hoveredPlaceId = State(initialValue: hoveredPlaceId)
         self.onSelect = onSelect
@@ -39,12 +43,27 @@ struct HeatingOverviewView: View {
         HeatingCard {
             VStack(alignment: .leading, spacing: 8) {
                 if let headline {
-                    Text(headline)
-                        .font(.title3.weight(.semibold))
+                    headlineView(headline)
                         // The info bubble takes the headline's place while it is shown.
                         .opacity(hovered == nil ? 1 : 0)
                 }
                 chart.frame(height: 200)
+            }
+        }
+    }
+
+    private func headlineView(_ headline: HeatingHeadline) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(headline.title).font(.title3.weight(.semibold))
+                Text(headline.subtitle).font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+            }
+            Spacer()
+            if let updatedAt {
+                Text(HeatingFormat.time(updatedAt, includingDay: false))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
             }
         }
     }
@@ -66,7 +85,8 @@ struct HeatingOverviewView: View {
                 .lineStyle(StrokeStyle(lineWidth: 1))
             ForEach(rooms) { room in
                 if let delta = room.delta {
-                    BarMark(x: .value("Raum", room.shortName), y: .value("Δ", min(max(delta, -limit), limit)), width: .ratio(0.55))
+                    let extent = HeatingChartData.barExtent(forDelta: delta)
+                    BarMark(x: .value("Raum", room.shortName), yStart: .value("Δ", extent.lowerBound), yEnd: .value("Δ", extent.upperBound), width: .ratio(0.55))
                         .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
                         .clipShape(.rect(cornerRadius: 6))
                 } else {
@@ -93,7 +113,7 @@ struct HeatingOverviewView: View {
                                 .foregroundStyle(isSelected ? .primary : .secondary)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(isSelected ? Color.accentColor.opacity(0.18) : .clear, in: .capsule)
+                                .background(isSelected ? HeatingPalette.softFill : .clear, in: .capsule)
                             if rooms.contains(where: \.followsFireplace) {
                                 // Always reserves the line, so the plot does not jump with the switch.
                                 Image(systemName: "flame.fill")

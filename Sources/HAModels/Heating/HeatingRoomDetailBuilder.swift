@@ -92,12 +92,14 @@ public struct HeatingRoomDetailBuilder: Sendable {
             return HeatingSample(date: date, ist: ist, sollPlan: planned, valves: valveValues)
         }
 
+        let istSeries = sensorTemps.map { [$0] } ?? thermostatTemps
         return HeatingRoomDetail(placeId: room.placeId,
                                  name: room.name,
                                  range: range,
                                  istSource: room.roomSensor.map { .roomSensor($0.name) } ?? .thermostats(room.radiators.map(\.name)),
                                  radiators: room.radiators.map(\.name),
-                                 samples: samples)
+                                 samples: samples,
+                                 lastIst: istSeries.compactMap { $0.points.last?.date }.max())
     }
 
     /// Every stored value of `entityId` in the range plus the one before it, oldest first. Pages by cursor,

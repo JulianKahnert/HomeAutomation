@@ -41,14 +41,8 @@ struct HeatingRoomDetailView: View {
         HeatingCard {
             VStack(alignment: .leading, spacing: 8) {
                 header
-                Picker("Zeitraum", selection: $range) {
-                    Text("2 h").tag(HeatingRange.twoHours)
-                    Text("24 h").tag(HeatingRange.day)
-                    Text("7 T").tag(HeatingRange.week)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .padding(.bottom, 8)
+                HeatingRangePicker(range: $range)
+                    .padding(.bottom, 8)
                 HeatingSollIstChart(samples: detail.samples, crosshair: $crosshair, range: range)
                     .frame(height: 210)
                     .overlay {
@@ -58,11 +52,18 @@ struct HeatingRoomDetailView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                if !detail.radiators.isEmpty, !detail.hasNoData {
+                if !detail.radiators.isEmpty {
                     valveHeader
                         .padding(.top, 8)
                     HeatingValveChart(samples: detail.samples, radiators: detail.radiators, crosshair: $crosshair, range: range)
                         .frame(height: 56)
+                        .overlay {
+                            if !detail.hasValues {
+                                Text("Keine Daten im Zeitraum")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                 }
             }
         }
@@ -99,9 +100,15 @@ struct HeatingRoomDetailView: View {
                             .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
                     }
                 }
-                Label(sourceText, systemImage: sourceSymbol)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if crosshair != nil {
+                    Label(sourceText, systemImage: sourceSymbol)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if shown?.ist == nil {
+                    Text(lastIstText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if let onClose {
@@ -112,6 +119,11 @@ struct HeatingRoomDetailView: View {
                     .font(.title3)
             }
         }
+    }
+
+    private var lastIstText: String {
+        guard let last = detail.lastIst else { return "bisher kein Ist-Wert" }
+        return "kein Ist-Wert seit \(HeatingFormat.time(last, includingDay: true))"
     }
 
     private var sourceSymbol: String {
@@ -168,7 +180,7 @@ struct HeatingSollIstChart: View {
         if scheme == .dark {
             // A lighter blue than the bars, so the thin fill does not turn navy.
             let tint = band == .tooCold ? Color(red: 0.45, green: 0.7, blue: 1.0) : color
-            return AnyShapeStyle(tint.opacity(band == .ok ? 0.2 : band == .tooWarm ? 0.4 : 0.3))
+            return AnyShapeStyle(tint.opacity(band == .ok ? 0.25 : band == .tooWarm ? 0.85 : 0.7))
         }
         let opacity = band == .ok ? 0.12 : 0.2
         guard band != .ok else { return AnyShapeStyle(color.opacity(opacity)) }
@@ -249,10 +261,9 @@ struct HeatingValveChart: View {
             ForEach(radiators.indices, id: \.self) { index in
                 ForEach(Array(HeatingChartData.valveRuns(samples, radiator: index).enumerated()), id: \.offset) { run, points in
                     ForEach(Array(points.enumerated()), id: \.offset) { _, point in
-                        LineMark(x: .value("Zeit", point.date), y: .value("Ventil", point.value), series: .value("Ventil", "\(index)-\(run)"))
+                        AreaMark(x: .value("Zeit", point.date), y: .value("Ventil", point.value), series: .value("Ventil", "\(index)-\(run)"))
                             .interpolationMethod(.stepEnd)
-                            .lineStyle(StrokeStyle(lineWidth: 1.5, lineJoin: .round))
-                            .foregroundStyle(HeatingPalette.valveLine)
+                            .foregroundStyle(HeatingPalette.valveFill(radiator: index))
                     }
                 }
             }
@@ -326,5 +337,32 @@ struct HeatingCrosshairOverlay: View {
         guard let plotFrame = proxy.plotFrame else { return nil }
         let x = location.x - geometry[plotFrame].origin.x
         return proxy.value(atX: x, as: Date.self)
+    }
+}
+
+/// The range switch in neutral grey: a soft track and a lighter pill for the selection.
+struct HeatingRangePicker: View {
+    @Binding var range: HeatingRange
+
+    private static let items: [(HeatingRange, String)] = [(.twoHours, "2 h"), (.day, "24 h"), (.week, "7 T")]
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(Self.items, id: \.0) { item, title in
+                Button { range = item } label: {
+                    Text(title)
+                        .font(.subheadline.weight(range == item ? .semibold : .regular))
+                        .foregroundStyle(.primary)
+                        .frame(minWidth: 44, maxWidth: .infinity, minHeight: 28)
+                        .background(range == item ? HeatingPalette.selectedSegment : .clear, in: .rect(cornerRadius: 7))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(range == item ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(HeatingPalette.softFill, in: .rect(cornerRadius: 9))
+        .frame(maxWidth: 190, alignment: .leading)
     }
 }

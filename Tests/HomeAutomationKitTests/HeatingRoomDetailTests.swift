@@ -90,6 +90,20 @@ struct HeatingRoomDetailTests {
         #expect(none.samples[0].ist == nil)
     }
 
+    @Test("lastIst is the newest actual reading, also from before the range; nil without any")
+    func lastIst() async throws {
+        let old = try await builder([temp(thermoA, 3 * 24 * 60, 20), temp(thermoB, 4 * 24 * 60, 21)]).detail(for: sources, range: .twoHours)
+        #expect(old.lastIst == now.addingTimeInterval(-3 * 24 * 3_600))
+        let recent = try await builder([temp(thermoA, 30, 20), temp(thermoB, 10, 22)]).detail(for: sources, range: .twoHours)
+        #expect(recent.lastIst == now.addingTimeInterval(-10 * 60))
+        var withSensor = sources
+        withSensor.roomSensor = sensor
+        let viaSensor = try await builder([temp(thermoA, 5, 20), temp(sensor, 50, 21)]).detail(for: withSensor, range: .twoHours)
+        #expect(viaSensor.lastIst == now.addingTimeInterval(-50 * 60))
+        let none = try await builder([]).detail(for: sources, range: .twoHours)
+        #expect(none.lastIst == nil)
+    }
+
     @Test("valves are listed per radiator in the order of the room, null while silent")
     func valves() async throws {
         let b = builder([temp(thermoA, 30, 20), valve(valveA, 30, 40), valve(valveB, 10, 100)])

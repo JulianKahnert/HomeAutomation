@@ -32,7 +32,7 @@ struct HeatingDetailSnapshotTests {
         var state: HeatingFeature.State {
             switch self {
             case .day24h: HeatingPreviewData.state("Bad OG")
-            case .week7d: HeatingPreviewData.state("Küche", range: .week)
+            case .week7d: HeatingPreviewData.state("Schlafzimmer", range: .week)
             case .noData: HeatingPreviewData.state("Kaminzimmer")
             case .offline:
                 {
@@ -67,6 +67,25 @@ struct HeatingDetailSnapshotTests {
                     testName: "detail-\(scenario.rawValue)"
                 )
             }
+        }
+    }
+
+    @Test("the crosshair replaces the header and names the valve")
+    func crosshair() {
+        let detail = HeatingPreviewData.rooms.first { $0.id == "Küche" }!.detail(.day)
+        let moment = HeatingPreviewData.now.addingTimeInterval(-6 * 3_600)
+        for scheme in [ColorScheme.light, .dark] {
+            let view = HeatingRoomDetailView(detail: detail, range: .constant(.day), crosshair: moment)
+                .padding(16)
+                .frame(width: 402, height: 520)
+                .background(Color(white: scheme == .dark ? 0.08 : 0.96))
+                .environment(\.colorScheme, scheme)
+                .environment(\.locale, Locale(identifier: "de_DE"))
+                .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
+            let hosting = NSHostingView(rootView: view)
+            hosting.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+            assertSnapshot(of: hosting, as: .image(size: CGSize(width: 402, height: 520)),
+                           named: "iPhone-\(scheme == .dark ? "dark" : "light")", testName: "detail-crosshair")
         }
     }
 }

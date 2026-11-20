@@ -35,6 +35,7 @@ struct HeatingFeatureTests {
         let store = TestStore(initialState: HeatingFeature.State()) {
             HeatingFeature()
         } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
             $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: rooms) }
             $0.serverClient.getHeatingRoom = { placeId, range in
                 requests.append("\(placeId) \(range.rawValue)")
@@ -85,6 +86,34 @@ struct HeatingFeatureTests {
     func headlineAllInPlan() async {
         let store = await loaded([Self.room("Bad OG", ist: 20.5), Self.room("Küche", ist: 21.5)])
         #expect(store.state.headline == "Alle Räume im Plan")
+    }
+
+    @Test("the headline has a title and a grey subtitle line")
+    func headlineParts() async {
+        let cold = await loaded([Self.room("Bad OG", ist: 17.3), Self.room("Küche", ist: 22.2)])
+        #expect(cold.state.headlineParts?.title == "Bad OG am kältesten")
+        #expect(cold.state.headlineParts?.subtitle == "3,7 K unter Plan")
+        let warm = await loaded([Self.room("Bad OG", ist: 20.2), Self.room("Küche", ist: 23.0)])
+        #expect(warm.state.headlineParts?.title == "Küche am wärmsten")
+        #expect(warm.state.headlineParts?.subtitle == "2,0 K über Plan")
+        let ok = await loaded([Self.room("Bad OG", ist: 20.5)])
+        #expect(ok.state.headlineParts?.title == "Alle Räume im Plan")
+        #expect(ok.state.headlineParts?.subtitle == "jeder Raum innerhalb ±0,5 K")
+    }
+
+    @Test("the overview remembers when it was loaded")
+    func updatedAt() async {
+        let moment = Date(timeIntervalSince1970: 1_800_000_000)
+        let store = TestStore(initialState: HeatingFeature.State()) {
+            HeatingFeature()
+        } withDependencies: {
+            $0.date = .constant(moment)
+            $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: [Self.room("Bad", ist: 20)]) }
+        }
+        store.exhaustivity = .off
+        await store.send(.task)
+        await store.receive(\.overviewResponse.success)
+        #expect(store.state.updatedAt == moment)
     }
 
     @Test("rooms without a delta do not count for the headline")
@@ -151,6 +180,7 @@ struct HeatingFeatureTests {
         let store = TestStore(initialState: HeatingFeature.State()) {
             HeatingFeature()
         } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
             $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: rooms.value) }
             $0.serverClient.getHeatingRoom = { placeId, range in Self.detail(placeId, range) }
         }
@@ -183,6 +213,7 @@ struct HeatingFeatureTests {
         let store = TestStore(initialState: HeatingFeature.State()) {
             HeatingFeature()
         } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
             $0.serverClient.getHeatingOverview = { throw Failure() }
         }
         store.exhaustivity = .off
@@ -197,6 +228,7 @@ struct HeatingFeatureTests {
         let store = TestStore(initialState: HeatingFeature.State()) {
             HeatingFeature()
         } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
             $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: [Self.room("Bad", ist: 20)]) }
             $0.serverClient.getHeatingRoom = { _, _ in throw Failure() }
         }

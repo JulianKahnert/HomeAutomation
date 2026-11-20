@@ -12,11 +12,28 @@ public struct HeatingRoomSources: Sendable, Equatable {
         public let name: String
         public let temperatureId: EntityId
         public let valvePositionId: EntityId
+        /// The radiator's target temperature; needed to see manual changes ("observed").
+        public let targetTemperatureId: EntityId?
 
-        public init(name: String, temperatureId: EntityId, valvePositionId: EntityId) {
+        public init(name: String, temperatureId: EntityId, valvePositionId: EntityId, targetTemperatureId: EntityId? = nil) {
             self.name = name
             self.temperatureId = temperatureId
             self.valvePositionId = valvePositionId
+            self.targetTemperatureId = targetTemperatureId
+        }
+    }
+
+    /// A contact of the room whose history gives window and fireplace events a duration.
+    public struct Contact: Sendable, Equatable {
+        /// `.window` or `.fireplace`.
+        public let source: HeatingEventSource
+        public let name: String
+        public let entityId: EntityId
+
+        public init(source: HeatingEventSource, name: String, entityId: EntityId) {
+            self.source = source
+            self.name = name
+            self.entityId = entityId
         }
     }
 
@@ -28,8 +45,11 @@ public struct HeatingRoomSources: Sendable, Equatable {
     public var plan: HeatingPlan?
     /// Whether the room lists the fireplace as a contact (glossary: fireplace mode).
     public var followsFireplace: Bool
+    public var contacts: [Contact]
 
-    public init(placeId: String, name: String, radiators: [Radiator], roomSensor: EntityId?, plan: HeatingPlan?, followsFireplace: Bool = false) {
+    public init(placeId: String, name: String, radiators: [Radiator], roomSensor: EntityId?, plan: HeatingPlan?, followsFireplace: Bool = false,
+                contacts: [Contact] = []) {
+        self.contacts = contacts
         self.followsFireplace = followsFireplace
         self.placeId = placeId
         self.name = name
@@ -92,6 +112,17 @@ public struct HeatingRoomDetailBuilder: Sendable {
             return HeatingSample(date: date, ist: ist, sollPlan: planned, valves: valveValues)
         }
 
+        var contactItems: [EntityId: [EntityStorageItem]] = [:]
+        for contact in room.contacts {
+            contactItems[contact.entityId] = try await items(contact.entityId, from: start, to: end)
+        }
+        var targetItems: [String: [EntityStorageItem]] = [:]
+        for radiator in room.radiators {
+            if let id = radiator.targetTemperatureId { targetItems[radiator.name] = try await items(id, from: start, to: end) }
+        }
+        let allWrites = try await writes.writes(placeId: room.placeId, startDate: nil, endDate: end)
+        let events = HeatingEventBuilder(room: room, writes: allWrites, contactItems: contactItems, targetItems: targetItems, start: start, end: end).events()
+
         let istSeries = sensorTemps.map { [$0] } ?? thermostatTemps
         return HeatingRoomDetail(placeId: room.placeId,
                                  name: room.name,
@@ -99,12 +130,19 @@ public struct HeatingRoomDetailBuilder: Sendable {
                                  istSource: room.roomSensor.map { .roomSensor($0.name) } ?? .thermostats(room.radiators.map(\.name)),
                                  radiators: room.radiators.map(\.name),
                                  samples: samples,
-                                 lastIst: istSeries.compactMap { $0.points.last?.date }.max())
+                                 lastIst: istSeries.compactMap { $0.points.last?.date }.max(),
+                                 events: events)
     }
 
     /// Every stored value of `entityId` in the range plus the one before it, oldest first. Pages by cursor,
     /// because seven days of a temperature exceed one page.
     private func series(_ entityId: EntityId, from start: Date, to end: Date, value: (EntityStorageItem) -> Double?) async throws -> Series {
+        let all = try await items(entityId, from: start, to: end)
+        return Series(points: all.compactMap { item in value(item).map { (item.timestamp, $0) } })
+    }
+
+    /// The stored states of `entityId` in the range plus the one before it, oldest first.
+    private func items(_ entityId: EntityId, from start: Date, to end: Date) async throws -> [EntityStorageItem] {
         let pageSize = 1_000
         var items: [EntityStorageItem] = []
         var cursor: Date?
@@ -117,7 +155,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
         if let previous = try await storage.getHistory(for: entityId, startDate: nil, endDate: start, cursor: nil, limit: 1).first {
             items.append(previous)
         }
-        return Series(points: items.sorted { $0.timestamp < $1.timestamp }.compactMap { item in value(item).map { (item.timestamp, $0) } })
+        return items.sorted { $0.timestamp < $1.timestamp }
     }
 }
 

@@ -25,6 +25,13 @@ struct HeatingCard<Content: View>: View {
 struct HeatingRoomDetailView: View {
     let detail: HeatingRoomDetail
     @Binding var range: HeatingRange
+    /// The pin (or "+n" group) whose reason is shown.
+    var selectedPinId: String?
+    var onSelectPin: (String?) -> Void = { _ in }
+    /// Compact (iPhone): the reason is an inline card below the chart; regular (Mac, iPad): a popover at the pin.
+    var layout: HeatingLayout = .regular
+    /// Estimate of the plot width until the chart measured itself; the pins stack with it.
+    var plotWidthEstimate: CGFloat = 290
     /// The selected moment of the crosshair; driven by hover or drag, preset in previews.
     @State var crosshair: Date?
     var onClose: (() -> Void)?
@@ -37,14 +44,19 @@ struct HeatingRoomDetailView: View {
 
     private var includesDay: Bool { range == .week }
 
+    private var selectedSlot: HeatingPinLayout.Slot? {
+        HeatingSollIstChart.slots(events: detail.events, samples: detail.samples, range: range, plotWidth: plotWidthEstimate).first { $0.contains(selectedPinId) }
+    }
+
     var body: some View {
         HeatingCard {
             VStack(alignment: .leading, spacing: 8) {
                 header
                 HeatingRangePicker(range: $range)
                     .padding(.bottom, 8)
-                HeatingSollIstChart(samples: detail.samples, crosshair: $crosshair, range: range)
-                    .frame(height: 210)
+                HeatingSollIstChart(samples: detail.samples, events: detail.events, crosshair: $crosshair, range: range,
+                                    selectedPinId: selectedPinId, onSelectPin: onSelectPin, layout: layout, plotWidthEstimate: plotWidthEstimate)
+                    .frame(height: 210 + HeatingSollIstChart.pinAreaHeight)
                     .overlay {
                         if detail.hasNoData {
                             Text("Keine Daten im Zeitraum")
@@ -52,10 +64,13 @@ struct HeatingRoomDetailView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                if layout == .compact, let slot = selectedSlot {
+                    HeatingPinCard(events: slot.events)
+                }
                 if !detail.radiators.isEmpty {
                     valveHeader
                         .padding(.top, 8)
-                    HeatingValveChart(samples: detail.samples, radiators: detail.radiators, crosshair: $crosshair, range: range)
+                    HeatingValveChart(samples: detail.samples, events: detail.events, radiators: detail.radiators, crosshair: $crosshair, range: range)
                         .frame(height: 56)
                         .overlay {
                             if !detail.hasValues {
@@ -168,8 +183,30 @@ private let heatingGrid = Color.secondary.opacity(0.12)
 /// Soft grey actual line, dashed plan line, colour only in the gap between them.
 struct HeatingSollIstChart: View {
     let samples: [HeatingSample]
+    var events: [HeatingEvent] = []
     @Binding var crosshair: Date?
     var range: HeatingRange = .day
+    var selectedPinId: String?
+    var onSelectPin: (String?) -> Void = { _ in }
+    var layout: HeatingLayout = .regular
+    var plotWidthEstimate: CGFloat = 290
+
+    static let pinWidth: CGFloat = 22
+    static let pinRowHeight: CGFloat = 22
+    static let pinRows = 2
+    /// Room above the plot for the pin rows.
+    static let pinAreaHeight: CGFloat = pinRowHeight * CGFloat(pinRows) + 4
+
+    /// Measured width of the plot; the estimate until the first layout.
+    @State private var measuredWidth: CGFloat?
+
+    static func slots(events: [HeatingEvent], samples: [HeatingSample], range: HeatingRange, plotWidth: CGFloat) -> [HeatingPinLayout.Slot] {
+        HeatingPinLayout.slots(HeatingPinLayout.pins(events, range: range), in: HeatingChartData.timeDomain(samples), plotWidth: plotWidth, pinWidth: pinWidth, rows: pinRows)
+    }
+
+    private var slots: [HeatingPinLayout.Slot] {
+        Self.slots(events: events, samples: samples, range: range, plotWidth: measuredWidth ?? plotWidthEstimate)
+    }
 
     @Environment(\.colorScheme) private var scheme
 
@@ -193,7 +230,10 @@ struct HeatingSollIstChart: View {
 
     var body: some View {
         let selected = crosshair.flatMap { HeatingChartData.nearest(to: $0, in: samples) }
+        let slots = slots
+        let domain = HeatingChartData.timeDomain(samples)
         Chart {
+            HeatingEventAreas(events: events, domain: domain)
             ForEach(HeatingChartData.gapSegments(samples)) { segment in
                 ForEach(Array(segment.points.enumerated()), id: \.offset) { _, point in
                     AreaMark(x: .value("Zeit", point.date),
@@ -219,6 +259,11 @@ struct HeatingSollIstChart: View {
                         .foregroundStyle(HeatingPalette.istLine(scheme: scheme))
                 }
             }
+            ForEach(slots.filter { $0.contains(selectedPinId) }.flatMap(\.events)) { event in
+                RuleMark(x: .value("Zeit", event.pin))
+                    .foregroundStyle(Color.secondary.opacity(0.4))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
+            }
             if let selected {
                 RuleMark(x: .value("Zeit", selected.date))
                     .foregroundStyle(Color.secondary.opacity(0.45))
@@ -243,7 +288,56 @@ struct HeatingSollIstChart: View {
         .chartXAxis { HeatingTimeAxis.marks(range: range) }
         .chartPlotStyle { $0.clipped() }
         .chartOverlay { proxy in
-            HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair)
+            ZStack(alignment: .topLeading) {
+                HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair) { _, plotWidth in
+                    if measuredWidth != plotWidth { measuredWidth = plotWidth }
+                }
+                pinRows(slots, proxy: proxy)
+            }
+        }
+        .padding(.top, Self.pinAreaHeight)
+    }
+
+    /// The pins hang above the plot, outside the chart's clip: one button per slot, row 0 closest to the plot.
+    private func pinRows(_ slots: [HeatingPinLayout.Slot], proxy: ChartProxy) -> some View {
+        GeometryReader { geometry in
+            if let frame = proxy.plotFrame {
+                let plot = geometry[frame]
+                ForEach(slots) { slot in
+                    if let x = proxy.position(forX: slot.events[0].pin) {
+                        Button { onSelectPin(slot.id) } label: {
+                            HeatingPinBadge(slot: slot, isSelected: slot.contains(selectedPinId))
+                                .frame(width: Self.pinWidth, height: Self.pinRowHeight)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: popoverBinding(for: slot), arrowEdge: .top) {
+                            HeatingPinCard(events: slot.events, inPopover: true)
+                                .frame(width: 260)
+                        }
+                        .position(x: plot.minX + min(max(x, Self.pinWidth / 2), plot.width - Self.pinWidth / 2),
+                                  y: plot.minY - Self.pinRowHeight / 2 - 2 - CGFloat(slot.row) * Self.pinRowHeight)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Regular layout: the popover belongs to the selected pin. Compact shows an inline card instead.
+    private func popoverBinding(for slot: HeatingPinLayout.Slot) -> Binding<Bool> {
+        Binding(get: { layout == .regular && slot.contains(selectedPinId) }, set: { if !$0 { onSelectPin(nil) } })
+    }
+}
+
+/// The areas of events with a duration: window grey, fireplace soft orange.
+struct HeatingEventAreas: ChartContent {
+    let events: [HeatingEvent]
+    let domain: ClosedRange<Date>
+
+    var body: some ChartContent {
+        ForEach(HeatingPinLayout.areas(events).filter { ($0.end ?? domain.upperBound) > domain.lowerBound && $0.start < domain.upperBound }) { event in
+            RectangleMark(xStart: .value("Start", max(event.start, domain.lowerBound)), xEnd: .value("Ende", min(event.end ?? domain.upperBound, domain.upperBound)))
+                .foregroundStyle(event.source == .fireplace ? Color.orange.opacity(0.1) : Color.gray.opacity(0.1))
         }
     }
 }
@@ -251,6 +345,7 @@ struct HeatingSollIstChart: View {
 /// Slim valve chart: one quiet line per radiator, only 0 and 100 % marked, names only on hover.
 struct HeatingValveChart: View {
     let samples: [HeatingSample]
+    var events: [HeatingEvent] = []
     let radiators: [String]
     @Binding var crosshair: Date?
     var range: HeatingRange = .day
@@ -258,6 +353,7 @@ struct HeatingValveChart: View {
     var body: some View {
         let selected = crosshair.flatMap { HeatingChartData.nearest(to: $0, in: samples) }
         Chart {
+            HeatingEventAreas(events: events, domain: HeatingChartData.timeDomain(samples))
             ForEach(radiators.indices, id: \.self) { index in
                 ForEach(Array(HeatingChartData.valveRuns(samples, radiator: index).enumerated()), id: \.offset) { run, points in
                     ForEach(Array(points.enumerated()), id: \.offset) { _, point in
@@ -313,12 +409,17 @@ enum HeatingTimeAxis {
 struct HeatingCrosshairOverlay: View {
     let proxy: ChartProxy
     @Binding var crosshair: Date?
+    /// Reports the x (relative to the plot) and the width of the plot, so the pins can stack with the real width.
+    var onPlot: (CGFloat, CGFloat) -> Void = { _, _ in }
 
     var body: some View {
         GeometryReader { geometry in
+            let plot = proxy.plotFrame.map { geometry[$0] }
             Rectangle()
                 .fill(.clear)
                 .contentShape(Rectangle())
+                .onAppear { if let plot { onPlot(plot.minX, plot.width) } }
+                .onChange(of: plot?.width) { if let plot { onPlot(plot.minX, plot.width) } }
                 .onContinuousHover { phase in
                     switch phase {
                     case .active(let location): crosshair = date(at: location, in: geometry)

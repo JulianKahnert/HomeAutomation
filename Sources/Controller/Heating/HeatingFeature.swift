@@ -25,6 +25,8 @@ struct HeatingFeature: Sendable {
         var selectedPlaceId: String?
         var range: HeatingRange = .day
         var detail: HeatingRoomDetail?
+        /// The pin (or "+n" group) whose reason is shown; `nil` for none.
+        var selectedPinId: String?
         var isLoading = false
         /// When the overview was loaded; the headline shows the time.
         var updatedAt: Date?
@@ -53,6 +55,7 @@ struct HeatingFeature: Sendable {
         case fireplaceSwitched(Result<FireplaceState, Error>)
         case overviewResponse(Result<HeatingOverview, Error>)
         case refresh
+        case selectPin(String?)
         case selectRoom(String?)
         /// The toolbar button, the push action "Kamin an?" and later the reminder push: switches the fireplace.
         case setFireplace(Bool)
@@ -135,9 +138,15 @@ struct HeatingFeature: Sendable {
             case let .selectRoom(placeId):
                 state.selectedPlaceId = placeId
                 state.detail = nil
+                state.selectedPinId = nil
                 return loadDetail(&state)
 
+            case let .selectPin(pinId):
+                state.selectedPinId = state.selectedPinId == pinId ? nil : pinId
+                return .none
+
             case .binding(\.range):
+                state.selectedPinId = nil
                 return loadDetail(&state)
 
             case let .detailResponse(.success(detail)):

@@ -84,3 +84,9 @@ One cell of the week heatmap: the mean Δ of one room over one six-hour segment 
 
 **Week heatmap** (Wochen-Heatmap)
 The card "Woche" of the Heizung tab: rooms × days × four segments as rounded cells, coloured like the bars (blue too cold, grey in the comfort band, orange too warm, deeper tint for a larger Δ), hatched without actual value. The value appears only on tap or hover; there is no legend.
+
+**Heating event** (Ereignis)
+Something that happened in a room, in the room detail's `events` (`source`, title, reason, real `start`, optional `end`, `pin`): `plan` (a plan switch, from the plan writes), `window` and `fireplace` (from the contact's history, with a duration; a window counts only when the server wrote for it, the fireplace that ran eight hours says the timeout ended it), `observed` and `system` (see observed change and heating write reason). An event that began before the range keeps its real start and its `pin` sits at the range start; events outside the range are dropped. Several radiators written within a minute are one event.
+
+**Pin** (Pin)
+The small SF Symbol above the room detail's chart for one event: `calendar` plan, `window.vertical.open` window, `flame` fireplace, `hand.raised` observed, `gearshape` system. At most two rows; a pin that finds both rows taken joins the last pin of the second row as a "+n" pin that lists all of them. Plan pins show up to 24 h only. Tapping or hovering shows the reason, as a popover on Mac and iPad and as an inline card on iPhone. Window and fireplace events with a duration also draw an area over the plot. There is no legend.

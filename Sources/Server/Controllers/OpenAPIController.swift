@@ -438,6 +438,7 @@ extension Components.Schemas.HeatingRoomDetail {
                   istSource: source,
                   radiators: detail.radiators,
                   samples: detail.samples.map { .init(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) },
-                  lastIst: detail.lastIst)
+                  lastIst: detail.lastIst,
+                  events: detail.events.map { .init(source: $0.source.rawValue, title: $0.title, reason: $0.reason, start: $0.start, end: $0.end, pin: $0.pin) })
     }
 }

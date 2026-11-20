@@ -115,7 +115,10 @@ struct HeatingScreen: View {
     @ViewBuilder
     private var detail: some View {
         if let detail = store.detail {
-            HeatingRoomDetailView(detail: detail, range: $store.range, onClose: layout == .compact ? { store.send(.selectRoom(nil)) } : nil)
+            HeatingRoomDetailView(detail: detail, range: $store.range, selectedPinId: store.selectedPinId,
+                                  onSelectPin: { store.send(.selectPin($0)) }, layout: layout,
+                                  plotWidthEstimate: layout == .compact ? 290 : 560,
+                                  onClose: layout == .compact ? { store.send(.selectRoom(nil)) } : nil)
         } else if store.detailError != nil {
             ContentUnavailableView("Raum nicht ladbar", systemImage: "exclamationmark.triangle",
                                    description: Text("Der Server hat keine Daten für diesen Raum geliefert."))

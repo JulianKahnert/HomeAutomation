@@ -18,18 +18,30 @@ public struct RoomHeating: Automatable {
     /// `nil` for a room without a plan of its own: it follows the standard plan.
     public let plan: HeatingPlan?
     public let configuration: HeatingConfiguration
+    /// The room's own temperature sensor; `nil` when the actual value is the mean of the radiators.
+    public let roomSensor: EntityId?
 
     public var triggerEntityIds: Set<EntityId> { [] }
 
     /// The plan this room follows.
     public var effectivePlan: HeatingPlan { plan ?? configuration.standardPlan }
 
-    public init(_ name: String, placeId: PlaceId, radiators: [Radiator], plan: HeatingPlan? = nil, configuration: HeatingConfiguration) {
+    public init(_ name: String, placeId: PlaceId, radiators: [Radiator], plan: HeatingPlan? = nil, roomSensor: EntityId? = nil, configuration: HeatingConfiguration) {
+        self.roomSensor = roomSensor
         self.name = name
         self.placeId = placeId
         self.radiators = radiators
         self.plan = plan
         self.configuration = configuration
+    }
+
+    /// What the room endpoint needs to build the detail of this room.
+    public var heatingSources: HeatingRoomSources {
+        HeatingRoomSources(placeId: placeId,
+                           name: placeId,
+                           radiators: radiators.map { .init(name: $0.heatingId.name, temperatureId: $0.temperatureId, valvePositionId: $0.valvePositionId) },
+                           roomSensor: roomSensor,
+                           plan: effectivePlan)
     }
 
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {

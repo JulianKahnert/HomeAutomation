@@ -13,6 +13,15 @@ open class RadiatorDevice: Codable, @unchecked Sendable, Validatable, Log {
     /// The heating threshold, the target temperature the radiator holds.
     public let targetTemperatureId: EntityId
 
+    /// The radiator's own temperature measurement (same device as `heatingId`).
+    public var temperatureId: EntityId { sibling(.temperatureSensor) }
+    /// The radiator's valve opening in percent (same device as `heatingId`).
+    public var valvePositionId: EntityId { sibling(.valvePosition) }
+
+    private func sibling(_ characteristic: CharacteristicsType) -> EntityId {
+        EntityId(placeId: heatingId.placeId, name: heatingId.name, characteristicsName: nil, characteristic: characteristic)
+    }
+
     public init(heatingId: EntityId, targetTemperatureId: EntityId) {
         self.heatingId = heatingId
         self.targetTemperatureId = targetTemperatureId

@@ -46,11 +46,14 @@ public enum Fireplace {
     /// Collapse id of the fireplace pushes, so a newer one replaces an older.
     public static let notificationId = "fireplace"
 
-    /// The state of the switch `switchId`. An unreachable switch (its state cannot be read) is off.
+    /// The state of the switch `switchId`. An unreachable switch is off: its state cannot be read, or HomeKit
+    /// is degraded (the adapter lost `homed`, or Homebridge is down), so a last known "on" cannot be trusted.
+    /// While HomeKit is not judged yet (a restart) the last known value counts, so the restart re-applies it.
     ///
     /// The start time comes from the database, not from the cache: after a restart the adapter's resync
     /// refreshes the cache with a new timestamp, the database still holds when the switch went on.
     public static func state(of switchId: EntityId, with hm: HomeManagable) async -> FireplaceState {
+        if case .degraded = await hm.homeKitHealth() { return .off }
         guard let current = try? await hm.getCurrentEntity(with: switchId), current.isDeviceOn == true else { return .off }
         if let stored = await hm.getStoredEntity(with: switchId), stored.isDeviceOn == true {
             return FireplaceState(isOn: true, since: stored.timestamp)

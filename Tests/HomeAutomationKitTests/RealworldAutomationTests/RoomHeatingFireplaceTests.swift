@@ -127,6 +127,24 @@ struct RoomHeatingFireplaceTests {
         #expect(targets() == [plan.planTarget(at: noon)!])
     }
 
+    @Test("A fireplace switch that is on while HomeKit is degraded counts as off: the plan keeps running")
+    func degradedHomeKitIsOff() async throws {
+        setFireplace(on: true, at: noon.addingTimeInterval(-3600))
+        homeManager.health = .degraded(reason: "homed dropped the adapter")
+
+        #expect(await Fireplace.state(with: homeManager) == .off)
+        #expect(try await !room().shouldTrigger(with: .serverStarted, using: homeManager))
+    }
+
+    @Test("A fireplace switch that is on while HomeKit is not judged yet still counts, so a restart re-applies it")
+    func unknownHomeKitKeepsTheValue() async throws {
+        setFireplace(on: true, at: noon.addingTimeInterval(-3600))
+        homeManager.health = .unknown(reason: "starting")
+
+        #expect(await Fireplace.state(with: homeManager).isOn)
+        #expect(try await room().shouldTrigger(with: .serverStarted, using: homeManager))
+    }
+
     @Test("A restart with the fireplace on switches the room off by itself, without a plan write")
     func restartWithFireplaceOn() async throws {
         setFireplace(on: true, at: noon.addingTimeInterval(-3600))

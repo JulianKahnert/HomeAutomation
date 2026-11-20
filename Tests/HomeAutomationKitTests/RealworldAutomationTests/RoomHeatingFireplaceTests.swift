@@ -121,7 +121,7 @@ struct RoomHeatingFireplaceTests {
     func unreachableIsOff() async throws {
         // no state of the switch at all
         #expect(try await !room().shouldTrigger(with: .serverStarted, using: homeManager))
-        try await room().execute(using: homeManager, now: noon, sleep: { _ in })
+        try await room().execute(using: homeManager, now: noon, isDeploy: true, sleep: { _ in })
 
         #expect(homeManager.performedActions.allSatisfy { if case .setTargetTemperature = $0.action { true } else { $0.action == .setHeating(left.heatingId, active: true) } })
         #expect(targets() == [plan.planTarget(at: noon)!])

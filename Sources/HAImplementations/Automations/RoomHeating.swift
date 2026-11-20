@@ -102,9 +102,11 @@ public struct RoomHeating: Automatable {
     ///   waits the rest of the delay and looks again; a run cancelled meanwhile writes nothing.
     /// - A radiator without: the plan target at a switch point (reason `plan`), when the contact that took
     ///   it off just closed (reason of the contact: back to the plan at once, not to an old manual value),
-    ///   and `system` after a deploy. A switch point while a radiator is off records the plan target for the
-    ///   history without sending it. A radiator that no switch point and no closing concerns keeps its value.
-    func execute(using hm: HomeManagable, now: Date, sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) async throws {
+    ///   and `system` after a deploy (`isDeploy`), also while other radiators of the room are off. A switch
+    ///   point while a radiator is off records the plan target for the history without sending it. A radiator
+    ///   that no switch point, no closing and no deploy concerns keeps its value.
+    func execute(using hm: HomeManagable, now: Date, isDeploy: Bool = AutomationRunContext.isConfigDeploy,
+                 sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) async throws {
         let plan = effectivePlan
         let isSwitchPoint = plan.switchPoint(at: now) != nil
         let initialOffs = await offStates(using: hm)
@@ -130,10 +132,10 @@ public struct RoomHeating: Automatable {
                 current = next
             }
             let others = radiators.filter { radiator in !initialOffs.contains { $0.radiator.heatingId == radiator.heatingId } }
-            try await writePlan(to: others, now: now, isSwitchPoint: isSwitchPoint, isDeploy: false, using: hm)
+            try await writePlan(to: others, now: now, isSwitchPoint: isSwitchPoint, isDeploy: isDeploy, using: hm)
             return
         }
-        try await writePlan(to: radiators, now: now, isSwitchPoint: isSwitchPoint, isDeploy: true, using: hm)
+        try await writePlan(to: radiators, now: now, isSwitchPoint: isSwitchPoint, isDeploy: isDeploy, using: hm)
     }
 
     /// Writes the plan target to the `targets` that a switch point or a closing contact concerns. With

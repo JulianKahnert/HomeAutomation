@@ -108,7 +108,7 @@ struct RoomHeatingTests {
         let room = room()
 
         #expect(try await room.shouldTrigger(with: .configDeployed, using: homeManager))
-        try await room.execute(using: homeManager, now: date(day: 18, hour: 12, minute: 17))
+        try await room.execute(using: homeManager, now: date(day: 18, hour: 12, minute: 17), isDeploy: true)
 
         #expect(targets() == [21, 21])
         #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .system, planTargetInC: 21) })
@@ -116,9 +116,37 @@ struct RoomHeatingTests {
 
     @Test("After midnight a deploy writes the last target of the day before")
     func deployBeforeFirstSwitchPoint() async throws {
-        try await room().execute(using: homeManager, now: date(day: 19, hour: 3))
+        try await room().execute(using: homeManager, now: date(day: 19, hour: 3), isDeploy: true)
 
         #expect(targets() == [17, 17])
+    }
+
+    @Test("A deploy writes the plan target with reason system to the radiators the fireplace does not switch off")
+    func deployWritesPlanTargetToRadiatorsNotOff() async throws {
+        let fireplace = GenericSwitch(query: .init(placeId: "Kitchen", name: "Kamin"))
+        let room = RoomHeating("heating-kitchen", placeId: "Kitchen", radiators: [left, right],
+                               contacts: [.window(windowA), .fireplace(fireplace, radiators: [left])],
+                               configuration: HeatingConfiguration(standardPlan: standardPlan))
+        let now = date(day: 18, hour: 12, minute: 17)
+        homeManager.storageItems = [
+            EntityStorageItem(entityId: windowA.contactSensorId, timestamp: now.addingTimeInterval(-3600), isContactOpen: false),
+            EntityStorageItem(entityId: fireplace.switchId, timestamp: now.addingTimeInterval(-600), isDeviceOn: true)
+        ]
+
+        #expect(try await room.shouldTrigger(with: .configDeployed, using: homeManager))
+        try await AutomationRunContext.$event.withValue(.configDeployed) {
+            try await room.execute(using: homeManager, now: now, sleep: { _ in })
+        }
+
+        let writes = homeManager.performedActions
+        #expect(writes.map(\.action) == [
+            .setHeating(left.heatingId, active: false),
+            .setHeating(right.heatingId, active: true), .setTargetTemperature(right.targetTemperatureId, celsius: 21)
+        ])
+        #expect(writes.map(\.heating) == [
+            .init(reason: .fireplace),
+            .init(reason: .system, planTargetInC: 21), .init(reason: .system, planTargetInC: 21)
+        ])
     }
 
     // MARK: - configuration

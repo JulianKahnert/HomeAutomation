@@ -65,6 +65,9 @@ struct ServerClientDependency: Sendable {
     /// History of every entity in a room, newest first per entity
     var getRoomHistory: @Sendable (_ placeId: String, _ startDate: Date?, _ endDate: Date?, _ includePrevious: Bool) async throws -> [EntityHistory]
 
+    /// The time grid of one heating room for a range
+    var getHeatingRoom: @Sendable (_ placeId: String, _ range: HeatingRange) async throws -> HeatingRoomDetail
+
     /// The server's location, used for sunrise and sunset
     var getLocation: @Sendable () async throws -> Location
 }
@@ -87,6 +90,7 @@ extension ServerClientDependency: TestDependencyKey {
         getEntityIdsWithHistory: { [] },
         getEntityHistory: { _, _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) },
         getRoomHistory: { _, _, _, _ in [] },
+        getHeatingRoom: { placeId, range in HeatingRoomDetail(placeId: placeId, name: placeId, range: range, istSource: .thermostats([]), radiators: [], samples: []) },
         getLocation: { Location(latitude: 52.5, longitude: 13.4) }
     )
 
@@ -208,6 +212,9 @@ extension ServerClientDependency: TestDependencyKey {
             return EntityHistoryResponse(items: items, nextCursor: nil)
         },
         getRoomHistory: { _, _, _, _ in [] },
+        getHeatingRoom: { placeId, range in
+            HeatingPreviewData.rooms.first { $0.id == placeId }?.detail(range) ?? HeatingPreviewData.rooms[0].detail(range)
+        },
         getLocation: { Location(latitude: 52.5, longitude: 13.4) }
     )
 
@@ -288,6 +295,9 @@ extension ServerClientDependency: DependencyKey {
         },
         getRoomHistory: { placeId, startDate, endDate, includePrevious in
             try await client.getRoomHistory(placeId: placeId, startDate: startDate, endDate: endDate, includePrevious: includePrevious)
+        },
+        getHeatingRoom: { placeId, range in
+            try await client.getHeatingRoom(placeId: placeId, range: range)
         },
         getLocation: {
             try await client.getLocation()

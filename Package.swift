@@ -45,6 +45,7 @@ let package = Package(
                     "ComposableArchitecture2DeprecationOverloads"
                  ]),
         .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.10.1"),
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.19.7"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", exact: "5.1.0"),
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.17.0"),
@@ -169,7 +170,10 @@ let package = Package(
         ),
         .testTarget(
             name: "ControllerTests",
-            dependencies: ["Controller"],
+            dependencies: [
+                "Controller",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
+            ],
             path: "Tests/ControllerTests"
         ),
         .testTarget(

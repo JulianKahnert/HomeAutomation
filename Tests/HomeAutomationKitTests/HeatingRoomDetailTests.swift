@@ -129,6 +129,18 @@ struct HeatingRoomDetailTests {
         #expect(fallback.samples.first?.sollPlan == 18)
     }
 
+    @Test("a plan target recorded while the room was off still moves the plan line")
+    func unsentPlanWriteMovesPlan() async throws {
+        let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)
+        let off = HeatingWrite(timestamp: now.addingTimeInterval(-7_200), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 21, planTargetInC: 21)
+        let unsent = HeatingWrite(timestamp: now.addingTimeInterval(-3_600), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 17, planTargetInC: 17, sentToDevice: false)
+
+        let detail = try await builder([temp(thermoA, 30, 20)], writes: [off, unsent]).detail(for: sources, range: .day)
+
+        #expect(detail.samples.last?.sollPlan == 17)
+        #expect(detail.samples.last?.delta == 3)
+    }
+
     @Test("a write without a plan target does not change the plan history")
     func nonPlanWrites() async throws {
         let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .heating)

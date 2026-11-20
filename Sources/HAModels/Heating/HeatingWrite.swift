@@ -58,6 +58,9 @@ public struct HeatingWrite: Identifiable, Sendable, Codable, Equatable {
     public let targetTemperatureInC: Double?
     /// The plan target at the time of the write; `nil` for writes that do not follow the plan.
     public let planTargetInC: Double?
+    /// `false` for a plan target the server only recorded because the room was off at the switch point:
+    /// nothing was sent to the radiator, so it is no state of the radiator.
+    public let sentToDevice: Bool
 
     public var placeId: String { entityId.placeId }
 
@@ -68,7 +71,8 @@ public struct HeatingWrite: Identifiable, Sendable, Codable, Equatable {
                 actionName: String,
                 isActive: Bool? = nil,
                 targetTemperatureInC: Double? = nil,
-                planTargetInC: Double? = nil) {
+                planTargetInC: Double? = nil,
+                sentToDevice: Bool = true) {
         self.id = id
         self.timestamp = timestamp
         self.entityId = entityId
@@ -77,6 +81,7 @@ public struct HeatingWrite: Identifiable, Sendable, Codable, Equatable {
         self.isActive = isActive
         self.targetTemperatureInC = targetTemperatureInC
         self.planTargetInC = planTargetInC
+        self.sentToDevice = sentToDevice
     }
 
     /// The record of `action`, or `nil` when `action` is not a radiator write.
@@ -98,7 +103,7 @@ public protocol HeatingWriteRepository: Sendable {
     /// The writes to the radiators of room `placeId` in `startDate ..< endDate` (open ends allowed),
     /// oldest first.
     func writes(placeId: String, startDate: Date?, endDate: Date?) async throws -> [HeatingWrite]
-    /// The newest write to the radiator `radiatorName` of room `placeId`, whatever its characteristic.
+    /// The newest write that reached the radiator `radiatorName` of room `placeId`, whatever its characteristic.
     func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite?
     func deleteWrites(olderThan date: Date) async throws
 }

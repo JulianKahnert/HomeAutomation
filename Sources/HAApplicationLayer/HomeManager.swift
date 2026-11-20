@@ -191,7 +191,9 @@ public final class HomeManager: HomeManagable {
             // Only a command that reached the device may deduplicate its successors.
             await actionLogManager.markExecuted(action)
             liveness.recordCommandSuccess(at: Date())
-            await recordHeatingWrite(of: action, context: heating)
+            if let heating, let write = HeatingWrite(action: action, context: heating) {
+                await record(write)
+            }
         } catch {
             liveness.recordCommandFailure(error, at: Date())
             await actionLogManager.markFailed(action)
@@ -211,13 +213,13 @@ public final class HomeManager: HomeManagable {
         }
     }
 
-    /// Persists a radiator write that reached the device; a failing database must not fail the command.
-    private func recordHeatingWrite(of action: HomeManagableAction, context: HeatingWriteContext.Context?) async {
-        guard let heatingWrites, let context, let write = HeatingWrite(action: action, context: context) else { return }
+    /// Persists a radiator write; a failing database must not fail the command.
+    public func record(_ write: HeatingWrite) async {
+        guard let heatingWrites else { return }
         do {
             try await heatingWrites.add(write)
         } catch {
-            log.error("Failed to record heating write [\(action)]: \(error)")
+            log.error("Failed to record heating write", metadata: ["action": "\(write.actionName)", "radiator": "\(write.entityId.name)", "error": "\(error)"])
         }
     }
 

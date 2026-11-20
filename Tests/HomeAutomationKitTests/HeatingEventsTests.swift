@@ -51,6 +51,14 @@ struct HeatingEventsTests {
         #expect(!found[0].reason.isEmpty)
     }
 
+    @Test("a plan target recorded without sending it is no event and no manual change")
+    func unsentPlanWrite() async throws {
+        let unsent = HeatingWrite(timestamp: ago(60), entityId: target, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 17, planTargetInC: 17, sentToDevice: false)
+        let items = [EntityStorageItem(entityId: target, timestamp: ago(120), targetTemperatureInC: 21)]   // the radiator was not told
+
+        #expect(try await events(items, writes: [unsent]).isEmpty)
+    }
+
     @Test("a system write becomes a system event")
     func system() async throws {
         let found = try await events(writes: [write(.system, 30, target: 19, plan: 19)])

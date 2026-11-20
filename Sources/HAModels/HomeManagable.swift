@@ -28,9 +28,11 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem]
     /// When a notification with this id was last sent by this server process; `nil` if none was since the start.
     func lastNotificationDate(id: String) async -> Date?
-    /// The newest write the server made to `radiator` (matched by room and name, whatever the characteristic),
-    /// `nil` when it made none or does not record them.
+    /// The newest write that reached `radiator` (matched by room and name, whatever the characteristic),
+    /// `nil` when there is none or the server does not record them.
     func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite?
+    /// Records a write of the plan history that sends nothing (`HeatingWrite.sentToDevice` is `false`).
+    func record(_ write: HeatingWrite) async
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
     /// - Returns: Whether the item carries new information, i.e. differs in value — not just in
     ///   timestamp — from the last known state of that entity.

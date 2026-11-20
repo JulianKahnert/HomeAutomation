@@ -93,6 +93,7 @@ public struct RoomHeating: Automatable {
     ///   contact is open leaves the radiators off.
     func execute(using hm: HomeManagable, now: Date, sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) async throws {
         if let off = await firstOff(using: hm) {
+            await recordPlanTargetWhileOff(at: now, using: hm)
             let remaining = off.at.timeIntervalSince(now)
             if remaining > 0 {
                 try await sleep(.seconds(remaining))
@@ -125,6 +126,17 @@ public struct RoomHeating: Automatable {
             for radiator in radiators {
                 await radiator.setTarget(target, with: hm)
             }
+        }
+    }
+
+    /// A switch point while the room is off writes nothing to the radiators, but the plan history has to
+    /// follow the plan (glossary: plan target): it records the new plan target as a write that was not sent.
+    private func recordPlanTargetWhileOff(at now: Date, using hm: HomeManagable) async {
+        let plan = effectivePlan
+        guard plan.switchPoint(at: now) != nil, let target = plan.planTarget(at: now) else { return }
+        for radiator in radiators {
+            await hm.record(HeatingWrite(timestamp: now, entityId: radiator.targetTemperatureId, reason: .plan, actionName: "setTargetTemperature",
+                                         targetTemperatureInC: target, planTargetInC: target, sentToDevice: false))
         }
     }
 

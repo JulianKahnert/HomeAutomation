@@ -120,8 +120,9 @@ public struct HeatingRoomDetailBuilder: Sendable {
         for radiator in room.radiators {
             if let id = radiator.targetTemperatureId { targetItems[radiator.name] = try await items(id, from: start, to: end) }
         }
-        let allWrites = try await writes.writes(placeId: room.placeId, startDate: nil, endDate: end)
-        let events = HeatingEventBuilder(room: room, writes: allWrites, contactItems: contactItems, targetItems: targetItems, start: start, end: end).events()
+        // Only what reached a radiator is an event: a plan target recorded while the room was off is not.
+        let sentWrites = try await writes.writes(placeId: room.placeId, startDate: nil, endDate: end).filter(\.sentToDevice)
+        let events = HeatingEventBuilder(room: room, writes: sentWrites, contactItems: contactItems, targetItems: targetItems, start: start, end: end).events()
 
         let istSeries = sensorTemps.map { [$0] } ?? thermostatTemps
         return HeatingRoomDetail(placeId: room.placeId,

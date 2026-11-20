@@ -144,7 +144,11 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     var heatingWrites: [HeatingWrite] = []
 
     func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
-        heatingWrites.last { $0.placeId == radiator.placeId && $0.entityId.name == radiator.name }
+        heatingWrites.last { $0.sentToDevice && $0.placeId == radiator.placeId && $0.entityId.name == radiator.name }
+    }
+
+    func record(_ write: HeatingWrite) async {
+        heatingWrites.append(write)
     }
 
     func getAllEntitiesLive() async throws -> [EntityStorageItem] {

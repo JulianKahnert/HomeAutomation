@@ -437,6 +437,7 @@ extension Components.Schemas.HeatingRoomDetail {
                   range: detail.range.rawValue,
                   istSource: source,
                   radiators: detail.radiators,
-                  samples: detail.samples.map { .init(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) })
+                  samples: detail.samples.map { .init(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) },
+                  lastIst: detail.lastIst)
     }
 }

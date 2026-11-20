@@ -46,10 +46,26 @@ enum HeatingChartData {
 
     static func istRuns(_ samples: [HeatingSample]) -> [[Point]] { runs(samples) { $0.ist } }
 
-    /// The plan line is only drawn next to an actual value; a room without any has no plan line.
+    /// The plan line; a room without any actual value still has it.
     static func planRuns(_ samples: [HeatingSample]) -> [[Point]] {
-        guard samples.contains(where: { $0.ist != nil }) else { return [] }
-        return runs(samples) { $0.sollPlan }
+        runs(samples) { $0.sollPlan }
+    }
+
+    /// The smallest height of a bar in K, so a room at Δ≈0 stays a visible pill.
+    static let minimumBarHeight = 0.34
+
+    /// The extent of the Δ bar: from the zero line to Δ, clipped at the ±3 K scale (the bar then runs off the
+    /// end), and at least `minimumBarHeight` high (a bar at Δ≈0 is a pill around the zero line).
+    static func barExtent(forDelta delta: Double) -> ClosedRange<Double> {
+        let clipped = min(max(delta, -HeatingPalette.barScale), HeatingPalette.barScale)
+        var low = min(clipped, 0)
+        var high = max(clipped, 0)
+        if high - low < minimumBarHeight {
+            let middle = (low + high) / 2
+            low = middle - minimumBarHeight / 2
+            high = middle + minimumBarHeight / 2
+        }
+        return low...high
     }
 
     static func valveRuns(_ samples: [HeatingSample], radiator: Int) -> [[Point]] {

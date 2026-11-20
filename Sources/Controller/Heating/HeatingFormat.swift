@@ -30,9 +30,10 @@ enum HeatingFormat {
 
     /// "15.11. 22:40" for ranges over a day, "22:40" otherwise.
     static func time(_ date: Date, includingDay: Bool, calendar: Calendar = .current) -> String {
-        var style = Date.FormatStyle(date: .omitted, time: .omitted, locale: locale, calendar: calendar, timeZone: calendar.timeZone)
-        style = includingDay ? style.day(.twoDigits).month(.twoDigits).hour().minute() : style.hour().minute()
-        return date.formatted(style)
+        let style = Date.FormatStyle(date: .omitted, time: .omitted, locale: locale, calendar: calendar, timeZone: calendar.timeZone)
+        let time = date.formatted(style.hour().minute())
+        guard includingDay else { return time }
+        return "\(date.formatted(style.day(.twoDigits).month(.twoDigits))) \(time)"
     }
 
     /// "Mo.", "Di." for the 7 d axis.

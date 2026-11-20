@@ -79,7 +79,7 @@ struct HeatingOverviewSnapshotTests {
         let rooms = HeatingFeature.sorted([room("Bad OG", ist: 16.5), room("Küche", ist: 22.4), room("Büro", ist: 20.7),
                                            room("Flur", ist: 23.5), room("Keller", ist: nil)])
         for scheme in [ColorScheme.light, .dark] {
-            let view = HeatingOverviewView(rooms: rooms, headline: HeatingFeature.headline(for: rooms), selectedPlaceId: "Büro",
+            let view = HeatingOverviewView(rooms: rooms, headline: HeatingFeature.headlineParts(for: rooms), updatedAt: HeatingPreviewData.now, selectedPlaceId: "Büro",
                                            hoveredPlaceId: "Küche") { _ in }
                 .padding(16)
             render(view, CGSize(width: 402, height: 340), scheme, name: "iPhone", test: "overview-bubble")

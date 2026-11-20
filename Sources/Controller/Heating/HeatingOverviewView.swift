@@ -78,7 +78,7 @@ struct HeatingOverviewView: View {
                         .clipShape(.rect(cornerRadius: 8))
                 }
             }
-            RectangleMark(yStart: .value("Δ", -HeatingPalette.comfortBand), yEnd: .value("Δ", HeatingPalette.comfortBand))
+            RectangleMark(yStart: .value("Δ", -HeatingComfort.band), yEnd: .value("Δ", HeatingComfort.band))
                 .foregroundStyle(Color.gray.opacity(0.1))
             RuleMark(y: .value("Δ", 0))
                 .foregroundStyle(Color.secondary.opacity(0.5))

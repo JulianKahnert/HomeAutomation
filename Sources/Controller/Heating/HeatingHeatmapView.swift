@@ -108,7 +108,7 @@ struct HeatingHeatmapView: View {
     /// Grey inside the comfort band, blue or orange beyond it; the stronger the deviation, the deeper the tint.
     static func color(_ delta: Double, scheme: ColorScheme) -> Color {
         let base = HeatingPalette.color(forDelta: delta, scheme: scheme)
-        if HeatingPalette.band(forDelta: delta) == .ok { return base.opacity(0.28) }
+        if HeatingComfort(delta: delta) == .ok { return base.opacity(0.28) }
         let strength = min(abs(delta) / HeatingPalette.barScale, 1)
         // Dark mode needs a higher floor: a weak peach over a dark card turns brown.
         return base.opacity((scheme == .dark ? 0.6 : 0.4) + (scheme == .dark ? 0.4 : 0.6) * strength)

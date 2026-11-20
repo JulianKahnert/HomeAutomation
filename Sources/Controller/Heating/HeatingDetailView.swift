@@ -212,7 +212,7 @@ struct HeatingSollIstChart: View {
 
     /// Light: strong at the actual line, fading towards the plan. Dark: a flat, higher opacity, so
     /// the peach orange does not turn brown on the dark card.
-    private func gapStyle(_ band: HeatingPalette.Band) -> AnyShapeStyle {
+    private func gapStyle(_ band: HeatingComfort) -> AnyShapeStyle {
         let color = HeatingPalette.color(band, scheme: scheme)
         if scheme == .dark {
             // A lighter blue than the bars, so the thin fill does not turn navy.

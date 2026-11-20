@@ -26,8 +26,11 @@ public struct HeatingRoomSources: Sendable, Equatable {
     public var roomSensor: EntityId?
     /// Fallback for plan targets before the first plan write in a range.
     public var plan: HeatingPlan?
+    /// Whether the room lists the fireplace as a contact (glossary: fireplace mode).
+    public var followsFireplace: Bool
 
-    public init(placeId: String, name: String, radiators: [Radiator], roomSensor: EntityId?, plan: HeatingPlan?) {
+    public init(placeId: String, name: String, radiators: [Radiator], roomSensor: EntityId?, plan: HeatingPlan?, followsFireplace: Bool = false) {
+        self.followsFireplace = followsFireplace
         self.placeId = placeId
         self.name = name
         self.radiators = radiators

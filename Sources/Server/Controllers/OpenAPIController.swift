@@ -337,6 +337,24 @@ struct OpenAPIController: APIProtocol {
         let detail = try await builder.detail(for: room.heatingSources, range: range)
         return .ok(.init(body: .json(.init(detail))))
     }
+    // MARK: - /heating/fireplace
+
+    func getFireplace(_ input: Operations.GetFireplace.Input) async throws -> Operations.GetFireplace.Output {
+        let state = await Fireplace.state(with: request.application.homeManager)
+        return .ok(.init(body: .json(.init(state))))
+    }
+
+    func setFireplace(_ input: Operations.SetFireplace.Input) async throws -> Operations.SetFireplace.Output {
+        guard case .json(let body) = input.body else { throw Abort(.badRequest) }
+        let state = await Fireplace.set(isOn: body.isOn, with: request.application.homeManager)
+        return .ok(.init(body: .json(.init(state))))
+    }
+}
+
+extension Components.Schemas.Fireplace {
+    init(_ state: FireplaceState) {
+        self.init(isOn: state.isOn, since: state.since, endsAt: state.endsAt)
+    }
 }
 
 extension Components.Schemas.EntityId {
@@ -402,7 +420,8 @@ extension Components.Schemas.HeatingIstSource {
 extension Components.Schemas.HeatingOverview {
     init(_ overview: HeatingOverview) {
         self.init(rooms: overview.rooms.map {
-            .init(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, istSource: .init($0.istSource))
+            .init(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, istSource: .init($0.istSource),
+                  followsFireplace: $0.followsFireplace)
         })
     }
 }

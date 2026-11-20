@@ -447,6 +447,41 @@ paths:
         "404":
           description: The room has no heating automation.
 
+  /heating/fireplace:
+    get:
+      summary: Get the state of the fireplace
+      description: |
+        The fireplace is the switch `Keller_Kamin_switcher`. An unreachable switch counts as off.
+        `since` is when it went on, `endsAt` when the server switches it off (eight hours after `since`).
+      operationId: getFireplace
+      responses:
+        "200":
+          description: The state of the fireplace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fireplace"
+    put:
+      summary: Switch the fireplace on or off
+      description: |
+        Used by the Heizung tab and the push action "Kamin an?". Asking for the state it already has changes
+        nothing, so a second "on" does not restart the eight hours. The answer is the state the switch will
+        have; HomeKit reports the change a moment later.
+      operationId: setFireplace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FireplaceRequest"
+      responses:
+        "200":
+          description: The state of the fireplace after the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fireplace"
+
 components:
   schemas:
     Automation:
@@ -801,6 +836,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/HeatingSample"
+    Fireplace:
+      type: object
+      required: [isOn]
+      properties:
+        isOn:
+          type: boolean
+        since:
+          type: string
+          format: date-time
+          description: When the fireplace went on; missing while it is off.
+        endsAt:
+          type: string
+          format: date-time
+          description: When the server switches it off; missing while it is off.
+    FireplaceRequest:
+      type: object
+      required: [isOn]
+      properties:
+        isOn:
+          type: boolean
     HeatingOverview:
       type: object
       required: [rooms]
@@ -811,7 +866,7 @@ components:
             $ref: "#/components/schemas/HeatingOverviewRoom"
     HeatingOverviewRoom:
       type: object
-      required: [placeId, name, shortName, istSource]
+      required: [placeId, name, shortName, istSource, followsFireplace]
       properties:
         placeId:
           type: string
@@ -830,6 +885,9 @@ components:
           description: Plan target now; missing when unknown.
         istSource:
           $ref: "#/components/schemas/HeatingIstSource"
+        followsFireplace:
+          type: boolean
+          description: Whether the room follows the fireplace (flame and orange area while it burns).
     HeatingIstSource:
       type: object
       required: [kind, names]

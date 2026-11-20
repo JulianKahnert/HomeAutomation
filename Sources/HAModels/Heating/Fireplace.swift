@@ -59,4 +59,19 @@ public enum Fireplace {
     public static func state(with hm: HomeManagable) async -> FireplaceState {
         await state(of: switchId, with: hm)
     }
+
+    /// Switches the fireplace on or off, as the Heizung tab and the push action ask. Asking for the state
+    /// it already has changes nothing, so a second "on" does not restart the eight hours. The answer is the
+    /// state the switch will have, because HomeKit reports the change a moment later.
+    public static func set(isOn: Bool, with hm: HomeManagable, now: Date = Date()) async -> FireplaceState {
+        let current = await state(with: hm)
+        guard current.isOn != isOn else { return current }
+        if isOn {
+            await switchDevice.turnOn(with: hm)
+            return FireplaceState(isOn: true, since: now)
+        } else {
+            await switchDevice.turnOff(with: hm)
+            return .off
+        }
+    }
 }

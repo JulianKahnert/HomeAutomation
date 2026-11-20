@@ -34,6 +34,8 @@ public struct HeatingOverviewRoom: Sendable, Codable, Equatable, Identifiable {
     /// Plan target now; `nil` when unknown.
     public let sollPlan: Double?
     public let istSource: HeatingIstSource
+    /// Whether the room follows the fireplace: it shows the flame and the orange area while it burns.
+    public let followsFireplace: Bool
 
     public var id: String { placeId }
 
@@ -46,13 +48,14 @@ public struct HeatingOverviewRoom: Sendable, Codable, Equatable, Identifiable {
     /// `nil` when the room has no Δ.
     public var comfort: HeatingComfort? { delta.map(HeatingComfort.init(delta:)) }
 
-    public init(placeId: String, name: String, shortName: String, ist: Double?, sollPlan: Double?, istSource: HeatingIstSource) {
+    public init(placeId: String, name: String, shortName: String, ist: Double?, sollPlan: Double?, istSource: HeatingIstSource, followsFireplace: Bool = false) {
         self.placeId = placeId
         self.name = name
         self.shortName = shortName
         self.ist = ist
         self.sollPlan = sollPlan
         self.istSource = istSource
+        self.followsFireplace = followsFireplace
     }
 }
 
@@ -83,7 +86,8 @@ public struct HeatingOverviewBuilder: Sendable {
                                               shortName: Self.shortName(room.name),
                                               ist: grid.latest?.ist,
                                               sollPlan: grid.latest?.sollPlan,
-                                              istSource: grid.istSource))
+                                              istSource: grid.istSource,
+                                              followsFireplace: room.followsFireplace))
         }
         return HeatingOverview(rooms: result)
     }

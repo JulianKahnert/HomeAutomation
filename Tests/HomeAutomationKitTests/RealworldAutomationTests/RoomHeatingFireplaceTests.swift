@@ -228,3 +228,56 @@ struct FireplaceTimeoutTests {
         #expect(timeout.triggerEntityIds == [Fireplace.switchId])
     }
 }
+
+@Suite("Fireplace switch")
+@HomeManagerActor
+struct FireplaceSwitchTests {
+    private let homeManager = MockHomeAdapter()
+    private let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+
+    private func setFireplace(on: Bool, at date: Date) {
+        homeManager.storageItems.append(EntityStorageItem(entityId: Fireplace.switchId, timestamp: date, isDeviceOn: on))
+    }
+
+    @Test("Switching on an off fireplace turns the switch on and answers with the new state")
+    func switchOn() async {
+        setFireplace(on: false, at: start)
+
+        let state = await Fireplace.set(isOn: true, with: homeManager, now: start.addingTimeInterval(5))
+
+        #expect(homeManager.performedActions.map(\.action) == [.turnOn(Fireplace.switchId)])
+        #expect(state == FireplaceState(isOn: true, since: start.addingTimeInterval(5)))
+    }
+
+    @Test("Switching on a fireplace that is on changes nothing and keeps the start")
+    func switchOnTwice() async {
+        setFireplace(on: true, at: start)
+
+        let state = await Fireplace.set(isOn: true, with: homeManager, now: start.addingTimeInterval(600))
+
+        #expect(homeManager.performedActions.isEmpty)
+        #expect(state == FireplaceState(isOn: true, since: start))
+    }
+
+    @Test("Switching off turns the switch off")
+    func switchOff() async {
+        setFireplace(on: true, at: start)
+
+        let state = await Fireplace.set(isOn: false, with: homeManager)
+
+        #expect(homeManager.performedActions.map(\.action) == [.turnOff(Fireplace.switchId)])
+        #expect(state == .off)
+    }
+
+    @Test("An unreachable switch reads as off")
+    func unreachable() async {
+        #expect(await Fireplace.state(with: homeManager) == .off)
+    }
+
+    @Test("A switch that is on counts since the stored switch-on time, and ends eight hours later")
+    func endsAt() async {
+        setFireplace(on: true, at: start)
+
+        #expect(await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(8 * 3600))
+    }
+}

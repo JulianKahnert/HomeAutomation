@@ -46,7 +46,8 @@ public struct RoomHeating: Automatable {
                            name: placeId,
                            radiators: radiators.map { .init(name: $0.heatingId.name, temperatureId: $0.temperatureId, valvePositionId: $0.valvePositionId) },
                            roomSensor: roomSensor,
-                           plan: effectivePlan)
+                           plan: effectivePlan,
+                           followsFireplace: contacts.contains { if case .fireplace = $0 { true } else { false } })
     }
 
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {

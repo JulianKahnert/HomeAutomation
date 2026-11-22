@@ -121,14 +121,12 @@ public struct HeatingOverviewBuilder: Sendable {
         for room in rooms {
             let week = try await detail.detail(for: room, range: .week)
             cells += Self.heatmap(for: week, calendar: calendar)
-            let grid = HeatingRoomDetail(placeId: week.placeId, name: week.name, range: .twoHours, istSource: week.istSource,
-                                         radiators: week.radiators, samples: Array(week.samples.suffix(1)))
             result.append(HeatingOverviewRoom(placeId: room.placeId,
                                               name: room.name,
                                               shortName: room.shortName ?? Self.shortName(room.name),
-                                              ist: grid.latest?.ist,
-                                              sollPlan: grid.latest?.sollPlan,
-                                              istSource: grid.istSource,
+                                              ist: week.latest?.ist,
+                                              sollPlan: week.latest?.sollPlan,
+                                              istSource: week.istSource,
                                               followsFireplace: room.followsFireplace))
         }
         return HeatingOverview(rooms: result, heatmap: cells)

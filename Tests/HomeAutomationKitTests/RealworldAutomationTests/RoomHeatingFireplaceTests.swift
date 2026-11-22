@@ -313,24 +313,24 @@ struct FireplaceTimeoutTests {
     private let fireplace = Fireplace.switchDevice
     private let homeManager = MockHomeAdapter()
     private let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
-    private let eightHours: TimeInterval = 8 * 3600
+    private let maxDuration = Fireplace.maxDuration
 
     private func setFireplace(on: Bool, at date: Date) {
         homeManager.storageItems.append(EntityStorageItem(entityId: fireplace.switchId, timestamp: date, isDeviceOn: on))
     }
 
-    @Test("Before eight hours nothing happens")
-    func beforeEightHours() async throws {
+    @Test("Before the maximum duration nothing happens")
+    func beforeMaxDuration() async throws {
         setFireplace(on: true, at: start)
-        let now = start.addingTimeInterval(eightHours - 60)
+        let now = start.addingTimeInterval(maxDuration - 60)
 
         #expect(try await !FireplaceTimeout().shouldTrigger(with: .time(date: now), using: homeManager))
     }
 
-    @Test("After eight hours the fireplace goes off and a push says so")
-    func endsAfterEightHours() async throws {
+    @Test("After the maximum duration the fireplace goes off and a push says so")
+    func endsAfterMaxDuration() async throws {
         setFireplace(on: true, at: start)
-        let now = start.addingTimeInterval(eightHours)
+        let now = start.addingTimeInterval(maxDuration)
         let timeout = FireplaceTimeout()
 
         #expect(try await timeout.shouldTrigger(with: .time(date: now), using: homeManager))
@@ -339,40 +339,48 @@ struct FireplaceTimeoutTests {
         #expect(homeManager.performedActions.map(\.action) == [.turnOff(fireplace.switchId)])
         #expect(homeManager.sentNotifications.map(\.title) == ["Kamin aus"])
         #expect(homeManager.sentNotifications.first?.id == Fireplace.notificationId)
+        #expect(homeManager.sentNotifications.first?.message.contains(FireplaceTimeout.durationText(maxDuration)) == true)
+    }
+
+    @Test("The push names the duration in German", arguments: [
+        (2 * 3600.0, "2 Stunden"), (3600.0, "1 Stunde"), (5400.0, "1 Stunde und 30 Minuten"), (60.0, "1 Minute"), (45 * 60.0, "45 Minuten"),
+    ])
+    func durationText(duration: TimeInterval, text: String) {
+        #expect(FireplaceTimeout.durationText(duration) == text)
     }
 
     @Test("A fireplace that is off is left alone")
     func offStaysOff() async throws {
         setFireplace(on: false, at: start)
 
-        #expect(try await !FireplaceTimeout().shouldTrigger(with: .time(date: start.addingTimeInterval(eightHours * 2)), using: homeManager))
+        #expect(try await !FireplaceTimeout().shouldTrigger(with: .time(date: start.addingTimeInterval(maxDuration * 2)), using: homeManager))
     }
 
     @Test("An unreachable fireplace (no state) is off: no end, no push")
     func unreachable() async throws {
-        try await FireplaceTimeout().execute(using: homeManager, now: start.addingTimeInterval(eightHours * 2))
+        try await FireplaceTimeout().execute(using: homeManager, now: start.addingTimeInterval(maxDuration * 2))
 
         #expect(homeManager.performedActions.isEmpty)
         #expect(homeManager.sentNotifications.isEmpty)
     }
 
-    @Test("The eight hours count from the switch-on time in the database, not from the restart")
+    @Test("The duration counts from the switch-on time in the database, not from the restart")
     func startSurvivesRestart() async throws {
         // the database knows the switch went on at `start`; after the restart the adapter's resync put the same
         // state into the cache with the time of the restart
-        let restart = start.addingTimeInterval(eightHours - 60)
+        let restart = start.addingTimeInterval(maxDuration - 60)
         homeManager.storedItems[fireplace.switchId] = EntityStorageItem(entityId: fireplace.switchId, timestamp: start, isDeviceOn: true)
         setFireplace(on: true, at: restart)
-        let now = start.addingTimeInterval(eightHours + 60)
+        let now = start.addingTimeInterval(maxDuration + 60)
 
         #expect(try await FireplaceTimeout().shouldTrigger(with: .time(date: now), using: homeManager))
         #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
-        #expect(await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(eightHours))
+        #expect(await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(maxDuration))
     }
 
     @Test("Another event does not trigger it")
     func onlyTimeTriggers() async throws {
-        setFireplace(on: true, at: start.addingTimeInterval(-eightHours * 2))
+        setFireplace(on: true, at: start.addingTimeInterval(-maxDuration * 2))
 
         #expect(try await !FireplaceTimeout().shouldTrigger(with: .sunrise, using: homeManager))
     }
@@ -432,10 +440,10 @@ struct FireplaceSwitchTests {
         #expect(await Fireplace.state(with: homeManager) == .off)
     }
 
-    @Test("A switch that is on counts since the stored switch-on time, and ends eight hours later")
+    @Test("A switch that is on counts since the stored switch-on time, and ends after the maximum duration")
     func endsAt() async {
         setFireplace(on: true, at: start)
 
-        #expect(await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(8 * 3600))
+        #expect(await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(Fireplace.maxDuration))
     }
 }

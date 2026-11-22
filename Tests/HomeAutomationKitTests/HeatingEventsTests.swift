@@ -110,9 +110,9 @@ struct HeatingEventsTests {
         #expect(found[0].end == ago(80))
     }
 
-    @Test("a fireplace that ran eight hours says the timeout ended it")
+    @Test("a fireplace that ran its maximum duration says the timeout ended it")
     func fireplaceTimeout() async throws {
-        let items = [EntityStorageItem(entityId: fireplace, timestamp: ago(600), isDeviceOn: true),
+        let items = [EntityStorageItem(entityId: fireplace, timestamp: ago(120 + Fireplace.maxDuration / 60), isDeviceOn: true),
                      EntityStorageItem(entityId: fireplace, timestamp: ago(120), isDeviceOn: false)]
         let found = try await events(items, contacts: [fireplaceContact], range: .week)
         #expect(found.first?.reason.contains("Zeitablauf") == true)

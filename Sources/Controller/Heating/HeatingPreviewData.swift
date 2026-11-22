@@ -100,13 +100,13 @@ enum HeatingPreviewData {
         event(.system, "System", "Der Server hat Eve Thermo links, Eve Thermo rechts auf 21,0 °C gesetzt (Deploy oder Zeitablauf).", moment(15, 13, 0)),
         event(.observed, "Von Hand: 19,0 °C", "Eve Thermo rechts steht auf 19,0 °C statt 21,0 °C. Der Server greift nicht ein.", moment(15, 13, 5)),
         event(.observed, "Von Hand: 21,0 °C", "Eve Thermo links steht wieder auf 21,0 °C.", moment(15, 13, 8)),
-        event(.fireplace, "Kamin an", "Kamin war 3 h an: die Heizkörper waren aus.", moment(15, 17, 30), until: moment(15, 20, 30))
+        event(.fireplace, "Kamin an", "Kamin war 1 h 30 min an: die Heizkörper waren aus.", moment(15, 17, 30), until: moment(15, 19, 0))
     ]
 
     static let bedroomEvents: [HeatingEvent] = [
         event(.window, "Fenster offen", "Fenster „Schlafzimmer Fenster“ war 40 min offen, die Heizkörper waren aus.", moment(13, 7), until: moment(13, 7, 40)),
         event(.observed, "Von Hand: 22,0 °C", "Eve Thermo steht auf 22,0 °C statt 17,5 °C. Der Server greift nicht ein.", moment(14, 21)),
-        event(.fireplace, "Kamin an", "Der Kamin wurde nach 8 h 0 min per Zeitablauf ausgeschaltet; dazu kam die Benachrichtigung „Kamin aus“.", moment(14, 12), until: moment(14, 20))
+        event(.fireplace, "Kamin an", "Der Kamin wurde nach 2 h 0 min per Zeitablauf ausgeschaltet; dazu kam die Benachrichtigung „Kamin aus“.", moment(14, 12), until: moment(14, 14))
     ]
 
     /// 10.11.2026 14:40: the last actual value of the room without data.
@@ -139,11 +139,11 @@ enum HeatingPreviewData {
     /// The rooms that follow the fireplace in the fireplace previews.
     static let fireplaceRooms: Set<String> = ["Küche", "Kaminzimmer"]
 
-    /// A store state with the fireplace rooms marked; the fireplace burns since two hours (ends in six).
+    /// A store state with the fireplace rooms marked; the fireplace ends in one hour.
     static func fireplaceState(on isOn: Bool, selected placeId: String? = nil) -> HeatingFeature.State {
         var state = state(placeId)
         state.rooms = HeatingFeature.sorted(overviewRooms(following: fireplaceRooms))
-        state.fireplace = isOn ? FireplaceState(isOn: true, since: now.addingTimeInterval(-2 * 3_600)) : .off
+        state.fireplace = isOn ? FireplaceState(isOn: true, since: now.addingTimeInterval(3_600 - Fireplace.maxDuration)) : .off
         return state
     }
 

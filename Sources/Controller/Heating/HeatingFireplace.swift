@@ -12,7 +12,7 @@ import SwiftUI
 import UserNotifications
 
 extension HeatingFormat {
-    /// "Kamin an · endet in 7 h" while the fireplace burns, `nil` while it is off.
+    /// "Kamin an · endet in 1 h" while the fireplace burns, `nil` while it is off.
     static func fireplaceHint(_ state: FireplaceState, now: Date) -> String? {
         guard state.isOn, let end = state.endsAt else { return nil }
         let hours = end.timeIntervalSince(now) / 3_600

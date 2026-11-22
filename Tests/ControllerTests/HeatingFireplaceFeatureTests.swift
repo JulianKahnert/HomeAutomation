@@ -113,10 +113,11 @@ struct HeatingFireplaceFeatureTests {
     @Test("the subtitle says when the fireplace ends, and is empty while it is off")
     func hint() {
         let burning = FireplaceState(isOn: true, since: start)
+        let end = start.addingTimeInterval(Fireplace.maxDuration)
 
-        #expect(HeatingFormat.fireplaceHint(burning, now: start.addingTimeInterval(3_600)) == "Kamin an · endet in 7 h")
-        #expect(HeatingFormat.fireplaceHint(burning, now: start.addingTimeInterval(7.5 * 3_600)) == "Kamin an · endet in < 1 h")
-        #expect(HeatingFormat.fireplaceHint(burning, now: start.addingTimeInterval(9 * 3_600)) == "Kamin an · endet gleich")
+        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(-3_600)) == "Kamin an · endet in 1 h")
+        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(-1_800)) == "Kamin an · endet in < 1 h")
+        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(3_600)) == "Kamin an · endet gleich")
         #expect(HeatingFormat.fireplaceHint(.off, now: start) == nil)
     }
 

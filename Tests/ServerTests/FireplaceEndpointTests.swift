@@ -89,7 +89,7 @@ final class FireplaceEndpointTests: XCTestCase {
         XCTAssertEqual(status, .ok)
         XCTAssertEqual(state?.isOn, true)
         XCTAssertEqual(try XCTUnwrap(state?.since).timeIntervalSince1970, start.timeIntervalSince1970, accuracy: 1)
-        XCTAssertEqual(try XCTUnwrap(state?.endsAt).timeIntervalSince1970, start.addingTimeInterval(8 * 3600).timeIntervalSince1970, accuracy: 1)
+        XCTAssertEqual(try XCTUnwrap(state?.endsAt).timeIntervalSince1970, start.addingTimeInterval(Fireplace.maxDuration).timeIntervalSince1970, accuracy: 1)
     }
 
     func testSwitchOnAnswersTheNewState() async throws {

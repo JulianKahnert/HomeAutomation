@@ -452,7 +452,7 @@ paths:
       summary: Get the state of the fireplace
       description: |
         The fireplace is the switch `Keller_Kamin_switcher`. An unreachable switch counts as off.
-        `since` is when it went on, `endsAt` when the server switches it off (eight hours after `since`).
+        `since` is when it went on, `endsAt` when the server switches it off (the fireplace's maximum duration, two hours, after `since`).
       operationId: getFireplace
       responses:
         "200":
@@ -465,7 +465,7 @@ paths:
       summary: Switch the fireplace on or off
       description: |
         Used by the Heizung tab and the push action "Kamin an?". Asking for the state it already has changes
-        nothing, so a second "on" does not restart the eight hours. The answer is the state the switch will
+        nothing, so a second "on" does not restart that duration. The answer is the state the switch will
         have; HomeKit reports the change a moment later.
       operationId: setFireplace
       requestBody:

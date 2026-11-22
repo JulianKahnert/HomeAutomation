@@ -28,7 +28,7 @@ public struct FireplaceState: Sendable, Equatable {
 /// contact (`RoomContact.fireplace`), the server switches it on request of the Heizung tab and the push action.
 public enum Fireplace {
     /// The fireplace ends this long after it was switched on.
-    public static let maxDuration: TimeInterval = 8 * 3600
+    public static let maxDuration: TimeInterval = 2 * 3600
 
     /// The switch in HomeKit (adapter id `Keller_Kamin_switcher`).
     public static let switchId = EntityId(placeId: "Keller", name: "Kamin", characteristicsName: nil, characteristic: .switcher)
@@ -66,7 +66,7 @@ public enum Fireplace {
     }
 
     /// Switches the fireplace on or off, as the Heizung tab and the push action ask. Asking for the state
-    /// it already has changes nothing, so a second "on" does not restart the eight hours. The answer is the
+    /// it already has changes nothing, so a second "on" does not restart `maxDuration`. The answer is the
     /// state the switch will have, because HomeKit reports the change a moment later.
     public static func set(isOn: Bool, with hm: HomeManagable, now: Date = Date()) async -> FireplaceState {
         let current = await state(with: hm)

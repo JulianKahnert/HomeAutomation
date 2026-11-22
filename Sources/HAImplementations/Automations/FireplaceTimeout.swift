@@ -6,10 +6,10 @@
 import Foundation
 import HAModels
 
-/// Ends the fireplace eight hours after it was switched on, with a push (glossary: fireplace mode).
+/// Ends the fireplace `maxDuration` after it was switched on, with a push (glossary: fireplace mode).
 ///
-/// The eight hours count from the switch-on time stored in the database, so a server restart does not
-/// restart them. The rooms that follow the fireplace return to their plan through their own automation
+/// The duration counts from the switch-on time stored in the database, so a server restart does not
+/// restart it. The rooms that follow the fireplace return to their plan through their own automation
 /// when the switch goes off.
 public struct FireplaceTimeout: Automatable {
     public var isActive = true
@@ -39,8 +39,19 @@ public struct FireplaceTimeout: Automatable {
         guard await hasExpired(at: now, using: hm) else { return }
         await fireplace.turnOff(with: hm)
         await hm.sendNotification(title: "Kamin aus",
-                                  message: "Der Kamin war acht Stunden an und wurde ausgeschaltet. Die Heizkörper folgen wieder dem Plan.",
+                                  message: "Der Kamin war \(Self.durationText(maxDuration)) an und wurde ausgeschaltet. Die Heizkörper folgen wieder dem Plan.",
                                   id: Fireplace.notificationId)
+    }
+
+    /// The duration in German for the push, rounded to whole minutes: "2 Stunden", "1 Stunde und 30 Minuten", "45 Minuten".
+    static func durationText(_ duration: TimeInterval) -> String {
+        let minutes = max(Int((duration / 60).rounded()), 0)
+        let hours = minutes / 60
+        let rest = minutes % 60
+        var parts: [String] = []
+        if hours > 0 { parts.append(hours == 1 ? "1 Stunde" : "\(hours) Stunden") }
+        if rest > 0 || hours == 0 { parts.append(rest == 1 ? "1 Minute" : "\(rest) Minuten") }
+        return parts.joined(separator: " und ")
     }
 
     private func hasExpired(at date: Date, using hm: HomeManagable) async -> Bool {

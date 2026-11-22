@@ -306,6 +306,30 @@ struct RoomHeatingTests {
         #expect(await homeManager.lastHeatingWrite(of: left.heatingId)?.isActive == false)
     }
 
+    @Test("A switch point while a window waits out its delay sends the plan target when the window closes in time")
+    func switchPointWithWindowClosingWithinDelay() async throws {
+        let switchPoint = date(day: 18, hour: 22)
+        setWindow(windowA, open: true, at: switchPoint.addingTimeInterval(-5))
+
+        let task = run(room(), now: switchPoint)
+        #expect(await sleeper.nextSleep() == .seconds(5))
+        setWindow(windowA, open: false, at: switchPoint.addingTimeInterval(3))
+        sleeper.wake()
+        try await task.value
+
+        #expect(targets() == [17, 17])
+        #expect(homeManager.heatingWrites.allSatisfy { $0.sentToDevice }, "the radiators never went off")
+    }
+
+    @Test("A time event processed after its minute still writes its switch point")
+    func lateTimeEvent() async throws {
+        try await AutomationRunContext.$event.withValue(.time(date: date(day: 18, hour: 6))) {
+            try await room().execute(using: homeManager)
+        }
+
+        #expect(targets() == [21, 21])
+    }
+
     @Test("A deploy or a window change while the room is off records no plan target")
     func onlySwitchPointsRecordPlan() async throws {
         setWindow(windowA, open: true, at: noon.addingTimeInterval(-3600))

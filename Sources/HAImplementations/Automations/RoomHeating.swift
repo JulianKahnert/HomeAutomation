@@ -91,7 +91,12 @@ public struct RoomHeating: Automatable {
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        try await execute(using: hm, now: Date(), sleep: { try await Task.sleep(for: $0) })
+        // A time event counts at its own minute, also when it is processed late (a backlog of events).
+        var now = Date()
+        if case .time(let date) = AutomationRunContext.event {
+            now = date
+        }
+        try await execute(using: hm, now: now)
     }
 
     /// Recomputes the room from `now` and the contacts, so a trigger that supersedes a running run (even
@@ -107,47 +112,45 @@ public struct RoomHeating: Automatable {
     ///   that no switch point, no closing and no deploy concerns keeps its value.
     func execute(using hm: HomeManagable, now: Date, isDeploy: Bool = AutomationRunContext.isConfigDeploy,
                  sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) async throws {
-        let plan = effectivePlan
-        let isSwitchPoint = plan.switchPoint(at: now) != nil
-        let initialOffs = await offStates(using: hm)
-
-        if !initialOffs.isEmpty {
-            if isSwitchPoint {
-                await recordPlanTargetWhileOff(of: initialOffs.map(\.radiator), at: now, using: hm)
-            }
-            var current = now
-            var written: Set<EntityId> = []
-            while true {
-                // the contacts may have changed while waiting: look again
-                let offs = await offStates(using: hm).filter { !written.contains($0.radiator.heatingId) }
-                guard !offs.isEmpty else { return }
-                for off in offs where off.at <= current {
-                    written.insert(off.radiator.heatingId)
-                    await HeatingWriteContext.withReason(off.contact.reason) {
-                        await off.radiator.turnOff(with: hm)
-                    }
-                }
-                guard let next = offs.map(\.at).filter({ $0 > current }).min() else { break }
-                try await sleep(.seconds(next.timeIntervalSince(current)))
-                current = next
-            }
-            let others = radiators.filter { radiator in !initialOffs.contains { $0.radiator.heatingId == radiator.heatingId } }
-            try await writePlan(to: others, now: now, isSwitchPoint: isSwitchPoint, isDeploy: isDeploy, using: hm)
-            return
+        let isSwitchPoint = effectivePlan.switchPoint(at: now) != nil
+        let off = try await switchOff(from: now, sleep: sleep, using: hm)
+        if isSwitchPoint {
+            await recordPlanTargetWhileOff(of: radiators.filter { off.contains($0.heatingId) }, at: now, using: hm)
         }
-        try await writePlan(to: radiators, now: now, isSwitchPoint: isSwitchPoint, isDeploy: isDeploy, using: hm)
+        // A radiator whose contact closed within its delay never went off: it follows the plan like the others.
+        await writePlan(to: radiators.filter { !off.contains($0.heatingId) }, now: now, isSwitchPoint: isSwitchPoint, isDeploy: isDeploy, using: hm)
+    }
+
+    /// Switches off every radiator whose contact has been open for its delay, waiting out the delays still
+    /// running. Returns the `heatingId`s it switched off.
+    private func switchOff(from now: Date, sleep: @Sendable (Duration) async throws -> Void, using hm: HomeManagable) async throws -> Set<EntityId> {
+        var current = now
+        var written: Set<EntityId> = []
+        while true {
+            // the contacts may have changed while waiting: look again
+            let offs = await offStates(using: hm).filter { !written.contains($0.radiator.heatingId) }
+            for off in offs where off.at <= current {
+                written.insert(off.radiator.heatingId)
+                await HeatingWriteContext.withReason(off.contact.reason) {
+                    await off.radiator.turnOff(with: hm)
+                }
+            }
+            guard let next = offs.map(\.at).filter({ $0 > current }).min() else { return written }
+            try await sleep(.seconds(next.timeIntervalSince(current)))
+            current = next
+        }
     }
 
     /// Writes the plan target to the `targets` that a switch point or a closing contact concerns. With
     /// `isDeploy` every other radiator gets it too, with reason `system`.
-    private func writePlan(to targets: [Radiator], now: Date, isSwitchPoint: Bool, isDeploy: Bool, using hm: HomeManagable) async throws {
-        let plan = effectivePlan
-        guard let target = plan.planTarget(at: now) else {
+    private func writePlan(to targets: [Radiator], now: Date, isSwitchPoint: Bool, isDeploy: Bool, using hm: HomeManagable) async {
+        guard let target = effectivePlan.planTarget(at: now) else {
             log.warning("Room has no plan target", metadata: ["placeId": "\(placeId)", "date": "\(now)"])
             return
         }
+        // A switch point writes every target with reason plan, whichever contact just closed.
         var ended: [EntityId: RoomContact] = [:]
-        for radiator in targets {
+        for radiator in targets where !isSwitchPoint {
             if let contact = await contactJustEndedOffState(of: radiator, now: now, using: hm) {
                 ended[radiator.heatingId] = contact
             }
@@ -190,41 +193,32 @@ public struct RoomHeating: Automatable {
             guard let state = await contact.currentState(with: hm), state.isOpen else { continue }
             open.append((contact, state.since.addingTimeInterval(contact.delay(in: configuration))))
         }
-        var result: [(radiator: Radiator, contact: RoomContact, at: Date)] = []
-        for radiator in radiators {
-            var first: (contact: RoomContact, at: Date)?
-            for entry in open where entry.contact.affects(radiator) {
-                if first == nil || entry.at < first!.at {
-                    first = entry
-                }
-            }
-            if let first {
-                result.append((radiator, first.contact, first.at))
-            }
+        return radiators.compactMap { radiator in
+            open.filter { $0.contact.affects(radiator) }.min { $0.at < $1.at }.map { (radiator, $0.contact, $0.at) }
         }
-        return result
     }
 
-    /// Whether the server switched a radiator that `contact` affects off because of it and has not written it
-    /// since. It reads what the server wrote, not the history of the contact: a closed contact the adapter
-    /// re-sends says nothing about what the room did.
+    /// Whether the server switched a radiator that `contact` affects off and has not written it since. It reads
+    /// what the server wrote, not the history of the contact: a closed contact the adapter re-sends says nothing
+    /// about what the room did.
     private func endedOffState(of contact: RoomContact, using hm: HomeManagable) async -> Bool {
         for radiator in radiators where contact.affects(radiator) {
-            if await wasSwitchedOff(radiator, by: contact, using: hm) { return true }
+            if await isSwitchedOff(radiator, using: hm) { return true }
         }
         return false
     }
 
-    private func wasSwitchedOff(_ radiator: Radiator, by contact: RoomContact, using hm: HomeManagable) async -> Bool {
-        guard let last = await hm.lastHeatingWrite(of: radiator.heatingId) else { return false }
-        return last.isActive == false && last.reason == contact.reason
+    /// Whether the last write that reached `radiator` switched it off. Whichever contact's reason it carries: a
+    /// duplicate off is not recorded, so after a handover between two contacts the reason can be the earlier one.
+    private func isSwitchedOff(_ radiator: Radiator, using hm: HomeManagable) async -> Bool {
+        await hm.lastHeatingWrite(of: radiator.heatingId)?.isActive == false
     }
 
     /// The contact that closed within the last minute, ending a state the server switched `radiator` off for.
     private func contactJustEndedOffState(of radiator: Radiator, now: Date, using hm: HomeManagable) async -> RoomContact? {
         for contact in contacts where contact.affects(radiator) {
             guard let current = await contact.currentState(with: hm), !current.isOpen, now.timeIntervalSince(current.since) < 60 else { continue }
-            if await wasSwitchedOff(radiator, by: contact, using: hm) { return contact }
+            if await isSwitchedOff(radiator, using: hm) { return contact }
         }
         return nil
     }

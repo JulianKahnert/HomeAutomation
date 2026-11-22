@@ -117,6 +117,24 @@ struct RoomHeatingFireplaceTests {
         #expect(targets() == [plan.planTarget(at: last)!])
     }
 
+    @Test("The fireplace going off returns the room to its plan although its own off write was a skipped duplicate")
+    func fireplaceEndsAfterDuplicateOff() async throws {
+        setWindow(open: true, at: noon)
+        seedOff(reason: .window, at: noon.addingTimeInterval(10))
+        setFireplace(on: true, at: noon.addingTimeInterval(30))
+        // the fireplace now holds the radiator; its setHeating(false) was a duplicate, so nothing was recorded with reason fireplace
+        setWindow(open: false, at: noon.addingTimeInterval(60))
+        let end = noon.addingTimeInterval(3600)
+        setFireplace(on: false, at: end)
+
+        #expect(try await room().shouldTrigger(with: change(fireplace.switchId), using: homeManager))
+        try await room().execute(using: homeManager, now: end, sleep: { _ in })
+
+        let target = plan.planTarget(at: end)!
+        #expect(targets() == [target])
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .fireplace, planTargetInC: target) })
+    }
+
     @Test("An unreachable fireplace switch counts as off: the plan keeps running")
     func unreachableIsOff() async throws {
         // no state of the switch at all

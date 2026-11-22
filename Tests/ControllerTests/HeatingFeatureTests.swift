@@ -70,25 +70,7 @@ struct HeatingFeatureTests {
         #expect(requests.all.isEmpty)
     }
 
-    @Test("the headline names the coldest room when the worst deviation is too cold")
-    func headlineColdest() async {
-        let store = await loaded([Self.room("Bad OG", ist: 17.3), Self.room("Küche", ist: 22.2)])
-        #expect(store.state.headline == "Bad OG am kältesten · 3,7 K unter Plan")
-    }
-
-    @Test("the headline names the warmest room when the worst deviation is too warm")
-    func headlineWarmest() async {
-        let store = await loaded([Self.room("Bad OG", ist: 20.2), Self.room("Küche", ist: 23.0)])
-        #expect(store.state.headline == "Küche am wärmsten · 2,0 K über Plan")
-    }
-
-    @Test("the headline says all rooms are in plan when every room is inside the comfort band")
-    func headlineAllInPlan() async {
-        let store = await loaded([Self.room("Bad OG", ist: 20.5), Self.room("Küche", ist: 21.5)])
-        #expect(store.state.headline == "Alle Räume im Plan")
-    }
-
-    @Test("the headline has a title and a grey subtitle line")
+    @Test("the headline names the coldest or warmest room, or all rooms in plan inside the comfort band (edges included)")
     func headlineParts() async {
         let cold = await loaded([Self.room("Bad OG", ist: 17.3), Self.room("Küche", ist: 22.2)])
         #expect(cold.state.headlineParts?.title == "Bad OG am kältesten")
@@ -96,7 +78,7 @@ struct HeatingFeatureTests {
         let warm = await loaded([Self.room("Bad OG", ist: 20.2), Self.room("Küche", ist: 23.0)])
         #expect(warm.state.headlineParts?.title == "Küche am wärmsten")
         #expect(warm.state.headlineParts?.subtitle == "2,0 K über Plan")
-        let ok = await loaded([Self.room("Bad OG", ist: 20.5)])
+        let ok = await loaded([Self.room("Bad OG", ist: 20.5), Self.room("Küche", ist: 21.5)])
         #expect(ok.state.headlineParts?.title == "Alle Räume im Plan")
         #expect(ok.state.headlineParts?.subtitle == "jeder Raum innerhalb ±0,5 K")
     }
@@ -119,9 +101,9 @@ struct HeatingFeatureTests {
     @Test("rooms without a delta do not count for the headline")
     func headlineIgnoresRoomsWithoutActual() async {
         let store = await loaded([Self.room("Leer", ist: nil), Self.room("Küche", ist: 21)])
-        #expect(store.state.headline == "Alle Räume im Plan")
+        #expect(store.state.headlineParts?.title == "Alle Räume im Plan")
         let none = await loaded([Self.room("Leer", ist: nil)])
-        #expect(none.state.headline == nil)
+        #expect(none.state.headlineParts == nil)
     }
 
     // MARK: Detail
@@ -204,7 +186,7 @@ struct HeatingFeatureTests {
         let store = await loaded([], requests: requests)
         #expect(store.state.rooms.isEmpty)
         #expect(store.state.error == nil)
-        #expect(store.state.headline == nil)
+        #expect(store.state.headlineParts == nil)
         #expect(requests.all.isEmpty)
     }
 
@@ -227,6 +209,28 @@ struct HeatingFeatureTests {
         await store.receive(\.overviewResponse.failure)
         #expect(store.state.error != nil)
         #expect(store.state.rooms.isEmpty)
+    }
+
+    @Test("a failed reload keeps the rooms it showed and only sets the error")
+    func failedReloadKeepsRooms() async {
+        let calls = LockIsolated(0)
+        let store = TestStore(initialState: HeatingFeature.State()) {
+            HeatingFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getHeatingOverview = {
+                calls.withValue { $0 += 1 }
+                guard calls.value == 1 else { throw Failure() }
+                return HeatingOverview(rooms: [Self.room("Bad", ist: 20)])
+            }
+        }
+        store.exhaustivity = .off
+        await store.send(.task)
+        await store.receive(\.overviewResponse.success)
+        await store.send(.refresh)
+        await store.receive(\.overviewResponse.failure)
+        #expect(store.state.rooms.map(\.placeId) == ["Bad"])
+        #expect(store.state.error != nil)
     }
 
     @Test("a failing detail keeps the rooms and sets a detail error")

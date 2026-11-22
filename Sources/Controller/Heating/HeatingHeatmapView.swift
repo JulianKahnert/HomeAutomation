@@ -71,7 +71,7 @@ struct HeatingHeatmapView: View {
                             ForEach(days, id: \.self) { day in
                                 HStack(spacing: 2) {
                                     ForEach(0..<4, id: \.self) { segment in
-                                        cellView(room.placeId, day, segment)
+                                        cellView(room, day, segment)
                                     }
                                 }
                             }
@@ -83,7 +83,8 @@ struct HeatingHeatmapView: View {
         }
     }
 
-    private func cellView(_ placeId: String, _ day: Date, _ segment: Int) -> some View {
+    private func cellView(_ room: HeatingOverviewRoom, _ day: Date, _ segment: Int) -> some View {
+        let placeId = room.placeId
         let value = cell(placeId, day, segment)?.delta
         let isSelected = selection == Selection(placeId: placeId, day: day, segment: segment)
         return Group {
@@ -102,7 +103,7 @@ struct HeatingHeatmapView: View {
         #if os(macOS)
         .onHover { if $0 { selection = Selection(placeId: placeId, day: day, segment: segment) } }
         #endif
-        .accessibilityLabel(Self.accessibilityLabel(placeId, day, segment, value))
+        .accessibilityLabel(Self.accessibilityLabel(room.shortName, day, segment, value))
     }
 
     /// Grey inside the comfort band, blue or orange beyond it; the stronger the deviation, the deeper the tint.
@@ -125,10 +126,7 @@ struct HeatingHeatmapView: View {
     }
 
     private static func weekday(_ day: Date) -> String {
-        let text = day.formatted(Date.FormatStyle(date: .omitted, time: .omitted, locale: HeatingFormat.locale,
-                                                  calendar: HeatingOverviewBuilder.berlin, timeZone: HeatingOverviewBuilder.berlin.timeZone)
-            .weekday(.abbreviated))
-        return text.hasSuffix(".") ? text : text + "."
+        HeatingFormat.weekday(day, calendar: HeatingOverviewBuilder.berlin)
     }
 }
 

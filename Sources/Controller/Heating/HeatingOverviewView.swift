@@ -180,7 +180,7 @@ struct HeatingOverviewView: View {
         if let plot = proxy.plotFrame {
             let frame = geo[plot]
             let width = frame.width / CGFloat(max(rooms.count, 1)) * 0.55
-            let card = HeatingPalette.card(scheme)
+            let card = HeatingPalette.card
             ForEach(rooms) { room in
                 if let x = proxy.position(forX: room.placeId) {
                     if let delta = room.delta {

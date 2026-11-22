@@ -32,10 +32,9 @@ struct HeatingFeature: Sendable {
         var detail: HeatingRoomDetail?
         /// The pin (or "+n" group) whose reason is shown; `nil` for none.
         var selectedPinId: String?
-        var isLoading = false
-        /// When the overview was loaded; the headline shows the time.
+        /// When the overview was last loaded, `nil` before the first answer; the headline shows the time.
         var updatedAt: Date?
-        /// Set when the rooms could not be loaded: the server is not reachable.
+        /// Set when the last reload failed: the server is not reachable. What was loaded before stays shown.
         var error: String?
         /// Set when the detail of the selected room could not be loaded.
         var detailError: String?
@@ -46,9 +45,7 @@ struct HeatingFeature: Sendable {
 
         var selectedRoom: HeatingOverviewRoom? { rooms.first { $0.placeId == selectedPlaceId } }
 
-        /// One line about the room that deviates most; `nil` while no room has a Δ.
-        var headline: String? { HeatingFeature.headline(for: rooms) }
-        /// The headline as bold title and grey subtitle.
+        /// The room that deviates most, as bold title and grey subtitle; `nil` while no room has a Δ.
         var headlineParts: HeatingHeadline? { HeatingFeature.headlineParts(for: rooms) }
     }
 
@@ -69,14 +66,13 @@ struct HeatingFeature: Sendable {
 
     @Dependency(\.date) var date
     @Dependency(\.serverClient) var serverClient
-    @Dependency(\.date.now) var now
 
     var body: some ReducerOf<Self> {
         BindingReducer()
         Reduce { state, action in
             switch action {
             case .task, .refresh:
-                state.isLoading = true
+                // The tab keeps showing what it has until the answer arrives, so a reload does not flicker.
                 return .merge(
                     .run { send in
                         await send(.overviewResponse(Result { try await serverClient.getHeatingOverview() }))
@@ -98,7 +94,7 @@ struct HeatingFeature: Sendable {
                 // Always asks the server, even for the state the tab shows: the tab may be stale (the push action
                 // runs in a freshly started app) and the server ignores a repeated request. Shows the new state at
                 // once; the server's answer replaces it.
-                state.fireplace = isOn ? FireplaceState(isOn: true, since: now) : .off
+                state.fireplace = isOn ? FireplaceState(isOn: true, since: date.now) : .off
                 state.fireplaceError = nil
                 return .run { send in
                     await send(.fireplaceSwitched(Result { try await serverClient.setFireplace(isOn) }))
@@ -120,7 +116,6 @@ struct HeatingFeature: Sendable {
                 return .none
 
             case let .overviewResponse(.success(overview)):
-                state.isLoading = false
                 state.error = nil
                 state.updatedAt = date.now
                 state.rooms = Self.sorted(overview.rooms)
@@ -132,13 +127,8 @@ struct HeatingFeature: Sendable {
                 return loadDetail(&state)
 
             case let .overviewResponse(.failure(error)):
-                state.isLoading = false
                 state.error = error.localizedDescription
-                state.rooms = []
-                state.heatmap = []
-                state.selectedPlaceId = nil
-                state.detail = nil
-                return .cancel(id: CancelID.detail)
+                return .none
 
             case let .selectRoom(placeId):
                 state.selectedPlaceId = placeId
@@ -196,12 +186,7 @@ struct HeatingFeature: Sendable {
         return indexed.map(\.element)
     }
 
-    /// "Bad OG am kältesten · 3,7 K unter Plan", "… am wärmsten · 2,0 K über Plan" or "Alle Räume im Plan".
-    static func headline(for rooms: [HeatingOverviewRoom]) -> String? {
-        guard let parts = headlineParts(for: rooms) else { return nil }
-        return parts.isAllInPlan ? parts.title : "\(parts.title) · \(parts.subtitle)"
-    }
-
+    /// "Bad OG am kältesten" / "3,7 K unter Plan", "… am wärmsten" / "2,0 K über Plan" or "Alle Räume im Plan".
     static func headlineParts(for rooms: [HeatingOverviewRoom]) -> HeatingHeadline? {
         let deviating = rooms.compactMap { room in room.delta.map { (room, $0) } }
         guard let worst = deviating.max(by: { abs($0.1) < abs($1.1) }) else { return nil }
@@ -217,13 +202,15 @@ struct HeatingFeature: Sendable {
 struct HeatingHeadline: Equatable, Sendable {
     let title: String
     let subtitle: String
-    var isAllInPlan: Bool { title == "Alle Räume im Plan" }
 }
 
 // MARK: - View
 
 enum HeatingLayout: Equatable {
     case compact, regular
+
+    /// The plot width of the room detail's chart until it measured itself; the pins stack with it.
+    var plotWidthEstimate: CGFloat { self == .compact ? 290 : 560 }
 }
 
 /// The tab with its navigation title and loading.
@@ -265,7 +252,11 @@ struct HeatingScreen: View {
     let layout: HeatingLayout
 
     var body: some View {
-        if store.error != nil, store.rooms.isEmpty {
+        // Decided by what was loaded, never by a reload in flight: the content stays until the answer arrives.
+        if store.rooms.isEmpty, store.updatedAt != nil {
+            ContentUnavailableView("Keine Räume", systemImage: "heater.vertical",
+                                   description: Text(HeatingFeature.noRoomsHint))
+        } else if store.rooms.isEmpty, store.error != nil {
             ContentUnavailableView {
                 Label("Server nicht erreichbar", systemImage: "wifi.slash")
             } description: {
@@ -273,9 +264,8 @@ struct HeatingScreen: View {
             } actions: {
                 Button("Erneut versuchen") { store.send(.refresh) }
             }
-        } else if store.rooms.isEmpty, !store.isLoading {
-            ContentUnavailableView("Keine Räume", systemImage: "heater.vertical",
-                                   description: Text(HeatingFeature.noRoomsHint))
+        } else if store.rooms.isEmpty {
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if layout == .compact {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -330,7 +320,6 @@ struct HeatingScreen: View {
         if let detail = store.detail {
             HeatingRoomDetailView(detail: detail, range: $store.range, selectedPinId: store.selectedPinId,
                                   onSelectPin: { store.send(.selectPin($0)) }, layout: layout,
-                                  plotWidthEstimate: layout == .compact ? 290 : 560,
                                   onClose: layout == .compact ? { store.send(.selectRoom(nil)) } : nil)
         } else if store.detailError != nil {
             ContentUnavailableView("Raum nicht ladbar", systemImage: "exclamationmark.triangle",
@@ -367,7 +356,11 @@ private enum HeatingPreviewState {
         state.error = "offline"
         return state
     }
-    static var noRooms: HeatingFeature.State { HeatingFeature.State() }
+    static var noRooms: HeatingFeature.State {
+        var state = HeatingFeature.State()
+        state.updatedAt = HeatingPreviewData.now
+        return state
+    }
 }
 
 #Preview("iPhone hell Übersicht") { HeatingPreview(state: HeatingPreviewState.overview, layout: .compact, scheme: .light) }

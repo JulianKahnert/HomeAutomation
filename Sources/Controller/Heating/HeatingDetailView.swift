@@ -11,14 +11,13 @@ import SwiftUI
 
 /// Rounded card of the Heizung tab.
 struct HeatingCard<Content: View>: View {
-    @Environment(\.colorScheme) private var scheme
     @ViewBuilder var content: Content
 
     var body: some View {
         content
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16).fill(HeatingPalette.card(scheme)))
+            .background(RoundedRectangle(cornerRadius: 16).fill(HeatingPalette.card))
     }
 }
 
@@ -30,13 +29,15 @@ struct HeatingRoomDetailView: View {
     var onSelectPin: (String?) -> Void = { _ in }
     /// Compact (iPhone): the reason is an inline card below the chart; regular (Mac, iPad): a popover at the pin.
     var layout: HeatingLayout = .regular
-    /// Estimate of the plot width until the chart measured itself; the pins stack with it.
-    var plotWidthEstimate: CGFloat = 290
     /// The selected moment of the crosshair; driven by hover or drag, preset in previews.
     @State var crosshair: Date?
     var onClose: (() -> Void)?
 
     @Environment(\.colorScheme) private var scheme
+    /// The plot width the chart measured: its pins and the inline card group with the same width.
+    @State private var measuredPlotWidth: CGFloat?
+
+    private var plotWidth: CGFloat { measuredPlotWidth ?? layout.plotWidthEstimate }
 
     private var shown: HeatingSample? {
         crosshair.flatMap { HeatingChartData.nearest(to: $0, in: detail.samples) } ?? detail.latest
@@ -45,7 +46,7 @@ struct HeatingRoomDetailView: View {
     private var includesDay: Bool { range == .week }
 
     private var selectedSlot: HeatingPinLayout.Slot? {
-        HeatingSollIstChart.slots(events: detail.events, samples: detail.samples, range: range, plotWidth: plotWidthEstimate).first { $0.contains(selectedPinId) }
+        HeatingSollIstChart.slots(events: detail.events, samples: detail.samples, range: range, plotWidth: plotWidth).first { $0.contains(selectedPinId) }
     }
 
     var body: some View {
@@ -55,7 +56,8 @@ struct HeatingRoomDetailView: View {
                 HeatingRangePicker(range: $range)
                     .padding(.bottom, 8)
                 HeatingSollIstChart(samples: detail.samples, events: detail.events, crosshair: $crosshair, range: range,
-                                    selectedPinId: selectedPinId, onSelectPin: onSelectPin, layout: layout, plotWidthEstimate: plotWidthEstimate)
+                                    selectedPinId: selectedPinId, onSelectPin: onSelectPin, layout: layout, plotWidth: plotWidth,
+                                    onPlotWidth: { measuredPlotWidth = $0 })
                     .frame(height: 210 + HeatingSollIstChart.pinAreaHeight)
                     .overlay {
                         if detail.hasNoData {
@@ -196,7 +198,9 @@ struct HeatingSollIstChart: View {
     var selectedPinId: String?
     var onSelectPin: (String?) -> Void = { _ in }
     var layout: HeatingLayout = .regular
-    var plotWidthEstimate: CGFloat = 290
+    /// The width the pins stack with; the chart reports its measured plot width through `onPlotWidth`.
+    var plotWidth: CGFloat = 290
+    var onPlotWidth: (CGFloat) -> Void = { _ in }
 
     static let pinWidth: CGFloat = 22
     static let pinRowHeight: CGFloat = 22
@@ -204,15 +208,12 @@ struct HeatingSollIstChart: View {
     /// Room above the plot for the pin rows.
     static let pinAreaHeight: CGFloat = pinRowHeight * CGFloat(pinRows) + 4
 
-    /// Measured width of the plot; the estimate until the first layout.
-    @State private var measuredWidth: CGFloat?
-
     static func slots(events: [HeatingEvent], samples: [HeatingSample], range: HeatingRange, plotWidth: CGFloat) -> [HeatingPinLayout.Slot] {
         HeatingPinLayout.slots(HeatingPinLayout.pins(events, range: range), in: HeatingChartData.timeDomain(samples), plotWidth: plotWidth, pinWidth: pinWidth, rows: pinRows)
     }
 
     private var slots: [HeatingPinLayout.Slot] {
-        Self.slots(events: events, samples: samples, range: range, plotWidth: measuredWidth ?? plotWidthEstimate)
+        Self.slots(events: events, samples: samples, range: range, plotWidth: plotWidth)
     }
 
     @Environment(\.colorScheme) private var scheme
@@ -280,7 +281,7 @@ struct HeatingSollIstChart: View {
                 }
             }
         }
-        .chartXScale(domain: HeatingChartData.timeDomain(samples))
+        .chartXScale(domain: domain)
         .chartYScale(domain: HeatingChartData.temperatureDomain(samples))
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
@@ -296,9 +297,7 @@ struct HeatingSollIstChart: View {
         .chartPlotStyle { $0.clipped() }
         .chartOverlay { proxy in
             ZStack(alignment: .topLeading) {
-                HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair) { _, plotWidth in
-                    if measuredWidth != plotWidth { measuredWidth = plotWidth }
-                }
+                HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair, onPlotWidth: onPlotWidth)
                 pinRows(slots, proxy: proxy)
             }
         }
@@ -431,8 +430,8 @@ enum HeatingTimeAxis {
 struct HeatingCrosshairOverlay: View {
     let proxy: ChartProxy
     @Binding var crosshair: Date?
-    /// Reports the x (relative to the plot) and the width of the plot, so the pins can stack with the real width.
-    var onPlot: (CGFloat, CGFloat) -> Void = { _, _ in }
+    /// Reports the width of the plot, so the pins can stack with the real width.
+    var onPlotWidth: (CGFloat) -> Void = { _ in }
 
     var body: some View {
         GeometryReader { geometry in
@@ -440,8 +439,8 @@ struct HeatingCrosshairOverlay: View {
             Rectangle()
                 .fill(.clear)
                 .contentShape(Rectangle())
-                .onAppear { if let plot { onPlot(plot.minX, plot.width) } }
-                .onChange(of: plot?.width) { if let plot { onPlot(plot.minX, plot.width) } }
+                .onAppear { if let plot { onPlotWidth(plot.width) } }
+                .onChange(of: plot?.width) { if let plot { onPlotWidth(plot.width) } }
                 .onContinuousHover { phase in
                     switch phase {
                     case .active(let location): crosshair = date(at: location, in: geometry)

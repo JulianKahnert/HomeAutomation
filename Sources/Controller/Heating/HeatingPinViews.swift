@@ -76,7 +76,7 @@ struct HeatingPinCard: View {
                 }
             }
         }
-        .padding(inPopover ? 12 : 12)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(inPopover ? AnyShapeStyle(.clear) : AnyShapeStyle(HeatingPalette.softFill), in: .rect(cornerRadius: 12))
     }

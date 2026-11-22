@@ -65,11 +65,7 @@ enum HeatingPreviewData {
         }
     }
 
-    static let calendar: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
-        return calendar
-    }()
+    static let calendar = HeatingOverviewBuilder.berlin
 
     /// 15.11.2026 22:40, the fixed "now" of the previews.
     static let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 15, hour: 22, minute: 40))!

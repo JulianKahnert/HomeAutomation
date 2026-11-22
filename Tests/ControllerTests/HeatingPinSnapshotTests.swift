@@ -29,10 +29,11 @@ struct HeatingPinSnapshotTests {
         var size: CGSize { self == .iPhone ? CGSize(width: 402, height: 900) : CGSize(width: 1_120, height: 760) }
     }
 
-    private func state(_ range: HeatingRange, room: String, select: Select) -> HeatingFeature.State {
+    /// The selection is picked from the pins as `device` stacks them before the chart measured itself.
+    private func state(_ range: HeatingRange, room: String, select: Select, on device: Device = .iPhone) -> HeatingFeature.State {
         var state = HeatingPreviewData.state(room, range: range)
-        let device = state.detail!
-        let slots = HeatingSollIstChart.slots(events: device.events, samples: device.samples, range: range, plotWidth: 290)
+        let detail = state.detail!
+        let slots = HeatingSollIstChart.slots(events: detail.events, samples: detail.samples, range: range, plotWidth: device.layout.plotWidthEstimate)
         switch select {
         case .none: break
         case .group: state.selectedPinId = slots.first { $0.badge != nil }?.id
@@ -71,7 +72,7 @@ struct HeatingPinSnapshotTests {
     func group() {
         for device in Device.allCases {
             for scheme in [ColorScheme.light, .dark] {
-                record(screen(state(.day, room: "Küche", select: .group), device, scheme), size: device.size, scheme: scheme, name: device.rawValue, test: "pins-group")
+                record(screen(state(.day, room: "Küche", select: .group, on: device), device, scheme), size: device.size, scheme: scheme, name: device.rawValue, test: "pins-group")
             }
         }
     }

@@ -41,7 +41,7 @@ enum HeatingPalette {
         Color.green.opacity(radiator == 0 ? 0.35 : 0.2)
     }
 
-    static func card(_ scheme: ColorScheme) -> Color {
+    static var card: Color {
         #if canImport(UIKit)
         Color(.secondarySystemGroupedBackground)
         #else

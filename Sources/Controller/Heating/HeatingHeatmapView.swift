@@ -52,7 +52,7 @@ struct HeatingHeatmapView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                Grid(horizontalSpacing: 6, verticalSpacing: 6) {
+                Grid(horizontalSpacing: 4, verticalSpacing: 6) {
                     GridRow {
                         Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                         ForEach(days, id: \.self) { day in
@@ -66,7 +66,8 @@ struct HeatingHeatmapView: View {
                             Text(room.shortName)
                                 .font(.caption.weight(room.placeId == selectedPlaceId ? .bold : .regular))
                                 .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
+                                // Truncates a long name instead of pushing the grid past the screen edge.
+                                .frame(maxWidth: 96, alignment: .leading)
                                 .gridColumnAlignment(.leading)
                             ForEach(days, id: \.self) { day in
                                 HStack(spacing: 2) {
@@ -94,7 +95,8 @@ struct HeatingHeatmapView: View {
                 HeatingHatch(showsMark: false).clipShape(.rect(cornerRadius: 3))
             }
         }
-        .frame(width: 7, height: 16)
+        // Narrows on small screens, so the seven days always fit.
+        .frame(minWidth: 3, maxWidth: 7, minHeight: 16, maxHeight: 16)
         .overlay {
             if isSelected { RoundedRectangle(cornerRadius: 3).strokeBorder(Color.primary, lineWidth: 1.5) }
         }

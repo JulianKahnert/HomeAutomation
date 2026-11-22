@@ -48,4 +48,13 @@ enum HeatingPalette {
         Color(nsColor: .controlBackgroundColor)
         #endif
     }
+
+    /// Behind the cards: the grouped background, so the cards stand out in light and dark mode alike.
+    static var screen: Color {
+        #if canImport(UIKit)
+        Color(.systemGroupedBackground)
+        #else
+        Color(nsColor: .windowBackgroundColor)
+        #endif
+    }
 }

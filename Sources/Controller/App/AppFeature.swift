@@ -50,7 +50,7 @@ struct AppFeature: Sendable {
             case .overview: return "Overview"
             case .automations: return "Automations"
             case .rooms: return "Rooms"
-            case .heating: return "Heizung"
+            case .heating: return "Heating"
             case .settings: return "Settings"
             }
         }
@@ -60,7 +60,7 @@ struct AppFeature: Sendable {
             case .overview: return "house"
             case .automations: return "lamp.floor"
             case .rooms: return "square.grid.2x2"
-            case .heating: return "heater.vertical"
+            case .heating: return "thermometer.high"
             case .settings: return "gear"
             }
         }

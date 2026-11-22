@@ -17,6 +17,8 @@
 
 ## Build Commands
 
+After a change to the apps or `Sources/Controller`, build the FlowKit Controller (or Adapter) scheme directly in the open Xcode workspace (`HomeAutomation.xcworkspace`, Xcode MCP `BuildProject`), not only with `swift build`.
+
 ### Swift Package (Server/Library)
 ```bash
 swift build

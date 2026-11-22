@@ -70,19 +70,6 @@ struct HeatingFeatureTests {
         #expect(requests.all.isEmpty)
     }
 
-    @Test("the headline names the coldest or warmest room, or all rooms in plan inside the comfort band (edges included)")
-    func headlineParts() async {
-        let cold = await loaded([Self.room("Bad OG", ist: 17.3), Self.room("Küche", ist: 22.2)])
-        #expect(cold.state.headlineParts?.title == "Bad OG am kältesten")
-        #expect(cold.state.headlineParts?.subtitle == "3,7 K unter Plan")
-        let warm = await loaded([Self.room("Bad OG", ist: 20.2), Self.room("Küche", ist: 23.0)])
-        #expect(warm.state.headlineParts?.title == "Küche am wärmsten")
-        #expect(warm.state.headlineParts?.subtitle == "2,0 K über Plan")
-        let ok = await loaded([Self.room("Bad OG", ist: 20.5), Self.room("Küche", ist: 21.5)])
-        #expect(ok.state.headlineParts?.title == "Alle Räume im Plan")
-        #expect(ok.state.headlineParts?.subtitle == "jeder Raum innerhalb ±0,5 K")
-    }
-
     @Test("the overview remembers when it was loaded")
     func updatedAt() async {
         let moment = Date(timeIntervalSince1970: 1_800_000_000)
@@ -96,14 +83,6 @@ struct HeatingFeatureTests {
         await store.send(.task)
         await store.receive(\.overviewResponse.success)
         #expect(store.state.updatedAt == moment)
-    }
-
-    @Test("rooms without a delta do not count for the headline")
-    func headlineIgnoresRoomsWithoutActual() async {
-        let store = await loaded([Self.room("Leer", ist: nil), Self.room("Küche", ist: 21)])
-        #expect(store.state.headlineParts?.title == "Alle Räume im Plan")
-        let none = await loaded([Self.room("Leer", ist: nil)])
-        #expect(none.state.headlineParts == nil)
     }
 
     // MARK: Detail
@@ -186,7 +165,6 @@ struct HeatingFeatureTests {
         let store = await loaded([], requests: requests)
         #expect(store.state.rooms.isEmpty)
         #expect(store.state.error == nil)
-        #expect(store.state.headlineParts == nil)
         #expect(requests.all.isEmpty)
     }
 

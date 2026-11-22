@@ -37,7 +37,7 @@ struct HeatingFireplaceSnapshotTests {
         var body: some View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Heizung").font(.largeTitle.bold())
+                    Text("Heating").font(.largeTitle.bold())
                     if let hint = HeatingFormat.fireplaceHint(fireplace, now: HeatingPreviewData.now) {
                         Text(hint).font(.subheadline).foregroundStyle(.secondary)
                     }

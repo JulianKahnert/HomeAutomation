@@ -32,7 +32,7 @@ struct HeatingFeature: Sendable {
         var detail: HeatingRoomDetail?
         /// The pin (or "+n" group) whose reason is shown; `nil` for none.
         var selectedPinId: String?
-        /// When the overview was last loaded, `nil` before the first answer; the headline shows the time.
+        /// When the overview was last loaded, `nil` before the first answer.
         var updatedAt: Date?
         /// Set when the last reload failed: the server is not reachable. What was loaded before stays shown.
         var error: String?
@@ -44,9 +44,6 @@ struct HeatingFeature: Sendable {
         var fireplaceError: String?
 
         var selectedRoom: HeatingOverviewRoom? { rooms.first { $0.placeId == selectedPlaceId } }
-
-        /// The room that deviates most, as bold title and grey subtitle; `nil` while no room has a Δ.
-        var headlineParts: HeatingHeadline? { HeatingFeature.headlineParts(for: rooms) }
     }
 
     enum Action: BindableAction, Sendable {
@@ -185,23 +182,6 @@ struct HeatingFeature: Sendable {
         }
         return indexed.map(\.element)
     }
-
-    /// "Bad OG am kältesten" / "3,7 K unter Plan", "… am wärmsten" / "2,0 K über Plan" or "Alle Räume im Plan".
-    static func headlineParts(for rooms: [HeatingOverviewRoom]) -> HeatingHeadline? {
-        let deviating = rooms.compactMap { room in room.delta.map { (room, $0) } }
-        guard let worst = deviating.max(by: { abs($0.1) < abs($1.1) }) else { return nil }
-        switch HeatingComfort(delta: worst.1) {
-        case .ok: return HeatingHeadline(title: "Alle Räume im Plan", subtitle: "jeder Raum innerhalb ±0,5 K")
-        case .tooCold: return HeatingHeadline(title: "\(worst.0.name) am kältesten", subtitle: "\(HeatingFormat.kelvinAmount(worst.1)) unter Plan")
-        case .tooWarm: return HeatingHeadline(title: "\(worst.0.name) am wärmsten", subtitle: "\(HeatingFormat.kelvinAmount(worst.1)) über Plan")
-        }
-    }
-}
-
-/// The overview's headline: a bold title and a grey subtitle.
-struct HeatingHeadline: Equatable, Sendable {
-    let title: String
-    let subtitle: String
 }
 
 // MARK: - View
@@ -223,12 +203,23 @@ struct HeatingView: View {
     private var layout: HeatingLayout { .regular }
     #endif
 
+    /// The clock of the subtitle "endet in 2 h"; ticks only while the fireplace burns, so the charts are not
+    /// rebuilt every minute.
+    @State private var now = Date()
+
     var body: some View {
         NavigationStack {
-            TimelineView(.everyMinute) { context in
-                HeatingScreen(store: store, layout: layout)
-                    .navigationTitle("Heizung")
-                    .heatingSubtitle(HeatingFormat.fireplaceHint(store.fireplace, now: context.date) ?? "")
+            HeatingScreen(store: store, layout: layout)
+                .background(HeatingPalette.screen)
+                .navigationTitle("Heating")
+                .heatingSubtitle(HeatingFormat.fireplaceHint(store.fireplace, now: now) ?? "")
+            .task(id: store.fireplace.isOn) {
+                now = Date()
+                guard store.fireplace.isOn else { return }
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(60))
+                    now = Date()
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -305,7 +296,7 @@ struct HeatingScreen: View {
     }
 
     private var overview: some View {
-        HeatingOverviewView(rooms: store.rooms, headline: store.headlineParts, updatedAt: store.updatedAt, selectedPlaceId: store.selectedPlaceId,
+        HeatingOverviewView(rooms: store.rooms, selectedPlaceId: store.selectedPlaceId,
                             fireplaceOn: store.fireplace.isOn) {
             store.send(.selectRoom($0))
         }

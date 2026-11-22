@@ -2,35 +2,32 @@
 //  HeatingOverviewView.swift
 //  ControllerFeatures
 //
-//  The overview in Variante G "Leicht": a headline and one rounded Δ bar per room, no axes or legend
+//  The overview in Variante G "Leicht": one rounded Δ bar per room, no headline, axes or legend
 //
 
 import Charts
 import HAModels
 import SwiftUI
 
-/// Headline and bars of all rooms. Selecting a room is reported through `onSelect`.
+/// The bars of all rooms. Selecting a room is reported through `onSelect`.
 struct HeatingOverviewView: View {
     let rooms: [HeatingOverviewRoom]
-    let headline: HeatingHeadline?
-    /// The time at the top right of the headline.
-    let updatedAt: Date?
     let selectedPlaceId: String?
     /// The fireplace burns: the rooms that follow it show the flame and a soft orange area.
     let fireplaceOn: Bool
-    /// The room the info bubble shows; driven by hover or drag, preset in previews.
+    /// The room the info bubble shows; driven by the chart's selection (drag or hover), preset in previews.
     @State var hoveredPlaceId: String?
     let onSelect: (String?) -> Void
 
     @Environment(\.colorScheme) private var scheme
+    /// The chart's width, so each room's label stays inside its own column.
+    @State private var chartWidth: CGFloat = 0
 
-    init(rooms: [HeatingOverviewRoom], headline: HeatingHeadline?, updatedAt: Date? = nil, selectedPlaceId: String?, fireplaceOn: Bool = false,
+    init(rooms: [HeatingOverviewRoom], selectedPlaceId: String?, fireplaceOn: Bool = false,
          hoveredPlaceId: String? = nil,
          onSelect: @escaping (String?) -> Void) {
         self.fireplaceOn = fireplaceOn
         self.rooms = rooms
-        self.headline = headline
-        self.updatedAt = updatedAt
         self.selectedPlaceId = selectedPlaceId
         self._hoveredPlaceId = State(initialValue: hoveredPlaceId)
         self.onSelect = onSelect
@@ -41,30 +38,7 @@ struct HeatingOverviewView: View {
 
     var body: some View {
         HeatingCard {
-            VStack(alignment: .leading, spacing: 8) {
-                if let headline {
-                    headlineView(headline)
-                        // The info bubble takes the headline's place while it is shown.
-                        .opacity(hovered == nil ? 1 : 0)
-                }
-                chart.frame(height: 200)
-            }
-        }
-    }
-
-    private func headlineView(_ headline: HeatingHeadline) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(headline.title).font(.title3.weight(.semibold))
-                Text(headline.subtitle).font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
-            }
-            Spacer()
-            if let updatedAt {
-                Text(HeatingFormat.time(updatedAt, includingDay: false))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-            }
+            chart.frame(height: 200)
         }
     }
 
@@ -109,11 +83,15 @@ struct HeatingOverviewView: View {
                             // Selection as a soft tinted pill; the bars keep their full colour.
                             Text(axisRoom.shortName)
                                 .font(.caption)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                                .minimumScaleFactor(0.75)
                                 .fontWeight(isSelected ? .semibold : .regular)
                                 .foregroundStyle(isSelected ? .primary : .secondary)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(isSelected ? HeatingPalette.softFill : .clear, in: .capsule)
+                                .frame(maxWidth: labelWidth)
                             if rooms.contains(where: \.followsFireplace) {
                                 // Always reserves the line, so the plot does not jump with the switch.
                                 Image(systemName: "flame.fill")
@@ -131,30 +109,24 @@ struct HeatingOverviewView: View {
                 ZStack(alignment: .topLeading) {
                     decorations(proxy: proxy, geo: geo)
                     bubble(proxy: proxy, geo: geo)
+                    // A tap opens the room; a drag is Swift Charts' selection below and leaves vertical swipes to the page.
                     Rectangle().fill(.clear).contentShape(Rectangle())
-                        .gesture(DragGesture(minimumDistance: 0)
-                            .onChanged { drag in
-                                hoveredPlaceId = room(at: drag.location.x, proxy: proxy, geo: geo)?.placeId
-                            }
-                            .onEnded { drag in
-                                hoveredPlaceId = nil
-                                // A drag only scrubs the bubble; a tap also opens the room.
-                                guard abs(drag.translation.width) < 8,
-                                      let room = room(at: drag.location.x, proxy: proxy, geo: geo) else { return }
-                                onSelect(selectedPlaceId == room.placeId ? nil : room.placeId)
-                            })
-                        .onContinuousHover { phase in
-                            if case .active(let point) = phase {
-                                hoveredPlaceId = room(at: point.x, proxy: proxy, geo: geo)?.placeId
-                            } else {
-                                hoveredPlaceId = nil
-                            }
+                        .onTapGesture { location in
+                            guard let room = room(at: location.x, proxy: proxy, geo: geo) else { return }
+                            onSelect(selectedPlaceId == room.placeId ? nil : room.placeId)
                         }
                 }
             }
         }
-        // Room for the bubble, which floats over the headline.
-        .padding(.top, 22)
+        // Drag (touch) or hover (pointer) shows the info bubble of the room under it.
+        .chartXSelection(value: $hoveredPlaceId)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chartWidth = $0 }
+    }
+
+    /// One room's column minus a small gap; unbounded until the chart measured itself.
+    private var labelWidth: CGFloat? {
+        guard chartWidth > 0, !rooms.isEmpty else { return nil }
+        return max(chartWidth / CGFloat(rooms.count) - 4, 24)
     }
 
     private func room(at x: CGFloat, proxy: ChartProxy, geo: GeometryProxy) -> HeatingOverviewRoom? {
@@ -166,10 +138,10 @@ struct HeatingOverviewView: View {
     private func bubble(proxy: ChartProxy, geo: GeometryProxy) -> some View {
         if let room = hovered, let plot = proxy.plotFrame, let x = proxy.position(forX: room.placeId) {
             let frame = geo[plot]
-            // A bottom-aligned box puts the bubble's bottom edge on the plot top.
+            // A top-aligned box puts the bubble's top edge on the plot top; it floats over the bars.
             HeatingInfoBubble(room: room)
-                .frame(width: 320, height: 200, alignment: .bottom)
-                .position(x: min(max(frame.minX + x, frame.minX + 120), frame.maxX - 120), y: frame.minY - 100)
+                .frame(width: 320, height: 200, alignment: .top)
+                .position(x: min(max(frame.minX + x, frame.minX + 120), frame.maxX - 120), y: frame.minY + 100)
                 .allowsHitTesting(false)
         }
     }
@@ -251,7 +223,7 @@ struct HeatingInfoBubble: View {
 
 #Preview("Übersicht") {
     let rooms = HeatingFeature.sorted(HeatingPreviewData.overviewRooms)
-    HeatingOverviewView(rooms: rooms, headline: HeatingFeature.headlineParts(for: rooms), updatedAt: HeatingPreviewData.now, selectedPlaceId: nil) { _ in }
+    HeatingOverviewView(rooms: rooms, selectedPlaceId: nil) { _ in }
         .padding(16)
         .frame(width: 402)
 }

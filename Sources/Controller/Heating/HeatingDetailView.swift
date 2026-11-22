@@ -45,18 +45,17 @@ struct HeatingRoomDetailView: View {
 
     private var includesDay: Bool { range == .week }
 
-    private var selectedSlot: HeatingPinLayout.Slot? {
-        HeatingSollIstChart.slots(events: detail.events, samples: detail.samples, range: range, plotWidth: plotWidth).first { $0.contains(selectedPinId) }
-    }
-
     var body: some View {
+        // Laid out once per render: the chart draws them, the inline card shows the selected one.
+        let slots = HeatingSollIstChart.slots(events: detail.events, samples: detail.samples, range: range, plotWidth: plotWidth)
+        let selectedSlot = slots.first { $0.contains(selectedPinId) }
         HeatingCard {
             VStack(alignment: .leading, spacing: 8) {
                 header
                 HeatingRangePicker(range: $range)
                     .padding(.bottom, 8)
                 HeatingSollIstChart(samples: detail.samples, events: detail.events, crosshair: $crosshair, range: range,
-                                    selectedPinId: selectedPinId, onSelectPin: onSelectPin, layout: layout, plotWidth: plotWidth,
+                                    selectedPinId: selectedPinId, onSelectPin: onSelectPin, layout: layout, slots: slots,
                                     onPlotWidth: { measuredPlotWidth = $0 })
                     .frame(height: 210 + HeatingSollIstChart.pinAreaHeight)
                     .overlay {
@@ -198,8 +197,8 @@ struct HeatingSollIstChart: View {
     var selectedPinId: String?
     var onSelectPin: (String?) -> Void = { _ in }
     var layout: HeatingLayout = .regular
-    /// The width the pins stack with; the chart reports its measured plot width through `onPlotWidth`.
-    var plotWidth: CGFloat = 290
+    /// The pins, laid out by the caller with the plot width the chart reports through `onPlotWidth`.
+    var slots: [HeatingPinLayout.Slot] = []
     var onPlotWidth: (CGFloat) -> Void = { _ in }
 
     static let pinWidth: CGFloat = 22
@@ -210,10 +209,6 @@ struct HeatingSollIstChart: View {
 
     static func slots(events: [HeatingEvent], samples: [HeatingSample], range: HeatingRange, plotWidth: CGFloat) -> [HeatingPinLayout.Slot] {
         HeatingPinLayout.slots(HeatingPinLayout.pins(events, range: range), in: HeatingChartData.timeDomain(samples), plotWidth: plotWidth, pinWidth: pinWidth, rows: pinRows)
-    }
-
-    private var slots: [HeatingPinLayout.Slot] {
-        Self.slots(events: events, samples: samples, range: range, plotWidth: plotWidth)
     }
 
     @Environment(\.colorScheme) private var scheme
@@ -238,7 +233,6 @@ struct HeatingSollIstChart: View {
 
     var body: some View {
         let selected = crosshair.flatMap { HeatingChartData.nearest(to: $0, in: samples) }
-        let slots = slots
         let domain = HeatingChartData.timeDomain(samples)
         Chart {
             HeatingEventAreas(events: events, domain: domain)
@@ -295,9 +289,11 @@ struct HeatingSollIstChart: View {
         }
         .chartXAxis { HeatingTimeAxis.marks(range: range) }
         .chartPlotStyle { $0.clipped() }
+        // Swift Charts' own selection: drag or hover moves the crosshair, a vertical swipe still scrolls the page.
+        .chartXSelection(value: $crosshair)
         .chartOverlay { proxy in
             ZStack(alignment: .topLeading) {
-                HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair, onPlotWidth: onPlotWidth)
+                HeatingPlotWidthReader(proxy: proxy, onPlotWidth: onPlotWidth)
                 pinRows(slots, proxy: proxy)
             }
         }
@@ -369,8 +365,9 @@ struct HeatingValveChart: View {
 
     var body: some View {
         let selected = crosshair.flatMap { HeatingChartData.nearest(to: $0, in: samples) }
+        let domain = HeatingChartData.timeDomain(samples)
         Chart {
-            HeatingEventAreas(events: events, domain: HeatingChartData.timeDomain(samples))
+            HeatingEventAreas(events: events, domain: domain)
             ForEach(radiators.indices, id: \.self) { index in
                 ForEach(Array(HeatingChartData.valveRuns(samples, radiator: index).enumerated()), id: \.offset) { run, points in
                     ForEach(Array(points.enumerated()), id: \.offset) { _, point in
@@ -385,7 +382,7 @@ struct HeatingValveChart: View {
                     .foregroundStyle(Color.secondary.opacity(0.45))
             }
         }
-        .chartXScale(domain: HeatingChartData.timeDomain(samples))
+        .chartXScale(domain: domain)
         .chartYScale(domain: 0...100)
         .chartLegend(.hidden)
         .chartYAxis {
@@ -396,9 +393,7 @@ struct HeatingValveChart: View {
         }
         .chartXAxis(.hidden)
         .chartPlotStyle { $0.clipped() }
-        .chartOverlay { proxy in
-            HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair)
-        }
+        .chartXSelection(value: $crosshair)
     }
 }
 
@@ -426,39 +421,20 @@ enum HeatingTimeAxis {
     }
 }
 
-/// Hover (Mac, iPad pointer) or drag (touch) sets the crosshair; leaving or lifting clears it.
-struct HeatingCrosshairOverlay: View {
+/// Reports the width of the plot, so the pins can stack with the real width. Takes no touches: the selection
+/// belongs to the chart.
+struct HeatingPlotWidthReader: View {
     let proxy: ChartProxy
-    @Binding var crosshair: Date?
-    /// Reports the width of the plot, so the pins can stack with the real width.
-    var onPlotWidth: (CGFloat) -> Void = { _ in }
+    var onPlotWidth: (CGFloat) -> Void
 
     var body: some View {
         GeometryReader { geometry in
-            let plot = proxy.plotFrame.map { geometry[$0] }
-            Rectangle()
-                .fill(.clear)
-                .contentShape(Rectangle())
-                .onAppear { if let plot { onPlotWidth(plot.width) } }
-                .onChange(of: plot?.width) { if let plot { onPlotWidth(plot.width) } }
-                .onContinuousHover { phase in
-                    switch phase {
-                    case .active(let location): crosshair = date(at: location, in: geometry)
-                    case .ended: crosshair = nil
-                    }
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { crosshair = date(at: $0.location, in: geometry) }
-                        .onEnded { _ in crosshair = nil }
-                )
+            let width = proxy.plotFrame.map { geometry[$0].width }
+            Color.clear
+                .onAppear { if let width { onPlotWidth(width) } }
+                .onChange(of: width) { if let width { onPlotWidth(width) } }
         }
-    }
-
-    private func date(at location: CGPoint, in geometry: GeometryProxy) -> Date? {
-        guard let plotFrame = proxy.plotFrame else { return nil }
-        let x = location.x - geometry[plotFrame].origin.x
-        return proxy.value(atX: x, as: Date.self)
+        .allowsHitTesting(false)
     }
 }
 
@@ -531,7 +507,7 @@ private extension HeatingRoomDetail {
     Chart(detail.samples, id: \.date) { sample in
         LineMark(x: .value("Zeit", sample.date), y: .value("Ist", sample.ist ?? 0))
     }
-    .chartOverlay { proxy in HeatingCrosshairOverlay(proxy: proxy, crosshair: $crosshair) }
+    .chartXSelection(value: $crosshair)
     .frame(width: 402, height: 160)
     .padding(16)
 }

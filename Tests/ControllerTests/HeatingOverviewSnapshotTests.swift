@@ -79,7 +79,7 @@ struct HeatingOverviewSnapshotTests {
         let rooms = [HeatingOverviewRoom(placeId: "Bad - OG", name: "Bad OG", shortName: "Bad", ist: 19, sollPlan: 21, istSource: .roomSensor("Eve Room")),
                      HeatingOverviewRoom(placeId: "Bad - EG", name: "Bad EG", shortName: "Bad", ist: 22, sollPlan: 21, istSource: .roomSensor("Eve Room"))]
         for scheme in [ColorScheme.light, .dark] {
-            let view = HeatingOverviewView(rooms: rooms, headline: HeatingFeature.headlineParts(for: rooms), updatedAt: HeatingPreviewData.now, selectedPlaceId: "Bad - EG") { _ in }
+            let view = HeatingOverviewView(rooms: rooms, selectedPlaceId: "Bad - EG") { _ in }
                 .padding(16)
             render(view, CGSize(width: 402, height: 340), scheme, name: "iPhone", test: "overview-sameShortLabel")
         }
@@ -90,7 +90,7 @@ struct HeatingOverviewSnapshotTests {
         let rooms = HeatingFeature.sorted([room("Bad OG", ist: 16.5), room("Küche", ist: 22.4), room("Büro", ist: 20.7),
                                            room("Flur", ist: 23.5), room("Keller", ist: nil)])
         for scheme in [ColorScheme.light, .dark] {
-            let view = HeatingOverviewView(rooms: rooms, headline: HeatingFeature.headlineParts(for: rooms), updatedAt: HeatingPreviewData.now, selectedPlaceId: "Büro",
+            let view = HeatingOverviewView(rooms: rooms, selectedPlaceId: "Büro",
                                            hoveredPlaceId: "Küche") { _ in }
                 .padding(16)
             render(view, CGSize(width: 402, height: 340), scheme, name: "iPhone", test: "overview-bubble")

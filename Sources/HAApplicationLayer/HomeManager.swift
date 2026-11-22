@@ -24,6 +24,12 @@ public final class HomeManager: HomeManagable {
     private let storageRepo: StorageRepository
     private let notificationSender: NotificationSender
     private let heatingWrites: (any HeatingWriteRepository)?
+    private let fireplaceSwitches: (any FireplaceRepository)?
+    /// Tells the automations about a switch of the fireplace; the server yields `HomeEvent.fireplaceChanged`.
+    private let onFireplaceSwitch: @Sendable (FireplaceSwitch) -> Void
+    /// The newest fireplace switch, loaded once from the database. It also holds a switch the database could
+    /// not save, so an end of the fireplace stays an end and `FireplaceTimeout` does not repeat itself.
+    private var fireplace: FireplaceSwitch??
     private let entityCache = Cache<EntityId, EntityStorageItem>(entryLifetime: .hours(2))
     /// One retry slot per entity: a newer failed action replaces an older queued one, so the newest
     /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
@@ -48,6 +54,8 @@ public final class HomeManager: HomeManagable {
     ///   - retryTicks: Cadence at which queued failed actions are retried. Pass a stream to drive the
     ///     retries deterministically; the default is a 5s timer.
     ///   - heatingWrites: Where the writes to radiators are recorded with their reason; `nil` records none.
+    ///   - fireplaceSwitches: Where the fireplace switches are stored; `nil` keeps them in memory only.
+    ///   - onFireplaceSwitch: Called after each switch of the fireplace, to tell the automations.
     ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
     ///     than there are delays.
     ///   - outdoorTemperature: The latest stored outdoor temperature reading in °C, `nil` without one;
@@ -58,12 +66,16 @@ public final class HomeManager: HomeManagable {
                 location: Location,
                 actionLogManager: ActionLogManager,
                 heatingWrites: (any HeatingWriteRepository)? = nil,
+                fireplaceSwitches: (any FireplaceRepository)? = nil,
+                onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
                 retryTicks: AsyncStream<Void>? = nil,
                 persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
                 outdoorTemperature: @escaping @Sendable () async -> Double? = { nil }) {
         self.windowManager = WindowManager(notificationSender: notificationSender, outdoorTemperature: outdoorTemperature)
         self.actionLogManager = actionLogManager
         self.heatingWrites = heatingWrites
+        self.fireplaceSwitches = fireplaceSwitches
+        self.onFireplaceSwitch = onFireplaceSwitch
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
         self.notificationSender = notificationSender
@@ -215,6 +227,39 @@ public final class HomeManager: HomeManagable {
                 log.critical("Giving up on action [\(action)] after \(Self.maxAttempts) attempts")
             }
         }
+    }
+
+    public func queuedRetry(of entityId: EntityId) async -> HomeManagableAction? {
+        failedActions[entityId]?.action
+    }
+
+    public func lastFireplaceSwitch() async -> FireplaceSwitch? {
+        if let fireplace { return fireplace }
+        do {
+            let stored = try await fireplaceSwitches?.latest()
+            // a switch made while the database was read wins over what it answered
+            if let fireplace { return fireplace }
+            // a failed read is not remembered, so the next call asks the database again
+            self.fireplace = .some(stored)
+            return stored
+        } catch {
+            log.error("Failed to read the fireplace state", metadata: ["error": "\(error)"])
+            return nil
+        }
+    }
+
+    public func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch? {
+        let current = await lastFireplaceSwitch()
+        guard (current?.isOn ?? false) != isOn else { return nil }
+        let new = FireplaceSwitch(timestamp: date, isOn: isOn)
+        fireplace = .some(new)
+        onFireplaceSwitch(new)
+        do {
+            try await fireplaceSwitches?.add(new)
+        } catch {
+            log.error("Failed to store the fireplace switch", metadata: ["isOn": "\(isOn)", "error": "\(error)"])
+        }
+        return new
     }
 
     /// Persists a radiator write; a failing database must not fail the command.

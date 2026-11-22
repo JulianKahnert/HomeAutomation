@@ -151,6 +151,27 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         heatingWrites.append(write)
     }
 
+    /// Commands waiting to be sent again, by entity; a test seeds them.
+    var queuedRetries: [EntityId: HomeManagableAction] = [:]
+
+    func queuedRetry(of entityId: EntityId) async -> HomeManagableAction? {
+        queuedRetries[entityId]
+    }
+
+    /// The fireplace switches the server stored, oldest first; a test seeds them.
+    var fireplaceSwitches: [FireplaceSwitch] = []
+
+    func lastFireplaceSwitch() async -> FireplaceSwitch? {
+        fireplaceSwitches.last
+    }
+
+    func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch? {
+        guard (fireplaceSwitches.last?.isOn ?? false) != isOn else { return nil }
+        let new = FireplaceSwitch(timestamp: date, isOn: isOn)
+        fireplaceSwitches.append(new)
+        return new
+    }
+
     func getAllEntitiesLive() async throws -> [EntityStorageItem] {
         return storageItems
     }

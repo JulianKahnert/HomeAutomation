@@ -115,11 +115,22 @@ public struct HeatingOverviewBuilder: Sendable {
         return calendar
     }()
 
+    /// Loads the rooms at the same time; the result keeps their order. The overview needs no events.
     public func overview(for rooms: [HeatingRoomSources]) async throws -> HeatingOverview {
+        let weeks = try await withThrowingTaskGroup(of: (Int, HeatingRoomDetail).self) { group in
+            for (index, room) in rooms.enumerated() {
+                group.addTask { (index, try await detail.detail(for: room, range: .week, includeEvents: false)) }
+            }
+            var weeks: [Int: HeatingRoomDetail] = [:]
+            for try await (index, week) in group {
+                weeks[index] = week
+            }
+            return weeks
+        }
         var result: [HeatingOverviewRoom] = []
         var cells: [HeatingHeatmapCell] = []
-        for room in rooms {
-            let week = try await detail.detail(for: room, range: .week)
+        for (index, room) in rooms.enumerated() {
+            guard let week = weeks[index] else { continue }
             cells += Self.heatmap(for: week, calendar: calendar)
             result.append(HeatingOverviewRoom(placeId: room.placeId,
                                               name: room.name,

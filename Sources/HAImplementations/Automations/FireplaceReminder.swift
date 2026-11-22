@@ -13,7 +13,6 @@ public struct FireplaceReminder: Automatable {
     public var isActive = true
     public let name: String
     public let roomSensor: EntityId
-    public let fireplace: SwitchDevice
     /// The rise in °C within `window` that triggers the reminder.
     public let riseInC: Double
     /// The time span the rise is measured over.
@@ -23,10 +22,9 @@ public struct FireplaceReminder: Automatable {
 
     public var triggerEntityIds: Set<EntityId> { [roomSensor] }
 
-    public init(_ name: String = "fireplace-reminder", roomSensor: EntityId, fireplace: SwitchDevice = Fireplace.switchDevice, riseInC: Double = 1.0, window: TimeInterval = 30 * 60, minInterval: TimeInterval = 2 * 3600) {
+    public init(_ name: String = "fireplace-reminder", roomSensor: EntityId, riseInC: Double = 1.0, window: TimeInterval = 30 * 60, minInterval: TimeInterval = 2 * 3600) {
         self.name = name
         self.roomSensor = roomSensor
-        self.fireplace = fireplace
         self.riseInC = riseInC
         self.window = window
         self.minInterval = minInterval
@@ -35,7 +33,7 @@ public struct FireplaceReminder: Automatable {
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
         guard case .change(let item) = event, item.entityId == roomSensor,
               let current = item.temperatureInC?.value else { return false }
-        guard !(await Fireplace.state(of: fireplace.switchId, with: hm).isOn) else { return false }
+        guard !(await Fireplace.state(with: hm).isOn) else { return false }
         if let last = await hm.lastNotificationDate(id: Fireplace.reminderNotificationId),
            item.timestamp.timeIntervalSince(last) < minInterval { return false }
 

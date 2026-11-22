@@ -33,6 +33,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         app.migrations.add(CreateEntityHourlyAggregate())
         app.migrations.add(AddTemperatureCalibration())
         app.migrations.add(CreateHeatingWrite())
+        app.migrations.add(CreateFireplaceSwitch())
         try await app.autoMigrate()
     }
 

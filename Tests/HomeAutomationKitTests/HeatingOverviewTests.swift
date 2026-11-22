@@ -35,6 +35,17 @@ struct HeatingOverviewTests {
         return try await HeatingOverviewBuilder(detail: detail).overview(for: rooms)
     }
 
+    @Test("the rooms load at the same time and keep their order")
+    func order() async throws {
+        let names = (1...8).map { "Raum \($0)" }
+        let items = names.enumerated().map { temp(id($1, "Thermo"), 18 + Double($0)) }
+
+        let result = try await overview(names.map { room($0) }, items: items, writes: names.map { plan($0, 20) })
+
+        #expect(result.rooms.map(\.placeId) == names)
+        #expect(result.rooms.map(\.ist) == (0..<8).map { 18 + Double($0) })
+    }
+
     @Test("a room reports actual, plan target, delta and the source of the actual value")
     func deltaIsActualMinusPlan() async throws {
         let sensor = id("Bad", "Sensor")

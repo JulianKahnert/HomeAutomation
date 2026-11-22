@@ -17,7 +17,7 @@ public struct RoomHeating: Automatable {
     public let placeId: PlaceId
     public let radiators: [Radiator]
     /// Contacts that switch the room off while open (glossary: contact): the window contacts of the room and
-    /// the fireplace switch when the room follows it (all radiators, or only those the contact lists).
+    /// the fireplace when the room follows it (all radiators, or only those the contact lists).
     public let contacts: [RoomContact]
     /// `nil` for a room without a plan of its own: it follows the standard plan.
     public let plan: HeatingPlan?
@@ -29,7 +29,7 @@ public struct RoomHeating: Automatable {
     /// The label under the room's bar in the overview; `nil` derives it from the name.
     public let shortLabel: String?
 
-    public var triggerEntityIds: Set<EntityId> { Set(contacts.map(\.entityId)) }
+    public var triggerEntityIds: Set<EntityId> { Set(contacts.compactMap(\.triggerEntityId)) }
 
     /// The plan this room follows.
     public var effectivePlan: HeatingPlan { plan ?? configuration.standardPlan }
@@ -63,8 +63,8 @@ public struct RoomHeating: Automatable {
         switch contact {
         case .window(let sensor):
             return .init(source: .window, name: sensor.contactSensorId.name, entityId: sensor.contactSensorId)
-        case .fireplace(let device, _):
-            return .init(source: .fireplace, name: "Kamin", entityId: device.switchId)
+        case .fireplace:
+            return .init(source: .fireplace, name: "Kamin", entityId: Fireplace.stateId)
         }
     }
 
@@ -75,7 +75,7 @@ public struct RoomHeating: Automatable {
         case .configDeployed:
             return true
         case .change(let item):
-            guard let contact = contacts.first(where: { $0.entityId == item.entityId }) else { return false }
+            guard let contact = contacts.first(where: { $0.triggerEntityId == item.entityId }) else { return false }
             // An opening starts the delay. A closing matters only when it ends a state the server acted on:
             // the re-sent closed contacts after a restart or a cache expiry must not write the plan over a
             // manual change.
@@ -85,6 +85,11 @@ public struct RoomHeating: Automatable {
             // Re-apply the overrides from the stored contact states, without waiting for the adapter to
             // re-send them. All closed: nothing to do, the radiators keep their manual values.
             return await !offStates(using: hm).isEmpty
+        case .fireplaceChanged(let isOn):
+            guard let contact = contacts.first(where: { $0.source == .fireplace }) else { return false }
+            // On: the radiators go off at once. Off: only when it ends a state the server acted on, like a closing.
+            if isOn { return true }
+            return await endedOffState(of: contact, using: hm)
         case .sunrise, .sunset:
             return false
         }
@@ -208,10 +213,13 @@ public struct RoomHeating: Automatable {
         return false
     }
 
-    /// Whether the last write that reached `radiator` switched it off. Whichever contact's reason it carries: a
-    /// duplicate off is not recorded, so after a handover between two contacts the reason can be the earlier one.
+    /// Whether the last write that reached `radiator` switched it off, or an off that failed waits to be sent
+    /// again. Whichever contact's reason it carries: a duplicate off is not recorded, so after a handover between
+    /// two contacts the reason can be the earlier one. The queued off counts so a contact that closes before the
+    /// retry went through writes the plan, whose command replaces the retry.
     private func isSwitchedOff(_ radiator: Radiator, using hm: HomeManagable) async -> Bool {
-        await hm.lastHeatingWrite(of: radiator.heatingId)?.isActive == false
+        if case .setHeating(_, active: false) = await hm.queuedRetry(of: radiator.heatingId) { return true }
+        return await hm.lastHeatingWrite(of: radiator.heatingId)?.isActive == false
     }
 
     /// The contact that closed within the last minute, ending a state the server switched `radiator` off for.

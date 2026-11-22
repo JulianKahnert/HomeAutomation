@@ -341,6 +341,7 @@ struct OpenAPIController: APIProtocol {
     private func heatingDetailBuilder() -> HeatingRoomDetailBuilder {
         HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
                                  writes: request.application.heatingWriteRepository,
+                                 fireplace: request.application.fireplaceRepository,
                                  calendar: HeatingOverviewBuilder.berlin)
     }
 

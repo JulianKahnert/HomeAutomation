@@ -145,6 +145,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateEntityHourlyAggregate())
     app.migrations.add(AddTemperatureCalibration())
     app.migrations.add(CreateHeatingWrite())
+    app.migrations.add(CreateFireplaceSwitch())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -260,6 +261,10 @@ public func configure(_ app: Application) async throws {
                                         location: app.homeAutomationConfigService.location,
                                         actionLogManager: actionLogManager,
                                         heatingWrites: app.heatingWriteRepository,
+                                        fireplaceSwitches: app.fireplaceRepository,
+                                        onFireplaceSwitch: { [continuation = app.homeEventsContinuation] fireplaceSwitch in
+        continuation.yield(.fireplaceChanged(isOn: fireplaceSwitch.isOn))
+    },
                                         outdoorTemperature: { [logger = app.logger] in
         // The same rows the OutdoorTemperatureJob writes for this location.
         do {

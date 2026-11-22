@@ -8,6 +8,7 @@
 import Distributed
 import Foundation
 import HAApplicationLayer
+@testable import HAImplementations
 import HAModels
 import Testing
 
@@ -101,6 +102,8 @@ struct HomeManagerTests {
     private func makeHomeManager(probe: AdapterProbe,
                                  storageRepo: any StorageRepository = MockStorageRepository(),
                                  heatingWrites: (any HeatingWriteRepository)? = nil,
+                                 fireplaceSwitches: (any FireplaceRepository)? = nil,
+                                 onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
                                  retryTicks: AsyncStream<Void> = AsyncStream { _ in },
                                  persistRetryDelays: [Duration] = [.zero, .zero],
                                  actionLogManager: ActionLogManager = ActionLogManager()) async -> HomeManager {
@@ -111,6 +114,8 @@ struct HomeManagerTests {
                                  location: Location(latitude: 0, longitude: 0),
                                  actionLogManager: actionLogManager,
                                  heatingWrites: heatingWrites,
+                                 fireplaceSwitches: fireplaceSwitches,
+                                 onFireplaceSwitch: onFireplaceSwitch,
                                  retryTicks: retryTicks,
                                  persistRetryDelays: persistRetryDelays)
     }
@@ -330,6 +335,78 @@ struct HomeManagerTests {
         #expect(await probe.performedActions == [.turnOff(switchId), .turnOn(switchId)])
     }
 
+    @Test("An off that failed and waits for its retry is replaced when the window closes, so the room does not go off after the closing")
+    func queuedOffIsReplacedByTheClosing() async throws {
+        let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
+        let probe = AdapterProbe(failure: .unreachable)
+        let homeManager = await makeHomeManager(probe: probe, heatingWrites: InMemoryHeatingWriteRepository(), retryTicks: ticks)
+        let thermo = Radiator(query: .init(placeId: "Kitchen", name: "Thermo"))
+        let window = WindowContactSensor(query: .init(placeId: "Kitchen", name: "Window"))
+        let plan = HeatingPlan([.init(weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday], switchPoints: [SwitchPoint(hour: 6, targetInC: 21)])])
+        let room = RoomHeating("heating-kitchen", placeId: "Kitchen", radiators: [thermo], contacts: [.window(window)],
+                               configuration: HeatingConfiguration(standardPlan: plan))
+
+        // the window has been open past its delay: the off fails and waits for its retry
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: window.contactSensorId, timestamp: Date().addingTimeInterval(-600), isContactOpen: true))
+        try await room.execute(using: homeManager, now: Date(), sleep: { _ in })
+        #expect(await homeManager.queuedRetry(of: thermo.heatingId) == .setHeating(thermo.heatingId, active: false))
+
+        // the window closes before the retry went through
+        let closed = EntityStorageItem(entityId: window.contactSensorId, timestamp: Date(), isContactOpen: false)
+        await homeManager.addEntityHistory(closed)
+        #expect(try await room.shouldTrigger(with: .change(entity: closed), using: homeManager))
+        try await room.execute(using: homeManager, now: Date(), sleep: { _ in })
+
+        // the adapter is back: the retries replay what the closing wrote, not the off
+        await probe.setFailure(nil)
+        tickContinuation.yield(())
+        try? await Task.sleep(for: .milliseconds(200))
+        let heating = await probe.performedActions.filter { if case .setHeating = $0 { true } else { false } }
+        #expect(heating == [.setHeating(thermo.heatingId, active: false), .setHeating(thermo.heatingId, active: true), .setHeating(thermo.heatingId, active: true)])
+        #expect(await homeManager.queuedRetry(of: thermo.heatingId) == nil)
+    }
+
+    // MARK: - fireplace
+
+    @Test("A fireplace switch holds at once, is stored and tells the automations; a repeat changes nothing")
+    func fireplaceSwitch() async {
+        let stored = InMemoryFireplaceRepository()
+        let told = FireplaceLog()
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored, onFireplaceSwitch: { told.append($0) })
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+
+        let on = await homeManager.switchFireplace(isOn: true, at: start)
+        let again = await homeManager.switchFireplace(isOn: true, at: start.addingTimeInterval(60))
+
+        #expect(on == FireplaceSwitch(timestamp: start, isOn: true))
+        #expect(again == nil)
+        #expect(await homeManager.lastFireplaceSwitch() == on)
+        #expect(await stored.all == [FireplaceSwitch(timestamp: start, isOn: true)])
+        #expect(told.all == [FireplaceSwitch(timestamp: start, isOn: true)])
+    }
+
+    @Test("After a restart the fireplace state comes from the database")
+    func fireplaceSurvivesRestart() async {
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let stored = InMemoryFireplaceRepository([FireplaceSwitch(timestamp: start, isOn: true)])
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored)
+
+        #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
+    }
+
+    @Test("A switch the database could not save still holds, so the end of the fireplace is not repeated")
+    func fireplaceSwitchWithoutDatabase() async {
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let stored = FailingFireplaceRepository(latest: FireplaceSwitch(timestamp: start, isOn: true))
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored)
+
+        let off = await homeManager.switchFireplace(isOn: false, at: start.addingTimeInterval(7200))
+
+        #expect(off?.isOn == false)
+        #expect(await homeManager.switchFireplace(isOn: false, at: start.addingTimeInterval(7260)) == nil)
+        #expect(await Fireplace.state(with: homeManager) == .off)
+    }
+
     // MARK: - entity history
 
     @Test("An unknown entity always counts as a change")
@@ -501,4 +578,22 @@ private actor RecordingStorageRepository: StorageRepository {
         defer { concurrentCalls -= 1 }
         return await body()
     }
+}
+
+/// The fireplace switches the automations were told about.
+private final class FireplaceLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var switches: [FireplaceSwitch] = []
+
+    var all: [FireplaceSwitch] { lock.withLock { switches } }
+    func append(_ fireplaceSwitch: FireplaceSwitch) { lock.withLock { switches.append(fireplaceSwitch) } }
+}
+
+/// A database that answers the last switch but saves none.
+private struct FailingFireplaceRepository: FireplaceRepository {
+    let latest: FireplaceSwitch?
+
+    func add(_ fireplaceSwitch: FireplaceSwitch) async throws { throw StorageFailure() }
+    func latest() async throws -> FireplaceSwitch? { latest }
+    func switches(from startDate: Date, to endDate: Date) async throws -> [FireplaceSwitch] { [] }
 }

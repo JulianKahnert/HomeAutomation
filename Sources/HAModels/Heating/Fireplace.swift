@@ -5,37 +5,62 @@
 
 import Foundation
 
-/// What the fireplace switch says right now (glossary: fireplace mode).
+/// Whether the fireplace burns right now (glossary: fireplace mode).
 public struct FireplaceState: Sendable, Equatable {
     public let isOn: Bool
-    /// When the switch went on; `nil` while it is off.
+    /// When the fireplace was switched on; `nil` while it is off.
     public let since: Date?
+    /// When the server ends the fireplace by itself; `nil` while it is off.
+    public let endsAt: Date?
 
-    public init(isOn: Bool, since: Date? = nil) {
+    /// - Parameter endsAt: The end the server named; `nil` derives it from `since` and `Fireplace.maxDuration`.
+    public init(isOn: Bool, since: Date? = nil, endsAt: Date? = nil) {
         self.isOn = isOn
         self.since = since
+        self.endsAt = endsAt ?? since.map { $0.addingTimeInterval(Fireplace.maxDuration) }
     }
 
-    /// When the server switches the fireplace off by itself; `nil` while it is off.
-    public var endsAt: Date? {
-        since.map { $0.addingTimeInterval(Fireplace.maxDuration) }
+    public init(_ fireplaceSwitch: FireplaceSwitch?) {
+        if let fireplaceSwitch, fireplaceSwitch.isOn {
+            self.init(isOn: true, since: fireplaceSwitch.timestamp)
+        } else {
+            self.init(isOn: false)
+        }
     }
 
     public static let off = FireplaceState(isOn: false)
 }
 
-/// The fireplace: the persistent Homebridge switch `Keller_Kamin_switcher`. Rooms read it like a window
-/// contact (`RoomContact.fireplace`), the server switches it on request of the Heizung tab and the push action.
+/// One switch of the fireplace on or off, as the server stored it. The newest one is the current state.
+public struct FireplaceSwitch: Sendable, Equatable, Codable {
+    public let timestamp: Date
+    public let isOn: Bool
+
+    public init(timestamp: Date, isOn: Bool) {
+        self.timestamp = timestamp
+        self.isOn = isOn
+    }
+}
+
+/// Persistence of the fireplace switches; implemented by the server's database.
+public protocol FireplaceRepository: Sendable {
+    func add(_ fireplaceSwitch: FireplaceSwitch) async throws
+    /// The newest switch; `nil` when the fireplace was never switched.
+    func latest() async throws -> FireplaceSwitch?
+    /// The switches in `startDate ..< endDate` plus the last one before `startDate`, oldest first.
+    func switches(from startDate: Date, to endDate: Date) async throws -> [FireplaceSwitch]
+}
+
+/// The fireplace mode: a state the server keeps itself, switched only from the FlowKit Controller app (the
+/// Heizung tab and the push action "Kamin an?") and ended by `FireplaceTimeout`. Rooms read it like a window
+/// contact (`RoomContact.fireplace`); a change reaches them as `HomeEvent.fireplaceChanged`.
 public enum Fireplace {
     /// The fireplace ends this long after it was switched on.
     public static let maxDuration: TimeInterval = 2 * 3600
 
-    /// The switch in HomeKit (adapter id `Keller_Kamin_switcher`).
-    public static let switchId = EntityId(placeId: "Keller", name: "Kamin", characteristicsName: nil, characteristic: .switcher)
-
-    public static var switchDevice: SwitchDevice {
-        SwitchDevice(switchId: switchId, brightnessId: nil, colorTemperatureId: nil, rgbId: nil)
-    }
+    /// Stands for the fireplace where the heating needs an `EntityId` (the contact of a room, its history in
+    /// the room detail). No HomeKit entity has it.
+    public static let stateId = EntityId(placeId: "Server", name: "Kamin", characteristicsName: nil, characteristic: .switcher)
 
     /// Category of the push "Kamin an?"; the app registers its action under this name.
     public static let notificationCategory = "FIREPLACE_ASK"
@@ -46,37 +71,19 @@ public enum Fireplace {
     /// Collapse id of the fireplace pushes, so a newer one replaces an older.
     public static let notificationId = "fireplace"
 
-    /// The state of the switch `switchId`. An unreachable switch is off: its state cannot be read, or HomeKit
-    /// is degraded (the adapter lost `homed`, or Homebridge is down), so a last known "on" cannot be trusted.
-    /// While HomeKit is not judged yet (a restart) the last known value counts, so the restart re-applies it.
-    ///
-    /// The start time comes from the database, not from the cache: after a restart the adapter's resync
-    /// refreshes the cache with a new timestamp, the database still holds when the switch went on.
-    public static func state(of switchId: EntityId, with hm: HomeManagable) async -> FireplaceState {
-        if case .degraded = await hm.homeKitHealth() { return .off }
-        guard let current = try? await hm.getCurrentEntity(with: switchId), current.isDeviceOn == true else { return .off }
-        if let stored = await hm.getStoredEntity(with: switchId), stored.isDeviceOn == true {
-            return FireplaceState(isOn: true, since: stored.timestamp)
-        }
-        return FireplaceState(isOn: true, since: current.timestamp)
-    }
-
+    /// The state the server holds. It does not depend on HomeKit: a degraded HomeKit stops the radiator writes,
+    /// not the fire.
     public static func state(with hm: HomeManagable) async -> FireplaceState {
-        await state(of: switchId, with: hm)
+        FireplaceState(await hm.lastFireplaceSwitch())
     }
 
-    /// Switches the fireplace on or off, as the Heizung tab and the push action ask. Asking for the state
-    /// it already has changes nothing, so a second "on" does not restart `maxDuration`. The answer is the
-    /// state the switch will have, because HomeKit reports the change a moment later.
+    /// Switches the fireplace on or off. Asking for the state it already has changes nothing, so a second "on"
+    /// does not restart `maxDuration`. The answer is the new state, effective at once.
+    @discardableResult
     public static func set(isOn: Bool, with hm: HomeManagable, now: Date = Date()) async -> FireplaceState {
-        let current = await state(with: hm)
-        guard current.isOn != isOn else { return current }
-        if isOn {
-            await switchDevice.turnOn(with: hm)
-            return FireplaceState(isOn: true, since: now)
-        } else {
-            await switchDevice.turnOff(with: hm)
-            return .off
+        if let changed = await hm.switchFireplace(isOn: isOn, at: now) {
+            return FireplaceState(changed)
         }
+        return await state(with: hm)
     }
 }

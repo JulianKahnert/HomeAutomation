@@ -261,8 +261,9 @@ public struct ServerClient {
 }
 
 extension FireplaceState {
+    /// Takes the end the server named, so an app of another version shows when this server ends the fireplace.
     init(_ body: Components.Schemas.Fireplace) {
-        self.init(isOn: body.isOn, since: body.since)
+        self.init(isOn: body.isOn, since: body.since, endsAt: body.endsAt)
     }
 }
 

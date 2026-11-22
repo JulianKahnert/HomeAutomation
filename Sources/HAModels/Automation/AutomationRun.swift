@@ -47,6 +47,7 @@ public struct AutomationTrigger: Codable, Sendable, Equatable {
         case sunset
         case serverStart
         case configDeploy
+        case fireplace
     }
 
     public let kind: Kind
@@ -80,6 +81,8 @@ extension HomeEvent {
             return AutomationTrigger(kind: .serverStart, entityId: nil, summary: "Server started")
         case .configDeployed:
             return AutomationTrigger(kind: .configDeploy, entityId: nil, summary: "Configuration deployed")
+        case .fireplaceChanged(let isOn):
+            return AutomationTrigger(kind: .fireplace, entityId: nil, summary: isOn ? "Kamin an" : "Kamin aus")
         }
     }
 }

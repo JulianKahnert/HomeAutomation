@@ -123,15 +123,14 @@ struct RoomHeatingTests {
 
     @Test("A deploy writes the plan target with reason system to the radiators the fireplace does not switch off")
     func deployWritesPlanTargetToRadiatorsNotOff() async throws {
-        let fireplace = GenericSwitch(query: .init(placeId: "Kitchen", name: "Kamin"))
         let room = RoomHeating("heating-kitchen", placeId: "Kitchen", radiators: [left, right],
-                               contacts: [.window(windowA), .fireplace(fireplace, radiators: [left])],
+                               contacts: [.window(windowA), .fireplace(radiators: [left])],
                                configuration: HeatingConfiguration(standardPlan: standardPlan))
         let now = date(day: 18, hour: 12, minute: 17)
         homeManager.storageItems = [
-            EntityStorageItem(entityId: windowA.contactSensorId, timestamp: now.addingTimeInterval(-3600), isContactOpen: false),
-            EntityStorageItem(entityId: fireplace.switchId, timestamp: now.addingTimeInterval(-600), isDeviceOn: true)
+            EntityStorageItem(entityId: windowA.contactSensorId, timestamp: now.addingTimeInterval(-3600), isContactOpen: false)
         ]
+        homeManager.fireplaceSwitches = [FireplaceSwitch(timestamp: now.addingTimeInterval(-600), isOn: true)]
 
         #expect(try await room.shouldTrigger(with: .configDeployed, using: homeManager))
         try await AutomationRunContext.$event.withValue(.configDeployed) {

@@ -451,7 +451,7 @@ paths:
     get:
       summary: Get the state of the fireplace
       description: |
-        The fireplace is the switch `Keller_Kamin_switcher`. An unreachable switch counts as off.
+        The fireplace mode is a state the server keeps itself; no HomeKit switch stands behind it.
         `since` is when it went on, `endsAt` when the server switches it off (the fireplace's maximum duration, two hours, after `since`).
       operationId: getFireplace
       responses:
@@ -465,8 +465,8 @@ paths:
       summary: Switch the fireplace on or off
       description: |
         Used by the Heizung tab and the push action "Kamin an?". Asking for the state it already has changes
-        nothing, so a second "on" does not restart that duration. The answer is the state the switch will
-        have; HomeKit reports the change a moment later.
+        nothing, so a second "on" does not restart that duration. The new state holds at once: the answer and
+        every later GET show it, and the rooms that follow the fireplace react right away.
       operationId: setFireplace
       requestBody:
         required: true
@@ -547,7 +547,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [entityChange, time, sunrise, sunset, serverStart, configDeploy]
+          enum: [entityChange, time, sunrise, sunset, serverStart, configDeploy, fireplace]
         entityId:
           $ref: "#/components/schemas/EntityId"
         summary:
@@ -880,7 +880,7 @@ components:
         endsAt:
           type: string
           format: date-time
-          description: When the server switches it off; missing while it is off.
+          description: When the server switches it off; missing while it is off. Clients show this value instead of computing it.
     FireplaceRequest:
       type: object
       required: [isOn]

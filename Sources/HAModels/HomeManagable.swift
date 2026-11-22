@@ -33,6 +33,13 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite?
     /// Records a write of the plan history that sends nothing (`HeatingWrite.sentToDevice` is `false`).
     func record(_ write: HeatingWrite) async
+    /// The command queued to be sent again for `entityId` after it failed, `nil` when none waits.
+    func queuedRetry(of entityId: EntityId) async -> HomeManagableAction?
+    /// The newest switch of the fireplace (glossary: fireplace mode), `nil` when it was never switched.
+    func lastFireplaceSwitch() async -> FireplaceSwitch?
+    /// Switches the fireplace and tells the automations (`HomeEvent.fireplaceChanged`). Returns the new switch,
+    /// `nil` when the fireplace already had that state.
+    func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
     /// - Returns: Whether the item carries new information, i.e. differs in value — not just in
     ///   timestamp — from the last known state of that entity.

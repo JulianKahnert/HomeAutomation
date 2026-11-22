@@ -15,7 +15,7 @@ struct HeatingEventsTests {
     private let temp = EntityId(placeId: "Bad", name: "Thermo", characteristicsName: nil, characteristic: .temperatureSensor)
     private let valve = EntityId(placeId: "Bad", name: "Thermo", characteristicsName: nil, characteristic: .valvePosition)
     private let window = EntityId(placeId: "Bad", name: "Fenster", characteristicsName: nil, characteristic: .contactSensor)
-    private let fireplace = Fireplace.switchId
+    private let fireplace = Fireplace.stateId
 
     private func ago(_ minutes: Double) -> Date { now.addingTimeInterval(-minutes * 60) }
 
@@ -36,7 +36,12 @@ struct HeatingEventsTests {
 
     private func events(_ items: [EntityStorageItem] = [], writes: [HeatingWrite] = [], contacts: [HeatingRoomSources.Contact] = [],
                         range: HeatingRange = .day) async throws -> [HeatingEvent] {
-        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: InMemoryHeatingWriteRepository(writes), now: { now })
+        // the fireplace states are the server's own switches, the rest the stored entity states
+        let switches = items.filter { $0.entityId == fireplace }.compactMap { item in item.isDeviceOn.map { FireplaceSwitch(timestamp: item.timestamp, isOn: $0) } }
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items.filter { $0.entityId != fireplace }),
+                                               writes: InMemoryHeatingWriteRepository(writes),
+                                               fireplace: InMemoryFireplaceRepository(switches),
+                                               now: { now })
         return try await builder.detail(for: sources(contacts: contacts), range: range).events
     }
 
@@ -174,4 +179,40 @@ struct HeatingEventsTests {
         let found = try await events(writes: [write(.plan, 10, target: 19, plan: 19), write(.system, 50, target: 20)])
         #expect(found.map(\.source) == [.system, .plan])
     }
+
+    @Test("the writes the events look at reach back at most a day before the range, however old the state before it is")
+    func writeLookback() async throws {
+        let writes = WriteQueryLog()
+        let items = [EntityStorageItem(entityId: window, timestamp: ago(60 * 24 * 90), isContactOpen: false)]   // a quiet contact, last changed months ago
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: writes, now: { now })
+
+        _ = try await builder.detail(for: sources(contacts: [windowContact]), range: .day)
+
+        #expect(await writes.startDates == [now.addingTimeInterval(-HeatingRange.day.duration - 24 * 3_600)])
+    }
+
+    @Test("without events the detail skips the contacts and loads the writes of the range only")
+    func withoutEvents() async throws {
+        let writes = WriteQueryLog()
+        let items = [EntityStorageItem(entityId: window, timestamp: ago(200), isContactOpen: true)]
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: writes, now: { now })
+
+        let detail = try await builder.detail(for: sources(contacts: [windowContact]), range: .day, includeEvents: false)
+
+        #expect(detail.events.isEmpty)
+        #expect(await writes.startDates == [now.addingTimeInterval(-HeatingRange.day.duration)])
+    }
+}
+
+/// Answers no writes and remembers from when each query asked.
+private actor WriteQueryLog: HeatingWriteRepository {
+    private(set) var startDates: [Date?] = []
+
+    func add(_ write: HeatingWrite) async throws {}
+    func writes(placeId: String, startDate: Date?, endDate: Date?) async throws -> [HeatingWrite] {
+        startDates.append(startDate)
+        return []
+    }
+    func lastPlanWrite(placeId: String, before date: Date) async throws -> HeatingWrite? { nil }
+    func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite? { nil }
 }

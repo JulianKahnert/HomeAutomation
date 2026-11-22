@@ -6,23 +6,20 @@
 import Foundation
 import HAModels
 
-/// Ends the fireplace `maxDuration` after it was switched on, with a push (glossary: fireplace mode).
+/// Ends the fireplace `Fireplace.maxDuration` after it was switched on, with a push (glossary: fireplace end).
 ///
-/// The duration counts from the switch-on time stored in the database, so a server restart does not
-/// restart it. The rooms that follow the fireplace return to their plan through their own automation
-/// when the switch goes off.
+/// The duration counts from the switch-on time the server stored, so a server restart does not restart it.
+/// Ending it sets the server's state, which tells the rooms that follow the fireplace to return to their plan.
+/// The push goes out only when this run switched it off: the next tick finds it off, so it is sent once per
+/// time the fireplace was on.
 public struct FireplaceTimeout: Automatable {
     public var isActive = true
     public let name: String
-    public let fireplace: SwitchDevice
-    public let maxDuration: TimeInterval
 
-    public var triggerEntityIds: Set<EntityId> { [fireplace.switchId] }
+    public var triggerEntityIds: Set<EntityId> { [] }
 
-    public init(_ name: String = "fireplace-timeout", fireplace: SwitchDevice = Fireplace.switchDevice, maxDuration: TimeInterval = Fireplace.maxDuration) {
+    public init(_ name: String = "fireplace-timeout") {
         self.name = name
-        self.fireplace = fireplace
-        self.maxDuration = maxDuration
     }
 
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
@@ -35,11 +32,11 @@ public struct FireplaceTimeout: Automatable {
     }
 
     func execute(using hm: HomeManagable, now: Date) async throws {
-        // look again: the switch may have gone off since the trigger
-        guard await hasExpired(at: now, using: hm) else { return }
-        await fireplace.turnOff(with: hm)
+        // look again: the fireplace may have gone off since the trigger
+        guard await hasExpired(at: now, using: hm),
+              await hm.switchFireplace(isOn: false, at: now) != nil else { return }
         await hm.sendNotification(title: "Kamin aus",
-                                  message: "Der Kamin war \(Self.durationText(maxDuration)) an und wurde ausgeschaltet. Die Heizkörper folgen wieder dem Plan.",
+                                  message: "Der Kamin war \(Self.durationText(Fireplace.maxDuration)) an und wurde ausgeschaltet. Die Heizkörper folgen wieder dem Plan.",
                                   id: Fireplace.notificationId)
     }
 
@@ -55,8 +52,7 @@ public struct FireplaceTimeout: Automatable {
     }
 
     private func hasExpired(at date: Date, using hm: HomeManagable) async -> Bool {
-        let state = await Fireplace.state(of: fireplace.switchId, with: hm)
-        guard state.isOn, let since = state.since else { return false }
-        return date.timeIntervalSince(since) >= maxDuration
+        guard let endsAt = await Fireplace.state(with: hm).endsAt else { return false }
+        return date >= endsAt
     }
 }

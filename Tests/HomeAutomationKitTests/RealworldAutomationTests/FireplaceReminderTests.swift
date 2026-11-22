@@ -12,7 +12,6 @@ import Testing
 @HomeManagerActor
 struct FireplaceReminderTests {
     private let sensor = EntityId(placeId: "Keller", name: "Raumsensor", characteristicsName: nil, characteristic: .temperatureSensor)
-    private let fireplace = Fireplace.switchDevice
     private let homeManager = MockHomeAdapter()
     private let now = Date()
     private let minute: TimeInterval = 60
@@ -70,7 +69,7 @@ struct FireplaceReminderTests {
 
     @Test("No push while the fireplace is already on")
     func fireplaceOn() async throws {
-        homeManager.storageItems.append(EntityStorageItem(entityId: fireplace.switchId, timestamp: now.addingTimeInterval(-600), isDeviceOn: true))
+        homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: now.addingTimeInterval(-600), isOn: true))
         let event = feed([reading(18.0, minutesAgo: 25), reading(20.0, minutesAgo: 0)])
 
         #expect(try await !reminder().shouldTrigger(with: event, using: homeManager))
@@ -78,7 +77,7 @@ struct FireplaceReminderTests {
 
     @Test("A fireplace that is off does not hold the push back")
     func fireplaceOff() async throws {
-        homeManager.storageItems.append(EntityStorageItem(entityId: fireplace.switchId, timestamp: now.addingTimeInterval(-600), isDeviceOn: false))
+        homeManager.fireplaceSwitches += [FireplaceSwitch(timestamp: now.addingTimeInterval(-1200), isOn: true), FireplaceSwitch(timestamp: now.addingTimeInterval(-600), isOn: false)]
         let event = feed([reading(18.0, minutesAgo: 25), reading(20.0, minutesAgo: 0)])
 
         #expect(try await reminder().shouldTrigger(with: event, using: homeManager))

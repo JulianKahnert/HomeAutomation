@@ -166,6 +166,10 @@ public final class HomeManager: HomeManagable {
             log.debug("Skipping action of a cancelled run: [\(action)]")
             return
         }
+        // A new command supersedes the queued retry of its entity, also as a duplicate: the newest intent wins.
+        if attempt == 0 {
+            failedActions[action.entityId] = nil
+        }
 
         // Log action and check if it's a duplicate (cache hit)
         let hasCacheHit = await actionLogManager.log(action: action, runId: runId, heating: heating)

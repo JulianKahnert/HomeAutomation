@@ -25,8 +25,12 @@ private actor AdapterProbe {
     private(set) var completedPerforms = 0
     private(set) var performedActions: [HomeManagableAction] = []
 
-    private let failure: FakeAdapterError?
+    private var failure: FakeAdapterError?
     private let performDuration: Duration?
+
+    func setFailure(_ failure: FakeAdapterError?) {
+        self.failure = failure
+    }
 
     init(failure: FakeAdapterError? = nil, performDuration: Duration? = nil) {
         self.failure = failure
@@ -308,6 +312,22 @@ struct HomeManagerTests {
         try? await Task.sleep(for: .milliseconds(200))
 
         #expect(await probe.performedActions == [.turnOn(switchId), .turnOff(switchId), .turnOff(switchId)])
+    }
+
+    @Test("A newer command for an entity drops its queued retry, so a stale command is not replayed")
+    func newerCommandSupersedesRetry() async {
+        let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
+        let probe = AdapterProbe(failure: .unreachable)
+        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks)
+
+        await homeManager.perform(.turnOff(switchId))   // fails and is queued
+        await probe.setFailure(nil)
+        await homeManager.perform(.turnOn(switchId))    // reaches the device
+
+        tickContinuation.yield(())
+        try? await Task.sleep(for: .milliseconds(200))
+
+        #expect(await probe.performedActions == [.turnOff(switchId), .turnOn(switchId)])
     }
 
     // MARK: - entity history

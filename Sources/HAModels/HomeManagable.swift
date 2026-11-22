@@ -56,10 +56,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
 }
 
 extension HomeManagable {
-    public func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
-        try? await getCurrentEntity(with: entityId)
-    }
-
     public func sendNotification(title: String, message: String, id: String) async {
         await sendNotification(title: title, message: message, id: id, category: nil)
     }

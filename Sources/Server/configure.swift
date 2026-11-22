@@ -145,7 +145,6 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateEntityHourlyAggregate())
     app.migrations.add(AddTemperatureCalibration())
     app.migrations.add(CreateHeatingWrite())
-    app.migrations.add(AddHeatingWriteSentToDevice())
 
     // Run migrations automatically
     try await app.autoMigrate()

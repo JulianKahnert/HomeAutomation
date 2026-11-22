@@ -21,6 +21,7 @@ struct CreateHeatingWrite: AsyncMigration {
             .field("isActive", .bool)
             .field("targetTemperatureInC", .double)
             .field("planTargetInC", .double)
+            .field("sentToDevice", .bool, .required)
             .create()
     }
 

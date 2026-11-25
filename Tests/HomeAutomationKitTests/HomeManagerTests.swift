@@ -451,6 +451,58 @@ struct HomeManagerTests {
         #expect(await storage.lookups == 2)
     }
 
+    @Test("A replay hours after the last change is no change and is not stored")
+    func lateReplayIsNotAChange() async {
+        let storage = RecordingStorageRepository()
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        let timestamp = Date().addingTimeInterval(-3 * 3600)
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: timestamp, isDeviceOn: true)))
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(), isDeviceOn: true)) == false)
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(), isDeviceOn: false)))
+        await storage.waitForAdds(2)
+
+        #expect(await storage.added.map(\.isDeviceOn) == [true, false])
+    }
+
+    @Test("A replay is a sign of life for HomeKit")
+    func replayCountsAsSignOfLife() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .accessDenied()))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        await homeManager.perform(.turnOff(switchId))
+        #expect(await homeManager.homeKitHealth() != .healthy)
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)) == false)
+
+        #expect(await homeManager.homeKitHealth() == .healthy)
+    }
+
+    @Test("A replay that contradicts the last command lets the command be sent again")
+    func replayIsCheckedAgainstLastCommand() async {
+        let probe = AdapterProbe()
+        let homeManager = await makeHomeManager(probe: probe)
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        await homeManager.perform(.turnOff(switchId))
+
+        // the light is still on: the command did not take
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)) == false)
+        await homeManager.perform(.turnOff(switchId))
+
+        #expect(await probe.startedPerforms == 2)
+    }
+
+    @Test("The current state comes from the last report, the stored state only for an entity not yet reported")
+    func currentStateComesFromLastReport() async throws {
+        let stored = EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: false)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: MockStorageRepository(items: [stored]))
+
+        #expect(try await homeManager.getCurrentEntity(with: switchId).isDeviceOn == false)
+
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+
+        #expect(try await homeManager.getCurrentEntity(with: switchId).isDeviceOn == true)
+    }
+
     @Test("A burst of events is persisted one at a time and in order")
     func burstIsPersistedSerially() async {
         let storage = RecordingStorageRepository(addDuration: .milliseconds(2))

@@ -221,8 +221,17 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         overdueWindowIds.append(entityId)
     }
 
+    /// The windows `setWindowOpenState` registered, überschritten as `markWindowOverdue` marked them.
     func getWindowContentState() async -> WindowContentState {
-        .empty
+        let windows = windowOpenStates.map { entityId, state in
+            WindowContentState.Window(id: state.id,
+                                      name: state.name,
+                                      room: state.room,
+                                      opened: state.opened,
+                                      closeBy: state.closeBy,
+                                      isOverdue: overdueWindowIds.contains(entityId))
+        }
+        return WindowContentState(sortedWindows: windows)
     }
 
     /// The window state per window, as `setWindowOpenState` last set it; a cleared state is absent.

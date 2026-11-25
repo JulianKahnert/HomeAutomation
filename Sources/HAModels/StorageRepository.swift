@@ -10,6 +10,8 @@ import Foundation
 public protocol StorageRepository: Sendable {
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem?
     func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem?
+    /// The last stored state of every entity, in one query; the server loads it once at start.
+    func getAllCurrent() async throws -> [EntityStorageItem]
 
     func add(_ item: EntityStorageItem) async throws
 

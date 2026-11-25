@@ -114,6 +114,30 @@ final class EntityStorageMySQLTests: XCTestCase {
         XCTAssertNil(ids.first { $0.characteristicType == .switcher }?.characteristicsName)
     }
 
+    func testGetAllCurrentReturnsTheNewestStateOfEveryEntity() async throws {
+        let repository = app.entityStorageDbRepository
+        let contact = EntityId(placeId: "Kitchen", name: "Window", characteristicsName: "Contact", characteristic: .contactSensor)
+        let lamp = EntityId(placeId: "Hall", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
+        try await repository.add(EntityStorageItem(entityId: contact, timestamp: Date(timeIntervalSince1970: 1_000), isContactOpen: false))
+        try await repository.add(EntityStorageItem(entityId: contact, timestamp: Date(timeIntervalSince1970: 3_000), isContactOpen: true))
+        try await repository.add(EntityStorageItem(entityId: lamp, timestamp: Date(timeIntervalSince1970: 2_000), isDeviceOn: true))
+        try await repository.add(EntityStorageItem(entityId: lamp, timestamp: Date(timeIntervalSince1970: 1_500), isDeviceOn: false))
+        try await EntityStorageDbItem(timestamp: Date(timeIntervalSince1970: 4_000),
+                                      entityPlaceId: "Hall",
+                                      entityServiceName: "Gone",
+                                      entityCharacteristicType: "noLongerKnown",
+                                      isDeviceOn: true)
+            .save(on: app.db)
+
+        let items = try await repository.getAllCurrent().sorted { $0.entityId.placeId < $1.entityId.placeId }
+
+        XCTAssertEqual(items.map(\.entityId.description), [lamp.description, contact.description])
+        XCTAssertEqual(items.map(\.timestamp), [Date(timeIntervalSince1970: 2_000), Date(timeIntervalSince1970: 3_000)])
+        XCTAssertEqual(items.first?.isDeviceOn, true)
+        XCTAssertEqual(items.last?.isContactOpen, true)
+        XCTAssertEqual(items.last?.entityId.characteristicsName, "Contact")
+    }
+
     // MARK: - storage rules
 
     private let co2 = EntityId(placeId: "Kueche", name: "Air", characteristicsName: nil, characteristic: .carbonDioxideSensorId)

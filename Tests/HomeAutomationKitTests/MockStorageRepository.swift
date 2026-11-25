@@ -23,6 +23,10 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
         return nil
     }
 
+    func getAllCurrent() async throws -> [EntityStorageItem] {
+        Array(Dictionary(items.map { ($0.entityId, $0) }, uniquingKeysWith: { _, newer in newer }).values)
+    }
+
     func add(_ item: EntityStorageItem) async throws {
         items.append(item)
     }

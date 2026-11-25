@@ -41,7 +41,7 @@ struct HeatingOverviewSnapshotTests {
             .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
         let view = NSHostingView(rootView: styled)
         view.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-        assertSnapshot(of: view, as: .image(size: size), named: "\(name)-\(scheme == .dark ? "dark" : "light")", testName: test)
+        assertSnapshot(of: view, as: .image(size: size, scale: 2), named: "\(name)-\(scheme == .dark ? "dark" : "light")", testName: test)
     }
 
     @Test("overview without a selection: bars on iPhone, bars and placeholder on Mac")

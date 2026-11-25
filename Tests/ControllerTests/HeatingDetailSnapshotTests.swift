@@ -64,7 +64,7 @@ struct HeatingDetailSnapshotTests {
                 view.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
                 assertSnapshot(
                     of: view,
-                    as: .image(size: device.size),
+                    as: .image(size: device.size, scale: 2),
                     named: name,
                     testName: "detail-\(scenario.rawValue)"
                 )
@@ -85,7 +85,7 @@ struct HeatingDetailSnapshotTests {
         store.send(.refresh)
         let view = NSHostingView(rootView: screen(store, .iPhone, .light))
         view.appearance = NSAppearance(named: .aqua)
-        assertSnapshot(of: view, as: .image(size: Device.iPhone.size), named: "iPhone-light", testName: "detail-noRoomsReloading")
+        assertSnapshot(of: view, as: .image(size: Device.iPhone.size, scale: 2), named: "iPhone-light", testName: "detail-noRoomsReloading")
     }
 
     @Test("the crosshair replaces the header and names the valve")
@@ -102,7 +102,7 @@ struct HeatingDetailSnapshotTests {
                 .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
             let hosting = NSHostingView(rootView: view)
             hosting.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-            assertSnapshot(of: hosting, as: .image(size: CGSize(width: 402, height: 600)),
+            assertSnapshot(of: hosting, as: .image(size: CGSize(width: 402, height: 600), scale: 2),
                            named: "iPhone-\(scheme == .dark ? "dark" : "light")", testName: "detail-crosshair")
         }
     }
@@ -121,7 +121,7 @@ struct HeatingDetailSnapshotTests {
                 .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
             let hosting = NSHostingView(rootView: view)
             hosting.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-            assertSnapshot(of: hosting, as: .image(size: CGSize(width: 402, height: 600)),
+            assertSnapshot(of: hosting, as: .image(size: CGSize(width: 402, height: 600), scale: 2),
                            named: "iPhone-\(scheme == .dark ? "dark" : "light")", testName: "detail-crosshairOffBand")
         }
     }

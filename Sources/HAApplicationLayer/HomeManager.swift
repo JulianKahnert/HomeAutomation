@@ -30,7 +30,7 @@ public final class HomeManager: HomeManagable {
     /// The newest fireplace switch, loaded once from the database. It also holds a switch the database could
     /// not save, so an end of the fireplace stays an end and `FireplaceTimeout` does not repeat itself.
     private var fireplace: FireplaceSwitch??
-    /// The current state of every entity reported since the process started: the last change, never a
+    /// The current state of every entity, loaded from the database at start and then the last change, never a
     /// replay. No expiry and no eviction, so a replay is no change however long ago the last change was.
     private var currentStates: [EntityId: EntityStorageItem] = [:]
     /// One retry slot per entity: a newer failed action replaces an older queued one, so the newest
@@ -125,6 +125,42 @@ public final class HomeManager: HomeManagable {
         }
         return stream
     }
+
+    /// Remembers the last stored state of every entity, so the adapter's resync after a start is no change.
+    /// Run once at start, before the first event; a failed load leaves no state remembered.
+    public func loadCurrentStates(timeout: Duration) async {
+        // Unstructured tasks race, so a query that ignores cancellation cannot hold up the start; the first answer wins.
+        let (answers, answer) = AsyncStream<Result<[EntityStorageItem], any Error>>.makeStream()
+        Task { [storageRepo] in
+            do {
+                answer.yield(.success(try await storageRepo.getAllCurrent()))
+            } catch {
+                answer.yield(.failure(error))
+            }
+        }
+        Task {
+            try? await Task.sleep(for: timeout)
+            answer.yield(.failure(LoadTimeout()))
+        }
+        var iterator = answers.makeAsyncIterator()
+        let first = await iterator.next()
+        answer.finish()
+
+        switch first {
+        case .success(let stored):
+            // a report that arrived during the load is newer than the stored state
+            for item in stored where currentStates[item.entityId] == nil {
+                currentStates[item.entityId] = item
+            }
+            log.info("Loaded the stored state of \(stored.count) entities")
+        case .failure(let error):
+            log.critical("Started without the stored entity states, replays count as changes until each entity changes", metadata: ["error": "\(error)"])
+        case nil:
+            break
+        }
+    }
+
+    private struct LoadTimeout: Error {}
 
     public func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
         if let item = currentStates[entityId] {
@@ -374,8 +410,8 @@ public final class HomeManager: HomeManagable {
     }
 
     nonisolated private static func persistOnce(_ item: EntityStorageItem, in storageRepo: StorageRepository) async throws {
-        // After a restart `currentStates` is empty, so the adapter's resync counts as a change; skip the
-        // states the database already holds. This also keeps a retry from saving a state twice.
+        // Skip a state the database already holds: it keeps a retry from saving a state twice, and covers
+        // a start whose load of the stored states failed, so the adapter's resync counted as changes.
         if var currentItem = try await storageRepo.getCurrent(item.entityId) {
             // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
             currentItem.timestamp = item.timestamp

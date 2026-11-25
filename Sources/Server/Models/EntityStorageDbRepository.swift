@@ -37,6 +37,22 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
             .map(Self.mapDbItem)
     }
 
+    /// The newest row per entity, grouped like `getAllEntityIds`. A row of an unknown characteristic type is skipped,
+    /// so it cannot stand in for another entity.
+    func getAllCurrent() async throws -> [EntityStorageItem] {
+        try await sqlDatabase().raw("""
+            SELECT * FROM (
+                SELECT e.*, ROW_NUMBER() OVER (PARTITION BY \(ident: "entityPlaceId"), \(ident: "entityServiceName"), \(ident: "entityCharacteristicType")
+                                               ORDER BY \(ident: "timestamp") DESC) AS \(ident: "rowNumber")
+                FROM \(ident: EntityStorageDbItem.schema) e
+            ) newest
+            WHERE \(ident: "rowNumber") = 1
+            """)
+            .all(decodingFluent: EntityStorageDbItem.self)
+            .filter { CharacteristicsType(rawValue: $0.entityCharacteristicType) != nil }
+            .map(Self.mapDbItem)
+    }
+
     /// The newest `limit` rows of an entity. Filters and limits in SQL, so a lookup reads a few
     /// entries of `idx_entityItems_entity_timestamp` instead of loading the entity's whole history.
     /// A row without `entityCharacteristicsName` matches any name, as before.

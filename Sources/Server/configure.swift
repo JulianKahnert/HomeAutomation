@@ -275,6 +275,8 @@ public func configure(_ app: Application) async throws {
         }
     })
     app.homeManager = homeManager
+    // Before the event processing job starts and before `.serverStarted`, which reads current states.
+    await homeManager.loadCurrentStates(timeout: .seconds(10))
     // Runs still marked `running` belong to a previous server process that died mid-run.
     try await app.automationRunRepository.markRunningAsInterrupted()
     let automationService = try AutomationService(using: homeManager,

@@ -12,7 +12,21 @@ import Testing
 @HomeManagerActor
 @Suite("MotionAtNight trigger rule")
 struct MotionAtNightTriggerRuleTests {
-    private let motion = EveMotion(query: .init(placeId: "Kueche", name: "Motion"))
+    /// What makes `MotionAtNight` look at the sensors.
+    enum Trigger: CaseIterable, CustomTestStringConvertible {
+        case motionReport, serverStart
+
+        var testDescription: String {
+            switch self {
+            case .motionReport: "motion report"
+            case .serverStart: "server start"
+            }
+        }
+    }
+
+    private static let sensor = EntityId.Query(placeId: "Kueche", name: "Motion")
+    private let motion = EveMotion(query: sensor)
+    private let lightSensorId = EntityId(query: sensor, characteristic: .lightSensor)
     private let light = LightBulbDimmable(query: .init(placeId: "Kueche", name: "Light"))
     private let homeManager = MockHomeAdapter()
 
@@ -20,79 +34,44 @@ struct MotionAtNightTriggerRuleTests {
         MotionAtNight("motion-at-night", motionSensors: [motion], lightSensor: motion, lights: [light], minBrightness: 0.1)
     }
 
-    /// Sets the sensor's current state and returns the motion report for it.
-    private func report(motionDetected: Bool, lux: Double?) throws -> HomeEvent {
-        let item = try setState(motionDetected: motionDetected, lux: lux)
-        return .change(entity: item)
-    }
-
-    /// Sets the sensor's current state and returns its motion state.
-    @discardableResult
-    private func setState(motionDetected: Bool, lux: Double?) throws -> EntityStorageItem {
+    /// Sets the sensor's current state and returns the event of `trigger` for it.
+    private func event(_ trigger: Trigger, motionDetected: Bool, lux: Double?) -> HomeEvent {
         if let lux {
-            let lightSensorId = try #require(motion.lightSensorId)
             homeManager.storageItems.append(EntityStorageItem(entityId: lightSensorId, illuminance: .init(value: lux, unit: .lux)))
         }
         let item = EntityStorageItem(entityId: motion.motionSensorId, motionDetected: motionDetected)
         homeManager.storageItems.append(item)
-        return item
+        switch trigger {
+        case .motionReport: return .change(entity: item)
+        case .serverStart: return .serverStarted
+        }
     }
 
-    @Test("motion below the lux threshold triggers")
-    func triggersOnMotionInTheDark() async throws {
-        let event = try report(motionDetected: true, lux: 59)
+    @Test("motion below the lux threshold triggers", arguments: Trigger.allCases)
+    func triggersOnMotionInTheDark(trigger: Trigger) async throws {
+        let event = event(trigger, motionDetected: true, lux: 59)
 
         #expect(try await automation.shouldTrigger(with: event, using: homeManager))
     }
 
-    @Test("a report without motion does not trigger, even in the dark")
-    func noTriggerWithoutMotion() async throws {
-        let event = try report(motionDetected: false, lux: 5)
+    @Test("no motion does not trigger, even in the dark", arguments: Trigger.allCases)
+    func noTriggerWithoutMotion(trigger: Trigger) async throws {
+        let event = event(trigger, motionDetected: false, lux: 5)
 
         #expect(try await automation.shouldTrigger(with: event, using: homeManager) == false)
     }
 
-    @Test("motion at or above the lux threshold does not trigger", arguments: [60.0, 500])
-    func noTriggerWhenBright(lux: Double) async throws {
-        let event = try report(motionDetected: true, lux: lux)
+    @Test("motion at or above the lux threshold does not trigger", arguments: Trigger.allCases, [60.0, 500])
+    func noTriggerWhenBright(trigger: Trigger, lux: Double) async throws {
+        let event = event(trigger, motionDetected: true, lux: lux)
 
         #expect(try await automation.shouldTrigger(with: event, using: homeManager) == false)
     }
 
-    @Test("motion does not trigger when the illuminance cannot be read")
-    func noTriggerWithoutIlluminance() async throws {
-        let event = try report(motionDetected: true, lux: nil)
+    @Test("motion does not trigger when the illuminance cannot be read", arguments: Trigger.allCases)
+    func noTriggerWithoutIlluminance(trigger: Trigger) async throws {
+        let event = event(trigger, motionDetected: true, lux: nil)
 
         #expect(try await automation.shouldTrigger(with: event, using: homeManager) == false)
-    }
-
-    // MARK: - Server start
-
-    @Test("a server start with motion below the lux threshold triggers")
-    func serverStartTriggersOnMotionInTheDark() async throws {
-        try setState(motionDetected: true, lux: 59)
-
-        #expect(try await automation.shouldTrigger(with: .serverStarted, using: homeManager))
-    }
-
-    @Test("a server start without motion does not trigger, even in the dark")
-    func serverStartNoTriggerWithoutMotion() async throws {
-        try setState(motionDetected: false, lux: 5)
-
-        #expect(try await automation.shouldTrigger(with: .serverStarted, using: homeManager) == false)
-    }
-
-    @Test("a server start with motion at or above the lux threshold does not trigger", arguments: [60.0, 500])
-    func serverStartNoTriggerWhenBright(lux: Double) async throws {
-        try setState(motionDetected: true, lux: lux)
-
-        #expect(try await automation.shouldTrigger(with: .serverStarted, using: homeManager) == false)
-    }
-
-    @Test("a server start with motion does not trigger when the illuminance cannot be read")
-    func serverStartNoTriggerWithoutIlluminance() async throws {
-        try setState(motionDetected: true, lux: nil)
-
-        #expect(try await automation.shouldTrigger(with: .serverStarted, using: homeManager) == false)
     }
 }

@@ -138,6 +138,26 @@ final class EntityStorageMySQLTests: XCTestCase {
         XCTAssertEqual(items.last?.entityId.characteristicsName, "Contact")
     }
 
+    func testGetAllCurrentPicksTheRowOfGetCurrentForEqualTimestamps() async throws {
+        let repository = app.entityStorageDbRepository
+        let lamp = EntityId(placeId: "Hall", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
+        for (id, isDeviceOn) in [("00000000-0000-0000-0000-000000000002", true), ("00000000-0000-0000-0000-000000000001", false)] {
+            let row = EntityStorageDbItem(timestamp: Date(timeIntervalSince1970: 1_000),
+                                          entityPlaceId: "Hall",
+                                          entityServiceName: "Lamp",
+                                          entityCharacteristicType: CharacteristicsType.switcher.rawValue,
+                                          isDeviceOn: isDeviceOn)
+            row.id = UUID(uuidString: id)
+            try await row.save(on: app.db)
+        }
+
+        let all = try await repository.getAllCurrent()
+        let current = try await repository.getCurrent(lamp)
+
+        XCTAssertEqual(all.map(\.isDeviceOn), [true])
+        XCTAssertEqual(current?.isDeviceOn, true)
+    }
+
     // MARK: - storage rules
 
     private let co2 = EntityId(placeId: "Kueche", name: "Air", characteristicsName: nil, characteristic: .carbonDioxideSensorId)

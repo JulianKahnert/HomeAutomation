@@ -25,6 +25,8 @@ private actor AdapterProbe {
     private(set) var startedPerforms = 0
     private(set) var completedPerforms = 0
     private(set) var performedActions: [HomeManagableAction] = []
+    /// The entities the adapter was asked to find.
+    private(set) var foundEntities: [EntityId] = []
 
     private var failure: FakeAdapterError?
     private let performDuration: Duration?
@@ -52,6 +54,10 @@ private actor AdapterProbe {
         if let failure { throw failure }
 
         completedPerforms += 1
+    }
+
+    func find(_ entityId: EntityId) {
+        foundEntities.append(entityId)
     }
 
     func waitForStart() async {
@@ -84,7 +90,9 @@ private distributed actor FakeEntityAdapter: EntityAdapterable {
         []
     }
 
-    distributed func findEntity(_ entity: EntityId) async throws {}
+    distributed func findEntity(_ entity: EntityId) async throws {
+        await probe.find(entity)
+    }
 
     distributed func perform(_ action: HomeManagableAction) async throws {
         try await probe.perform(action)
@@ -503,6 +511,40 @@ struct HomeManagerTests {
         #expect(try await homeManager.getCurrentEntity(with: switchId).isDeviceOn == true)
     }
 
+    @Test("A replay keeps the current state with the timestamp of the last change")
+    func replayKeepsTimestampOfChange() async throws {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+        let changed = Date(timeIntervalSince1970: 1_000)
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: changed, isDeviceOn: true))
+
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(timeIntervalSince1970: 2_000), isDeviceOn: true))
+
+        #expect(try await homeManager.getCurrentEntity(with: switchId).timestamp == changed)
+    }
+
+    @Test("An entity reported since the start is found without asking the adapter")
+    func reportedEntityIsFoundWithoutTheAdapter() async throws {
+        let probe = AdapterProbe()
+        let homeManager = await makeHomeManager(probe: probe)
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+
+        try await homeManager.findEntity(switchId)
+
+        #expect(await probe.foundEntities.isEmpty)
+    }
+
+    @Test("An entity with only a stored state is looked up at the adapter, so one removed from HomeKit is noticed")
+    func storedEntityIsFoundAtTheAdapter() async throws {
+        let probe = AdapterProbe()
+        let stored = EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true)
+        let homeManager = await makeHomeManager(probe: probe, storageRepo: MockStorageRepository(items: [stored]))
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
+
+        try await homeManager.findEntity(switchId)
+
+        #expect(await probe.foundEntities == [switchId])
+    }
+
     // MARK: - restart
 
     @Test("After a restart a replay of a stored value is no change and is not stored again")
@@ -552,17 +594,24 @@ struct HomeManagerTests {
         #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)))
     }
 
-    @Test("When the load exceeds its time limit, the server starts with no remembered states, also once it answers late")
+    @Test("When the load exceeds its time limit, the server starts with no remembered states, also once it answers late",
+          .timeLimit(.minutes(1)))
     func slowLoadStartsCold() async throws {
-        let storage = RecordingStorageRepository(load: .delayed(.milliseconds(300)))
+        let query = ManualSleeper()
+        let timer = ManualSleeper()
+        let storage = RecordingStorageRepository(load: .held(query))
         try await storage.add(EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true))
         let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
-        let start = ContinuousClock.now
+        let load = Task { await homeManager.loadCurrentStates(timeout: .seconds(10), sleep: { try await timer.sleep(for: $0) }) }
+        _ = await query.nextSleep()
 
-        await homeManager.loadCurrentStates(timeout: .milliseconds(20))
+        #expect(await timer.nextSleep() == .seconds(10))
+        timer.wake()
+        // returns while the query still has not answered
+        await load.value
+        query.wake()
+        await storage.waitForLateLoadAnswer()
 
-        #expect(start.duration(to: .now) < .milliseconds(300))
-        try await Task.sleep(for: .milliseconds(400))
         #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)))
     }
 
@@ -643,10 +692,14 @@ private actor RecordingStorageRepository: StorageRepository {
     private let addDuration: Duration?
     private let load: Load
 
+    private var loadAnswered = false
+    private var loadAnswerWaiter: CheckedContinuation<Void, Never>?
+
     /// How `getAllCurrent` answers.
     enum Load {
         case immediate, failing
-        case delayed(Duration)
+        /// Answers once the sleeper is woken, like a slow query that ignores cancellation.
+        case held(ManualSleeper)
     }
 
     /// - Parameter failingAdds: Number of `add` calls that throw before the first one succeeds.
@@ -671,11 +724,20 @@ private actor RecordingStorageRepository: StorageRepository {
             break
         case .failing:
             throw StorageFailure()
-        case .delayed(let duration):
+        case .held(let sleeper):
             // an unstructured task does not inherit cancellation, like a database query that ignores it
-            await Task { try? await Task.sleep(for: duration) }.value
+            _ = await Task { try await sleeper.sleep(for: .zero) }.result
+            loadAnswered = true
+            loadAnswerWaiter?.resume()
+            loadAnswerWaiter = nil
         }
         return Array(Dictionary(added.map { ($0.entityId, $0) }, uniquingKeysWith: { _, newer in newer }).values)
+    }
+
+    /// Waits until a held `getAllCurrent` answered.
+    func waitForLateLoadAnswer() async {
+        guard !loadAnswered else { return }
+        await withCheckedContinuation { loadAnswerWaiter = $0 }
     }
 
     func add(_ item: EntityStorageItem) async throws {

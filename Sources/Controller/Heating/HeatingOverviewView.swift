@@ -37,8 +37,12 @@ struct HeatingOverviewView: View {
     private var hovered: HeatingOverviewRoom? { rooms.first { $0.placeId == hoveredPlaceId } }
 
     var body: some View {
-        HeatingCard {
+        HeatingSection {
             chart.frame(height: 200)
+        } header: {
+            Text("Räume")
+        } footer: {
+            Text("Abweichung vom Plan, kälteste zuerst. Grau: innerhalb ±\(HeatingFormat.kelvinAmount(HeatingComfort.band)).")
         }
     }
 

@@ -19,6 +19,11 @@ extension HeatingEventSource {
         }
     }
 
+    /// The symbol at the top of an off band: filled, so it reads on the tinted band.
+    var offSymbol: String {
+        self == .fireplace ? "flame.fill" : symbol
+    }
+
     var label: String {
         switch self {
         case .plan: return "Plan"

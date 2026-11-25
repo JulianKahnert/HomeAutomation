@@ -37,22 +37,21 @@ public struct WindowOpen: Automatable {
                             metadata: ["entityId": "\(windowContact.contactSensorId)", "error": "\(error)"])
                 return false
             }
-        default:
+        case .time, .sunrise, .sunset, .configDeployed, .fireplaceChanged:
             return false
         }
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        let isServerStart = AutomationRunContext.event == .serverStarted
-        try await execute(using: hm, now: Date(), isServerStart: isServerStart, sleep: { try await Task.sleep(for: $0) })
+        try await execute(using: hm, on: AutomationRunContext.event, now: Date(), sleep: { try await Task.sleep(for: $0) })
     }
 
     /// Registers the open window and marks it überschritten at its Fensterschließzeit.
     ///
-    /// - On a report the window opened `now`. On a server start it has been open since the timestamp of its
-    ///   contact's current state, so the Live Activity keeps its real opening time and the run waits only
-    ///   for the rest of the Lüftungslimit.
-    func execute(using hm: HomeManagable, now: Date, isServerStart: Bool, sleep: @Sendable (Duration) async throws -> Void) async throws {
+    /// - On a report (`event`) the window opened `now`. On a server start it has been open since the timestamp
+    ///   of its contact's current state, so the Live Activity keeps its real opening time and the run waits
+    ///   only for the rest of the Lüftungslimit.
+    func execute(using hm: HomeManagable, on event: HomeEvent?, now: Date, sleep: @Sendable (Duration) async throws -> Void) async throws {
         log.debug("Executing 'WindowOpen' automation")
         let contact = try await hm.getCurrentEntity(with: windowContact.contactSensorId)
         let isWindowOpen = try contact.isContactOpen.get(with: log)
@@ -70,7 +69,7 @@ public struct WindowOpen: Automatable {
         if let registered = await registeredWindow(using: hm) {
             closeBy = registered.closeBy
         } else {
-            let opened = isServerStart ? contact.timestamp : now
+            let opened = event == .serverStarted ? contact.timestamp : now
             let state = WindowOpenState(entityId: windowContact.contactSensorId, opened: opened, maxOpenDuration: notificationWait.timeInterval)
             await hm.setWindowOpenState(entityId: windowContact.contactSensorId, to: state)
             closeBy = state.closeBy

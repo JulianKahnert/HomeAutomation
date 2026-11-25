@@ -34,11 +34,8 @@ struct MotionAtNightServerStartTests {
 
         // the light goes on first, then the run waits for the held motion to end
         let brightnessId = try #require(light.brightnessId)
-        while !homeManager.performedActions.contains(where: {
-            guard case .setBrightness(brightnessId, _) = $0.action else { return false }
-            return true
-        }) {
-            try await Task.sleep(for: .milliseconds(10))
+        for await action in homeManager.performedActionStream {
+            if case .setBrightness(brightnessId, _) = action { break }
         }
         await service.stopAutomation(with: "motion-at-night")
         let run = try #require(await runs.nextFinishedRun())

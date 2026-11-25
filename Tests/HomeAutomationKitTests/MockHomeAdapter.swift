@@ -22,17 +22,22 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     private var traceMap: [String: Int] = [:]
     /// Every action `perform` ran, with the heating context it ran in.
     var performedActions: [(action: HomeManagableAction, heating: HeatingWriteContext.Context?)] = []
+    /// Every action `perform` ran, in order, for a test that waits for one; it has a single reader.
+    let performedActionStream: AsyncStream<HomeManagableAction>
+    private let performedActionContinuation: AsyncStream<HomeManagableAction>.Continuation
 
     init() {
         let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(of: EntityStorageItem.self, bufferingPolicy: .unbounded)
         self.entityStream = entityStream
         self.entityStreamContinuation = entityStreamContinuation
+        (performedActionStream, performedActionContinuation) = AsyncStream.makeStream(of: HomeManagableAction.self)
     }
 
     func perform(_ action: HomeManagableAction) async {
 
         let item = storageItems.first(where: { $0.entityId == action.entityId })
         performedActions.append((action, HeatingWriteContext.current))
+        performedActionContinuation.yield(action)
         if let context = HeatingWriteContext.current, let write = HeatingWrite(action: action, context: context) {
             heatingWrites.append(write)
         }

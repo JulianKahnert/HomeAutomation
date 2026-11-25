@@ -71,7 +71,7 @@ One write of the server to a radiator, persisted with its reason, the written va
 The values every room shares unless it overrides them: the standard plan and the window delay. Built once in the configuration repository and handed to each room automation.
 
 **Server start / config deploy** (Serverstart / Konfigurations-Deploy)
-Two separate events for automations (`HomeEvent.serverStarted`, `.configDeployed`). A server start re-applies nothing in T1, so manual changes at a radiator survive it; a deploy makes every room write its current plan target once, with reason `system`.
+Two separate events for automations (`HomeEvent.serverStarted`, `.configDeployed`). A server start writes nothing to the radiators, so manual changes at a radiator survive it; it sets up again what the adapter's resync no longer triggers, because a replay is no change: an open window is registered with the opening time of its stored state, and motion still held in the dark switches the light on. A deploy makes every room write its current plan target once, with reason `system`.
 
 
 **Time grid** (Zeitraster)

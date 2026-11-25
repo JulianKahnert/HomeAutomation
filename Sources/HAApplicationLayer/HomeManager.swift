@@ -30,7 +30,9 @@ public final class HomeManager: HomeManagable {
     /// The newest fireplace switch, loaded once from the database. It also holds a switch the database could
     /// not save, so an end of the fireplace stays an end and `FireplaceTimeout` does not repeat itself.
     private var fireplace: FireplaceSwitch??
-    private let entityCache = Cache<EntityId, EntityStorageItem>(entryLifetime: .hours(2))
+    /// The current state of every entity reported since the process started: the last change, never a
+    /// replay. No expiry and no eviction, so a replay is no change however long ago the last change was.
+    private var currentStates: [EntityId: EntityStorageItem] = [:]
     /// One retry slot per entity: a newer failed action replaces an older queued one, so the newest
     /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
     /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
@@ -125,9 +127,10 @@ public final class HomeManager: HomeManagable {
     }
 
     public func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
-        if let item = await entityCache.value(forKey: entityId) {
+        if let item = currentStates[entityId] {
             return item
         }
+        // an entity not reported since the start
         return try await storageRepo.getCurrent(entityId).get(with: log)
     }
 
@@ -155,8 +158,8 @@ public final class HomeManager: HomeManagable {
     }
 
     public func findEntity(_ entityId: EntityId) async throws {
-        guard await entityCache.value(forKey: entityId) == nil else {
-            // found item in cache
+        guard currentStates[entityId] == nil else {
+            // already reported since the start
             return
         }
         return try await getAdapter().get(with: log).findEntity(entityId)
@@ -302,14 +305,14 @@ public final class HomeManager: HomeManagable {
         // only the values decide whether this is new information. An unknown entity counts as a
         // change so nothing is ever swallowed on the first sighting.
         let didChange: Bool
-        if var knownItem = await entityCache.value(forKey: item.entityId) {
+        if var knownItem = currentStates[item.entityId] {
             knownItem.timestamp = item.timestamp
             didChange = knownItem != item
         } else {
             didChange = true
         }
 
-        await entityCache.insert(item, forKey: item.entityId)
+        currentStates[item.entityId] = item
 
         // A freshly observed state can reveal that the device drifted away from what the server last
         // commanded — e.g. a scene activated outside the server (HomeKit only surfaces scenes as the
@@ -329,7 +332,7 @@ public final class HomeManager: HomeManagable {
             log.info("Invalidated \(invalidatedActions.count) cached command(s) for \(item.entityId) due to state drift: \(invalidatedActions)")
         }
 
-        // A value-identical replay is already queued or stored: the cache only holds states that
+        // A value-identical replay is already queued or stored: `currentStates` only holds states that
         // went through this queue.
         guard didChange else { return false }
 
@@ -350,7 +353,7 @@ public final class HomeManager: HomeManagable {
         return didChange
     }
 
-    /// Retries inside the serial queue instead of clearing the cache entry: a cleared entry would make
+    /// Retries inside the serial queue instead of forgetting the current state: a forgotten state would make
     /// the next identical replay count as a change and trigger automations again.
     nonisolated private static func persist(_ item: EntityStorageItem, in storageRepo: StorageRepository, retryDelays: [Duration], log: Logger) async {
         var attempt = 0
@@ -371,7 +374,7 @@ public final class HomeManager: HomeManagable {
     }
 
     nonisolated private static func persistOnce(_ item: EntityStorageItem, in storageRepo: StorageRepository) async throws {
-        // After a restart the cache is empty, so the adapter's resync counts as a change; skip the
+        // After a restart `currentStates` is empty, so the adapter's resync counts as a change; skip the
         // states the database already holds. This also keeps a retry from saving a state twice.
         if var currentItem = try await storageRepo.getCurrent(item.entityId) {
             // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily

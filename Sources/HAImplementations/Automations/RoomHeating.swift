@@ -77,7 +77,7 @@ public struct RoomHeating: Automatable {
         case .change(let item):
             guard let contact = contacts.first(where: { $0.triggerEntityId == item.entityId }) else { return false }
             // An opening starts the delay. A closing matters only when it ends a state the server acted on:
-            // the re-sent closed contacts after a restart or a cache expiry must not write the plan over a
+            // the re-sent closed contacts after a restart must not write the plan over a
             // manual change.
             if contact.isOpen(item) { return true }
             return await endedOffState(of: contact, using: hm)

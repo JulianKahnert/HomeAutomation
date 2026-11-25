@@ -33,6 +33,9 @@ public final class HomeManager: HomeManagable {
     /// The current state of every entity, loaded from the database at start and then the last change, never a
     /// replay. No expiry and no eviction, so a replay is no change however long ago the last change was.
     private var currentStates: [EntityId: EntityStorageItem] = [:]
+    /// The entities a source reported in this process; a state merely loaded from the database does not
+    /// prove the entity still exists in HomeKit.
+    private var reportedEntities: Set<EntityId> = []
     /// One retry slot per entity: a newer failed action replaces an older queued one, so the newest
     /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
     /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
@@ -127,36 +130,44 @@ public final class HomeManager: HomeManagable {
     }
 
     /// Remembers the last stored state of every entity, so the adapter's resync after a start is no change.
-    /// Run once at start, before the first event; a failed load leaves no state remembered.
-    public func loadCurrentStates(timeout: Duration) async {
+    /// Run once at start, before the first report is processed; a failed load leaves no state remembered.
+    ///
+    /// - Parameter sleep: Waits out `timeout`; stands in for `Task.sleep` so tests need no real time.
+    public func loadCurrentStates(timeout: Duration,
+                                  sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) async {
         // Unstructured tasks race, so a query that ignores cancellation cannot hold up the start; the first answer wins.
-        let (answers, answer) = AsyncStream<Result<[EntityStorageItem], any Error>>.makeStream()
-        Task { [storageRepo] in
+        let (outcomes, outcomeSink) = AsyncStream<Result<[EntityStorageItem], any Error>>.makeStream()
+        let query = Task { [storageRepo] in
             do {
-                answer.yield(.success(try await storageRepo.getAllCurrent()))
+                outcomeSink.yield(.success(try await storageRepo.getAllCurrent()))
             } catch {
-                answer.yield(.failure(error))
+                outcomeSink.yield(.failure(error))
             }
         }
-        Task {
-            try? await Task.sleep(for: timeout)
-            answer.yield(.failure(LoadTimeout()))
+        let timer = Task {
+            do {
+                try await sleep(timeout)
+                outcomeSink.yield(.failure(LoadTimeout()))
+            } catch {
+                // cancelled because the query answered first
+            }
         }
-        var iterator = answers.makeAsyncIterator()
-        let first = await iterator.next()
-        answer.finish()
+        var iterator = outcomes.makeAsyncIterator()
+        // No task finishes the stream, so it ends without an answer only when the start itself is cancelled.
+        let outcome = await iterator.next() ?? .failure(CancellationError())
+        outcomeSink.finish()
+        query.cancel()
+        timer.cancel()
 
-        switch first {
+        switch outcome {
         case .success(let stored):
             // a report that arrived during the load is newer than the stored state
             for item in stored where currentStates[item.entityId] == nil {
                 currentStates[item.entityId] = item
             }
-            log.info("Loaded the stored state of \(stored.count) entities")
+            log.info("Loaded the stored entity states", metadata: ["count": "\(stored.count)"])
         case .failure(let error):
             log.critical("Started without the stored entity states, replays count as changes until each entity changes", metadata: ["error": "\(error)"])
-        case nil:
-            break
         }
     }
 
@@ -166,7 +177,7 @@ public final class HomeManager: HomeManagable {
         if let item = currentStates[entityId] {
             return item
         }
-        // an entity not reported since the start
+        // an entity neither loaded at the start nor reported since
         return try await storageRepo.getCurrent(entityId).get(with: log)
     }
 
@@ -194,10 +205,7 @@ public final class HomeManager: HomeManagable {
     }
 
     public func findEntity(_ entityId: EntityId) async throws {
-        guard currentStates[entityId] == nil else {
-            // already reported since the start
-            return
-        }
+        guard !reportedEntities.contains(entityId) else { return }
         return try await getAdapter().get(with: log).findEntity(entityId)
     }
 
@@ -336,6 +344,7 @@ public final class HomeManager: HomeManagable {
         log.debug("Adding entity item to storage \(item.entityId)")
         // Every change event counts, a value-identical replay too: it proves HomeKit still delivers.
         liveness.recordEvent(at: Date())
+        reportedEntities.insert(item.entityId)
 
         // `EntityStorageItem` is Equatable including its timestamp, so align it before comparing —
         // only the values decide whether this is new information. An unknown entity counts as a
@@ -348,7 +357,10 @@ public final class HomeManager: HomeManagable {
             didChange = true
         }
 
-        currentStates[item.entityId] = item
+        // A replay keeps the known state, so its timestamp stays the time of the last change.
+        if didChange {
+            currentStates[item.entityId] = item
+        }
 
         // A freshly observed state can reveal that the device drifted away from what the server last
         // commanded — e.g. a scene activated outside the server (HomeKit only surfaces scenes as the
@@ -368,8 +380,8 @@ public final class HomeManager: HomeManagable {
             log.info("Invalidated \(invalidatedActions.count) cached command(s) for \(item.entityId) due to state drift: \(invalidatedActions)")
         }
 
-        // A value-identical replay is already queued or stored: `currentStates` only holds states that
-        // went through this queue.
+        // A value-identical replay is already queued or stored: `currentStates` only holds states loaded
+        // from the database or sent through this queue.
         guard didChange else { return false }
 
         // Persist item in the background to avoid blocking automation execution

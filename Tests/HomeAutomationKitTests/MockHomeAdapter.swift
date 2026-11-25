@@ -225,7 +225,11 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         .empty
     }
 
+    /// The window state per window, as `setWindowOpenState` last set it; a cleared state is absent.
+    private(set) var windowOpenStates: [EntityId: WindowOpenState] = [:]
+
     func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
+        windowOpenStates[entityId] = state
     }
 
     func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {

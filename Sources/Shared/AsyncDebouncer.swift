@@ -26,6 +26,9 @@ public actor AsyncDebouncer {
     /// When the requests coalesced so far have to run at the latest — set by the first request of a
     /// burst, not extended by the ones following it.
     private var runBy: ContinuousClock.Instant?
+    /// Whether the pending `delayTask` already waits for `runBy` rather than for `delay`. Such a
+    /// task is left alone by later requests, which would only re-create it for the same instant.
+    private var delayTaskIsCapped = false
     /// Set while a run is in flight to remember that its result is already stale.
     private var isDirty = false
 
@@ -38,12 +41,19 @@ public actor AsyncDebouncer {
     /// Request a run once `delay` has passed without a further request, at the latest `maxDelay`
     /// after the first request of the current burst.
     public func schedule() {
+        // Replacing a pending run that waits for the burst's deadline would not move it, but every
+        // replacement is a new task that a request arriving before it got to run would cancel again,
+        // so a steady stream of requests could postpone the forced run indefinitely.
+        if delayTask != nil, delayTaskIsCapped { return }
+
         let now = ContinuousClock.now
         let deadline = runBy ?? now.advanced(by: maxDelay)
         runBy = deadline
-        let wait = min(delay, now.duration(to: deadline))
+        let untilDeadline = now.duration(to: deadline)
+        let wait = min(delay, untilDeadline)
 
         delayTask?.cancel()
+        delayTaskIsCapped = untilDeadline <= delay
         delayTask = Task {
             do {
                 try await Task.sleep(for: max(.zero, wait))
@@ -56,6 +66,7 @@ public actor AsyncDebouncer {
             // Drop this handle before handing the request to the runner: from here on the debouncer
             // holds nothing it could cancel, so the operation always runs to completion.
             delayTask = nil
+            delayTaskIsCapped = false
             runBy = nil
             startRun()
         }
@@ -74,6 +85,7 @@ public actor AsyncDebouncer {
     public func cancelPending() {
         delayTask?.cancel()
         delayTask = nil
+        delayTaskIsCapped = false
         runBy = nil
     }
 

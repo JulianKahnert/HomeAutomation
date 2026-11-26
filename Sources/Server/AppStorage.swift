@@ -24,6 +24,14 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          AutomationRunDbRepository(database: { self.db })
      }
 
+     var heatingWriteRepository: HeatingWriteDbRepository {
+         HeatingWriteDbRepository(database: { self.db })
+     }
+
+     var fireplaceRepository: FireplaceSwitchDbRepository {
+         FireplaceSwitchDbRepository(database: { self.db })
+     }
+
     private struct HomeEventsStreamKey: StorageKey {
         typealias Value = AsyncStream<HomeEvent>
     }

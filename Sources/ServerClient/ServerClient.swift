@@ -7,9 +7,11 @@
 
 import Foundation
 import HAModels
+import Logging
 import OpenAPIURLSession
 
 public struct ServerClient {
+    private static let logger = Logger(label: "ServerClient")
     private let client: Client
     private let url: URL
     private let session: URLSession
@@ -140,7 +142,9 @@ public struct ServerClient {
                                  detailDescription: item.detailDescription,
                                  hasCacheHit: item.hasCacheHit,
                                  runId: item.runId.flatMap(UUID.init(uuidString:)),
-                                 status: item.status.flatMap { ActionLogItem.Status(rawValue: $0.rawValue) })
+                                 status: item.status.flatMap { ActionLogItem.Status(rawValue: $0.rawValue) },
+                                 reason: item.reason.flatMap { HeatingWriteReason(rawValue: $0.rawValue) },
+                                 planTargetInC: item.planTargetInC)
         }
     }
 
@@ -204,6 +208,76 @@ public struct ServerClient {
         return try response.ok.body.json.compactMap { history in
             guard let entityId = EntityId(history.entityId) else { return nil }
             return EntityHistory(entityId: entityId, items: history.items.map(EntityHistoryItem.init))
+        }
+    }
+
+    /// The rooms of the heating overview: actual, plan target and source of the actual value per room.
+    public func getHeatingOverview() async throws -> HeatingOverview {
+        let response = try await client.getHeatingOverview()
+        let body = try response.ok.body.json
+        return try HeatingOverview(rooms: body.rooms.map {
+            try HeatingOverviewRoom(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, delta: $0.delta,
+                                istSource: HeatingIstSource($0.istSource), followsFireplace: $0.followsFireplace)
+        }, heatmap: body.heatmap.map {
+            HeatingHeatmapCell(placeId: $0.placeId, day: $0.day, segment: $0.segment, delta: $0.delta)
+        })
+    }
+
+    /// The state of the fireplace switch (glossary: fireplace mode).
+    public func getFireplace() async throws -> FireplaceState {
+        FireplaceState(try await client.getFireplace().ok.body.json)
+    }
+
+    /// Switches the fireplace on or off; answers the state it will have.
+    public func setFireplace(isOn: Bool) async throws -> FireplaceState {
+        FireplaceState(try await client.setFireplace(body: .json(.init(isOn: isOn))).ok.body.json)
+    }
+
+    /// The time grid of a heating room (glossary: actual, plan target, Δ). Throws when the server answers
+    /// 400 (unknown range) or 404 (no heating automation for the room).
+    public func getHeatingRoom(placeId: String, range: HeatingRange) async throws -> HeatingRoomDetail {
+        let response = try await client.getHeatingRoom(path: .init(placeId: placeId), query: .init(range: range.rawValue))
+        let body = try response.ok.body.json
+        guard let detailRange = HeatingRange(rawValue: body.range) else {
+            throw InvalidResponseError(reason: "Unknown heating range \(body.range)")
+        }
+        let source = try HeatingIstSource(body.istSource)
+        return HeatingRoomDetail(placeId: body.placeId,
+                                 name: body.name,
+                                 range: detailRange,
+                                 istSource: source,
+                                 radiators: body.radiators,
+                                 samples: body.samples.map { HeatingSample(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) },
+                                 lastIst: body.lastIst,
+                                 events: (body.events ?? []).compactMap { event in
+                                     guard let source = HeatingEventSource(rawValue: event.source) else {
+                                         // A source this app does not know is a newer server or a bug: never drop it silently.
+                                         Self.logger.warning("Dropped a heating event of an unknown source", metadata: ["source": "\(event.source)", "placeId": "\(body.placeId)"])
+                                         return nil
+                                     }
+                                     return HeatingEvent(source: source, title: event.title, reason: event.reason, start: event.start, end: event.end, pin: event.pin)
+                                 })
+    }
+}
+
+extension FireplaceState {
+    /// Takes the end the server named, so an app of another version shows when this server ends the fireplace.
+    init(_ body: Components.Schemas.Fireplace) {
+        self.init(isOn: body.isOn, since: body.since, endsAt: body.endsAt)
+    }
+}
+
+extension HeatingIstSource {
+    /// Throws when the server names a room sensor without its name: that is a server bug, not an empty name.
+    init(_ source: Components.Schemas.HeatingIstSource) throws {
+        switch source.kind {
+        case .roomSensor:
+            guard let name = source.names.first else {
+                throw InvalidResponseError(reason: "A room sensor without a name")
+            }
+            self = .roomSensor(name)
+        case .thermostats:
+            self = .thermostats(source.names)
         }
     }
 }

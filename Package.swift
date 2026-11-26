@@ -26,7 +26,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.3"),
+        .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.4"),
         // 🗄 An ORM for SQL and NoSQL databases.
         .package(url: "https://github.com/vapor/fluent.git", exact: "4.13.0"),
         // 🐬 Fluent driver for MySQL.
@@ -45,9 +45,10 @@ let package = Package(
                     "ComposableArchitecture2DeprecationOverloads"
                  ]),
         .package(url: "https://github.com/pointfreeco/swift-sharing", exact: "2.10.1"),
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.19.7"),
         // other stuff
         .package(url: "https://github.com/vapor/apns.git", exact: "5.1.0"),
-        .package(url: "https://github.com/apple/swift-log.git", exact: "1.17.0"),
+        .package(url: "https://github.com/apple/swift-log.git", exact: "1.17.2"),
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "fix/linux-foundation-networking"),
         // Capped at 7.x: vapor/apns 5.1.0 requires apnswift 7.0.1..<8.0.0.
@@ -124,6 +125,7 @@ let package = Package(
             name: "ServerClient",
             dependencies: [
                 "HAModels",
+                .product(name: "Logging", package: "swift-log"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession")
             ],
@@ -169,7 +171,10 @@ let package = Package(
         ),
         .testTarget(
             name: "ControllerTests",
-            dependencies: ["Controller"],
+            dependencies: [
+                "Controller",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
+            ],
             path: "Tests/ControllerTests"
         ),
         .testTarget(

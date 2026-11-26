@@ -31,8 +31,8 @@ actor PushNotifcationService: NotificationSender {
         self.notificationTopic = notificationTopic
     }
 
-    func sendNotification(title: String, message: String, id: String) async throws {
-        try await sendAlert(title: title, message: message, id: id)
+    func sendNotification(title: String, message: String, id: String, category: String?) async throws {
+        try await sendAlert(title: title, message: message, id: id, category: category)
     }
 
     func clearNotification(id: String) async throws {
@@ -68,7 +68,7 @@ actor PushNotifcationService: NotificationSender {
 
     // MARK: - Private
 
-    private func sendAlert(title: String, message: String, id: String?) async throws {
+    private func sendAlert(title: String, message: String, id: String?, category: String? = nil) async throws {
         let deviceTokens =
             try await DeviceToken
             .query(on: database())
@@ -81,6 +81,8 @@ actor PushNotifcationService: NotificationSender {
             priority: .immediately,
             topic: notificationTopic
         )
+
+        notification.category = category
 
         if let id {
             notification.collapseID = id

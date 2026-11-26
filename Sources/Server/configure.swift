@@ -144,6 +144,8 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateWeatherHour())
     app.migrations.add(CreateEntityHourlyAggregate())
     app.migrations.add(AddTemperatureCalibration())
+    app.migrations.add(CreateHeatingWrite())
+    app.migrations.add(CreateFireplaceSwitch())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -258,6 +260,11 @@ public func configure(_ app: Application) async throws {
                                         notificationSender: notificationSender,
                                         location: app.homeAutomationConfigService.location,
                                         actionLogManager: actionLogManager,
+                                        heatingWrites: app.heatingWriteRepository,
+                                        fireplaceSwitches: app.fireplaceRepository,
+                                        onFireplaceSwitch: { [continuation = app.homeEventsContinuation] fireplaceSwitch in
+        continuation.yield(.fireplaceChanged(isOn: fireplaceSwitch.isOn))
+    },
                                         outdoorTemperature: { [logger = app.logger] in
         // The same rows the OutdoorTemperatureJob writes for this location.
         do {
@@ -302,6 +309,9 @@ public func configure(_ app: Application) async throws {
             await group.waitForAll()
         }
     }
+
+    // Once per process start; the stream buffers it until the event processing job runs.
+    app.homeEventsContinuation.yield(.serverStarted)
 
     // MARK: - register routes
 

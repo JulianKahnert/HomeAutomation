@@ -1,0 +1,242 @@
+//
+//  HeatingFeatureTests.swift
+//  ControllerTests
+//
+
+import ComposableArchitecture
+@testable import Controller
+import Foundation
+import HAModels
+import Testing
+
+private final class RequestLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [String] = []
+
+    func append(_ entry: String) { lock.withLock { entries.append(entry) } }
+    var all: [String] { lock.withLock { entries } }
+}
+
+@MainActor
+@Suite("HeatingFeature")
+struct HeatingFeatureTests {
+    private struct Failure: Error, Equatable {}
+
+    private nonisolated static func room(_ placeId: String, ist: Double?, plan: Double? = 21) -> HeatingOverviewRoom {
+        HeatingOverviewRoom(placeId: placeId, name: placeId, shortName: placeId, ist: ist, sollPlan: plan, istSource: .thermostats(["Thermo"]))
+    }
+
+    private nonisolated static func detail(_ placeId: String, _ range: HeatingRange) -> HeatingRoomDetail {
+        HeatingRoomDetail(placeId: placeId, name: placeId, range: range, istSource: .thermostats(["Thermo"]), radiators: ["Thermo"],
+                          samples: [HeatingSample(date: Date(timeIntervalSince1970: 1_000), ist: 20, sollPlan: 21, valves: [10])])
+    }
+
+    private func store(rooms: [HeatingOverviewRoom], requests: RequestLog = RequestLog()) -> TestStoreOf<HeatingFeature> {
+        let store = TestStore(initialState: HeatingFeature.State()) {
+            HeatingFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: rooms) }
+            $0.serverClient.getHeatingRoom = { placeId, range in
+                requests.append("\(placeId) \(range.rawValue)")
+                return Self.detail(placeId, range)
+            }
+        }
+        store.exhaustivity = .off
+        return store
+    }
+
+    private func loaded(_ rooms: [HeatingOverviewRoom], requests: RequestLog = RequestLog()) async -> TestStoreOf<HeatingFeature> {
+        let store = store(rooms: rooms, requests: requests)
+        await store.send(.task)
+        await store.receive(\.overviewResponse.success)
+        return store
+    }
+
+    // MARK: Overview
+
+    @Test("rooms are sorted coldest first and rooms without an actual value come last")
+    func sorting() async {
+        let store = await loaded([Self.room("Warm", ist: 22), Self.room("Leer", ist: nil), Self.room("Kalt", ist: 18), Self.room("Ok", ist: 21)])
+        #expect(store.state.rooms.map(\.placeId) == ["Kalt", "Ok", "Warm", "Leer"])
+    }
+
+    @Test("loading selects nothing and asks for no detail")
+    func noSelectionAfterLoad() async {
+        let requests = RequestLog()
+        let store = await loaded([Self.room("Bad", ist: 20)], requests: requests)
+        #expect(store.state.selectedPlaceId == nil)
+        #expect(store.state.detail == nil)
+        #expect(requests.all.isEmpty)
+    }
+
+    @Test("the overview remembers when it was loaded")
+    func updatedAt() async {
+        let moment = Date(timeIntervalSince1970: 1_800_000_000)
+        let store = TestStore(initialState: HeatingFeature.State()) {
+            HeatingFeature()
+        } withDependencies: {
+            $0.date = .constant(moment)
+            $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: [Self.room("Bad", ist: 20)]) }
+        }
+        store.exhaustivity = .off
+        await store.send(.task)
+        await store.receive(\.overviewResponse.success)
+        #expect(store.state.updatedAt == moment)
+    }
+
+    // MARK: Detail
+
+    @Test("selecting a room loads its detail for the selected range")
+    func selectRoom() async {
+        let requests = RequestLog()
+        let store = await loaded([Self.room("Bad", ist: 20), Self.room("Küche", ist: 21)], requests: requests)
+        await store.send(.selectRoom("Küche"))
+        await store.receive(\.detailResponse.success)
+        #expect(store.state.selectedPlaceId == "Küche")
+        #expect(store.state.detail?.placeId == "Küche")
+        #expect(requests.all == ["Küche 24h"])
+    }
+
+    @Test("changing the range reloads the selected room for that range")
+    func rangeChangeReloads() async {
+        let requests = RequestLog()
+        let store = await loaded([Self.room("Bad", ist: 20)], requests: requests)
+        await store.send(.selectRoom("Bad"))
+        await store.receive(\.detailResponse.success)
+        await store.send(.binding(.set(\.range, .week)))
+        await store.receive(\.detailResponse.success)
+        #expect(requests.all == ["Bad 24h", "Bad 7d"])
+        #expect(store.state.detail?.range == .week)
+    }
+
+    @Test("closing the detail clears the selection")
+    func closeDetail() async {
+        let store = await loaded([Self.room("Bad", ist: 20)])
+        await store.send(.selectRoom("Bad"))
+        await store.receive(\.detailResponse.success)
+        await store.send(.selectRoom(nil))
+        #expect(store.state.selectedPlaceId == nil)
+        #expect(store.state.detail == nil)
+    }
+
+    @Test("a refresh keeps the selected room and range")
+    func refreshKeepsSelection() async {
+        let requests = RequestLog()
+        let store = await loaded([Self.room("Bad", ist: 20), Self.room("Küche", ist: 21)], requests: requests)
+        await store.send(.selectRoom("Küche"))
+        await store.receive(\.detailResponse.success)
+        await store.send(.binding(.set(\.range, .twoHours)))
+        await store.receive(\.detailResponse.success)
+        await store.send(.refresh)
+        await store.receive(\.overviewResponse.success)
+        await store.receive(\.detailResponse.success)
+        #expect(requests.all.last == "Küche 2h")
+        #expect(store.state.selectedPlaceId == "Küche")
+    }
+
+    @Test("a refresh without the selected room clears the selection")
+    func refreshDropsVanishedRoom() async {
+        let rooms = LockedRooms([Self.room("Bad", ist: 20)])
+        let store = TestStore(initialState: HeatingFeature.State()) {
+            HeatingFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: rooms.value) }
+            $0.serverClient.getHeatingRoom = { placeId, range in Self.detail(placeId, range) }
+        }
+        store.exhaustivity = .off
+        await store.send(.task)
+        await store.receive(\.overviewResponse.success)
+        await store.send(.selectRoom("Bad"))
+        await store.receive(\.detailResponse.success)
+        rooms.value = [Self.room("Küche", ist: 20)]
+        await store.send(.refresh)
+        await store.receive(\.overviewResponse.success)
+        #expect(store.state.selectedPlaceId == nil)
+        #expect(store.state.detail == nil)
+    }
+
+    // MARK: Empty and error states
+
+    @Test("without heating rooms there is an empty overview and nothing is requested")
+    func noRooms() async {
+        let requests = RequestLog()
+        let store = await loaded([], requests: requests)
+        #expect(store.state.rooms.isEmpty)
+        #expect(store.state.error == nil)
+        #expect(requests.all.isEmpty)
+    }
+
+    @Test("the empty state points to the configuration")
+    func noRoomsHint() {
+        #expect(HeatingFeature.noRoomsHint.contains("RoomHeating"))
+        #expect(HeatingFeature.noRoomsHint.contains("Konfiguration"))
+    }
+
+    @Test("an unreachable server is an error state without rooms")
+    func serverNotReachable() async {
+        let store = TestStore(initialState: HeatingFeature.State()) {
+            HeatingFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getHeatingOverview = { throw Failure() }
+        }
+        store.exhaustivity = .off
+        await store.send(.task)
+        await store.receive(\.overviewResponse.failure)
+        #expect(store.state.error != nil)
+        #expect(store.state.rooms.isEmpty)
+    }
+
+    @Test("a failed reload keeps the rooms it showed and only sets the error")
+    func failedReloadKeepsRooms() async {
+        let calls = LockIsolated(0)
+        let store = TestStore(initialState: HeatingFeature.State()) {
+            HeatingFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getHeatingOverview = {
+                calls.withValue { $0 += 1 }
+                guard calls.value == 1 else { throw Failure() }
+                return HeatingOverview(rooms: [Self.room("Bad", ist: 20)])
+            }
+        }
+        store.exhaustivity = .off
+        await store.send(.task)
+        await store.receive(\.overviewResponse.success)
+        await store.send(.refresh)
+        await store.receive(\.overviewResponse.failure)
+        #expect(store.state.rooms.map(\.placeId) == ["Bad"])
+        #expect(store.state.error != nil)
+    }
+
+    @Test("a failing detail keeps the rooms and sets a detail error")
+    func detailFailure() async {
+        let store = TestStore(initialState: HeatingFeature.State()) {
+            HeatingFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: [Self.room("Bad", ist: 20)]) }
+            $0.serverClient.getHeatingRoom = { _, _ in throw Failure() }
+        }
+        store.exhaustivity = .off
+        await store.send(.task)
+        await store.receive(\.overviewResponse.success)
+        await store.send(.selectRoom("Bad"))
+        await store.receive(\.detailResponse.failure)
+        #expect(store.state.rooms.count == 1)
+        #expect(store.state.detailError != nil)
+        #expect(store.state.detail == nil)
+    }
+}
+
+private final class LockedRooms: @unchecked Sendable {
+    private let lock = NSLock()
+    private var rooms: [HeatingOverviewRoom]
+    init(_ rooms: [HeatingOverviewRoom]) { self.rooms = rooms }
+    var value: [HeatingOverviewRoom] {
+        get { lock.withLock { rooms } }
+        set { lock.withLock { rooms = newValue } }
+    }
+}

@@ -128,7 +128,9 @@ struct AutomationServiceTests {
                 return await iterator.next().flatMap { $0 }
             }
             group.addTask {
-                try? await Task.sleep(for: .seconds(2))
+                // The adds stay stalled until released below, so this timeout only bounds a failing
+                // run; it is generous because a loaded CI runner can pause the process for seconds.
+                try? await Task.sleep(for: .seconds(30))
                 return nil
             }
             let first = await group.next()

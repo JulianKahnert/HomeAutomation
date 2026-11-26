@@ -28,6 +28,7 @@ struct AppFeature: Sendable {
         var overview = OverviewFeature.State()
         var automations = AutomationsFeature.State()
         var rooms = RoomsFeature.State()
+        var heating = HeatingFeature.State()
         var settings = SettingsFeature.State()
 
         var openWindowsCount: Int? {
@@ -41,6 +42,7 @@ struct AppFeature: Sendable {
         case overview
         case automations
         case rooms
+        case heating
         case settings
 
         var title: String {
@@ -48,6 +50,7 @@ struct AppFeature: Sendable {
             case .overview: return "Overview"
             case .automations: return "Automations"
             case .rooms: return "Rooms"
+            case .heating: return "Heating"
             case .settings: return "Settings"
             }
         }
@@ -57,6 +60,7 @@ struct AppFeature: Sendable {
             case .overview: return "house"
             case .automations: return "lamp.floor"
             case .rooms: return "square.grid.2x2"
+            case .heating: return "thermometer.high"
             case .settings: return "gear"
             }
         }
@@ -69,6 +73,7 @@ struct AppFeature: Sendable {
         case overview(OverviewFeature.Action)
         case automations(AutomationsFeature.Action)
         case rooms(RoomsFeature.Action)
+        case heating(HeatingFeature.Action)
         case settings(SettingsFeature.Action)
 
         // Live Activities & Push Notifications
@@ -110,6 +115,10 @@ struct AppFeature: Sendable {
             RoomsFeature()
         }
 
+        Scope(\.heating, action: \.heating) {
+            HeatingFeature()
+        }
+
         Scope(\.settings, action: \.settings) {
             SettingsFeature()
         }
@@ -131,6 +140,9 @@ struct AppFeature: Sendable {
                 return .none
 
             case .rooms:
+                return .none
+
+            case .heating:
                 return .none
 
             case .settings:
@@ -213,6 +225,7 @@ struct AppFeature: Sendable {
                     .send(.overview(.refresh)),
                     .send(.automations(.refresh)),
                     .send(.rooms(.refresh)),
+                    .send(.heating(.refresh)),
                     .send(.refreshWindowStates),
                     .send(.startMonitoringLiveActivities),
                     .send(.clearDeliveredNotifications)
@@ -258,6 +271,14 @@ struct AppView: View {
                 value: AppFeature.Tab.rooms
             ) {
                 RoomsView(store: store.scope(\.rooms, action: \.rooms))
+            }
+
+            Tab(
+                AppFeature.Tab.heating.title,
+                systemImage: AppFeature.Tab.heating.systemImage,
+                value: AppFeature.Tab.heating
+            ) {
+                HeatingView(store: store.scope(\.heating, action: \.heating))
             }
 
             Tab(

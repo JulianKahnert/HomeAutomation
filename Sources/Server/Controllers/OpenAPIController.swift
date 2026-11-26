@@ -7,6 +7,7 @@
 
 import Dependencies
 import Fluent
+import HAImplementations
 import HAModels
 import OpenAPIRuntime
 import Vapor
@@ -189,7 +190,9 @@ struct OpenAPIController: APIProtocol {
                                              detailDescription: item.detailDescription,
                                              hasCacheHit: item.hasCacheHit,
                                              runId: item.runId?.uuidString,
-                                             status: item.status.flatMap { .init(rawValue: $0.rawValue) })
+                                             status: item.status.flatMap { .init(rawValue: $0.rawValue) },
+                                             reason: item.reason.flatMap { .init(rawValue: $0.rawValue) },
+                                             planTargetInC: item.planTargetInC)
         }
 
         return .ok(.init(body: .json(schemaItems)))
@@ -311,6 +314,55 @@ struct OpenAPIController: APIProtocol {
         return .ok(.init(body: .json(body)))
     }
 
+    func getHeatingOverview(_ input: Operations.GetHeatingOverview.Input) async throws -> Operations.GetHeatingOverview.Output {
+        let rooms = await heatingRooms().map(\.heatingSources)
+        let overview = try await HeatingOverviewBuilder(detail: heatingDetailBuilder()).overview(for: rooms)
+        return .ok(.init(body: .json(.init(overview))))
+    }
+
+    func getHeatingRoom(_ input: Operations.GetHeatingRoom.Input) async throws -> Operations.GetHeatingRoom.Output {
+        guard let range = HeatingRange(rawValue: input.query.range ?? HeatingRange.day.rawValue) else {
+            return .badRequest(.init())
+        }
+        let placeId = input.path.placeId
+        guard let room = await heatingRooms().first(where: { $0.placeId == placeId }) else {
+            return .notFound(.init())
+        }
+        let detail = try await heatingDetailBuilder().detail(for: room.heatingSources, range: range)
+        return .ok(.init(body: .json(.init(detail))))
+    }
+
+    /// The heating automations of the deployed configuration.
+    private func heatingRooms() async -> [RoomHeating] {
+        await request.application.homeAutomationConfigService.automations.compactMap { $0 as? RoomHeating }
+    }
+
+    /// Both heating endpoints cut the days by the local clock of the house, Europe/Berlin.
+    private func heatingDetailBuilder() -> HeatingRoomDetailBuilder {
+        HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
+                                 writes: request.application.heatingWriteRepository,
+                                 fireplace: request.application.fireplaceRepository,
+                                 calendar: HeatingOverviewBuilder.berlin)
+    }
+
+    // MARK: - /heating/fireplace
+
+    func getFireplace(_ input: Operations.GetFireplace.Input) async throws -> Operations.GetFireplace.Output {
+        let state = await Fireplace.state(with: request.application.homeManager)
+        return .ok(.init(body: .json(.init(state))))
+    }
+
+    func setFireplace(_ input: Operations.SetFireplace.Input) async throws -> Operations.SetFireplace.Output {
+        guard case .json(let body) = input.body else { throw Abort(.badRequest) }
+        let state = await Fireplace.set(isOn: body.isOn, with: request.application.homeManager)
+        return .ok(.init(body: .json(.init(state))))
+    }
+}
+
+extension Components.Schemas.Fireplace {
+    init(_ state: FireplaceState) {
+        self.init(isOn: state.isOn, since: state.since, endsAt: state.endsAt)
+    }
 }
 
 extension Components.Schemas.EntityId {
@@ -361,5 +413,39 @@ extension Components.Schemas.EntityHistoryItem {
                   pmDensity: item.pmDensity,
                   airQuality: item.airQuality,
                   valveOpen: item.valveOpen)
+    }
+}
+
+extension Components.Schemas.HeatingIstSource {
+    init(_ source: HeatingIstSource) {
+        switch source {
+        case .roomSensor(let name): self.init(kind: .roomSensor, names: [name])
+        case .thermostats(let names): self.init(kind: .thermostats, names: names)
+        }
+    }
+}
+
+extension Components.Schemas.HeatingOverview {
+    init(_ overview: HeatingOverview) {
+        self.init(rooms: overview.rooms.map {
+            .init(placeId: $0.placeId, name: $0.name, shortName: $0.shortName, ist: $0.ist, sollPlan: $0.sollPlan, delta: $0.delta, istSource: .init($0.istSource),
+                  followsFireplace: $0.followsFireplace)
+        }, heatmap: overview.heatmap.map {
+            .init(placeId: $0.placeId, day: $0.day, segment: $0.segment, delta: $0.delta)
+        })
+    }
+}
+
+extension Components.Schemas.HeatingRoomDetail {
+    init(_ detail: HeatingRoomDetail) {
+        let source = Components.Schemas.HeatingIstSource(detail.istSource)
+        self.init(placeId: detail.placeId,
+                  name: detail.name,
+                  range: detail.range.rawValue,
+                  istSource: source,
+                  radiators: detail.radiators,
+                  samples: detail.samples.map { .init(date: $0.date, ist: $0.ist, sollPlan: $0.sollPlan, valves: $0.valves) },
+                  lastIst: detail.lastIst,
+                  events: detail.events.map { .init(source: $0.source.rawValue, title: $0.title, reason: $0.reason, start: $0.start, end: $0.end, pin: $0.pin) })
     }
 }

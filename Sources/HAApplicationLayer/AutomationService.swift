@@ -43,7 +43,9 @@ public actor AutomationService {
                             let recording = Task { await self.record(runId, of: automation, for: event) }
                             do {
                                 try await AutomationRunContext.$runId.withValue(runId) {
-                                    try await automation.execute(using: self.homeManager)
+                                    try await AutomationRunContext.$event.withValue(event) {
+                                        try await automation.execute(using: self.homeManager)
+                                    }
                                 }
                                 await self.finish(await recording.value, outcome: .completed)
                             } catch is CancellationError {

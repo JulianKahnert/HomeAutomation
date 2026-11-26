@@ -11,11 +11,13 @@ extension AutomationInfo {
     private static let typeDisplay: [String: (label: String, systemImage: String, trigger: String)] = [
         "CreateScene": ("Scene", "sparkles", "Manual"),
         "EnergyLowPrice": ("Energy Price", "bolt", "Electricity price"),
+        "FireplaceTimeout": ("Fireplace", "flame", "Every minute"),
         "GardenWatering": ("Garden", "drop", "Schedule"),
         "HealthCheck": ("System", "stethoscope", "Every minute"),
         "MaintenanceAutomation": ("System", "wrench.and.screwdriver", "Schedule"),
         "MotionAtNight": ("Motion", "figure.walk", "Motion sensor"),
         "RestartSystem": ("System", "arrow.clockwise", "Schedule"),
+        "RoomHeating": ("Heating", "thermometer.medium", "Plan"),
         "SetLightProperties": ("Light", "lightbulb", "Light change"),
         "TriggerScene": ("Schedule", "clock", "Schedule"),
         "Turn": ("Schedule", "clock", "Schedule"),

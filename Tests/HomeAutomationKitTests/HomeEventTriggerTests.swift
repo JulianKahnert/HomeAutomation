@@ -30,4 +30,10 @@ struct HomeEventTriggerTests {
         #expect(HomeEvent.sunrise.trigger == AutomationTrigger(kind: .sunrise, entityId: nil, summary: "Sunrise"))
         #expect(HomeEvent.sunset.trigger == AutomationTrigger(kind: .sunset, entityId: nil, summary: "Sunset"))
     }
+
+    @Test func serverStartAndConfigDeployAreDistinctEvents() {
+        #expect(HomeEvent.serverStarted.trigger == AutomationTrigger(kind: .serverStart, entityId: nil, summary: "Server started"))
+        #expect(HomeEvent.configDeployed.trigger == AutomationTrigger(kind: .configDeploy, entityId: nil, summary: "Configuration deployed"))
+        #expect(HomeEvent.serverStarted != HomeEvent.configDeployed)
+    }
 }

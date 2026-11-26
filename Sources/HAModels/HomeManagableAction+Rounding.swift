@@ -30,6 +30,8 @@ extension HomeManagableAction {
             return .setHeating(id, active: active)
         case .setValve(let id, let active):
             return .setValve(id, active: active)
+        case .setTargetTemperature(let id, let celsius):
+            return .setTargetTemperature(id, celsius: (celsius * 2).rounded() / 2)
         }
     }
 }

@@ -1,0 +1,153 @@
+//
+//  HeatingChartData.swift
+//  ControllerFeatures
+//
+//  Pure preparation of the grid for the charts: runs split at gaps, gap segments per colour
+//
+
+import Foundation
+import HAModels
+
+enum HeatingChartData {
+    struct Point: Equatable, Sendable {
+        let date: Date
+        let value: Double
+    }
+
+    /// The gap between actual value and plan target over a stretch of one colour.
+    struct GapSegment: Equatable, Sendable, Identifiable {
+        struct Point: Equatable, Sendable {
+            let date: Date
+            let ist: Double
+            let plan: Double
+        }
+
+        let id: Int
+        let band: HeatingComfort
+        let points: [Point]
+    }
+
+    /// Contiguous stretches where `value` is not `nil`. A `nil` sample ends a run, so a line is not drawn
+    /// across a gap (silence stays visible).
+    static func runs(_ samples: [HeatingSample], value: (HeatingSample) -> Double?) -> [[Point]] {
+        var result: [[Point]] = []
+        var current: [Point] = []
+        for sample in samples {
+            if let v = value(sample) {
+                current.append(Point(date: sample.date, value: v))
+            } else if !current.isEmpty {
+                result.append(current)
+                current = []
+            }
+        }
+        if !current.isEmpty { result.append(current) }
+        return result
+    }
+
+    static func istRuns(_ samples: [HeatingSample]) -> [[Point]] { runs(samples) { $0.ist } }
+
+    /// A stretch in which an open window or the burning fireplace switched the radiators off.
+    struct OffPeriod: Equatable, Sendable, Identifiable {
+        let event: HeatingEvent
+        /// Clamped to the chart's domain; a period that still lasts runs to its end.
+        let range: ClosedRange<Date>
+
+        var id: String { event.id }
+        var source: HeatingEventSource { event.source }
+    }
+
+    /// The window and fireplace events as stretches inside `domain`.
+    static func offPeriods(_ events: [HeatingEvent], in domain: ClosedRange<Date>) -> [OffPeriod] {
+        HeatingPinLayout.areas(events).compactMap { event in
+            let start = max(event.start, domain.lowerBound)
+            let end = min(event.end ?? domain.upperBound, domain.upperBound)
+            guard start < end else { return nil }
+            return OffPeriod(event: event, range: start...end)
+        }
+    }
+
+    /// The off period `date` lies in, if any.
+    static func offPeriod(at date: Date, in periods: [OffPeriod]) -> OffPeriod? {
+        periods.first { $0.range.contains(date) }
+    }
+
+    /// The plan line; a room without any actual value still has it. It breaks inside `off`: the radiators
+    /// were off there, the plan did not apply.
+    static func planRuns(_ samples: [HeatingSample], off: [OffPeriod] = []) -> [[Point]] {
+        runs(samples) { offPeriod(at: $0.date, in: off) == nil ? $0.sollPlan : nil }
+    }
+
+    /// The smallest height of a bar in K, so a room at Δ≈0 stays a visible pill.
+    static let minimumBarHeight = 0.34
+
+    /// The extent of the Δ bar: from the zero line to Δ, clipped at the ±3 K scale (the bar then runs off the
+    /// end), and at least `minimumBarHeight` high (a bar at Δ≈0 is a pill around the zero line).
+    static func barExtent(forDelta delta: Double) -> ClosedRange<Double> {
+        let clipped = min(max(delta, -HeatingPalette.barScale), HeatingPalette.barScale)
+        var low = min(clipped, 0)
+        var high = max(clipped, 0)
+        if high - low < minimumBarHeight {
+            let middle = (low + high) / 2
+            low = middle - minimumBarHeight / 2
+            high = middle + minimumBarHeight / 2
+        }
+        return low...high
+    }
+
+    static func valveRuns(_ samples: [HeatingSample], radiator: Int) -> [[Point]] {
+        runs(samples) { $0.valves.indices.contains(radiator) ? $0.valves[radiator] : nil }
+    }
+
+    /// Stretches where both values exist, cut where the colour changes; the first sample of the next
+    /// colour closes the previous segment, so no hole shows between two colours.
+    /// No gap is drawn inside `off`, where the plan did not apply.
+    static func gapSegments(_ samples: [HeatingSample], off: [OffPeriod] = []) -> [GapSegment] {
+        var result: [GapSegment] = []
+        var points: [GapSegment.Point] = []
+        var band: HeatingComfort?
+        let close = {
+            if let band, points.count > 1 {
+                result.append(GapSegment(id: result.count, band: band, points: points))
+            }
+        }
+        for sample in samples {
+            guard let ist = sample.ist, let plan = sample.sollPlan, offPeriod(at: sample.date, in: off) == nil else {
+                close()
+                points = []
+                band = nil
+                continue
+            }
+            let point = GapSegment.Point(date: sample.date, ist: ist, plan: plan)
+            let sampleBand = HeatingComfort(delta: ist - plan)
+            if let current = band, current != sampleBand {
+                points.append(point)
+                close()
+                points = [point]
+            } else {
+                points.append(point)
+            }
+            band = sampleBand
+        }
+        close()
+        return result
+    }
+
+    /// The sample closest to `date`.
+    static func nearest(to date: Date, in samples: [HeatingSample]) -> HeatingSample? {
+        samples.min { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) }
+    }
+
+    /// The x range of both charts: first to last sample.
+    static func timeDomain(_ samples: [HeatingSample]) -> ClosedRange<Date> {
+        guard let first = samples.first?.date, let last = samples.last?.date else { return Date.now...Date.now.addingTimeInterval(1) }
+        return first...max(last, first.addingTimeInterval(1))
+    }
+
+    /// The y range of the temperature chart: the data with a margin, at least 2 K high.
+    static func temperatureDomain(_ samples: [HeatingSample]) -> ClosedRange<Double> {
+        let values = samples.flatMap { [$0.ist, $0.sollPlan].compactMap { $0 } }
+        guard let low = values.min(), let high = values.max() else { return 16...24 }
+        let margin = max((2 - (high - low)) / 2, 0.5)
+        return (low - margin)...(high + margin)
+    }
+}

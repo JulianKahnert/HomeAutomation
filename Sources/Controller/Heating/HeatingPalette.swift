@@ -36,6 +36,14 @@ enum HeatingPalette {
     /// The selected segment of the range switch: a step above the soft track.
     static let selectedSegment = Color.secondary.opacity(0.24)
 
+    /// The band of a stretch in which a window (grey) or the fireplace (orange) switched the radiators off;
+    /// stronger in dark mode, where a weak tint disappears on the card.
+    static func offFill(_ source: HeatingEventSource, scheme: ColorScheme) -> Color {
+        source == .fireplace
+            ? Color.orange.opacity(scheme == .dark ? 0.3 : 0.2)
+            : Color.gray.opacity(scheme == .dark ? 0.38 : 0.24)
+    }
+
     /// The filled area of a radiator's valve chart: green, the first radiator the strongest.
     static func valveFill(radiator: Int) -> Color {
         Color.green.opacity(radiator == 0 ? 0.35 : 0.2)

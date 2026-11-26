@@ -56,7 +56,7 @@ struct HeatingPinSnapshotTests {
     private func record<V: View>(_ view: V, size: CGSize, scheme: ColorScheme, name: String, test: String) {
         let hosting = NSHostingView(rootView: view)
         hosting.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-        assertSnapshot(of: hosting, as: .image(size: size), named: "\(name)-\(scheme == .dark ? "dark" : "light")", testName: test)
+        assertSnapshot(of: hosting, as: .image(size: size, scale: 2), named: "\(name)-\(scheme == .dark ? "dark" : "light")", testName: test)
     }
 
     @Test("several pins in two rows, a +n pin and the areas of window and fireplace")

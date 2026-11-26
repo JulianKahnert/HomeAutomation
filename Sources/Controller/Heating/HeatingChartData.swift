@@ -46,9 +46,35 @@ enum HeatingChartData {
 
     static func istRuns(_ samples: [HeatingSample]) -> [[Point]] { runs(samples) { $0.ist } }
 
-    /// The plan line; a room without any actual value still has it.
-    static func planRuns(_ samples: [HeatingSample]) -> [[Point]] {
-        runs(samples) { $0.sollPlan }
+    /// A stretch in which an open window or the burning fireplace switched the radiators off.
+    struct OffPeriod: Equatable, Sendable, Identifiable {
+        let event: HeatingEvent
+        /// Clamped to the chart's domain; a period that still lasts runs to its end.
+        let range: ClosedRange<Date>
+
+        var id: String { event.id }
+        var source: HeatingEventSource { event.source }
+    }
+
+    /// The window and fireplace events as stretches inside `domain`.
+    static func offPeriods(_ events: [HeatingEvent], in domain: ClosedRange<Date>) -> [OffPeriod] {
+        HeatingPinLayout.areas(events).compactMap { event in
+            let start = max(event.start, domain.lowerBound)
+            let end = min(event.end ?? domain.upperBound, domain.upperBound)
+            guard start < end else { return nil }
+            return OffPeriod(event: event, range: start...end)
+        }
+    }
+
+    /// The off period `date` lies in, if any.
+    static func offPeriod(at date: Date, in periods: [OffPeriod]) -> OffPeriod? {
+        periods.first { $0.range.contains(date) }
+    }
+
+    /// The plan line; a room without any actual value still has it. It breaks inside `off`: the radiators
+    /// were off there, the plan did not apply.
+    static func planRuns(_ samples: [HeatingSample], off: [OffPeriod] = []) -> [[Point]] {
+        runs(samples) { offPeriod(at: $0.date, in: off) == nil ? $0.sollPlan : nil }
     }
 
     /// The smallest height of a bar in K, so a room at Δ≈0 stays a visible pill.
@@ -74,7 +100,8 @@ enum HeatingChartData {
 
     /// Stretches where both values exist, cut where the colour changes; the first sample of the next
     /// colour closes the previous segment, so no hole shows between two colours.
-    static func gapSegments(_ samples: [HeatingSample]) -> [GapSegment] {
+    /// No gap is drawn inside `off`, where the plan did not apply.
+    static func gapSegments(_ samples: [HeatingSample], off: [OffPeriod] = []) -> [GapSegment] {
         var result: [GapSegment] = []
         var points: [GapSegment.Point] = []
         var band: HeatingComfort?
@@ -84,7 +111,7 @@ enum HeatingChartData {
             }
         }
         for sample in samples {
-            guard let ist = sample.ist, let plan = sample.sollPlan else {
+            guard let ist = sample.ist, let plan = sample.sollPlan, offPeriod(at: sample.date, in: off) == nil else {
                 close()
                 points = []
                 band = nil

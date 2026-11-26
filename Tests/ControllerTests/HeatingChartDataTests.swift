@@ -49,6 +49,30 @@ struct HeatingChartDataTests {
         #expect(HeatingChartData.planRuns([sample(0, ist: 20), sample(5, ist: nil)]).count == 1)
     }
 
+    @Test("window and fireplace become off periods clamped to the domain; a running one lasts to its end")
+    func offPeriods() {
+        let at = { (minute: Int) in Date(timeIntervalSince1970: Double(minute) * 60) }
+        let events = [
+            HeatingEvent(source: .window, title: "Fenster offen", reason: "", start: at(-10), end: at(10)),
+            HeatingEvent(source: .plan, title: "Plan", reason: "", start: at(15)),
+            HeatingEvent(source: .fireplace, title: "Kamin an", reason: "", start: at(30))
+        ]
+        let periods = HeatingChartData.offPeriods(events, in: at(0)...at(60))
+        #expect(periods.map(\.source) == [.window, .fireplace])
+        #expect(periods.map(\.range) == [at(0)...at(10), at(30)...at(60)])
+        #expect(HeatingChartData.offPeriod(at: at(5), in: periods)?.source == .window)
+        #expect(HeatingChartData.offPeriod(at: at(20), in: periods) == nil)
+    }
+
+    @Test("the plan line and the gap break where the radiators were off")
+    func planBreaksInOffPeriod() {
+        let samples = (0..<6).map { sample($0 * 5, ist: 19) }
+        let window = HeatingEvent(source: .window, title: "Fenster offen", reason: "", start: samples[2].date, end: samples[3].date)
+        let off = HeatingChartData.offPeriods([window], in: HeatingChartData.timeDomain(samples))
+        #expect(HeatingChartData.planRuns(samples, off: off).map(\.count) == [2, 2])
+        #expect(HeatingChartData.gapSegments(samples, off: off).count == 2)
+    }
+
     @Test("a bar near zero is at least a pill high, clipped at the scale, and keeps its sign")
     func barExtent() {
         let zero = HeatingChartData.barExtent(forDelta: 0)

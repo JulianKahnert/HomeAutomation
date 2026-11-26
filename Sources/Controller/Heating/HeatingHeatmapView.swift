@@ -41,46 +41,47 @@ struct HeatingHeatmapView: View {
     }
 
     var body: some View {
-        HeatingCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Woche").font(.subheadline.weight(.semibold))
-                    Spacer()
-                    // Reserves its line so the card does not jump when a value appears.
-                    Text(selectionText ?? " ")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Grid(horizontalSpacing: 4, verticalSpacing: 6) {
-                    GridRow {
-                        Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                        ForEach(days, id: \.self) { day in
-                            Text(Self.weekday(day))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
+        HeatingSection {
+            Grid(horizontalSpacing: 4, verticalSpacing: 6) {
+                GridRow {
+                    Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                    ForEach(days, id: \.self) { day in
+                        Text(Self.weekday(day))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
-                    ForEach(rooms) { room in
-                        GridRow {
-                            Text(room.shortName)
-                                .font(.caption.weight(room.placeId == selectedPlaceId ? .bold : .regular))
-                                .lineLimit(1)
-                                // Truncates a long name instead of pushing the grid past the screen edge.
-                                .frame(maxWidth: 96, alignment: .leading)
-                                .gridColumnAlignment(.leading)
-                            ForEach(days, id: \.self) { day in
-                                HStack(spacing: 2) {
-                                    ForEach(0..<4, id: \.self) { segment in
-                                        cellView(room, day, segment)
-                                    }
+                }
+                ForEach(rooms) { room in
+                    GridRow {
+                        Text(room.shortName)
+                            .font(.caption.weight(room.placeId == selectedPlaceId ? .bold : .regular))
+                            .lineLimit(1)
+                            // Truncates a long name instead of pushing the grid past the screen edge.
+                            .frame(maxWidth: 96, alignment: .leading)
+                            .gridColumnAlignment(.leading)
+                        ForEach(days, id: \.self) { day in
+                            HStack(spacing: 2) {
+                                ForEach(0..<4, id: \.self) { segment in
+                                    cellView(room, day, segment)
                                 }
                             }
                         }
                     }
                 }
-                .frame(maxWidth: .infinity)
             }
+            .frame(maxWidth: .infinity)
+        } header: {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Woche")
+                Spacer()
+                // Reserves its line so the section does not jump when a value appears.
+                Text(selectionText ?? " ")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        } footer: {
+            Text("Abweichung vom Plan je sechs Stunden. Schraffiert: kein Ist-Wert.")
         }
     }
 

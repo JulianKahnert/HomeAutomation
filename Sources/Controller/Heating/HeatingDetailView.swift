@@ -21,6 +21,32 @@ struct HeatingCard<Content: View>: View {
     }
 }
 
+/// One part of the Heizung tab as a section: the headline above the card, a note below it.
+struct HeatingSection<Content: View, Header: View, Footer: View>: View {
+    @ViewBuilder var content: Content
+    @ViewBuilder var header: Header
+    @ViewBuilder var footer: Footer
+
+    var body: some View {
+        // A plain stack instead of a List: the cards, their charts and their gestures stay as they are.
+        VStack(alignment: .leading, spacing: 6) {
+            Section {
+                HeatingCard { content }
+            } header: {
+                header
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.horizontal, 4)
+            } footer: {
+                footer
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+            }
+        }
+    }
+}
+
 struct HeatingRoomDetailView: View {
     let detail: HeatingRoomDetail
     @Binding var range: HeatingRange
@@ -49,9 +75,9 @@ struct HeatingRoomDetailView: View {
         // Laid out once per render: the chart draws them, the inline card shows the selected one.
         let slots = HeatingSollIstChart.slots(events: detail.events, samples: detail.samples, range: range, plotWidth: plotWidth)
         let selectedSlot = slots.first { $0.contains(selectedPinId) }
-        HeatingCard {
+        HeatingSection {
             VStack(alignment: .leading, spacing: 8) {
-                header
+                readout
                 HeatingRangePicker(range: $range)
                     .padding(.bottom, 8)
                 HeatingSollIstChart(samples: detail.samples, events: detail.events, crosshair: $crosshair, range: range,
@@ -82,20 +108,48 @@ struct HeatingRoomDetailView: View {
                         }
                 }
             }
+        } header: {
+            HStack(alignment: .firstTextBaseline) {
+                Text(detail.name)
+                Spacer()
+                if let onClose {
+                    Button("Schließen", systemImage: "xmark.circle.fill", action: onClose)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tertiary)
+                        .font(.title3)
+                }
+            }
+        } footer: {
+            // Where the actual value comes from does not change with the crosshair, so it sits below the card.
+            VStack(alignment: .leading, spacing: 2) {
+                Label(sourceText, systemImage: sourceSymbol)
+                if detail.latest?.ist == nil {
+                    Text(lastIstText)
+                }
+                if let offHint {
+                    Text(offHint)
+                }
+            }
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                if crosshair != nil, let sample = shown {
-                    Text("\(detail.name) · \(HeatingFormat.time(sample.date, includingDay: includesDay))")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(detail.name)
-                        .font(.headline)
-                }
+    /// The values at the crosshair, else the latest. Every line keeps its height while the crosshair comes and
+    /// goes: the variants are stacked and only swapped by opacity, so a long press on the chart moves nothing.
+    private var readout: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ZStack(alignment: .leading) {
+                Text("Jetzt")
+                    .opacity(crosshair == nil ? 1 : 0)
+                Text(shown.map { HeatingFormat.time($0.date, includingDay: includesDay) } ?? "")
+                    .opacity(crosshair == nil ? 0 : 1)
+            }
+            .font(.subheadline.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            ZStack(alignment: .leading) {
+                // Holds the height of the large value, also while "Kein Ist-Wert" is shown.
+                Text("0").font(.largeTitle.weight(.semibold)).hidden()
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     if let ist = shown?.ist {
                         Text(HeatingFormat.degrees(ist))
@@ -105,36 +159,46 @@ struct HeatingRoomDetailView: View {
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
-                    if let plan = shown?.sollPlan {
-                        Text("Plan \(HeatingFormat.degrees(plan))")
-                            .font(.title3.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                    if let delta = shown?.delta {
-                        Text(HeatingFormat.kelvin(delta))
-                            .font(.title3.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
+                    if let period = shownOffPeriod {
+                        // The plan did not apply: the cause instead of plan and Δ, in one line of the same font.
+                        Label("Heizung aus · \(period.source.label)", systemImage: period.source.offSymbol)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(period.source == .fireplace ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                            .lineLimit(1)
+                    } else {
+                        if let plan = shown?.sollPlan {
+                            Text("Plan \(HeatingFormat.degrees(plan))")
+                                .font(.title3.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        if let delta = shown?.delta {
+                            Text(HeatingFormat.kelvin(delta))
+                                .font(.title3.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
+                        }
                     }
                 }
-                if crosshair != nil {
-                    Label(sourceText, systemImage: sourceSymbol)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if shown?.ist == nil {
-                    Text(lastIstText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if let onClose {
-                Button("Schließen", systemImage: "xmark.circle.fill", action: onClose)
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tertiary)
-                    .font(.title3)
             }
         }
+    }
+
+    private var offPeriods: [HeatingChartData.OffPeriod] {
+        HeatingChartData.offPeriods(detail.events, in: HeatingChartData.timeDomain(detail.samples))
+    }
+
+    /// The window or fireplace stretch of the shown moment, when the radiators were off then.
+    private var shownOffPeriod: HeatingChartData.OffPeriod? {
+        shown.flatMap { HeatingChartData.offPeriod(at: $0.date, in: offPeriods) }
+    }
+
+    /// Explains the bands of the charts, naming only the causes the range has.
+    private var offHint: String? {
+        let sources = Set(offPeriods.map(\.source))
+        var parts: [String] = []
+        if sources.contains(.window) { parts.append("grau: Fenster offen") }
+        if sources.contains(.fireplace) { parts.append("orange: Kamin an") }
+        guard !parts.isEmpty else { return nil }
+        return "Flächen: Heizung aus, \(parts.joined(separator: ", "))."
     }
 
     private var lastIstText: String {
@@ -171,6 +235,8 @@ struct HeatingRoomDetailView: View {
         }
         .font(.caption.monospacedDigit())
         .foregroundStyle(.secondary)
+        // One line also with many or long radiator names, so the valve chart does not move.
+        .lineLimit(1)
     }
 }
 
@@ -234,9 +300,10 @@ struct HeatingSollIstChart: View {
     var body: some View {
         let selected = crosshair.flatMap { HeatingChartData.nearest(to: $0, in: samples) }
         let domain = HeatingChartData.timeDomain(samples)
+        let off = HeatingChartData.offPeriods(events, in: domain)
         Chart {
-            HeatingEventAreas(events: events, domain: domain)
-            ForEach(HeatingChartData.gapSegments(samples)) { segment in
+            HeatingOffAreas(periods: off, scheme: scheme, showsSymbols: true)
+            ForEach(HeatingChartData.gapSegments(samples, off: off)) { segment in
                 ForEach(Array(segment.points.enumerated()), id: \.offset) { _, point in
                     AreaMark(x: .value("Zeit", point.date),
                              yStart: .value("Ist", point.ist),
@@ -245,7 +312,7 @@ struct HeatingSollIstChart: View {
                         .foregroundStyle(gapStyle(segment.band))
                 }
             }
-            ForEach(Array(HeatingChartData.planRuns(samples).enumerated()), id: \.offset) { index, run in
+            ForEach(Array(HeatingChartData.planRuns(samples, off: off).enumerated()), id: \.offset) { index, run in
                 ForEach(Array(run.enumerated()), id: \.offset) { _, point in
                     LineMark(x: .value("Zeit", point.date), y: .value("Plan", point.value), series: .value("Serie", "plan-\(index)"))
                         .interpolationMethod(.stepEnd)
@@ -342,15 +409,25 @@ struct HeatingSollIstChart: View {
     }
 }
 
-/// The areas of events with a duration: window grey, fireplace soft orange.
-struct HeatingEventAreas: ChartContent {
-    let events: [HeatingEvent]
-    let domain: ClosedRange<Date>
+/// The stretches in which a window (grey) or the fireplace (orange) switched the radiators off: a band over the
+/// full height, in the temperature chart with the cause's symbol at its top.
+struct HeatingOffAreas: ChartContent {
+    let periods: [HeatingChartData.OffPeriod]
+    let scheme: ColorScheme
+    var showsSymbols = false
 
     var body: some ChartContent {
-        ForEach(HeatingPinLayout.areas(events).filter { ($0.end ?? domain.upperBound) > domain.lowerBound && $0.start < domain.upperBound }) { event in
-            RectangleMark(xStart: .value("Start", max(event.start, domain.lowerBound)), xEnd: .value("Ende", min(event.end ?? domain.upperBound, domain.upperBound)))
-                .foregroundStyle(event.source == .fireplace ? Color.orange.opacity(0.1) : Color.gray.opacity(0.1))
+        ForEach(periods) { period in
+            RectangleMark(xStart: .value("Start", period.range.lowerBound), xEnd: .value("Ende", period.range.upperBound))
+                .foregroundStyle(HeatingPalette.offFill(period.source, scheme: scheme))
+                .annotation(position: .overlay, alignment: .top, spacing: 4) {
+                    if showsSymbols {
+                        Image(systemName: period.source.offSymbol)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(period.source == .fireplace ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                            .accessibilityLabel("\(period.source.label): Heizung aus")
+                    }
+                }
         }
     }
 }
@@ -363,11 +440,13 @@ struct HeatingValveChart: View {
     @Binding var crosshair: Date?
     var range: HeatingRange = .day
 
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         let selected = crosshair.flatMap { HeatingChartData.nearest(to: $0, in: samples) }
         let domain = HeatingChartData.timeDomain(samples)
         Chart {
-            HeatingEventAreas(events: events, domain: domain)
+            HeatingOffAreas(periods: HeatingChartData.offPeriods(events, in: domain), scheme: scheme)
             ForEach(radiators.indices, id: \.self) { index in
                 ForEach(Array(HeatingChartData.valveRuns(samples, radiator: index).enumerated()), id: \.offset) { run, points in
                     ForEach(Array(points.enumerated()), id: \.offset) { _, point in

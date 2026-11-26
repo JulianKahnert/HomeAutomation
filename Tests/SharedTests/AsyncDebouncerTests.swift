@@ -146,11 +146,13 @@ struct AsyncDebouncerTests {
     @Test("Requests arriving faster than the delay still run within maxDelay")
     func maxDelayCapsAContinuousBurst() async {
         let recorder = RunRecorder()
-        let debouncer = AsyncDebouncer(delay: .milliseconds(100), maxDelay: .milliseconds(300)) { await recorder.run() }
+        // The delay is far beyond the time the test waits, so only the maxDelay cap can start a run,
+        // even on a loaded machine where the requests below arrive late.
+        let debouncer = AsyncDebouncer(delay: .seconds(60), maxDelay: .milliseconds(200)) { await recorder.run() }
 
-        // requests keep arriving faster than the debounce delay for well beyond maxDelay
+        // requests keep arriving until the cap forced a run, or the generous timeout ran out
         let start = ContinuousClock.now
-        while start.duration(to: .now) < .milliseconds(700) {
+        while await recorder.startedRuns == 0, start.duration(to: .now) < .seconds(10) {
             await debouncer.schedule()
             try? await Task.sleep(for: .milliseconds(20))
         }

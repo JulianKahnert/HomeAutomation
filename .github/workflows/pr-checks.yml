@@ -22,7 +22,9 @@ concurrency:
 jobs:
   swift-package:
     name: Swift Package Build & Test
-    runs-on: macos-26
+    # xcode-27 (macOS 27), not macos-26: the Controller snapshot references are rendered on
+    # macOS 27, and text, controls and charts render differently on macOS 26.
+    runs-on: xcode-27
     # The draft guard holds even if more pull_request types are added above; a
     # dispatched run has no pull_request, so draft is falsy and it runs.
     if: ${{ !github.event.pull_request.draft }}

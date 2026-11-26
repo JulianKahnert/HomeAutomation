@@ -71,7 +71,7 @@ struct HeatingFireplaceSnapshotTests {
                 .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
                 let view = NSHostingView(rootView: content)
                 view.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-                assertSnapshot(of: view, as: .image(size: device.size), named: "\(device.rawValue)-\(scheme == .dark ? "dark" : "light")", testName: test)
+                assertSnapshot(of: view, as: .image(size: device.size, scale: 2), named: "\(device.rawValue)-\(scheme == .dark ? "dark" : "light")", testName: test)
             }
         }
     }

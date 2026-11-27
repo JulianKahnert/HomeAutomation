@@ -62,17 +62,26 @@ actor EveMatterValvePoller {
         let deadline = ContinuousClock.now + Self.readTimeout
 
         if isThermostatByNode[node] == nil {
-            let clusterIDs = try await read(device, EveMatterValve.descriptorClusterID, EveMatterValve.serverListAttributeID,
-                                            deadline: deadline, parse: Self.unsignedIntegerArray)
+            let clusterIDs = try await read(device,
+                                            EveMatterValve.descriptorClusterID,
+                                            EveMatterValve.serverListAttributeID,
+                                            deadline: deadline,
+                                            parse: Self.unsignedIntegerArray)
             isThermostatByNode[node] = EveMatterValve.isThermostat(serverClusterIDs: clusterIDs.map { UInt32(truncatingIfNeeded: $0) })
         }
         guard isThermostatByNode[node] == true else { return [] }
 
-        let rawValvePosition = try await read(device, EveMatterValve.clusterID, EveMatterValve.valvePositionAttributeID,
-                                              deadline: deadline, parse: Self.unsignedInteger)
+        let rawValvePosition = try await read(device,
+                                              EveMatterValve.clusterID,
+                                              EveMatterValve.valvePositionAttributeID,
+                                              deadline: deadline,
+                                              parse: Self.unsignedInteger)
         // The offset is a bonus: a missing answer must not hide the valve position.
-        let rawCalibration = try? await read(device, EveMatterValve.thermostatClusterID, EveMatterValve.localTemperatureCalibrationAttributeID,
-                                             deadline: deadline, parse: Self.signedInteger)
+        let rawCalibration = try? await read(device,
+                                             EveMatterValve.thermostatClusterID,
+                                             EveMatterValve.localTemperatureCalibrationAttributeID,
+                                             deadline: deadline,
+                                             parse: Self.signedInteger)
 
         var items: [EntityStorageItem] = []
         if let percent = EveMatterValve.percent(fromRawValue: rawValvePosition) {

@@ -20,6 +20,14 @@ struct StoragePolicy: Sendable, Equatable {
         case state
         /// Enumerated levels such as HomeKit air quality.
         case enumeration
+
+        init(_ storageClass: ValueDescriptor.StorageRule.Class) {
+            switch storageClass {
+            case .analog: self = .analog
+            case .state: self = .state
+            case .enumeration: self = .enumeration
+            }
+        }
     }
 
     /// A new value is stored only when it moved far enough from the last stored one, or when the
@@ -83,7 +91,7 @@ struct StoragePolicy: Sendable, Equatable {
     /// Values outside are sensor errors (CO₂ reports 0 ppm) and are left out of the rollup.
     let validRange: ClosedRange<Double>?
 
-    /// Rows stored per entity in 24 hours above which ``DatabaseCleanupJob`` suggests a dead band.
+    /// Rows stored per entity in 24 hours above which ``NoisyEntityWarner`` suggests a dead band.
     /// An `entityItems` row costs about 370 B (data plus index): 285 B measured in production
     /// (81 MB / 285k rows, Nov 2026) plus about 80 B for `idx_entityItems_type_timestamp` (measured on
     /// mysql:9). So 500 rows a day are 500 × 365 × 370 B ≈ 68 MB per entity and year, kept forever.
@@ -100,41 +108,30 @@ struct StoragePolicy: Sendable, Equatable {
     /// A type stored in the database that this server version does not know: kept raw forever.
     static let unknown = state()
 
-    /// Exhaustive on purpose: a new `CharacteristicsType` does not compile until it gets a value kind here.
+    /// The rule comes from the value kind's descriptor; only the database column is Server knowledge.
     static func policy(for type: CharacteristicsType) -> StoragePolicy {
+        let rule = ValueDescriptor.descriptor(for: type).storage
+        return StoragePolicy(kind: StorageKind(rule.storageClass),
+                             valueColumn: column(for: type),
+                             deadBand: rule.deadBand.map { DeadBand(threshold: .absolute($0.absoluteChange), maxInterval: $0.maxInterval) },
+                             rawRetentionDays: rule.rawRetentionDays,
+                             rollup: rule.hourlyRollup ? .hourly : .none,
+                             validRange: rule.validRange)
+    }
+
+    /// Exhaustive on purpose: a new `CharacteristicsType` does not compile until it is placed here.
+    private static func column(for type: CharacteristicsType) -> ValueColumn? {
         switch type {
-        case .lightSensor:
-            // Lux already jumps in big steps, so a dead band saves little; the rollup after 90 days does.
-            StoragePolicy(kind: .analog,
-                          valueColumn: .illuminanceInLux,
-                          deadBand: nil,
-                          rawRetentionDays: 90,
-                          rollup: .hourly,
-                          validRange: 0...100_000)
-        case .carbonDioxideSensorId:
-            StoragePolicy(kind: .analog,
-                          valueColumn: .carbonDioxideSensorId,
-                          deadBand: DeadBand(threshold: .absolute(25), maxInterval: .minutes(15)),
-                          rawRetentionDays: 90,
-                          rollup: .hourly,
-                          validRange: 1...100_000)
-        case .temperatureSensor:
-            analog(.temperatureInC)
-        case .relativeHumiditySensor:
-            analog(.relativeHumidity)
-        case .pmDensitySensor:
-            analog(.pmDensity)
-        case .batterySensor:
-            analog(.stateOfCharge)
-        case .brightness:
-            analog(.brightness)
-        case .colorTemperature:
-            analog(.colorTemperature)
-        case .airQualitySensor:
-            state(.enumeration)
-        case .motionSensor, .contactSensor, .switcher, .color, .valve, .lock, .heating,
-             .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration:
-            state()
+        case .lightSensor: .illuminanceInLux
+        case .carbonDioxideSensorId: .carbonDioxideSensorId
+        case .temperatureSensor: .temperatureInC
+        case .relativeHumiditySensor: .relativeHumidity
+        case .pmDensitySensor: .pmDensity
+        case .batterySensor: .stateOfCharge
+        case .brightness: .brightness
+        case .colorTemperature: .colorTemperature
+        case .airQualitySensor, .motionSensor, .contactSensor, .switcher, .color, .valve, .lock, .heating,
+             .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration: nil
         }
     }
 

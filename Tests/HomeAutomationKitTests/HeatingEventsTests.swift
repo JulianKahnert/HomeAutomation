@@ -215,4 +215,5 @@ private actor WriteQueryLog: HeatingWriteRepository {
     }
     func lastPlanWrite(placeId: String, before date: Date) async throws -> HeatingWrite? { nil }
     func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite? { nil }
+    func lastWrites() async throws -> [HeatingWrite] { [] }
 }

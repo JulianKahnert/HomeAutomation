@@ -24,7 +24,7 @@ public struct MaintenanceAutomation: Automatable {
         return time.isEqual(event)
     }
 
-    // Retention lives in the server's `DatabaseCleanupJob` only; the type stays so existing
+    // Retention lives in the built-in `DatabaseCleanup` automation only; the type stays so existing
     // configs still decode.
     public func execute(using hm: HomeManagable) async throws {}
 }

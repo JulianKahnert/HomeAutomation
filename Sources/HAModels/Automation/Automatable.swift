@@ -42,6 +42,10 @@ public protocol Automatable: Sendable, Codable {
     /// that trigger every minute, which would flood the run history.
     var recordsRuns: Bool { get }
 
+    /// Whether a new trigger cancels this automation's run that is still going (the newest intent wins).
+    /// Off for work that must finish, such as the database upkeep.
+    var supersedesRunningRun: Bool { get }
+
     /// Whether several waiting changes of the same entity in this automation's lane collapse to the newest.
     /// Off for lanes that must see every change (projections). Events without a state never collapse.
     var collapsesChanges: Bool { get }
@@ -52,6 +56,8 @@ public protocol Automatable: Sendable, Codable {
 
 public extension Automatable {
     var recordsRuns: Bool { true }
+
+    var supersedesRunningRun: Bool { true }
 
     var collapsesChanges: Bool { true }
 

@@ -98,5 +98,4 @@ public protocol AutomationRunRepository: Sendable {
     /// Keyed by automation name.
     func latestRunPerAutomation() async throws -> [String: AutomationRun]
     func markRunningAsInterrupted() async throws
-    func deleteRuns(olderThan date: Date) async throws
 }

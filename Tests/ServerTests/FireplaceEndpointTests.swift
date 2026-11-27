@@ -32,7 +32,6 @@ final class FireplaceEndpointTests: XCTestCase {
                                             storageRepo: EmptyStorage(),
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 52.52, longitude: 13.405),
-                                            actionLogManager: ActionLogManager(),
                                             fireplaceSwitches: switches,
                                             onFireplaceSwitch: { [events] in events?.append($0) })
         try routes(app)
@@ -87,6 +86,7 @@ final class FireplaceEndpointTests: XCTestCase {
     func testStateSaysSinceAndEnd() async throws {
         let start = Date(timeIntervalSinceNow: -3600)
         try await switches.add(FireplaceSwitch(timestamp: start, isOn: true))
+        await (app.homeManager as? HomeManager)?.loadCurrentStates(timeout: .seconds(2))
 
         let (status, state) = try await request(.GET, token: token)
 
@@ -111,6 +111,7 @@ final class FireplaceEndpointTests: XCTestCase {
 
     func testSwitchOffHoldsAtOnce() async throws {
         try await switches.add(FireplaceSwitch(timestamp: Date(timeIntervalSinceNow: -60), isOn: true))
+        await (app.homeManager as? HomeManager)?.loadCurrentStates(timeout: .seconds(2))
 
         let (status, state) = try await request(.PUT, token: token, body: #"{"isOn":false}"#)
         XCTAssertEqual(status, .ok)
@@ -124,6 +125,7 @@ final class FireplaceEndpointTests: XCTestCase {
     func testRepeatedOnKeepsTheStartAndTellsNobody() async throws {
         let start = Date(timeIntervalSinceNow: -600)
         try await switches.add(FireplaceSwitch(timestamp: start, isOn: true))
+        await (app.homeManager as? HomeManager)?.loadCurrentStates(timeout: .seconds(2))
 
         let (_, state) = try await request(.PUT, token: token, body: #"{"isOn":true}"#)
 

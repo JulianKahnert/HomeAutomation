@@ -61,6 +61,8 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func clearActionLog() async
     /// Whether HomeKit works end to end; shared by `/health` and the `HealthCheck` automation.
     func homeKitHealth() async -> HomeKitHealth
+    /// Runs one step of the database upkeep (cleanup, rollup). A no-op where the host has no database upkeep.
+    func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws
 }
 
 public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equatable {

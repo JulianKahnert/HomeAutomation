@@ -7,7 +7,7 @@ import Fluent
 
 struct CreateAutomationRun: AsyncMigration {
     func prepare(on database: Database) async throws {
-        try await database.schema(AutomationRunDbItem.schema)
+        try await database.schema("automationRuns")
             .id()
             .field("automationName", .string, .required)
             .field("startedAt", .datetime, .required)
@@ -24,6 +24,6 @@ struct CreateAutomationRun: AsyncMigration {
     }
 
     func revert(on database: Database) async throws {
-        try await database.schema(AutomationRunDbItem.schema).delete()
+        try await database.schema("automationRuns").delete()
     }
 }

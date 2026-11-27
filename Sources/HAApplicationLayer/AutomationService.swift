@@ -33,6 +33,9 @@ public actor AutomationService {
     }
 
     private var lanes: [String: Lane] = [:]
+    /// Automations the server itself needs (e.g. the database cleanup). They are added when a deploy or the
+    /// stored config lacks them, and keep their active state like any other automation.
+    private let builtIns: [any Automatable]
     private var runningTasks: [String: Task<Void, Never>] = [:]
     /// Names whose current task was cancelled by `stopAutomation`, so its run ends as `stopped`
     /// rather than `superseded`.
@@ -41,17 +44,19 @@ public actor AutomationService {
     public init(using homeManager: HomeManagable,
                 runs: AutomationRunRepository,
                 automations: [any Automatable] = [],
+                builtIns: [any Automatable] = [],
                 repository: any AutomationRepository = InMemoryAutomationRepository()) throws {
         self.homeManager = homeManager
         self.runs = runs
-        self.automations = automations
+        self.builtIns = builtIns
+        self.automations = Self.adding(builtIns, to: automations)
         self.repository = repository
     }
 
     /// Replaces the deployed automations and stores them. An automation that was deployed before keeps its active state.
     public func deploy(_ newAutomations: [any Automatable]) async throws {
         let previous = automations
-        automations = newAutomations.map { automation in
+        automations = Self.adding(builtIns, to: newAutomations).map { automation in
             var automation = automation
             if let existing = previous.first(where: { $0.name == automation.name }) {
                 automation.isActive = existing.isActive
@@ -59,6 +64,10 @@ public actor AutomationService {
             return automation
         }
         try await repository.save(automations)
+    }
+
+    private static func adding(_ builtIns: [any Automatable], to automations: [any Automatable]) -> [any Automatable] {
+        automations + builtIns.filter { builtIn in !automations.contains { $0.name == builtIn.name } }
     }
 
     public func setAutomationActive(with name: String, to value: Bool) async throws {
@@ -148,6 +157,11 @@ public actor AutomationService {
                 return
             }
 
+            if !automation.supersedesRunningRun, self.isRunning(automation.name) {
+                self.log.info("Automation \(automation.name) is still running, not starting it again")
+                return
+            }
+
             self.log.info("Running automation \(automation.name)")
             let runId = automation.recordsRuns ? UUID() : nil
             let task = Task {
@@ -193,6 +207,10 @@ public actor AutomationService {
         guard let task = runningTasks[name], !task.isCancelled else { return }
         stopRequested.insert(name)
         task.cancel()
+    }
+
+    private func isRunning(_ name: String) -> Bool {
+        runningTasks[name].map { !$0.isCancelled } ?? false
     }
 
     private func set(task: Task<Void, Never>, with id: String) {

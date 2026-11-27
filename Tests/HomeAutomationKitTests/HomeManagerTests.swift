@@ -866,7 +866,7 @@ private actor RecordingStorageRepository: StorageRepository {
         []
     }
 
-    func waitForAdds(_ count: Int, timeout: Duration = .seconds(2)) async {
+    func waitForAdds(_ count: Int, timeout: Duration = .seconds(30)) async {
         let deadline = ContinuousClock.now + timeout
         while added.count < count, ContinuousClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(5))

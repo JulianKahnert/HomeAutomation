@@ -108,7 +108,9 @@ public final class HomeManager: HomeManagable {
 
         let (persistStream, persistQueue) = AsyncStream<EntityStorageItem>.makeStream(bufferingPolicy: .bufferingNewest(Self.persistQueueLimit))
         self.persistQueue = persistQueue
-        Task.detached(priority: .background) { [storageRepo, log] in
+        // Normal priority: a background consumer is starved under load. A slow database still never delays a
+        // command, because the queue is a separate task that commands only yield into (ADR-004).
+        Task.detached { [storageRepo, log] in
             for await item in persistStream {
                 await Self.persist(item, in: storageRepo, retryDelays: persistRetryDelays, log: log)
             }

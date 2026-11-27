@@ -282,7 +282,7 @@ public final class HomeManager: HomeManagable {
         // Log action and check if it's a duplicate (cache hit)
         let hasCacheHit = await commandCache.isDuplicate(action)
         let entry = ActionLogItem(action: action,
-                                  hasCacheHit: hasCacheHit,
+                                  status: hasCacheHit ? .cacheHit : .executed,
                                   runId: runId,
                                   reason: heating?.reason,
                                   planTargetInC: heating?.planTargetInC)

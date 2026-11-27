@@ -130,11 +130,10 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
 
     /// The rollup rows of an entity, oldest hour first.
     func hourlyAggregates(of entityId: EntityId) async throws -> [EntityHourlyAggregate] {
+        guard let entity = try await findEntity(entityId) else { return [] }
         let rows = try await sqlDatabase().raw("""
             SELECT * FROM \(ident: EntityHourlyAggregate.schema)
-            WHERE \(ident: "entityPlaceId") = \(bind: entityId.placeId)
-              AND \(ident: "entityServiceName") = \(bind: entityId.name)
-              AND \(ident: "entityCharacteristicType") = \(bind: entityId.characteristicType.rawValue)
+            WHERE \(ident: "entityId") = \(bind: entity.requireID())
             ORDER BY \(ident: "hourStart")
             """)
             .all()
@@ -217,13 +216,12 @@ extension EntityStorageDbRepository: EntityRetentionStore {
             // reserved word, hence the backticks.
             try await sql.raw("""
                 INSERT INTO \(ident: EntityHourlyAggregate.schema)
-                    (entityPlaceId, entityServiceName, entityCharacteristicType, hourStart, `minValue`, `meanValue`, `maxValue`, `lastValue`, `valueCount`)
+                    (entityId, hourStart, `minValue`, `meanValue`, `maxValue`, `lastValue`, `valueCount`)
                 SELECT * FROM (
-                    SELECT entityPlaceId, entityServiceName, entityCharacteristicType, hourStart,
+                    SELECT entityId, hourStart,
                            MIN(v) AS minV, AVG(v) AS meanV, MAX(v) AS maxV, MAX(CASE WHEN rn = 1 THEN v END) AS lastV, COUNT(*) AS countV
                     FROM (
-                        SELECT e.\(ident: "placeId") AS entityPlaceId, e.\(ident: "serviceName") AS entityServiceName,
-                               e.\(ident: "characteristicType") AS entityCharacteristicType,
+                        SELECT c.\(ident: "entityId") AS entityId,
                                TIMESTAMP(DATE_FORMAT(c.\(ident: "timestamp"), '%Y-%m-%d %H:00:00')) AS hourStart,
                                c.\(ident: "number") AS v,
                                ROW_NUMBER() OVER (PARTITION BY c.\(ident: "entityId"), DATE_FORMAT(c.\(ident: "timestamp"), '%Y-%m-%d %H')
@@ -234,7 +232,7 @@ extension EntityStorageDbRepository: EntityRetentionStore {
                           AND c.\(ident: "timestamp") < \(bind: date)
                           AND c.\(ident: "number") BETWEEN \(bind: range.lowerBound) AND \(bind: range.upperBound)
                     ) raw
-                    GROUP BY entityPlaceId, entityServiceName, entityCharacteristicType, hourStart
+                    GROUP BY entityId, hourStart
                 ) AS hourly
                 ON DUPLICATE KEY UPDATE
                     `minValue` = LEAST(`minValue`, hourly.minV),

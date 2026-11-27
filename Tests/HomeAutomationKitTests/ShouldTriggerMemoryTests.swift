@@ -102,8 +102,8 @@ struct ShouldTriggerMemoryTests {
     @Test("The last command per radiator is loaded from the journal at start")
     func lastCommandPerRadiator() async throws {
         let store = InMemoryJournalStore()
-        let earlier = ActionLogItem(timestamp: now.addingTimeInterval(-600), action: .setHeating(radiator.heatingId, active: false), hasCacheHit: false, reason: .window)
-        let older = ActionLogItem(timestamp: now.addingTimeInterval(-1_200), action: .setHeating(radiator.heatingId, active: true), hasCacheHit: false, reason: .plan)
+        let earlier = ActionLogItem(timestamp: now.addingTimeInterval(-600), action: .setHeating(radiator.heatingId, active: false), reason: .window)
+        let older = ActionLogItem(timestamp: now.addingTimeInterval(-1_200), action: .setHeating(radiator.heatingId, active: true), reason: .plan)
         try await store.addCommand(older)
         try await store.addCommand(earlier)
         let repositories = Repositories()

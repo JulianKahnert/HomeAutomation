@@ -6,7 +6,7 @@
 import Foundation
 import Shared
 
-/// What one value kind is: the shape of its value, unit, display and storage rule.
+/// What one value kind is: the shape of its value, display and storage rule.
 ///
 /// ``descriptor(for:)`` is the only table and is exhaustive on purpose: a new `CharacteristicsType`
 /// does not compile until it has a descriptor.
@@ -18,8 +18,8 @@ public struct ValueDescriptor: Sendable, Equatable {
     }
 
     public enum Display: Sendable, Equatable {
-        case boolean(trueLabel: String, falseLabel: String)
-        case number(fractionDigits: Int)
+        case boolean
+        case number
         case color
         case enumeration
         case deadline
@@ -68,8 +68,6 @@ public struct ValueDescriptor: Sendable, Equatable {
     }
 
     public let shape: Shape
-    /// Unit symbol, `nil` for unitless kinds.
-    public let unit: String?
     public let display: Display
     public let storage: StorageRule
     public let constraint: Constraint
@@ -127,11 +125,10 @@ public struct ValueDescriptor: Sendable, Equatable {
         validRange: 1...100_000
     )
 
-    private static func bool(_ type: CharacteristicsType, _ trueLabel: String, _ falseLabel: String, isSettableFromApp: Bool = false) -> ValueDescriptor {
+    private static func bool(isSettableFromApp: Bool = false) -> ValueDescriptor {
         ValueDescriptor(
             shape: .bool,
-            unit: nil,
-            display: .boolean(trueLabel: trueLabel, falseLabel: falseLabel),
+            display: .boolean,
             storage: .keepRaw,
             constraint: .none,
             isSettableFromApp: isSettableFromApp
@@ -139,27 +136,22 @@ public struct ValueDescriptor: Sendable, Equatable {
     }
 
     private static func number(
-        _ type: CharacteristicsType,
-        unit: String?,
-        digits: Int = 0,
         storage: StorageRule = .keepRaw,
         constraint: Constraint = .none,
         isSettableFromApp: Bool = false
     ) -> ValueDescriptor {
         ValueDescriptor(
             shape: .number,
-            unit: unit,
-            display: .number(fractionDigits: digits),
+            display: .number,
             storage: storage,
             constraint: constraint,
             isSettableFromApp: isSettableFromApp
         )
     }
 
-    private static func structured(_ type: CharacteristicsType, shape: Shape, display: Display, constraint: Constraint) -> ValueDescriptor {
+    private static func structured(shape: Shape, display: Display, constraint: Constraint) -> ValueDescriptor {
         ValueDescriptor(
             shape: shape,
-            unit: nil,
             display: display,
             storage: .keepRaw,
             constraint: constraint,
@@ -170,49 +162,49 @@ public struct ValueDescriptor: Sendable, Equatable {
     public static func descriptor(for type: CharacteristicsType) -> ValueDescriptor {
         switch type {
         case .motionSensor:
-            return bool(type, "motion", "no motion")
+            return bool()
         case .contactSensor:
-            return bool(type, "open", "closed")
+            return bool()
         case .switcher:
-            return bool(type, "on", "off", isSettableFromApp: true)
+            return bool(isSettableFromApp: true)
         case .valve:
-            return bool(type, "open", "closed")
+            return bool()
         case .lock:
-            return bool(type, "locked", "unlocked")
+            return bool()
         case .heating:
-            return bool(type, "heating", "idle")
+            return bool()
         case .lightSensor:
-            return number(type, unit: "lx", storage: lightStorage)
+            return number(storage: lightStorage)
         case .carbonDioxideSensorId:
-            return number(type, unit: "ppm", storage: carbonDioxideStorage, constraint: .wholeNumber)
+            return number(storage: carbonDioxideStorage, constraint: .wholeNumber)
         case .temperatureSensor:
-            return number(type, unit: "°C", digits: 1)
+            return number()
         case .relativeHumiditySensor:
-            return number(type, unit: "%")
+            return number()
         case .pmDensitySensor:
-            return number(type, unit: "µg/m³")
+            return number()
         case .batterySensor:
-            return number(type, unit: "%", constraint: .wholeNumber)
+            return number(constraint: .wholeNumber)
         case .brightness:
-            return number(type, unit: "%", constraint: .wholeNumber)
+            return number(constraint: .wholeNumber)
         case .colorTemperature:
-            return number(type, unit: nil, digits: 2)
+            return number()
         case .airQualitySensor:
-            return number(type, unit: nil, storage: StorageRule.keepRaw, constraint: .wholeNumber)
+            return number(constraint: .wholeNumber)
         case .targetTemperature:
-            return number(type, unit: "°C", digits: 1, storage: .keepRaw, isSettableFromApp: true)
+            return number(isSettableFromApp: true)
         case .heatingMode:
-            return number(type, unit: nil, storage: .keepRaw, constraint: .heatingMode, isSettableFromApp: true)
+            return number(constraint: .heatingMode, isSettableFromApp: true)
         case .valvePosition:
-            return number(type, unit: "%", storage: .keepRaw, constraint: .wholeNumber)
+            return number(constraint: .wholeNumber)
         case .temperatureCalibration:
-            return number(type, unit: "°C", digits: 1, storage: .keepRaw)
+            return number()
         case .energyPrice:
-            return number(type, unit: "€/kWh", digits: 3)
+            return number()
         case .deadline:
-            return structured(type, shape: .textWithNumber, display: .deadline, constraint: .deadlineText)
+            return structured(shape: .textWithNumber, display: .deadline, constraint: .deadlineText)
         case .color:
-            return structured(type, shape: .text, display: .color, constraint: .colorText)
+            return structured(shape: .text, display: .color, constraint: .colorText)
         }
     }
 }

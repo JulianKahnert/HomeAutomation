@@ -52,7 +52,7 @@ struct ActionLogItemCompatibilityTests {
         let json = """
         {"id":"7B9F4B7A-0000-4000-8000-000000000001","timestamp":0,
          "entityId":{"placeId":"Kitchen","name":"Radiator","characteristicType":"heating"},
-         "actionName":"setHeating","detailDescription":"setHeating(active: true)","hasCacheHit":false}
+         "actionName":"setHeating","detailDescription":"setHeating(active: true)","status":"executed"}
         """
         let item = try JSONDecoder().decode(ActionLogItem.self, from: Data(json.utf8))
 
@@ -64,7 +64,7 @@ struct ActionLogItemCompatibilityTests {
     @Test("An entry with reason and plan target round-trips")
     func newEntryRoundTrips() throws {
         let radiator = EntityId(placeId: "Kitchen", name: "Radiator", characteristicsName: nil, characteristic: .targetTemperature)
-        let item = ActionLogItem(action: .setTargetTemperature(radiator, celsius: 20), hasCacheHit: false, reason: .plan, planTargetInC: 20)
+        let item = ActionLogItem(action: .setTargetTemperature(radiator, celsius: 20), reason: .plan, planTargetInC: 20)
 
         let decoded = try JSONDecoder().decode(ActionLogItem.self, from: JSONEncoder().encode(item))
 

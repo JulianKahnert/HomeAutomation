@@ -37,13 +37,12 @@ struct JournalMappingTests {
     @Test(arguments: ActionLogItem.Status.allCases)
     func commandRoundTripKeepsAllFields(status: ActionLogItem.Status) throws {
         let runId = UUID()
-        var command = ActionLogItem(timestamp: Date(timeIntervalSince1970: 500),
+        let command = ActionLogItem(timestamp: Date(timeIntervalSince1970: 500),
                                     action: .setTargetTemperature(entityId, celsius: 21),
-                                    hasCacheHit: status == .cacheHit,
+                                    status: status,
                                     runId: runId,
                                     reason: .plan,
                                     planTargetInC: 21)
-        command.status = status
 
         let row = JournalDbItem(command)
 
@@ -54,7 +53,7 @@ struct JournalMappingTests {
 
     @Test
     func commandWithoutRunOrReasonRoundTrips() throws {
-        let command = ActionLogItem(timestamp: Date(timeIntervalSince1970: 1), action: .turnOn(entityId), hasCacheHit: false)
+        let command = ActionLogItem(timestamp: Date(timeIntervalSince1970: 1), action: .turnOn(entityId))
 
         #expect(try JournalDbItem(command).toCommand() == command)
     }

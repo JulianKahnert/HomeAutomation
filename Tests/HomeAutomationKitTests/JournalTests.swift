@@ -93,8 +93,8 @@ struct JournalTests {
         let trigger = AutomationTrigger(kind: .sunset, entityId: nil, summary: "Sunset")
         try await store.add(AutomationRun(automationName: "old", startedAt: old, trigger: trigger, outcome: .completed))
         try await store.add(AutomationRun(automationName: "new", startedAt: now, trigger: trigger, outcome: .completed))
-        try await store.addCommand(ActionLogItem(timestamp: old, action: .turnOn(switchId), hasCacheHit: false))
-        try await store.addCommand(ActionLogItem(timestamp: now, action: .turnOn(switchId), hasCacheHit: false))
+        try await store.addCommand(ActionLogItem(timestamp: old, action: .turnOn(switchId)))
+        try await store.addCommand(ActionLogItem(timestamp: now, action: .turnOn(switchId)))
         try await store.addPush(JournalPush(timestamp: old, runId: nil, title: "o", message: "o", pushId: "o"))
         try await store.addPush(JournalPush(timestamp: now, runId: nil, title: "n", message: "n", pushId: "n"))
 
@@ -111,9 +111,9 @@ struct JournalTests {
         let now = Date(timeIntervalSince1970: 100_000_000)
         let old = now.addingTimeInterval(-400 * 86_400)
         let older = now.addingTimeInterval(-500 * 86_400)
-        try await store.addCommand(ActionLogItem(timestamp: older, action: .setTargetTemperature(radiator, celsius: 19), hasCacheHit: false, reason: .plan))
-        try await store.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(radiator, celsius: 21), hasCacheHit: false, reason: .fireplace))
-        try await store.addCommand(ActionLogItem(timestamp: old, action: .turnOn(switchId), hasCacheHit: false))
+        try await store.addCommand(ActionLogItem(timestamp: older, action: .setTargetTemperature(radiator, celsius: 19), reason: .plan))
+        try await store.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(radiator, celsius: 21), reason: .fireplace))
+        try await store.addCommand(ActionLogItem(timestamp: old, action: .turnOn(switchId)))
 
         try await store.deleteEntries(olderThan: now.addingTimeInterval(-30 * 86_400))
 

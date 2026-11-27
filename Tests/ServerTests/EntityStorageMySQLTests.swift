@@ -354,7 +354,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         let kitchen = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .targetTemperature)
         let bath = EntityId(placeId: "Bath", name: "Thermo", characteristicsName: nil, characteristic: .targetTemperature)
         func command(_ id: EntityId, at seconds: Double, reason: HeatingWriteReason?, plan: Double?) -> ActionLogItem {
-            ActionLogItem(timestamp: Date(timeIntervalSince1970: seconds), action: .setTargetTemperature(id, celsius: 21), hasCacheHit: false, reason: reason, planTargetInC: plan)
+            ActionLogItem(timestamp: Date(timeIntervalSince1970: seconds), action: .setTargetTemperature(id, celsius: 21), reason: reason, planTargetInC: plan)
         }
         try await repository.addCommand(command(kitchen, at: 3_000, reason: .system, plan: 21))
         try await repository.addCommand(command(kitchen, at: 1_000, reason: .plan, plan: 21))
@@ -377,8 +377,8 @@ final class EntityStorageMySQLTests: XCTestCase {
         let journal = app.journalRepository
         let kitchen = EntityId(placeId: "Kitchen", name: "Radiator", characteristicsName: nil, characteristic: .targetTemperature)
         let old = Date(timeIntervalSince1970: 1_000)
-        try await journal.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(kitchen, celsius: 21), hasCacheHit: false, reason: .plan))
-        try await journal.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(kitchen, celsius: 18), hasCacheHit: false))
+        try await journal.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(kitchen, celsius: 21), reason: .plan))
+        try await journal.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(kitchen, celsius: 18)))
         try await journal.addPush(JournalPush(timestamp: old, runId: nil, title: "t", message: "m", pushId: "p"))
 
         try await journal.deleteEntries(olderThan: Date())

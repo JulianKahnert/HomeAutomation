@@ -36,7 +36,7 @@ public struct WindowProjection: Automatable {
         case .time(let date):
             guard Calendar.current.component(.minute, from: date) % Self.refreshMinutes == 0 else { return false }
             return await hm.states(of: CharacteristicsType.deadline.valueKind).contains { $0.deadline?.end != nil }
-        case .sunrise, .sunset, .serverStarted, .configDeployed, .fireplaceChanged:
+        case .sunrise, .sunset, .serverStarted, .configDeployed:
             return false
         }
     }

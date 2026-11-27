@@ -123,4 +123,20 @@ struct HeatingWriteDbRepository: HeatingWriteRepository {
             .first()
             .map { try $0.toWrite() }
     }
+
+    func lastWrites() async throws -> [HeatingWrite] {
+        let radiators = try await HeatingWriteDbItem.query(on: database())
+            .filter(\.$sentToDevice == true)
+            .field(\.$placeId)
+            .field(\.$name)
+            .unique()
+            .all()
+        var writes: [HeatingWrite] = []
+        for radiator in radiators {
+            if let write = try await lastWrite(placeId: radiator.placeId, radiatorName: radiator.name) {
+                writes.append(write)
+            }
+        }
+        return writes
+    }
 }

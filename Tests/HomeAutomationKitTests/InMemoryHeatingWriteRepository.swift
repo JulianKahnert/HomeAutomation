@@ -33,4 +33,9 @@ actor InMemoryHeatingWriteRepository: HeatingWriteRepository {
     func lastWrite(placeId: String, radiatorName: String) -> HeatingWrite? {
         all.filter { $0.sentToDevice && $0.placeId == placeId && $0.entityId.name == radiatorName }.max { $0.timestamp < $1.timestamp }
     }
+
+    func lastWrites() -> [HeatingWrite] {
+        Dictionary(grouping: all.filter(\.sentToDevice)) { "\($0.placeId)/\($0.entityId.name)" }
+            .compactMap { $0.value.max { $0.timestamp < $1.timestamp } }
+    }
 }

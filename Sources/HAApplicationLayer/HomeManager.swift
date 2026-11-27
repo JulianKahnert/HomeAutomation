@@ -32,6 +32,14 @@ public final class HomeManager: HomeManagable {
     /// The newest fireplace switch, loaded once from the database. It also holds a switch the database could
     /// not save, so an end of the fireplace stays an end and `FireplaceTimeout` does not repeat itself.
     private var fireplace: FireplaceSwitch??
+    /// The last command that reached each radiator, keyed by room and radiator name; loaded from the database at
+    /// start and kept current by `record`, so a decision never reads the database.
+    private var lastCommands: [String: HeatingWrite] = [:]
+    /// The changes of every entity of the last `readingRetention`, newest first; what a decision compares
+    /// (the rise `FireplaceReminder` looks for). Fills from the changes since the start.
+    private var recentReadings: [EntityId: [EntityStorageItem]] = [:]
+    nonisolated private static let readingRetention: TimeInterval = 3 * 3600
+    nonisolated private static let readingLimit = 500
     /// The current state of every entity, loaded from the database at start and then the last change, never a
     /// replay. No expiry and no eviction, so a replay is no change however long ago the last change was.
     private var currentStates: [EntityId: EntityStorageItem] = [:]
@@ -168,6 +176,8 @@ public final class HomeManager: HomeManagable {
         query.cancel()
         timer.cancel()
 
+        await loadDecisionState()
+
         switch outcome {
         case .success(let stored):
             // a report that arrived during the load is newer than the stored state
@@ -175,6 +185,7 @@ public final class HomeManager: HomeManagable {
                 currentStates[item.entityId] = item
             }
             log.info("Loaded the stored entity states", metadata: ["count": "\(stored.count)"])
+            await loadRecentReadings(of: stored)
         case .failure(let error):
             log.critical("Started without the stored entity states, replays count as changes until each entity changes", metadata: ["error": "\(error)"])
         }
@@ -182,12 +193,56 @@ public final class HomeManager: HomeManagable {
 
     private struct LoadTimeout: Error {}
 
+    /// Loads what the automations decide on and the database alone holds: the last command per radiator and the
+    /// fireplace state. A failed read leaves it empty and logs; the decision then runs without it.
+    private func loadDecisionState() async {
+        if let heatingWrites {
+            do {
+                for write in try await heatingWrites.lastWrites() where lastCommands[Self.key(of: write.entityId)] == nil {
+                    lastCommands[Self.key(of: write.entityId)] = write
+                }
+            } catch {
+                log.error("Failed to load the last heating commands", metadata: ["error": "\(error)"])
+            }
+        }
+        if fireplace == nil, let fireplaceSwitches {
+            do {
+                // a switch made while the database was read wins over what it answered
+                let stored = try await fireplaceSwitches.latest()
+                if fireplace == nil { fireplace = .some(stored) }
+            } catch {
+                log.error("Failed to read the fireplace state", metadata: ["error": "\(error)"])
+            }
+        }
+    }
+
+    /// Remembers the changes of the last `readingRetention` of every entity that changed within it, so the rise a
+    /// decision looks for survives a restart. A failed read leaves that entity without history.
+    private func loadRecentReadings(of stored: [EntityStorageItem]) async {
+        let cutoff = Date().addingTimeInterval(-Self.readingRetention)
+        for item in stored where item.timestamp >= cutoff {
+            do {
+                let history = try await storageRepo.getHistory(for: item.entityId, startDate: cutoff, endDate: nil, cursor: nil, limit: Self.readingLimit)
+                // changes reported while the load ran are newer and already in front
+                let known = Set((recentReadings[item.entityId] ?? []).map(\.timestamp))
+                recentReadings[item.entityId, default: []] += history.filter { !known.contains($0.timestamp) }
+            } catch {
+                log.error("Failed to load the recent readings", metadata: ["entityId": "\(item.entityId)", "error": "\(error)"])
+            }
+        }
+    }
+
+    nonisolated private static func key(of radiator: EntityId) -> String {
+        "\(radiator.placeId)/\(radiator.name)"
+    }
+
     public func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
         if let item = currentStates[entityId] {
             return item
         }
-        // an entity neither loaded at the start nor reported since
-        return try await storageRepo.getCurrent(entityId).get(with: log)
+        // Memory only, so a decision never waits for the database: an entity neither loaded at the start nor
+        // reported since is unknown.
+        throw OptionalError.notFound
     }
 
     public func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem? {
@@ -195,13 +250,7 @@ public final class HomeManager: HomeManagable {
     }
 
     public func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
-        guard let heatingWrites else { return nil }
-        do {
-            return try await heatingWrites.lastWrite(placeId: radiator.placeId, radiatorName: radiator.name)
-        } catch {
-            log.error("Failed to read the last heating write", metadata: ["radiator": "\(radiator.name)", "error": "\(error)"])
-            return nil
-        }
+        lastCommands[Self.key(of: radiator)]
     }
 
     public func getAllEntitiesLive() async throws -> [EntityStorageItem] {
@@ -296,18 +345,7 @@ public final class HomeManager: HomeManagable {
     }
 
     public func lastFireplaceSwitch() async -> FireplaceSwitch? {
-        if let fireplace { return fireplace }
-        do {
-            let stored = try await fireplaceSwitches?.latest()
-            // a switch made while the database was read wins over what it answered
-            if let fireplace { return fireplace }
-            // a failed read is not remembered, so the next call asks the database again
-            self.fireplace = .some(stored)
-            return stored
-        } catch {
-            log.error("Failed to read the fireplace state", metadata: ["error": "\(error)"])
-            return nil
-        }
+        fireplace.flatMap { $0 }
     }
 
     public func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch? {
@@ -326,6 +364,7 @@ public final class HomeManager: HomeManagable {
 
     /// Persists a radiator write; a failing database must not fail the command.
     public func record(_ write: HeatingWrite) async {
+        if write.sentToDevice { lastCommands[Self.key(of: write.entityId)] = write }
         guard let heatingWrites else { return }
         do {
             try await heatingWrites.add(write)
@@ -379,6 +418,7 @@ public final class HomeManager: HomeManagable {
         // A replay keeps the known state, so its timestamp stays the time of the last change.
         if didChange {
             currentStates[item.entityId] = item
+            remember(reading: item)
         }
 
         // A freshly observed state can reveal that the device drifted away from what the server last
@@ -456,6 +496,15 @@ public final class HomeManager: HomeManagable {
         return location
     }
 
+    private func remember(reading item: EntityStorageItem) {
+        let cutoff = item.timestamp.addingTimeInterval(-Self.readingRetention)
+        var readings = recentReadings[item.entityId] ?? []
+        readings.insert(item, at: 0)
+        readings.removeAll { $0.timestamp < cutoff }
+        if readings.count > Self.readingLimit { readings.removeLast(readings.count - Self.readingLimit) }
+        recentReadings[item.entityId] = readings
+    }
+
     public func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
         do {
             return try await storageRepo.getCurrent(entityId)
@@ -466,12 +515,7 @@ public final class HomeManager: HomeManagable {
     }
 
     public func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] {
-        do {
-            return try await storageRepo.getHistory(for: entityId, startDate: since, endDate: nil, cursor: nil, limit: 1000)
-        } catch {
-            log.error("Failed to read the entity history", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
-            return []
-        }
+        (recentReadings[entityId] ?? []).filter { $0.timestamp >= since }
     }
 
     public func lastNotificationDate(id: String) async -> Date? {

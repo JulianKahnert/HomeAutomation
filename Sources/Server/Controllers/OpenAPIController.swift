@@ -289,7 +289,15 @@ struct OpenAPIController: APIProtocol {
             limit: limit,
             includePrevious: input.query.includePrevious ?? false
         )
-        let schemaItems = historyItems.map(Components.Schemas.EntityHistoryItem.init)
+        var schemaItems = historyItems.map(Components.Schemas.EntityHistoryItem.init)
+
+        // The last report lives in memory next to the current state: it belongs to the newest change only.
+        if cursor == nil, !schemaItems.isEmpty,
+           let current = try? await request.application.homeManager.getCurrentEntity(with: entityId),
+           let lastReport = current.lastReport,
+           abs(current.timestamp.timeIntervalSince(schemaItems[0].timestamp)) < 1 {
+            schemaItems[0].lastReport = lastReport
+        }
 
         // Calculate next cursor (timestamp of last item, or nil if no more data)
         let nextCursor = schemaItems.last?.timestamp
@@ -339,9 +347,11 @@ struct OpenAPIController: APIProtocol {
 
     /// Both heating endpoints cut the days by the local clock of the house, Europe/Berlin.
     private func heatingDetailBuilder() -> HeatingRoomDetailBuilder {
-        HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
+        let homeManager = request.application.homeManager
+        return HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
                                  writes: request.application.heatingWriteRepository,
                                  fireplace: request.application.fireplaceRepository,
+                                 lastReport: { await homeManager.lastReport(of: $0) },
                                  calendar: HeatingOverviewBuilder.berlin)
     }
 
@@ -413,7 +423,8 @@ extension Components.Schemas.EntityHistoryItem {
                   pmDensity: item.pmDensity,
                   airQuality: item.airQuality,
                   valveOpen: item.valveOpen,
-                  origin: item.origin.rawValue)
+                  origin: item.origin.rawValue,
+                  lastReport: item.lastReport)
     }
 }
 

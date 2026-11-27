@@ -19,6 +19,11 @@ public protocol EntityValidator {
 @HomeManagerActor
 public protocol HomeManagable: EntityValidator, Sendable {
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem
+    /// When each reporting source (an origin: `homekit`, `server` or a job name) last reported, a replay included.
+    /// Memory only, so a source is missing after a restart until its first report.
+    func lastReports() async -> [String: Date]
+    /// When the entity last reported, a replay included; `nil` while unknown (after a restart until its first report).
+    func lastReport(of entityId: EntityId) async -> Date?
     func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem?
     /// The last state of the entity the database holds, past the in-memory cache. After a restart the
     /// adapter's resync refreshes the cache with a new timestamp; only the database still knows since

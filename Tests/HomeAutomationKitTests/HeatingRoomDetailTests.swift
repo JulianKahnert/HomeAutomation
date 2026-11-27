@@ -75,6 +75,23 @@ struct HeatingRoomDetailTests {
         #expect(at?.ist == 22)
     }
 
+    @Test("an unchanged value that still reports shows no gap, a silent sensor does")
+    func reportingKeepsTheValue() async throws {
+        let items = [temp(thermoA, 110, 20)]
+        func detail(reportedMinutesAgo: Double?) async throws -> HeatingRoomDetail {
+            let reportedAt = reportedMinutesAgo.map { now.addingTimeInterval(-$0 * 60) }
+            return try await HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: InMemoryHeatingWriteRepository([]),
+                                                      now: { now }, sensorFailureLimit: 30 * 60, lastReport: { _ in reportedAt })
+                .detail(for: sources, range: .twoHours)
+        }
+        let reporting = try await detail(reportedMinutesAgo: 2)
+        #expect(reporting.samples.last?.ist == 20)
+        let silent = try await detail(reportedMinutesAgo: 90)
+        #expect(silent.samples.last?.ist == nil)
+        let unknown = try await detail(reportedMinutesAgo: nil)
+        #expect(unknown.samples.last?.ist == nil)
+    }
+
     @Test("a reading older than the failure limit is a gap, and so is the time before the first reading")
     func gaps() async throws {
         let b = builder([temp(thermoA, 110, 20)])

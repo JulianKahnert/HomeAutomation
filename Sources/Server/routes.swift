@@ -51,7 +51,8 @@ func routes(_ app: Application) throws {
                 let jobs = await scheduler?.lastSuccesses ?? [:]
                 let body = HealthDTO(jobs: jobs.mapValues { $0.formatted(.iso8601) },
                                      loopAgeSeconds: await gauge?.age() ?? 0,
-                                     laneAgeSeconds: await automationService.laneAges())
+                                     laneAgeSeconds: await automationService.laneAges(),
+                                     lastReports: await homeManager.lastReports().mapValues { $0.formatted(.iso8601) })
                 let response = Response(status: .ok)
                 try response.content.encode(body, as: .json)
                 return response
@@ -127,4 +128,7 @@ struct HealthDTO: Content {
     let loopAgeSeconds: Double
     /// Per automation: the age of the oldest event its lane has not finished checking; 0 when idle.
     let laneAgeSeconds: [String: Double]
+    /// Per reporting source (`homekit`, `server`, a job name): when it last reported, a replay included (ISO 8601).
+    /// A source is missing after a restart until its first report.
+    let lastReports: [String: String]
 }

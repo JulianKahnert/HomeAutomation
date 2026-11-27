@@ -88,6 +88,11 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// timestamp and origin carry the same information (see `HomeManager.addEntityHistory`).
     public var origin: Origin
 
+    /// When the entity last reported, a replay included; `timestamp` stays the time of the last change.
+    /// Memory only: never stored, `nil` after a restart until the first report. Like `origin` it is no part of
+    /// the value (see `HomeManager.addEntityHistory`).
+    public var lastReport: Date?
+
     public var description: String {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -122,7 +127,8 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         heatingMode: HeatingMode? = nil,
         valvePositionPercent: Int? = nil,
         temperatureCalibrationInC: Double? = nil,
-        origin: Origin = .homekit
+        origin: Origin = .homekit,
+        lastReport: Date? = nil
     ) {
         self.entityId = entityId
         self.timestamp = timestamp
@@ -147,6 +153,7 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         self.valvePositionPercent = valvePositionPercent
         self.temperatureCalibrationInC = temperatureCalibrationInC
         self.origin = origin
+        self.lastReport = lastReport
     }
 
     /// Retrieves a non-optional value for a given optional property key path

@@ -35,6 +35,9 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     public let temperatureCalibrationInC: Double?
     /// Where the change came from; `nil` for an item that is no single change, such as an hourly aggregate.
     public let origin: String?
+    /// When the entity last reported, a replay included. Only set on the newest item of a history, and only while the
+    /// server holds it in memory; `nil` after a restart until the first report.
+    public let lastReport: Date?
 
     public init(
         id: UUID = UUID(),
@@ -61,7 +64,8 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         heatingMode: HeatingMode? = nil,
         valvePositionPercent: Int? = nil,
         temperatureCalibrationInC: Double? = nil,
-        origin: String? = nil
+        origin: String? = nil,
+        lastReport: Date? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -88,6 +92,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         self.valvePositionPercent = valvePositionPercent
         self.temperatureCalibrationInC = temperatureCalibrationInC
         self.origin = origin
+        self.lastReport = lastReport
     }
 }
 
@@ -116,7 +121,8 @@ extension EntityHistoryItem {
                   heatingMode: item.heatingMode,
                   valvePositionPercent: item.valvePositionPercent,
                   temperatureCalibrationInC: item.temperatureCalibrationInC,
-                  origin: item.origin.rawValue)
+                  origin: item.origin.rawValue,
+                  lastReport: item.lastReport)
     }
 
     /// Human-readable description of the primary value

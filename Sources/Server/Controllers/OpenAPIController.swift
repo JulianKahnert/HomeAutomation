@@ -390,7 +390,9 @@ extension Components.Schemas.AutomationRun {
 
 extension Components.Schemas.EntityHistoryItem {
     init(_ item: EntityStorageItem) {
-        self.init(timestamp: item.timestamp,
+        self.init(valueKind: item.genericValue?.kind.rawValue,
+                  value: item.genericValue.map { .init($0.value) },
+                  timestamp: item.timestamp,
                   motionDetected: item.motionDetected,
                   illuminanceInLux: item.illuminance?.value,
                   isDeviceOn: item.isDeviceOn,
@@ -414,6 +416,16 @@ extension Components.Schemas.EntityHistoryItem {
                   airQuality: item.airQuality,
                   valveOpen: item.valveOpen,
                   origin: item.origin.rawValue)
+    }
+}
+
+extension Components.Schemas.EntityHistoryItem.ValuePayload {
+    init(_ value: Value) {
+        switch value {
+        case .bool(let bool): self = .case1(bool)
+        case .number(let number): self = .case2(number)
+        case .text(let text): self = .case3(text)
+        }
     }
 }
 

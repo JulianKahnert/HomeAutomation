@@ -35,6 +35,10 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     public let temperatureCalibrationInC: Double?
     /// Where the change came from; `nil` for an item that is no single change, such as an hourly aggregate.
     public let origin: String?
+    /// The generic form of the value: its value kind (`ValueKind.rawValue`) and the value. A kind this build does
+    /// not know still arrives here, with its raw value.
+    public let valueKind: String?
+    public let value: Value?
 
     public init(
         id: UUID = UUID(),
@@ -61,7 +65,9 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         heatingMode: HeatingMode? = nil,
         valvePositionPercent: Int? = nil,
         temperatureCalibrationInC: Double? = nil,
-        origin: String? = nil
+        origin: String? = nil,
+        valueKind: String? = nil,
+        value: Value? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -88,6 +94,59 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         self.valvePositionPercent = valvePositionPercent
         self.temperatureCalibrationInC = temperatureCalibrationInC
         self.origin = origin
+        if let valueKind, let value {
+            self.valueKind = valueKind
+            self.value = value
+        } else if let derived = Self.genericValue(motionDetected: motionDetected, illuminanceInLux: illuminanceInLux,
+                                                  isDeviceOn: isDeviceOn, brightness: brightness,
+                                                  colorTemperature: colorTemperature,
+                                                  color: [colorRed, colorGreen, colorBlue], isContactOpen: isContactOpen,
+                                                  isDoorLocked: isDoorLocked, stateOfCharge: stateOfCharge,
+                                                  isHeaterActive: isHeaterActive, temperatureInC: temperatureInC,
+                                                  relativeHumidity: relativeHumidity,
+                                                  carbonDioxideSensorId: carbonDioxideSensorId, pmDensity: pmDensity,
+                                                  airQuality: airQuality, valveOpen: valveOpen,
+                                                  targetTemperatureInC: targetTemperatureInC, heatingMode: heatingMode,
+                                                  valvePositionPercent: valvePositionPercent,
+                                                  temperatureCalibrationInC: temperatureCalibrationInC) {
+            self.valueKind = derived.kind.rawValue
+            self.value = derived.value
+        } else {
+            self.valueKind = nil
+            self.value = nil
+        }
+    }
+
+    /// Kind and value of the first typed field that is set; the same order as `EntityStorageItem.genericValue`.
+    private static func genericValue(
+        motionDetected: Bool?, illuminanceInLux: Double?, isDeviceOn: Bool?, brightness: Int?, colorTemperature: Float?,
+        color: [Float?], isContactOpen: Bool?, isDoorLocked: Bool?, stateOfCharge: Int?, isHeaterActive: Bool?,
+        temperatureInC: Double?, relativeHumidity: Double?, carbonDioxideSensorId: Int?, pmDensity: Double?,
+        airQuality: Int?, valveOpen: Bool?, targetTemperatureInC: Double?, heatingMode: HeatingMode?,
+        valvePositionPercent: Int?, temperatureCalibrationInC: Double?
+    ) -> (kind: ValueKind, value: Value)? {
+        func make(_ type: CharacteristicsType, _ value: Value) -> (kind: ValueKind, value: Value) { (type.valueKind, value) }
+        if let motionDetected { return make(.motionSensor, .bool(motionDetected)) }
+        if let illuminanceInLux { return make(.lightSensor, .number(illuminanceInLux)) }
+        if let isDeviceOn { return make(.switcher, .bool(isDeviceOn)) }
+        if let brightness { return make(.brightness, .number(Double(brightness))) }
+        if let colorTemperature { return make(.colorTemperature, .number(Double(colorTemperature))) }
+        if let red = color[0], let green = color[1], let blue = color[2] { return make(.color, .text("\(red) \(green) \(blue)")) }
+        if let isContactOpen { return make(.contactSensor, .bool(isContactOpen)) }
+        if let isDoorLocked { return make(.lock, .bool(isDoorLocked)) }
+        if let stateOfCharge { return make(.batterySensor, .number(Double(stateOfCharge))) }
+        if let isHeaterActive { return make(.heating, .bool(isHeaterActive)) }
+        if let temperatureInC { return make(.temperatureSensor, .number(temperatureInC)) }
+        if let relativeHumidity { return make(.relativeHumiditySensor, .number(relativeHumidity)) }
+        if let carbonDioxideSensorId { return make(.carbonDioxideSensorId, .number(Double(carbonDioxideSensorId))) }
+        if let pmDensity { return make(.pmDensitySensor, .number(pmDensity)) }
+        if let airQuality { return make(.airQualitySensor, .number(Double(airQuality))) }
+        if let valveOpen { return make(.valve, .bool(valveOpen)) }
+        if let targetTemperatureInC { return make(.targetTemperature, .number(targetTemperatureInC)) }
+        if let heatingMode { return make(.heatingMode, .number(Double(heatingMode.rawValue))) }
+        if let valvePositionPercent { return make(.valvePosition, .number(Double(valvePositionPercent))) }
+        if let temperatureCalibrationInC { return make(.temperatureCalibration, .number(temperatureCalibrationInC)) }
+        return nil
     }
 }
 
@@ -116,11 +175,31 @@ extension EntityHistoryItem {
                   heatingMode: item.heatingMode,
                   valvePositionPercent: item.valvePositionPercent,
                   temperatureCalibrationInC: item.temperatureCalibrationInC,
-                  origin: item.origin.rawValue)
+                  origin: item.origin.rawValue,
+                  valueKind: item.genericValue?.kind.rawValue,
+                  value: item.genericValue?.value)
+    }
+
+    /// The descriptor of the value kind; `nil` for a kind this build does not know.
+    public var descriptor: ValueDescriptor? {
+        valueKind.flatMap { ValueKind(rawValue: $0).descriptor }
+    }
+
+    /// The raw value as text, for a kind without a descriptor.
+    public var rawValueDescription: String? {
+        switch value {
+        case .bool(let bool): String(bool)
+        case .number(let number): abs(number) < 1e15 && number.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(number)) : String(number)
+        case .text(let text): text
+        case nil: nil
+        }
     }
 
     /// Human-readable description of the primary value
     public var valueDescription: String {
+        if let valueKind, ValueKind(rawValue: valueKind).descriptor == nil, let rawValueDescription {
+            return "\(valueKind): \(rawValueDescription)"
+        }
         if let temperatureInC {
             return "\(String(format: "%.1f", temperatureInC))°C"
         }

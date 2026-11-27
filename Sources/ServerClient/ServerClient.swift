@@ -349,6 +349,18 @@ extension EntityHistoryItem {
                   targetTemperatureInC: item.targetTemperatureInC,
                   heatingMode: item.heatingMode.flatMap { HeatingMode(name: $0.rawValue) },
                   valvePositionPercent: item.valvePositionPercent,
-                  temperatureCalibrationInC: item.temperatureCalibrationInC)
+                  temperatureCalibrationInC: item.temperatureCalibrationInC,
+                  valueKind: item.valueKind,
+                  value: item.value.flatMap(Value.init))
+    }
+}
+
+extension Value {
+    init?(_ payload: Components.Schemas.EntityHistoryItem.ValuePayload) {
+        switch payload {
+        case .case1(let bool): self = .bool(bool)
+        case .case2(let number): self = .number(number)
+        case .case3(let text): self = .text(text)
+        }
     }
 }

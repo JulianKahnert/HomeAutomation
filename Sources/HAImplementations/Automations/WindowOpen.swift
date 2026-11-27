@@ -99,6 +99,9 @@ public struct WindowOpen: Automatable {
     /// Reports the deadline of this window unless it already holds it. An overdue deadline is never taken back
     /// to running for the same end, so a replay after a restart changes nothing and sends nothing.
     private func reportDeadline(_ deadline: Deadline, using hm: HomeManagable) async {
+        // The stored deadline went through its text form, which can move the end by a fraction of a microsecond;
+        // compare in that form so the same end counts as the same deadline.
+        let deadline = Deadline(text: deadline.text) ?? deadline
         let current = await hm.states(of: CharacteristicsType.deadline.valueKind)
             .first { $0.entityId == deadlineId }?.deadline
         guard current != deadline else { return }

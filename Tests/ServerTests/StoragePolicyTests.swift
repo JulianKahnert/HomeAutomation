@@ -50,10 +50,9 @@ struct StoragePolicyTests {
     }
 
     @Test(arguments: CharacteristicsType.allCases)
-    func rollupAndDeadBandAlwaysNameTheirValueColumn(_ type: CharacteristicsType) {
+    func rollupAndDeadBandOnlyBelongToAnalogTypes(_ type: CharacteristicsType) {
         let policy = StoragePolicy.policy(for: type)
         if policy.rollup != .none || policy.deadBand != nil {
-            #expect(policy.valueColumn != nil)
             #expect(policy.kind == .analog)
         }
         if policy.rollup != .none {
@@ -103,7 +102,6 @@ struct StoragePolicyTests {
         let targets = StoragePolicy.rollupCutoffs(now: now)
         #expect(Set(targets.map(\.type)) == [.lightSensor, .carbonDioxideSensorId])
         let co2 = try #require(targets.first { $0.type == .carbonDioxideSensorId })
-        #expect(co2.column == .carbonDioxideSensorId)
         #expect(co2.before.timeIntervalSince1970.truncatingRemainder(dividingBy: 3600) == 0)
         let exact = now.addingTimeInterval(-90 * 86_400)
         #expect(co2.before <= exact)
@@ -192,7 +190,7 @@ private actor RecordingRetentionStore: EntityRetentionStore {
         deletedTypes.append(type)
     }
 
-    func rollUpHourly(type: CharacteristicsType, column: StoragePolicy.ValueColumn, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
+    func rollUpHourly(type: CharacteristicsType, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
         rolledUpTypes.append(type)
     }
 

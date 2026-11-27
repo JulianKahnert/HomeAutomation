@@ -6,6 +6,7 @@
 import Fluent
 import Foundation
 import HAModels
+import SQLKit
 
 /// The fireplace mode as the server's own state: one row per switch, the newest is the current state.
 ///
@@ -24,15 +25,24 @@ struct CreateFireplaceSwitch: AsyncMigration {
             .field("isOn", .bool, .required)
             .create()
 
-        let legacy = try await EntityStorageDbItem.query(on: database)
-            .filter(\.$entityPlaceId == Self.legacySwitch.placeId)
-            .filter(\.$entityServiceName == Self.legacySwitch.name)
-            .filter(\.$entityCharacteristicType == Self.legacySwitch.characteristicType)
-            .sort(\.$timestamp, .ascending)
-            .all()
-        for fireplaceSwitch in Self.switches(from: legacy.compactMap { item in item.isDeviceOn.map { (item.timestamp, $0) } }) {
+        let legacy = try await legacyStates(on: database)
+        for fireplaceSwitch in Self.switches(from: legacy) {
             try await FireplaceSwitchDbItem(fireplaceSwitch).create(on: database)
         }
+    }
+
+    /// The on/off rows of the former switch in the old wide table, oldest first.
+    private func legacyStates(on database: Database) async throws -> [(timestamp: Date, isOn: Bool)] {
+        guard let sql = database as? SQLDatabase else { return [] }
+        let rows = try await sql.raw("""
+            SELECT \(ident: "timestamp"), \(ident: "isDeviceOn") FROM \(ident: LegacyEntityItems.schema)
+            WHERE \(ident: "entityPlaceId") = \(bind: Self.legacySwitch.placeId)
+              AND \(ident: "entityServiceName") = \(bind: Self.legacySwitch.name)
+              AND \(ident: "entityCharacteristicType") = \(bind: Self.legacySwitch.characteristicType)
+              AND \(ident: "isDeviceOn") IS NOT NULL
+            ORDER BY \(ident: "timestamp") ASC
+            """).all()
+        return try rows.map { try ($0.decode(column: "timestamp", as: Date.self), $0.decode(column: "isDeviceOn", as: Bool.self)) }
     }
 
     func revert(on database: Database) async throws {

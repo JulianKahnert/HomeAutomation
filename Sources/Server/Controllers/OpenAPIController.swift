@@ -378,31 +378,9 @@ extension Components.Schemas.AutomationRun {
 
 extension Components.Schemas.EntityHistoryItem {
     init(_ item: EntityStorageItem) {
-        self.init(valueKind: item.genericValue?.kind.rawValue,
-                  value: item.genericValue.map { .init($0.value) },
+        self.init(valueKind: item.kind?.rawValue,
+                  value: item.value.map { .init($0) },
                   timestamp: item.timestamp,
-                  motionDetected: item.motionDetected,
-                  illuminanceInLux: item.illuminance?.value,
-                  isDeviceOn: item.isDeviceOn,
-                  brightness: item.brightness,
-                  colorTemperature: item.colorTemperature,
-                  colorRed: item.color?.red,
-                  colorGreen: item.color?.green,
-                  colorBlue: item.color?.blue,
-                  isContactOpen: item.isContactOpen,
-                  isDoorLocked: item.isDoorLocked,
-                  stateOfCharge: item.stateOfCharge,
-                  isHeaterActive: item.isHeaterActive,
-                  temperatureInC: item.temperatureInC?.value,
-                  targetTemperatureInC: item.targetTemperatureInC,
-                  heatingMode: item.heatingMode.flatMap { .init(rawValue: $0.name) },
-                  valvePositionPercent: item.valvePositionPercent,
-                  temperatureCalibrationInC: item.temperatureCalibrationInC,
-                  relativeHumidity: item.relativeHumidity,
-                  carbonDioxideSensorId: item.carbonDioxideSensorId,
-                  pmDensity: item.pmDensity,
-                  airQuality: item.airQuality,
-                  valveOpen: item.valveOpen,
                   origin: item.origin.rawValue,
                   lastReport: item.lastReport)
     }

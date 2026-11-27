@@ -8,13 +8,13 @@ import Fluent
 /// Adds the thermostat temperature offset (Matter `LocalTemperatureCalibration`, in Celsius) to the entityItems table.
 struct AddTemperatureCalibration: AsyncMigration {
     func prepare(on database: Database) async throws {
-        try await database.schema(EntityStorageDbItem.schema)
+        try await database.schema(LegacyEntityItems.schema)
             .field("temperatureCalibrationInC", .double)
             .update()
     }
 
     func revert(on database: Database) async throws {
-        try await database.schema(EntityStorageDbItem.schema)
+        try await database.schema(LegacyEntityItems.schema)
             .deleteField("temperatureCalibrationInC")
             .update()
     }

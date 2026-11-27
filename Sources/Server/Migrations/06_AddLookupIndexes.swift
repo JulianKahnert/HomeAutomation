@@ -19,8 +19,8 @@ struct AddLookupIndexes: AsyncMigration {
     // (8 bytes) ≈ 3068 of InnoDB's 3072 bytes (DYNAMIC row format, the default since MySQL 5.7).
     // Adding `entityCharacteristicsName` would exceed it ("Specified key was too long").
     private static let indexes: [(name: String, table: String, columns: [String])] = [
-        ("idx_entityItems_entity_timestamp", EntityStorageDbItem.schema, ["entityPlaceId", "entityServiceName", "entityCharacteristicType", "timestamp"]),
-        ("idx_entityItems_timestamp", EntityStorageDbItem.schema, ["timestamp"]),
+        ("idx_entityItems_entity_timestamp", LegacyEntityItems.schema, ["entityPlaceId", "entityServiceName", "entityCharacteristicType", "timestamp"]),
+        ("idx_entityItems_timestamp", LegacyEntityItems.schema, ["timestamp"]),
         ("idx_automationRuns_name_startedAt", "automationRuns", ["automationName", "startedAt"]),
         ("idx_automationRuns_startedAt", "automationRuns", ["startedAt"])
     ]

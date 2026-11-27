@@ -55,35 +55,27 @@ struct OutdoorTemperatureJobTests {
 
     @Test func historyItemExposesHeatingFields() {
         let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .valvePosition)
-        let history = EntityHistoryItem(EntityStorageItem(entityId: id, targetTemperatureInC: 20.5, heatingMode: .heat, valvePositionPercent: 35))
-        #expect(history.targetTemperatureInC == 20.5)
-        #expect(history.heatingMode == .heat)
-        #expect(history.valvePositionPercent == 35)
+        #expect(EntityHistoryItem(EntityStorageItem(entityId: id, targetTemperatureInC: 20.5)).targetTemperatureInC == 20.5)
+        #expect(EntityHistoryItem(EntityStorageItem(entityId: id, heatingMode: .heat)).heatingMode == .heat)
+        #expect(EntityHistoryItem(EntityStorageItem(entityId: id, valvePositionPercent: 35)).valvePositionPercent == 35)
     }
 
     @Test(arguments: HeatingMode.allCases)
-    func heatingModeKeepsHAPRawValueAndApiName(_ mode: HeatingMode) {
+    func heatingModeKeepsHAPRawValueAndApiValue(_ mode: HeatingMode) {
         #expect(HeatingMode(name: mode.name) == mode)
         let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .heatingMode)
         let api = Components.Schemas.EntityHistoryItem(EntityStorageItem(entityId: id, heatingMode: mode))
-        #expect(api.heatingMode?.rawValue == mode.name)
+        #expect(api.valueKind == "heatingMode")
+        #expect(api.value == .case2(Double(mode.rawValue)))
         #expect(HeatingMode(rawValue: 4) == nil)
         #expect([HeatingMode.off, .heat, .cool, .auto].map(\.rawValue) == [0, 1, 2, 3])
     }
 
-    @Test func apiItemExposesHeatingFields() {
-        let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .valvePosition)
-        let api = Components.Schemas.EntityHistoryItem(EntityStorageItem(entityId: id, targetTemperatureInC: 20.5, heatingMode: .auto, valvePositionPercent: 35))
-        #expect(api.targetTemperatureInC == 20.5)
-        #expect(api.heatingMode?.rawValue == "auto")
-        #expect(api.valvePositionPercent == 35)
-    }
-
-    @Test func historyAndApiItemsExposeTemperatureCalibration() {
+    @Test func historyItemExposesTemperatureCalibration() {
         let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .temperatureCalibration)
         let item = EntityStorageItem(entityId: id, temperatureCalibrationInC: -0.5)
         #expect(EntityHistoryItem(item).temperatureCalibrationInC == -0.5)
-        #expect(Components.Schemas.EntityHistoryItem(item).temperatureCalibrationInC == -0.5)
+        #expect(Components.Schemas.EntityHistoryItem(item).value == .case2(-0.5))
     }
 }
 

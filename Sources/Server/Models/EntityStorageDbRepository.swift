@@ -219,7 +219,7 @@ extension EntityStorageDbRepository: EntityRetentionStore {
             .run()
     }
 
-    func rollUpHourly(type: CharacteristicsType, column: StoragePolicy.ValueColumn, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
+    func rollUpHourly(type: CharacteristicsType, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
         let range = validRange ?? -Double.greatestFiniteMagnitude...Double.greatestFiniteMagnitude
         try await database().transaction { database in
             guard let sql = database as? SQLDatabase else {

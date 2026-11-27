@@ -149,6 +149,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(AddOrigin())
     app.migrations.add(CreateJournal())
     app.migrations.add(CreateNarrowStorage())
+    app.migrations.add(DropEntityItems())
 
     // Run migrations automatically
     try await app.autoMigrate()

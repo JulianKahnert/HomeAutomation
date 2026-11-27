@@ -5,6 +5,7 @@
 
 import Foundation
 import HAApplicationLayer
+import HAImplementations
 import HAModels
 import Testing
 
@@ -17,6 +18,7 @@ private struct TestAutomation: Automatable {
     let name: String
     let mode: Mode
     var recordsRuns = true
+    var supersedesRunningRun = true
     var summaryDetail: String?
     var triggerEntityIds: Set<EntityId> { [] }
     /// Receives the run id seen inside `execute`; not part of the config.
@@ -104,6 +106,34 @@ struct AutomationServiceTests {
         #expect(run.trigger.kind == .sunrise)
         #expect(run.outcome == .superseded)
         await service.stopAutomation(with: "a")
+    }
+
+    @Test func aTriggerDoesNotCutARunOfAnAutomationThatDoesNotSupersede() async throws {
+        var automation = TestAutomation(name: "a", mode: .waitForCancellation)
+        automation.supersedesRunningRun = false
+        let service = try makeService(automation)
+
+        await service.trigger(with: .sunrise)
+        await service.trigger(with: .sunset)
+        await service.stopAutomation(with: "a")
+
+        let run = try #require(await repository.nextFinishedRun())
+        #expect(run.trigger.kind == .sunrise)
+        #expect(run.outcome == .stopped)
+        #expect(await repository.runs.count == 1)
+    }
+
+    @Test func builtInsJoinTheConfigAndKeepTheirActiveState() async throws {
+        let service = try AutomationService(using: homeManager, runs: repository,
+                                            automations: [TestAutomation(name: "a", mode: .complete)],
+                                            builtIns: [DatabaseCleanup()])
+        #expect(await service.automations.map(\.name) == ["a", DatabaseCleanup.defaultName])
+
+        try await service.setAutomationActive(with: DatabaseCleanup.defaultName, to: false)
+        try await service.deploy([TestAutomation(name: "b", mode: .complete)])
+
+        #expect(await service.automations.map(\.name) == ["b", DatabaseCleanup.defaultName])
+        #expect(await service.automations.map(\.isActive) == [true, false])
     }
 
     @Test func stopViaServiceEndsTheRunAsStopped() async throws {

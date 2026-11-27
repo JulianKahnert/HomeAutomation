@@ -18,6 +18,8 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     var storageItems: [EntityStorageItem] = []
     var health = HomeKitHealth.healthy
+    /// Every upkeep step the facade was asked to run.
+    var upkeepSteps: [StorageUpkeepStep] = []
     private let log = Logger(label: "MockHomeAdapter")
     private var traceMap: [String: Int] = [:]
     /// Every action `perform` ran, with the heating context it ran in.
@@ -256,6 +258,10 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     }
 
     func clearActionLog() async {
+    }
+
+    func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws {
+        upkeepSteps.append(step)
     }
 
     func homeKitHealth() async -> HomeKitHealth {

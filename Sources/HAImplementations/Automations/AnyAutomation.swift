@@ -9,6 +9,7 @@ import HAModels
 
 public enum AnyAutomation: Codable, Sendable {
     case createScene(CreateScene)
+    case databaseCleanup(DatabaseCleanup)
     case energyLowPrice(EnergyLowPrice)
     case fireplaceReminder(FireplaceReminder)
     case fireplaceTimeout(FireplaceTimeout)
@@ -30,6 +31,7 @@ public enum AnyAutomation: Codable, Sendable {
     public var automation: any Automatable {
         switch self {
         case .createScene(let createScene): return createScene
+        case .databaseCleanup(let databaseCleanup): return databaseCleanup
         case .energyLowPrice(let energyLowPrice): return energyLowPrice
         case .fireplaceReminder(let fireplaceReminder): return fireplaceReminder
         case .fireplaceTimeout(let fireplaceTimeout): return fireplaceTimeout
@@ -53,6 +55,7 @@ public enum AnyAutomation: Codable, Sendable {
     public var automationTypes: [Automatable.Type] {
         var tmp: [Automatable.Type] = [
             CreateScene.self,
+            DatabaseCleanup.self,
             EnergyLowPrice.self,
             FireplaceReminder.self,
             FireplaceTimeout.self,
@@ -78,6 +81,8 @@ public enum AnyAutomation: Codable, Sendable {
     public static func create(from automation: any Automatable) -> AnyAutomation {
         if let createScene = automation as? CreateScene {
             return .createScene(createScene)
+        } else if let databaseCleanup = automation as? DatabaseCleanup {
+            return .databaseCleanup(databaseCleanup)
         } else if let energyLowPrice = automation as? EnergyLowPrice {
             return .energyLowPrice(energyLowPrice)
         } else if let fireplaceReminder = automation as? FireplaceReminder {

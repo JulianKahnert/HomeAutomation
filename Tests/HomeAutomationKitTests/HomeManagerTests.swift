@@ -134,13 +134,13 @@ struct HomeManagerTests {
                                  onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
                                  retryTicks: AsyncStream<Void> = AsyncStream { _ in },
                                  persistRetryDelays: [Duration] = [.zero, .zero],
-                                 actionLogManager: ActionLogManager = ActionLogManager()) async -> HomeManager {
+                                 journal: Journal = Journal(store: InMemoryJournalStore())) async -> HomeManager {
         let adapter = FakeEntityAdapter(actorSystem: LocalTestingDistributedActorSystem(), probe: probe)
         return await HomeManager(getAdapter: { adapter },
                                  storageRepo: storageRepo,
                                  notificationSender: MockNotificationSender(),
                                  location: Location(latitude: 0, longitude: 0),
-                                 actionLogManager: actionLogManager,
+                                 journal: journal,
                                  heatingWrites: heatingWrites,
                                  fireplaceSwitches: fireplaceSwitches,
                                  onFireplaceSwitch: onFireplaceSwitch,
@@ -193,7 +193,8 @@ struct HomeManagerTests {
     @Test("A cancelled run issues no further commands")
     func cancelledRunIssuesNoCommand() async {
         let probe = AdapterProbe()
-        let homeManager = await makeHomeManager(probe: probe)
+        let journal = Journal(store: InMemoryJournalStore())
+        let homeManager = await makeHomeManager(probe: probe, journal: journal)
 
         let run = Task {
             // returns immediately once the task is cancelled
@@ -204,6 +205,7 @@ struct HomeManagerTests {
         await run.value
 
         #expect(await probe.startedPerforms == 0)
+        await journal.flush()
         #expect(await homeManager.getActionLog(limit: nil, runId: nil).isEmpty)
     }
 
@@ -231,14 +233,15 @@ struct HomeManagerTests {
     @Test("A radiator write with a reason lands in the action log and the heating write record")
     func heatingWriteIsRecorded() async throws {
         let writes = InMemoryHeatingWriteRepository()
-        let actionLog = ActionLogManager()
-        let homeManager = await makeHomeManager(probe: AdapterProbe(), heatingWrites: writes, actionLogManager: actionLog)
+        let journal = Journal(store: InMemoryJournalStore())
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), heatingWrites: writes, journal: journal)
 
         await HeatingWriteContext.withReason(.plan, planTargetInC: 21) {
             await homeManager.perform(.setTargetTemperature(radiator, celsius: 21.2))
         }
 
-        let logged = try #require(await actionLog.getActions().first)
+        await journal.flush()
+        let logged = try #require(await journal.commands(limit: nil, runId: nil).first)
         #expect(logged.reason == .plan)
         #expect(logged.planTargetInC == 21)
         let recorded = try #require(await writes.all.first)
@@ -273,8 +276,8 @@ struct HomeManagerTests {
     func retryKeepsHeatingReason() async {
         let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
         let writes = InMemoryHeatingWriteRepository()
-        let actionLog = ActionLogManager()
-        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), heatingWrites: writes, retryTicks: ticks, actionLogManager: actionLog)
+        let journal = Journal(store: InMemoryJournalStore())
+        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), heatingWrites: writes, retryTicks: ticks, journal: journal)
 
         await HeatingWriteContext.withReason(.plan, planTargetInC: 19) {
             await homeManager.perform(.setTargetTemperature(radiator, celsius: 19))
@@ -282,7 +285,8 @@ struct HomeManagerTests {
         tickContinuation.yield(())
         try? await Task.sleep(for: .milliseconds(200))
 
-        let reasons = await actionLog.getActions().map(\.reason)
+        await journal.flush()
+        let reasons = await journal.commands(limit: nil, runId: nil).map(\.reason)
         #expect(reasons == [.plan, .plan])
     }
 
@@ -311,7 +315,8 @@ struct HomeManagerTests {
     func retryKeepsRunIdAndLogsFailure() async {
         let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
         let probe = AdapterProbe(failure: .unreachable)
-        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks)
+        let journal = Journal(store: InMemoryJournalStore())
+        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks, journal: journal)
         let runId = UUID()
 
         await AutomationRunContext.$runId.withValue(runId) {
@@ -323,6 +328,7 @@ struct HomeManagerTests {
         await probe.waitForPerforms(3)
         try? await Task.sleep(for: .milliseconds(200))
 
+        await journal.flush()
         let log = await homeManager.getActionLog(limit: nil, runId: runId)
         #expect(log.count == 3)
         #expect(log.allSatisfy { $0.status == .failed })
@@ -434,6 +440,7 @@ struct HomeManagerTests {
         let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let stored = InMemoryFireplaceRepository([FireplaceSwitch(timestamp: start, isOn: true)])
         let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored)
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
 
         #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
     }
@@ -443,6 +450,7 @@ struct HomeManagerTests {
         let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let stored = FailingFireplaceRepository(latest: FireplaceSwitch(timestamp: start, isOn: true))
         let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored)
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
 
         let off = await homeManager.switchFireplace(isOn: false, at: start.addingTimeInterval(7200))
 
@@ -555,10 +563,11 @@ struct HomeManagerTests {
         #expect(await probe.startedPerforms == 2)
     }
 
-    @Test("The current state comes from the last report, the stored state only for an entity not yet reported")
+    @Test("The current state comes from the last report, the stored state loaded at start for an entity not yet reported")
     func currentStateComesFromLastReport() async throws {
         let stored = EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: false)
         let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: MockStorageRepository(items: [stored]))
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
 
         #expect(try await homeManager.getCurrentEntity(with: switchId).isDeviceOn == false)
 

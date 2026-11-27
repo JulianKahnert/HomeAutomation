@@ -21,8 +21,8 @@ struct AddLookupIndexes: AsyncMigration {
     private static let indexes: [(name: String, table: String, columns: [String])] = [
         ("idx_entityItems_entity_timestamp", EntityStorageDbItem.schema, ["entityPlaceId", "entityServiceName", "entityCharacteristicType", "timestamp"]),
         ("idx_entityItems_timestamp", EntityStorageDbItem.schema, ["timestamp"]),
-        ("idx_automationRuns_name_startedAt", AutomationRunDbItem.schema, ["automationName", "startedAt"]),
-        ("idx_automationRuns_startedAt", AutomationRunDbItem.schema, ["startedAt"])
+        ("idx_automationRuns_name_startedAt", "automationRuns", ["automationName", "startedAt"]),
+        ("idx_automationRuns_startedAt", "automationRuns", ["startedAt"])
     ]
 
     func prepare(on database: Database) async throws {

@@ -6,6 +6,19 @@
 import Foundation
 
 public extension WindowContentState {
+    /// When the window opened: the oldest of the newest changes that carry this `end`. A window that is closed and
+    /// reopened into a deadline that ran before counts from the reopening; an overdue one keeps its start.
+    /// - Parameter history: The deadline entity's changes, newest first.
+    /// - Returns: `nil` when the history does not show it.
+    static func opened(end: Date, history: [EntityStorageItem]) -> Date? {
+        var opened: Date?
+        for item in history {
+            guard item.deadline?.end == end else { break }
+            opened = item.timestamp
+        }
+        return opened
+    }
+
     /// The window name of a deadline entity named `"<room>/<window>"`, `nil` for any other entity.
     static func window(of deadlineId: EntityId) -> (room: String, name: String)? {
         guard deadlineId.characteristicType == .deadline,
@@ -43,10 +56,8 @@ public extension HomeManagable {
         var windows: [(deadlineId: EntityId, deadline: Deadline, opened: Date)] = []
         for item in deadlines {
             guard let deadline = item.deadline, let end = deadline.end else { continue }
-            // The window opened when its deadline started running; an overdue one keeps that start in the history.
-            let history = await getEntityHistory(with: item.entityId, since: .distantPast)
-            let started = history.filter { $0.deadline == .running(until: end) }.map(\.timestamp).min()
-            windows.append((item.entityId, deadline, started ?? item.timestamp))
+            let history = await getFullEntityHistory(with: item.entityId, limit: 50)
+            windows.append((item.entityId, deadline, WindowContentState.opened(end: end, history: history) ?? item.timestamp))
         }
         let outdoor = await states(of: CharacteristicsType.temperatureSensor.valueKind)
             .first { $0.entityId == .outdoorTemperature }?.temperatureInC?.value

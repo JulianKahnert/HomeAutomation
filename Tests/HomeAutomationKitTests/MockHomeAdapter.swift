@@ -238,6 +238,10 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         storageItems.filter { $0.entityId == entityId && $0.timestamp >= since }.sorted { $0.timestamp > $1.timestamp }
     }
 
+    func getFullEntityHistory(with entityId: EntityId, limit: Int) async -> [EntityStorageItem] {
+        Array(storageItems.filter { $0.entityId == entityId }.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
+    }
+
     func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws {
         upkeepSteps.append(step)
     }

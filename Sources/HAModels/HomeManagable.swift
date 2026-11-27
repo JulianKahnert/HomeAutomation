@@ -29,8 +29,12 @@ public protocol HomeManagable: EntityValidator, Sendable {
     /// adapter's resync refreshes the cache with a new timestamp; only the database still knows since
     /// when the state really holds. `nil` when the database has none.
     func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem?
-    /// The stored states of the entity since `since`, newest first; empty when the database has none.
+    /// The changes of the entity the server holds in memory since `since` (the last 3 hours), newest first; a decision
+    /// reads this, never the database. A longer history is ``getFullEntityHistory(with:limit:)``.
     func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem]
+    /// The last `limit` changes of the entity, newest first: the database's, joined with the memory's that may not be
+    /// stored yet. Reads the database, so only a run that may wait for it (not `shouldTrigger`) calls it.
+    func getFullEntityHistory(with entityId: EntityId, limit: Int) async -> [EntityStorageItem]
     /// When a notification with this id was last sent by this server process; `nil` if none was since the start.
     func lastNotificationDate(id: String) async -> Date?
     /// The newest write that reached `radiator` (matched by room and name, whatever the characteristic),

@@ -509,6 +509,19 @@ public final class HomeManager: HomeManagable {
         (recentReadings[entityId] ?? []).filter { $0.timestamp >= since }
     }
 
+    public func getFullEntityHistory(with entityId: EntityId, limit: Int) async -> [EntityStorageItem] {
+        let recent = recentReadings[entityId] ?? []
+        var stored: [EntityStorageItem] = []
+        do {
+            stored = try await storageRepo.getHistory(for: entityId, startDate: nil, endDate: nil, cursor: nil, limit: limit)
+        } catch {
+            log.error("Failed to read the entity history", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
+        }
+        let known = Set(recent.map(\.timestamp))
+        let merged = recent + stored.filter { !known.contains($0.timestamp) }
+        return Array(merged.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
+    }
+
     public func lastNotificationDate(id: String) async -> Date? {
         await deliveries.lastPushDate(id: id)
     }

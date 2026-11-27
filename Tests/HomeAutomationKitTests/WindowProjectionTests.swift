@@ -9,6 +9,11 @@ import Foundation
 import HAModels
 import Testing
 
+private extension Date {
+    /// The deadline text keeps whole seconds only.
+    var roundedToSecond: Date { Date(timeIntervalSince1970: timeIntervalSince1970.rounded()) }
+}
+
 @Suite("WindowProjection Live Activity updates")
 struct WindowProjectionTests {
     private static let start = Date(timeIntervalSince1970: 1_800_000_000)
@@ -105,6 +110,47 @@ struct WindowProjectionTests {
         let window = try #require(await sender.contentStates.last?.windows.first)
         #expect(window.isOverdue)
         #expect(window.opened >= before && window.opened <= Date())
+    }
+
+    @Test("an overdue window shows its opening time after a restart, when only the database holds the history")
+    func openedSurvivesARestart() async throws {
+        let base = Date(timeIntervalSinceNow: -86_400).roundedToSecond
+        let id = Self.deadlineId("Fenster", in: "Küche")
+        let end = base.addingTimeInterval(1_500)
+        let opened = base
+        let stored = MockStorageRepository(items: [
+            EntityStorageItem(entityId: id, timestamp: opened, deadline: .running(until: end)),
+            EntityStorageItem(entityId: id, timestamp: end, deadline: .overdue(since: end))
+        ])
+        let restarted = await HomeManager(getAdapter: { nil }, storageRepo: stored, notificationSender: sender,
+                                          location: Location(latitude: 52.52, longitude: 13.405))
+        await restarted.loadCurrentStates(timeout: .seconds(5))
+
+        let window = try #require(await restarted.getWindowContentState().windows.first)
+
+        #expect(window.isOverdue)
+        #expect(window.opened == opened)
+    }
+
+    @Test("a window reopened into a deadline that ran before shows the reopening as its opening time")
+    func openedIsTheLatestOpening() async throws {
+        let base = Date(timeIntervalSinceNow: -86_400).roundedToSecond
+        let id = Self.deadlineId("Fenster", in: "Küche")
+        let end = base.addingTimeInterval(1_500)
+        let reopened = base.addingTimeInterval(600)
+        let stored = MockStorageRepository(items: [
+            EntityStorageItem(entityId: id, timestamp: base, deadline: .running(until: end)),
+            EntityStorageItem(entityId: id, timestamp: base.addingTimeInterval(300), deadline: Deadline.none),
+            EntityStorageItem(entityId: id, timestamp: reopened, deadline: .running(until: end)),
+            EntityStorageItem(entityId: id, timestamp: end, deadline: .overdue(since: end))
+        ])
+        let restarted = await HomeManager(getAdapter: { nil }, storageRepo: stored, notificationSender: sender,
+                                          location: Location(latitude: 52.52, longitude: 13.405))
+        await restarted.loadCurrentStates(timeout: .seconds(5))
+
+        let window = try #require(await restarted.getWindowContentState().windows.first)
+
+        #expect(window.opened == reopened)
     }
 
     @Test("closing a window updates the Live Activity, closing the last one ends it")

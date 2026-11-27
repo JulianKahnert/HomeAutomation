@@ -33,6 +33,22 @@ struct OutdoorTemperatureJobTests {
         #expect(rows[0].fetchedAt == Date(timeIntervalSince1970: 100))
     }
 
+    @Test func reportsTheCurrentHoursTemperatureAsServerOwnedEntity() async throws {
+        let reports = Reports()
+        var job = OutdoorTemperatureJob(location: location, hours: InMemoryHours(), report: { await reports.add($0, $1, $2) })
+        let data = response
+        job.fetch = { _ in data }
+
+        try await job.run(plannedAt: Date(timeIntervalSince1970: 1_794_654_000 + 1800)) // 11:30Z
+
+        let all = await reports.all
+        #expect(all.count == 1)
+        #expect(all[0].0 == OutdoorTemperatureJob.entityId)
+        #expect(all[0].0 == .serverOwned(name: "outdoor", characteristic: .temperatureSensor))
+        #expect(all[0].1 == .number(7.9))
+        #expect(all[0].2 == .job("OutdoorTemperatureJob"))
+    }
+
     @Test func rejectsResponseWithoutHourlyBlock() async {
         let store = InMemoryHours()
         var job = OutdoorTemperatureJob(location: location, hours: store)
@@ -83,5 +99,13 @@ private actor InMemoryHours: WeatherHourStoring {
     private(set) var rows: [WeatherHour] = []
     func upsert(_ hours: [WeatherHour]) async throws {
         rows.append(contentsOf: hours)
+    }
+}
+
+actor Reports {
+    private(set) var all: [(EntityId, Value, Origin)] = []
+    func add(_ id: EntityId, _ value: Value, _ origin: Origin) -> Bool {
+        all.append((id, value, origin))
+        return true
     }
 }

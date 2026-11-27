@@ -72,6 +72,9 @@ public extension EntityStorageItem {
 
     /// Thermostat temperature offset in Celsius, already included in the temperature it reports
     var temperatureCalibrationInC: Double? { number(.temperatureCalibration) }
+
+    /// Electricity price in EUR per kWh
+    var energyPriceInEURPerKWh: Double? { number(.energyPrice) }
 }
 
 private extension EntityStorageItem {
@@ -114,6 +117,7 @@ public extension EntityStorageItem {
         heatingMode: HeatingMode? = nil,
         valvePositionPercent: Int? = nil,
         temperatureCalibrationInC: Double? = nil,
+        energyPriceInEURPerKWh: Double? = nil,
         origin: Origin = .homekit,
         lastReport: Date? = nil
     ) {
@@ -137,7 +141,8 @@ public extension EntityStorageItem {
             (.targetTemperature, targetTemperatureInC.map { .number($0) }),
             (.heatingMode, heatingMode.map { .number(Double($0.rawValue)) }),
             (.valvePosition, valvePositionPercent.map { .number(Double($0)) }),
-            (.temperatureCalibration, temperatureCalibrationInC.map { .number($0) })
+            (.temperatureCalibration, temperatureCalibrationInC.map { .number($0) }),
+            (.energyPrice, energyPriceInEURPerKWh.map { .number($0) })
         ]
         let first = candidates.first { $0.1 != nil }
         self.init(entityId: entityId, timestamp: timestamp, uncheckedKind: first?.0.valueKind, value: first?.1, origin: origin, lastReport: lastReport)

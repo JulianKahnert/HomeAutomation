@@ -95,6 +95,7 @@ public struct ValueDescriptor: Sendable, Equatable {
         case .heatingMode: number(type, unit: nil, storage: .state)
         case .valvePosition: number(type, unit: "%", storage: .state)
         case .temperatureCalibration: number(type, unit: "°C", digits: 1, storage: .state)
+        case .energyPrice: number(type, unit: "€/kWh", digits: 3)
         case .color:
             ValueDescriptor(kind: type.valueKind, shape: .text, unit: nil, display: .color, storage: .state)
         }

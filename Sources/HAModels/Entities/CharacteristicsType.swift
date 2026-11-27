@@ -21,6 +21,8 @@ public enum CharacteristicsType: String, Sendable, Codable, CaseIterable {
     /// Thermostat temperature offset in Celsius (Matter `LocalTemperatureCalibration`, the Eve app's
     /// "Temperaturabweichung"), stored in `temperatureCalibrationInC`.
     case temperatureCalibration
+    /// Electricity price in EUR per kWh, read through `energyPriceInEURPerKWh`.
+    case energyPrice
 }
 
 public extension CharacteristicsType {
@@ -37,6 +39,8 @@ public extension CharacteristicsType {
              .temperatureSensor, .relativeHumiditySensor,
              .heating, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration:
             return true
+        case .energyPrice:
+            return false
         case .batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor:
             return false
         }

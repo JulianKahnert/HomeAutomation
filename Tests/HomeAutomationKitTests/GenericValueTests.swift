@@ -42,7 +42,8 @@ struct GenericValueTests {
             .init(entityId: id, timestamp: date, targetTemperatureInC: 19.5),
             .init(entityId: id, timestamp: date, heatingMode: .auto),
             .init(entityId: id, timestamp: date, valvePositionPercent: 30),
-            .init(entityId: id, timestamp: date, temperatureCalibrationInC: -0.5)
+            .init(entityId: id, timestamp: date, temperatureCalibrationInC: -0.5),
+            .init(entityId: id, timestamp: date, energyPriceInEURPerKWh: 0.31)
         ]
     }
 
@@ -53,6 +54,12 @@ struct GenericValueTests {
             let back = try #require(EntityStorageItem(entityId: item.entityId, timestamp: date, kind: generic.kind, value: generic.value))
             #expect(back == item)
         }
+    }
+
+    @Test func energyPriceHasItsOwnKindWithEuroDescriptor() {
+        let descriptor = CharacteristicsType.energyPrice.valueKind.descriptor
+        #expect(descriptor?.shape == .number)
+        #expect(descriptor?.unit == "€/kWh")
     }
 
     @Test func mismatchingValueOrKindDoesNotConvert() {

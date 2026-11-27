@@ -12,10 +12,16 @@ import Logging
 import Shared
 
 /// Stores the Open-Meteo weather of the configured location once an hour as one `weatherHours` row
-/// per hour, so heating data can be compared with the weather.
+/// per hour, so heating data can be compared with the weather, and reports the current hour's temperature
+/// as the server-owned entity ``entityId`` with the origin of this job.
 struct OutdoorTemperatureJob: ScheduledJob, Log {
+    /// The outdoor temperature as state; the window projection and automations read it from here.
+    static let entityId = EntityId.outdoorTemperature
+
     let location: Location
     let hours: any WeatherHourStoring
+    /// Reports a value of a server-owned entity (`HomeManagable.report`).
+    var report: @Sendable (EntityId, Value, Origin) async -> Bool = { _, _, _ in true }
     var fetch: @Sendable (URL) async throws -> Data = { url in
         try await URLSession.shared.data(from: url).0
     }
@@ -57,7 +63,17 @@ struct OutdoorTemperatureJob: ScheduledJob, Log {
         let data = try await fetch(try Self.url(for: location))
         let hours = try Self.parse(data, locationKey: Self.locationKey(for: location), fetchedAt: now)
         try await self.hours.upsert(hours)
+        if let current = Self.currentTemperature(in: hours, at: now) {
+            _ = await report(Self.entityId, .number(current), .job(name))
+        }
         return hours
+    }
+
+    /// The temperature of the latest hour that started at or before `date` and has a reading.
+    static func currentTemperature(in hours: [WeatherHour], at date: Date) -> Double? {
+        hours.filter { $0.hour <= date && $0.temperature2mC != nil }
+            .max { $0.hour < $1.hour }?
+            .temperature2mC
     }
 
     /// Throws for a response without hourly data, so an error page is never stored.

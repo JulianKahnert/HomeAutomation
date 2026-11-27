@@ -18,7 +18,8 @@ struct EntityStorageMappingTests {
         (.heating, .bool(true)), (.temperatureSensor, .number(21.5)), (.relativeHumiditySensor, .number(55)),
         (.carbonDioxideSensorId, .number(450)), (.pmDensitySensor, .number(8.5)), (.airQualitySensor, .number(2)),
         (.valve, .bool(false)), (.targetTemperature, .number(19.5)), (.heatingMode, .number(2)),
-        (.valvePosition, .number(42)), (.temperatureCalibration, .number(-0.5))
+        (.valvePosition, .number(42)), (.temperatureCalibration, .number(-0.5)),
+        (.energyPrice, .number(0.31))
     ]
 
     @Test("every value kind is covered by a sample")

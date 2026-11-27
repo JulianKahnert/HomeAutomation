@@ -15,7 +15,7 @@ public extension EntityStorageItem {
     }
 
     /// Creates an item from kind and value; `nil` when the kind is unknown or the value does not fit it: the wrong
-    /// shape, a fraction for a whole-number kind, a heating mode that does not exist or a colour that is not "r g b".
+    /// shape, a fraction for a whole-number kind, a heating mode that does not exist, a colour that is not "r g b" or a deadline that does not parse.
     init?(entityId: EntityId, timestamp: Date = Date(), kind: ValueKind, value: Value, origin: Origin = .homekit) {
         guard let type = kind.characteristicsType, Self.fits(value, type) else { return nil }
         self.init(entityId: entityId, timestamp: timestamp, uncheckedKind: kind, value: value, origin: origin)
@@ -36,6 +36,8 @@ public extension EntityStorageItem {
             }
         case (.text, .text(let text)):
             return type != .color || text.split(separator: " ").compactMap { Float($0) }.count == 3
+        case (.textWithNumber, .text(let text)):
+            return Deadline(text: text) != nil
         default:
             return false
         }

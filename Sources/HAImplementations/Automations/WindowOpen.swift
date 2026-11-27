@@ -60,6 +60,7 @@ public struct WindowOpen: Automatable {
         guard isWindowOpen else {
             log.debug("Skipping 'WindowOpen' automation, window is closed")
             await hm.setWindowOpenState(entityId: windowContact.contactSensorId, to: nil)
+            await reportDeadline(.none, using: hm)
             return
         }
 
@@ -75,6 +76,8 @@ public struct WindowOpen: Automatable {
             closeBy = state.closeBy
         }
 
+        await reportDeadline(.running(until: closeBy), using: hm)
+
         let remaining = closeBy.timeIntervalSince(now)
         if remaining > 0 {
             log.debug("Start sleeping until the Fensterschließzeit", metadata: ["remaining": "\(remaining)"])
@@ -83,7 +86,24 @@ public struct WindowOpen: Automatable {
 
         // The Live Activity marks the window überschritten and alerts the resident.
         log.debug("Fensterschließzeit reached, marking window überschritten")
+        await reportDeadline(.overdue(since: closeBy), using: hm)
         await hm.markWindowOverdue(entityId: windowContact.contactSensorId)
+    }
+
+    /// The server-owned entity that holds this window's deadline, one per window.
+    public var deadlineId: EntityId {
+        let id = windowContact.contactSensorId
+        return .serverOwned(name: "\(id.placeId)/\(id.name)", characteristic: .deadline)
+    }
+
+    /// Reports the deadline of this window unless it already holds it. An overdue deadline is never taken back
+    /// to running for the same end, so a replay after a restart changes nothing and sends nothing.
+    private func reportDeadline(_ deadline: Deadline, using hm: HomeManagable) async {
+        let current = await hm.states(of: CharacteristicsType.deadline.valueKind)
+            .first { $0.entityId == deadlineId }?.deadline
+        guard current != deadline else { return }
+        if case .running(let until) = deadline, current == .overdue(since: until) { return }
+        await hm.report(deadlineId, value: .text(deadline.text))
     }
 
     /// This offene Fenster as the Live Activity shows it, `nil` when it is not registered.

@@ -75,6 +75,12 @@ public extension EntityStorageItem {
 
     /// Electricity price in EUR per kWh
     var energyPriceInEURPerKWh: Double? { number(.energyPrice) }
+
+    /// The deadline of a window, a server-owned state
+    var deadline: Deadline? {
+        guard case .text(let text)? = value(of: .deadline) else { return nil }
+        return Deadline(text: text)
+    }
 }
 
 private extension EntityStorageItem {
@@ -118,6 +124,7 @@ public extension EntityStorageItem {
         valvePositionPercent: Int? = nil,
         temperatureCalibrationInC: Double? = nil,
         energyPriceInEURPerKWh: Double? = nil,
+        deadline: Deadline? = nil,
         origin: Origin = .homekit,
         lastReport: Date? = nil
     ) {
@@ -142,7 +149,8 @@ public extension EntityStorageItem {
             (.heatingMode, heatingMode.map { .number(Double($0.rawValue)) }),
             (.valvePosition, valvePositionPercent.map { .number(Double($0)) }),
             (.temperatureCalibration, temperatureCalibrationInC.map { .number($0) }),
-            (.energyPrice, energyPriceInEURPerKWh.map { .number($0) })
+            (.energyPrice, energyPriceInEURPerKWh.map { .number($0) }),
+            (.deadline, deadline.map { .text($0.text) })
         ]
         let first = candidates.first { $0.1 != nil }
         self.init(entityId: entityId, timestamp: timestamp, uncheckedKind: first?.0.valueKind, value: first?.1, origin: origin, lastReport: lastReport)

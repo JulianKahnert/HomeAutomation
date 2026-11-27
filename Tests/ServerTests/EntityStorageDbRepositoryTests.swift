@@ -19,7 +19,8 @@ struct EntityStorageMappingTests {
         (.carbonDioxideSensorId, .number(450)), (.pmDensitySensor, .number(8.5)), (.airQualitySensor, .number(2)),
         (.valve, .bool(false)), (.targetTemperature, .number(19.5)), (.heatingMode, .number(2)),
         (.valvePosition, .number(42)), (.temperatureCalibration, .number(-0.5)),
-        (.energyPrice, .number(0.31))
+        (.energyPrice, .number(0.31)),
+        (.deadline, .text("running 1800000000.0"))
     ]
 
     @Test("every value kind is covered by a sample")
@@ -40,6 +41,14 @@ struct EntityStorageMappingTests {
         #expect(restored == item)
         #expect(restored.origin == .server)
         #expect(restored.value(of: type) == value)
+    }
+
+    @Test("a deadline is one row: the number for the end, the text for the case")
+    func deadlineColumns() {
+        let row = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .text("overdue 1800000000.0"), origin: "server")
+        let none = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .text("none"), origin: "server")
+        #expect(row.number == 1_800_000_000 && row.text == "overdue")
+        #expect(none.number == nil && none.text == "none")
     }
 
     @Test("a bool is stored in the number column, a text in the text column")

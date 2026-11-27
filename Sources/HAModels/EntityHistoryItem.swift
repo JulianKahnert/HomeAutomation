@@ -108,6 +108,9 @@ extension EntityHistoryItem {
         if let valueKind, ValueKind(rawValue: valueKind).descriptor == nil, let rawValueDescription {
             return "\(valueKind): \(rawValueDescription)"
         }
+        if valueKind == CharacteristicsType.deadline.rawValue, case .text(let text) = value, let deadline = Deadline(text: text) {
+            return deadline.displayText
+        }
         if let temperatureInC {
             return "\(String(format: "%.1f", temperatureInC))°C"
         }

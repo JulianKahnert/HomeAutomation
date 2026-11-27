@@ -32,6 +32,7 @@ struct ValueKindExtensibilityTests {
         case .bool: .bool(true)
         case .number: .number(type == .heatingMode ? 1 : 2)
         case .text: .text("0.5 0.25 1.0")
+        case .textWithNumber: .text("running 1800000000.0")
         }
         let id = EntityId(placeId: "p", name: "e", characteristicsName: nil, characteristic: type)
         let item = try #require(EntityStorageItem(entityId: id, timestamp: date, kind: type.valueKind, value: value))

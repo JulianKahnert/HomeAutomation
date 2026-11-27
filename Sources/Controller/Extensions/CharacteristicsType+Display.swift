@@ -54,6 +54,8 @@ extension CharacteristicsType {
             return "Temperature Offset"
         case .energyPrice:
             return "Electricity Price"
+        case .deadline:
+            return "Deadline"
         }
     }
 
@@ -79,6 +81,7 @@ extension CharacteristicsType {
         case .valvePosition: return "spigot"
         case .temperatureCalibration: return "plusminus"
         case .energyPrice: return "bolt"
+        case .deadline: return "timer"
         }
     }
 }

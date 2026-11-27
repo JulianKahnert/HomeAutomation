@@ -128,6 +128,11 @@ struct EntityCharacteristicView: View {
                 Spacer()
                 Label(String(format: "%.3f €/kWh", price), systemImage: "bolt")
             }
+        case .deadline:
+            if let deadline = item.deadline {
+                Spacer()
+                Label(deadline.displayText, systemImage: "timer")
+            }
         case .valve:
             if let valveOpen = item.valveOpen {
                 Spacer()

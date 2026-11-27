@@ -12,6 +12,8 @@ import Foundation
 public struct ValueDescriptor: Sendable, Equatable {
     public enum Shape: Sendable, Equatable {
         case bool, number, text
+        /// A text for the case and a number for the end, kept in one row (``Deadline``).
+        case textWithNumber
     }
 
     public enum Display: Sendable, Equatable {
@@ -19,6 +21,7 @@ public struct ValueDescriptor: Sendable, Equatable {
         case number(fractionDigits: Int)
         case color
         case enumeration
+        case deadline
     }
 
     /// How a kind is written, kept and condensed (the rules behind `StoragePolicy`).
@@ -96,6 +99,8 @@ public struct ValueDescriptor: Sendable, Equatable {
         case .valvePosition: number(type, unit: "%", storage: .state)
         case .temperatureCalibration: number(type, unit: "°C", digits: 1, storage: .state)
         case .energyPrice: number(type, unit: "€/kWh", digits: 3)
+        case .deadline:
+            ValueDescriptor(kind: type.valueKind, shape: .textWithNumber, unit: nil, display: .deadline, storage: .state)
         case .color:
             ValueDescriptor(kind: type.valueKind, shape: .text, unit: nil, display: .color, storage: .state)
         }

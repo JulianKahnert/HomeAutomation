@@ -43,7 +43,8 @@ struct GenericValueTests {
             .init(entityId: id, timestamp: date, heatingMode: .auto),
             .init(entityId: id, timestamp: date, valvePositionPercent: 30),
             .init(entityId: id, timestamp: date, temperatureCalibrationInC: -0.5),
-            .init(entityId: id, timestamp: date, energyPriceInEURPerKWh: 0.31)
+            .init(entityId: id, timestamp: date, energyPriceInEURPerKWh: 0.31),
+            .init(entityId: id, timestamp: date, deadline: .overdue(since: date))
         ]
     }
 

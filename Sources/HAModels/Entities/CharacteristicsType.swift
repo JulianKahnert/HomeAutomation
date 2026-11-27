@@ -23,6 +23,8 @@ public enum CharacteristicsType: String, Sendable, Codable, CaseIterable {
     case temperatureCalibration
     /// Electricity price in EUR per kWh, read through `energyPriceInEURPerKWh`.
     case energyPrice
+    /// The deadline of a window (server-owned): none, running until a moment or overdue, read through `deadline`.
+    case deadline
 }
 
 public extension CharacteristicsType {
@@ -41,7 +43,7 @@ public extension CharacteristicsType {
             return true
         case .energyPrice:
             return false
-        case .batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor:
+        case .batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor, .deadline:
             return false
         }
     }

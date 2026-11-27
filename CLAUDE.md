@@ -80,8 +80,9 @@ docker exec -it homeautomation-config-template-db-1 mysql -u vapor_username -pva
 
 # Useful commands
 SHOW TABLES;
-DESCRIBE entityItems;
-SELECT * FROM entityItems ORDER BY timestamp DESC LIMIT 10;
+DESCRIBE entityChanges;
+SELECT e.placeId, e.serviceName, e.characteristicType, c.timestamp, c.number, c.text, c.origin
+FROM entityChanges c JOIN entities e ON e.id = c.entityId ORDER BY c.timestamp DESC LIMIT 10;
 ```
 
 View application and database logs:
@@ -184,30 +185,41 @@ AUTH_TOKEN=your-secure-token-here
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ EntityStorageItem (Domain Model)                            │
-│ - Full entity with EntityId                                 │
-│ - Type-safe (Measurement<T>, RGB struct)                    │
+│ - EntityId, timestamp, origin and one generic value         │
+│   (value kind + Bool, number or text)                       │
+│ - Typed accessors (Measurement, RGB, Deadline) derive from  │
+│   the value                                                 │
 │ - Used in: Adapter, HomeManager, Automations                │
 │ File: Sources/HAModels/EntityStorageItem.swift              │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ ValueDescriptor says what each kind is
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│ ValueDescriptor (the one table per value kind)              │
+│ - Shape, unit, display, constraint, settable by the app,    │
+│   storage rule                                              │
+│ File: Sources/HAModels/Entities/ValueDescriptor.swift       │
 └─────────────────────┬───────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ EntityStorageDbItem (Database/ORM Model)                    │
-│ - Fluent model with @Field wrappers                         │
-│ - Direct database schema mapping                            │
+│ EntityDbItem + EntityChangeDbItem (Database/ORM Models)     │
+│ - `entities`: one row per entity; `entityChanges`: one row  │
+│   per change, a number or a text                            │
 │ - Used in: EntityStorageDbRepository                        │
-│ File: Sources/Server/Models/EntityStorageDbItem.swift       │
+│ File: Sources/Server/Models/EntityDbItem.swift              │
 └─────────────────────┬───────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ EntityHistoryItem (API/Transport Model)                     │
-│ - Lightweight, no EntityId                                  │
-│ - Simple types (Double, Int) for JSON                       │
+│ - Lightweight, no EntityId: value kind and one value        │
 │ - Used in: OpenAPI responses, iOS UI                        │
 │ File: Sources/HAModels/EntityHistoryItem.swift              │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+The schema is one initial migration, documented in `docs/database-schema.md`. A new value kind costs a `CharacteristicsType` case, its descriptor and the adapter mapping (`CODING_STANDARDS.md`, "Database and API schema updates"); no migration, no model field.
 
 ## CI / GitHub Actions
 
@@ -224,6 +236,7 @@ Additional workflows: `docker-publish.yaml` (amd64 + arm64 image for pushes to `
 - [CODING_STANDARDS.md](CODING_STANDARDS.md): the code rules (security, pre-commit checks, Git flow, adding entity fields), the shared ones linked from it and this repo's own. Read it before writing code.
 - `docs/setup-FlowKitAdapter.md` — Adapter setup: launchctl, iOS guided access, logging
 - `docs/setup-server.md` — Server Docker setup, log levels, migration
+- `docs/database-schema.md` — the database schema and how data of the old schema moves over
 - More on how the features work: the project's folder in the knowledge base (the Obsidian vault), under `references/`. Without the vault (a cloud session, CI), go on without it.
 
 ## Agent skills

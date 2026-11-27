@@ -108,111 +108,21 @@ gh pr create --base develop --head feature/123-my-feature
 
 ### Database and API schema updates
 
-When adding new sensor fields or entity properties, you MUST update **all three layers**:
+The database has one initial schema (`Sources/Server/Migrations/01_InitialSchema.swift`, documented in `docs/database-schema.md`). A state is a value of a **value kind**, stored generically in `entityChanges` (`EntityChangeDbItem`: a number or a text per change) under its entity (`EntityDbItem`). A new kind of value therefore needs no migration, no column and no new field on the transport models.
 
-##### 1. Database Migration (REQUIRED)
-Create a new migration file in `Sources/Server/Migrations/`:
+**A new value kind costs three things:**
 
-```bash
-# Example: 04_AddNewSensorFields.swift
-```
+1. A `CharacteristicsType` case (`Sources/HAModels/Entities/CharacteristicsType.swift`).
+2. Its `ValueDescriptor` in `ValueDescriptor.descriptor(for:)` (`Sources/HAModels/Entities/ValueDescriptor.swift`): the shape of the value, unit, display, constraint, whether the app may set it, and its storage rule (dead band, raw retention, hourly rollup, valid range). The switch is exhaustive, so a case without a descriptor does not compile.
+3. The adapter mapping from the HomeKit characteristic (`Sources/Adapter/HomeKitCharacteristic.swift`, `Sources/Adapter/Extensions/HMCharacteristic.swift`), when the value comes from HomeKit. A server-owned value (placeId `server`, written with `HomeManagable.report`) needs no adapter mapping.
 
-**Template:**
-```swift
-import Fluent
+**Not needed for a new kind:** a migration, an `EntityDbItem` change, a change of `openapi.yaml`, of `EntityHistoryItem` or of the wire format. History items, the wire format and the charts carry whatever the descriptor says.
 
-struct AddNewSensorFields: AsyncMigration {
-    func prepare(on database: Database) async throws {
-        try await database.schema("entityItems")
-            .field("newFieldName", .double)  // or .int, .bool, .string
-            .update()
-    }
+**A schema change** (a new column or table, which a new kind does not need) edits `01_InitialSchema.swift` for a new database. An existing database gets a separate migration script by hand, as for the move from the old schema (`docs/database-schema.md`); the migration list stays one entry.
 
-    func revert(on database: Database) async throws {
-        try await database.schema("entityItems")
-            .deleteField("newFieldName")
-            .update()
-    }
-}
-```
+#### Checklist
 
-**Don't forget to register it in `Sources/Server/configure.swift`:**
-```swift
-app.migrations.add(AddNewSensorFields())
-```
-
-##### 2. Update Database Model
-File: `Sources/Server/Models/EntityStorageDbItem.swift`
-
-- Add `@Field` property to the model
-- Update `map()` method to convert FROM `EntityStorageItem`
-- Update `mapDbItem()` function to convert TO `EntityStorageItem`
-
-##### 3. Update OpenAPI Schema (REQUIRED)
-File: `openapi.yaml`
-
-Update the `EntityHistoryItem` schema with ALL fields:
-```yaml
-EntityHistoryItem:
-  type: object
-  properties:
-    id:
-      type: string
-      format: uuid
-    timestamp:
-      type: string
-      format: date-time
-    newFieldName:  # ADD YOUR NEW FIELD HERE
-      type: number
-      format: double
-      nullable: true
-```
-
-##### 4. Update API Response Model
-File: `Sources/HAModels/EntityHistoryItem.swift`
-
-- Add the new field as an optional property
-- Update the `Codable` mapping if needed
-
-##### 5. Update Chart Display Logic (Optional)
-File: `Sources/Controller/Extensions/EntityHistoryItem+Chart.swift`
-
-Add your field to `primaryValue` getter with appropriate priority:
-```swift
-var primaryValue: Double? {
-    if let newField { return newField }  // Add here
-    if let temperatureInC { return temperatureInC }
-    // ... rest of priority list
-}
-```
-
-##### 6. Update Server Controller
-File: `Sources/Server/Controllers/OpenAPIController.swift`
-
-In `getEntityHistory()`, ensure the field is mapped from `EntityStorageItem` to the OpenAPI response.
-
-**When to update each:**
-- **EntityStorageItem**: When HomeKit adapter reads new characteristics
-- **EntityStorageDbItem**: ALWAYS when adding fields that need persistence
-- **EntityHistoryItem**: ALWAYS when fields should appear in history charts
-
-#### Migration Checklist
-
-When adding new entity fields, verify ALL of these:
-
-- [ ] Created migration file in `Sources/Server/Migrations/`
-- [ ] Registered migration in `Sources/Server/configure.swift`
-- [ ] Updated `EntityStorageDbItem` model with `@Field` property
-- [ ] Updated `map()` method in EntityStorageDbItem (TO database)
-- [ ] Updated `mapDbItem()` function (FROM database)
-- [ ] Updated `openapi.yaml` schema with new fields
-- [ ] Updated `EntityHistoryItem.swift` with new properties
-- [ ] Updated OpenAPIController mapping logic
-- [ ] Updated chart display logic (if visualization needed)
-- [ ] New `CharacteristicsType`: gave it a value kind in `StoragePolicy.policy(for:)` (dead band, raw retention, rollup, valid range); the switch is exhaustive, so it does not compile without one
-- [ ] Tested with `swift build` and app builds
-
-**Example PRs that missed migrations:**
-- PR #89: Added entity history but no migration for new fields
-- PR #90: Server changes but OpenAPI schema incomplete
-- PR #93: ✅ Correct implementation with migration + full schema
+- [ ] New `CharacteristicsType` case with its `ValueDescriptor`
+- [ ] Adapter mapping, when the value comes from HomeKit
+- [ ] A test that the kind survives the wire and the history (`ValueKindExtensibilityTests` covers every case of `CharacteristicsType`)
+- [ ] Tested with `swift build` and both app builds

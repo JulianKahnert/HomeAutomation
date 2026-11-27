@@ -13,7 +13,7 @@ enum ServerMigrations {
     static var all: [any Migration] { [InitialSchema()] }
 }
 
-/// Creates every table the server uses. The final schema is documented in `notes/T26.md`.
+/// Creates every table the server uses. The final schema is documented in `docs/database-schema.md`.
 ///
 /// Key lengths: a key over 3 × VARCHAR(255) utf8mb4 (3060 bytes) plus a DATETIME(6) (8 bytes) fits
 /// InnoDB's 3072 bytes (DYNAMIC row format); a fourth string column would not.

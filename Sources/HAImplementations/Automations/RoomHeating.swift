@@ -29,7 +29,7 @@ public struct RoomHeating: Automatable {
     /// The label under the room's bar in the overview; `nil` derives it from the name.
     public let shortLabel: String?
 
-    public var triggerEntityIds: Set<EntityId> { Set(contacts.compactMap(\.triggerEntityId)) }
+    public var triggerEntityIds: Set<EntityId> { Set(contacts.map(\.triggerEntityId)) }
 
     /// The plan this room follows.
     public var effectivePlan: HeatingPlan { plan ?? configuration.standardPlan }
@@ -85,11 +85,6 @@ public struct RoomHeating: Automatable {
             // Re-apply the overrides from the stored contact states, without waiting for the adapter to
             // re-send them. All closed: nothing to do, the radiators keep their manual values.
             return await !offStates(using: hm).isEmpty
-        case .fireplaceChanged(let isOn):
-            guard let contact = contacts.first(where: { $0.source == .fireplace }) else { return false }
-            // On: the radiators go off at once. Off: only when it ends a state the server acted on, like a closing.
-            if isOn { return true }
-            return await endedOffState(of: contact, using: hm)
         case .sunrise, .sunset:
             return false
         }

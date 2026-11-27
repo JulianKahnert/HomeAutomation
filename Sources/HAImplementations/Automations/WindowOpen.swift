@@ -37,7 +37,7 @@ public struct WindowOpen: Automatable {
                             metadata: ["entityId": "\(windowContact.contactSensorId)", "error": "\(error)"])
                 return false
             }
-        case .time, .sunrise, .sunset, .configDeployed, .fireplaceChanged:
+        case .time, .sunrise, .sunset, .configDeployed:
             return false
         }
     }

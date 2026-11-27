@@ -9,7 +9,7 @@ import HAModels
 /// Ends the fireplace `Fireplace.maxDuration` after it was switched on, with a push (glossary: fireplace end).
 ///
 /// The duration counts from the switch-on time the server stored, so a server restart does not restart it.
-/// Ending it sets the server's state, which tells the rooms that follow the fireplace to return to their plan.
+/// Ending it reports the entity off (origin `server`), which tells the rooms that follow the fireplace to return to their plan.
 /// The push goes out only when this run switched it off: the next tick finds it off, so it is sent once per
 /// time the fireplace was on.
 public struct FireplaceTimeout: Automatable {
@@ -34,7 +34,7 @@ public struct FireplaceTimeout: Automatable {
     func execute(using hm: HomeManagable, now: Date) async throws {
         // look again: the fireplace may have gone off since the trigger
         guard await hasExpired(at: now, using: hm),
-              await hm.switchFireplace(isOn: false, at: now) != nil else { return }
+              await hm.report(Fireplace.stateId, value: .bool(false), origin: .server) else { return }
         await hm.deliver(.push(title: "Kamin aus",
                                message: "Der Kamin war \(Self.durationText(Fireplace.maxDuration)) an und wurde ausgeschaltet. Die Heizkörper folgen wieder dem Plan.",
                                id: Fireplace.notificationId))

@@ -16,9 +16,6 @@ public enum HomeEvent: Codable, Sendable {
     case serverStarted
     /// A configuration was deployed through `POST /config`. Fires once per deploy, after it is stored.
     case configDeployed
-    /// The fireplace was switched on or off (glossary: fireplace mode). The server holds that state itself,
-    /// so no entity change reports it.
-    case fireplaceChanged(isOn: Bool)
 }
 
 extension HomeEvent: CustomStringConvertible, Equatable {
@@ -37,8 +34,6 @@ extension HomeEvent: CustomStringConvertible, Equatable {
             return "serverStarted"
         case .configDeployed:
             return "configDeployed"
-        case .fireplaceChanged(let isOn):
-            return "fireplaceChanged(\(isOn ? "on" : "off"))"
         }
     }
 

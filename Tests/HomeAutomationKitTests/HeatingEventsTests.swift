@@ -36,11 +36,8 @@ struct HeatingEventsTests {
 
     private func events(_ items: [EntityStorageItem] = [], writes: [HeatingWrite] = [], contacts: [HeatingRoomSources.Contact] = [],
                         range: HeatingRange = .day) async throws -> [HeatingEvent] {
-        // the fireplace states are the server's own switches, the rest the stored entity states
-        let switches = items.filter { $0.entityId == fireplace }.compactMap { item in item.isDeviceOn.map { FireplaceSwitch(timestamp: item.timestamp, isOn: $0) } }
-        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items.filter { $0.entityId != fireplace }),
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items),
                                                writes: InMemoryHeatingCommands(writes),
-                                               fireplace: InMemoryFireplaceRepository(switches),
                                                now: { now })
         return try await builder.detail(for: sources(contacts: contacts), range: range).events
     }
@@ -115,12 +112,17 @@ struct HeatingEventsTests {
         #expect(found[0].end == ago(80))
     }
 
-    @Test("a fireplace that ran its maximum duration says the timeout ended it")
+    @Test("a fireplace the server ended says the timeout ended it, one the app switched off does not")
     func fireplaceTimeout() async throws {
-        let items = [EntityStorageItem(entityId: fireplace, timestamp: ago(120 + Fireplace.maxDuration / 60), isDeviceOn: true),
-                     EntityStorageItem(entityId: fireplace, timestamp: ago(120), isDeviceOn: false)]
-        let found = try await events(items, contacts: [fireplaceContact], range: .week)
-        #expect(found.first?.reason.contains("Zeitablauf") == true)
+        func closed(by origin: Origin) -> [EntityStorageItem] {
+            var off = EntityStorageItem(entityId: fireplace, timestamp: ago(120), isDeviceOn: false)
+            off.origin = origin
+            return [EntityStorageItem(entityId: fireplace, timestamp: ago(120 + Fireplace.maxDuration / 60), isDeviceOn: true), off]
+        }
+        let byServer = try await events(closed(by: .server), contacts: [fireplaceContact], range: .week)
+        #expect(byServer.first?.reason.contains("Zeitablauf") == true)
+        let byApp = try await events(closed(by: .app), contacts: [fireplaceContact], range: .week)
+        #expect(byApp.first?.reason.contains("Zeitablauf") == false)
     }
 
     @Test("without contacts, window and fireplace writes still give pins")

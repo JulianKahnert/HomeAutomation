@@ -180,9 +180,14 @@ public struct ServerClient {
         FireplaceState(try await client.getFireplace().ok.body.json)
     }
 
-    /// Switches the fireplace on or off; answers the state it will have.
+    /// Switches the fireplace on or off through the general route `PUT /entities/state`; answers the state it will
+    /// have. Asking for the state it already has changes nothing.
     public func setFireplace(isOn: Bool) async throws -> FireplaceState {
-        FireplaceState(try await client.setFireplace(body: .json(.init(isOn: isOn))).ok.body.json)
+        let id = Fireplace.stateId
+        let entityId = Components.Schemas.EntityId(placeId: id.placeId, name: id.name, characteristicsName: "", characteristicType: id.characteristicType.rawValue)
+        let answer = try await client.setEntityState(body: .json(.init(entityId: entityId, value: .case1(isOn)))).ok.body.json
+        guard case .case1(true) = answer.value else { return .off }
+        return FireplaceState(isOn: true, since: answer.timestamp)
     }
 
     /// The time grid of a heating room (glossary: actual, plan target, Δ). Throws when the server answers

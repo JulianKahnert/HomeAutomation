@@ -11,7 +11,7 @@ import Foundation
 /// with a state the user sets, and the app must not overwrite it. A later ticket adds its entity here.
 public enum AppSettableEntities {
     public static let all: Set<EntityId> = [
-        .serverOwned(name: "fireplace", characteristic: .switcher)
+        Fireplace.stateId
     ]
 
     public static func contains(_ entityId: EntityId) -> Bool {

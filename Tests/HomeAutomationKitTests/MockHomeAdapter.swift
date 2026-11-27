@@ -161,18 +161,15 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         queuedRetries[entityId]
     }
 
-    /// The fireplace switches the server stored, oldest first; a test seeds them.
-    var fireplaceSwitches: [FireplaceSwitch] = []
-
-    func lastFireplaceSwitch() async -> FireplaceSwitch? {
-        fireplaceSwitches.last
-    }
-
-    func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch? {
-        guard (fireplaceSwitches.last?.isOn ?? false) != isOn else { return nil }
-        let new = FireplaceSwitch(timestamp: date, isOn: isOn)
-        fireplaceSwitches.append(new)
-        return new
+    /// The fireplace as a test seeds and reads it: the states of `Fireplace.stateId`, oldest first.
+    var fireplaceSwitches: [FireplaceSwitch] {
+        get {
+            storageItems.filter { $0.entityId == Fireplace.stateId }.compactMap { item in item.isDeviceOn.map { FireplaceSwitch(timestamp: item.timestamp, isOn: $0) } }
+        }
+        set {
+            storageItems.removeAll { $0.entityId == Fireplace.stateId }
+            storageItems += newValue.map { EntityStorageItem(entityId: Fireplace.stateId, timestamp: $0.timestamp, isDeviceOn: $0.isOn) }
+        }
     }
 
     func listThermostats() async throws -> [Thermostat] { [] }
@@ -273,4 +270,10 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     func homeKitHealth() async -> HomeKitHealth {
         health
     }
+}
+
+/// One state of the fireplace entity, for tests.
+struct FireplaceSwitch: Equatable {
+    let timestamp: Date
+    let isOn: Bool
 }

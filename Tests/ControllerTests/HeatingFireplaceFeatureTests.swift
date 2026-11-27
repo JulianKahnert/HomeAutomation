@@ -35,6 +35,7 @@ struct HeatingFireplaceFeatureTests {
             HeatingFeature()
         } withDependencies: {
             $0.date = .constant(now)
+            $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: []) }
             $0.serverClient.getFireplace = { loaded }
             $0.serverClient.setFireplace = { isOn in
                 calls.append(isOn)

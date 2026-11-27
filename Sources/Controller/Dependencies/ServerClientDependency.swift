@@ -75,24 +75,8 @@ struct ServerClientDependency: Sendable {
 // MARK: - Dependency Key Implementation
 
 extension ServerClientDependency: TestDependencyKey {
-    static let testValue = Self(
-        getAutomations: { [] },
-        activate: { _ in },
-        deactivate: { _ in },
-        stop: { _ in },
-        isHealthy: { true },
-        getRuns: { _, _, _, _ in [] },
-        getRecentRuns: { _, _ in [] },
-        getWindowContentState: { .empty },
-        registerDevice: { _ in },
-        getEntityHistory: { _, _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) },
-        getRoomHistory: { _, _, _, _ in [] },
-        getHeatingOverview: { HeatingOverview(rooms: []) },
-        getHeatingRoom: { placeId, range in HeatingRoomDetail(placeId: placeId, name: placeId, range: range, istSource: .thermostats([]), radiators: [], samples: []) },
-        getFireplace: { .off },
-        setFireplace: { isOn in isOn ? FireplaceState(isOn: true, since: Date()) : .off },
-        getLocation: { Location(latitude: 52.5, longitude: 13.4) }
-    )
+    /// Every endpoint is unimplemented: a test fails on a call it did not override.
+    static let testValue = Self()
 
     static let previewValue = Self(
         getAutomations: {

@@ -33,6 +33,7 @@ struct OverviewFeatureTests {
             OverviewFeature()
         } withDependencies: {
             $0.date.now = now
+            $0.serverClient.isHealthy = { true }
             $0.serverClient.getAutomations = { [zebra, alpha] }
             $0.serverClient.getRecentRuns = { _, _ in [completed] }
         }
@@ -54,6 +55,9 @@ struct OverviewFeatureTests {
         } withDependencies: {
             $0.date.now = Date(timeIntervalSince1970: 100_000)
             $0.serverClient.stop = { name in stopped.withLock { $0.append(name) } }
+            $0.serverClient.isHealthy = { true }
+            $0.serverClient.getAutomations = { [] }
+            $0.serverClient.getRecentRuns = { _, _ in [] }
         }
         store.exhaustivity = .off
 
@@ -72,6 +76,9 @@ struct OverviewFeatureTests {
         } withDependencies: {
             $0.continuousClock = clock
             $0.date.now = Date(timeIntervalSince1970: 100_000)
+            $0.serverClient.isHealthy = { true }
+            $0.serverClient.getAutomations = { [] }
+            $0.serverClient.getRecentRuns = { _, _ in [] }
         }
         store.exhaustivity = .off
 

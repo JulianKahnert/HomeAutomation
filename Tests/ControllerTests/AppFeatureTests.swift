@@ -80,7 +80,7 @@ struct AppFeatureTests {
         let store = TestStore(initialState: AppFeature.State()) {
             AppFeature()
         } withDependencies: {
-            $0.serverClient = .testValue
+            $0.serverClient.getWindowContentState = { .empty }
             $0.liveActivity = .testValue
             $0.pushNotification = .testValue
         }

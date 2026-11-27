@@ -54,7 +54,7 @@ public struct DatabaseCleanup: Automatable {
             do {
                 try await hm.performStorageUpkeep(step, now: now)
             } catch {
-                log.error("Database upkeep step \(step.rawValue) failed: \(error)")
+                log.error("Database upkeep step failed", metadata: ["step": "\(step.rawValue)", "error": "\(error)"])
                 firstError = firstError ?? error
             }
         }

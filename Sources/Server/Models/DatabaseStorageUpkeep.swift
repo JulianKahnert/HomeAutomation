@@ -40,30 +40,32 @@ struct DatabaseStorageUpkeep: StorageUpkeep, Log {
     }
 
     private func cleanUp(now: Date) async {
-        do {
+        await attempt("Database cleanup") {
             for (type, cutoff) in StoragePolicy.cleanupCutoffs(now: now) {
-                log.info("Deleting \(type.rawValue) entries before \(cutoff)")
+                log.info("Deleting entries past their retention", metadata: ["type": "\(type.rawValue)", "before": "\(cutoff)"])
                 try await entities.deleteEntries(ofType: type, olderThan: cutoff)
             }
             log.info("Database cleanup completed successfully")
-        } catch {
-            log.error("Database cleanup failed: \(error)")
         }
-
-        do {
+        await attempt("Noisy entity check") {
             try await noisyEntityWarner.check(entities, now: now)
-        } catch {
-            log.error("Noisy entity check failed: \(error)")
         }
     }
 
     private func rollUp(now: Date) async {
         for target in StoragePolicy.rollupCutoffs(now: now) {
-            do {
+            await attempt("Hourly rollup", metadata: ["type": "\(target.type.rawValue)"]) {
                 try await entities.rollUpHourly(type: target.type, validRange: target.validRange, olderThan: target.before)
-            } catch {
-                log.error("Hourly rollup of \(target.type.rawValue) failed: \(error)")
             }
+        }
+    }
+
+    /// Runs one upkeep piece; a failure is logged and the next piece still runs.
+    private func attempt(_ piece: String, metadata: Logger.Metadata = [:], _ work: () async throws -> Void) async {
+        do {
+            try await work()
+        } catch {
+            log.error("Database upkeep failed", metadata: metadata.merging(["piece": "\(piece)", "error": "\(error)"]) { current, _ in current })
         }
     }
 }

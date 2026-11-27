@@ -192,7 +192,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
     func getAllEntityIds() async throws -> [EntityId] {
         try await EntityDbItem.query(on: database()).all().compactMap { entity in
             guard let type = CharacteristicsType(rawValue: entity.characteristicType) else {
-                log.warning("Entity of unknown characteristic type \(entity.characteristicType) skipped")
+                log.warning("Entity of unknown characteristic type skipped", metadata: ["characteristicType": "\(entity.characteristicType)"])
                 return nil
             }
             return EntityId(placeId: entity.placeId, name: entity.serviceName,

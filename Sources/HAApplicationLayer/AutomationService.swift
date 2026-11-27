@@ -158,11 +158,11 @@ public actor AutomationService {
             }
 
             if !automation.supersedesRunningRun, !automation.runsEveryTrigger, self.isRunning(automation.name) {
-                self.log.info("Automation \(automation.name) is still running, not starting it again")
+                self.log.info("Automation is still running, not starting it again", metadata: ["automation": "\(automation.name)"])
                 return
             }
 
-            self.log.info("Running automation \(automation.name)")
+            self.log.info("Running automation", metadata: ["automation": "\(automation.name)"])
             let runId = automation.recordsRuns ? UUID() : nil
             let task = Task {
                 // Persisted alongside `execute`: the database must never delay the first command.
@@ -178,7 +178,7 @@ public actor AutomationService {
                     let stopped = await self.consumeStopRequest(for: automation.name)
                     await self.finish(await recording.value, outcome: stopped ? .stopped : .superseded)
                 } catch {
-                    self.log.error("Automation failed with error - \(error)")
+                    self.log.error("Automation failed", metadata: ["automation": "\(automation.name)", "error": "\(error)"])
                     await self.finish(await recording.value, outcome: .failed, error: String(describing: error))
                 }
 
@@ -192,7 +192,7 @@ public actor AutomationService {
                 await task.value
             }
         } catch {
-            self.log.error("Automation shouldTrigger failed with error - \(error)")
+            self.log.error("Automation shouldTrigger failed", metadata: ["automation": "\(automation.name)", "error": "\(error)"])
         }
     }
 
@@ -201,12 +201,12 @@ public actor AutomationService {
             .filter { !$0.value.isCancelled }
             .map(\.key)
 
-        log.debug("Found currently active automations \(keys)")
+        log.debug("Found currently active automations", metadata: ["automations": "\(keys)"])
         return Set(keys)
     }
 
     public func stopAutomation(with name: String) async {
-        log.debug("Cancel automation \(name)")
+        log.debug("Cancel automation", metadata: ["automation": "\(name)"])
         guard let task = runningTasks[name], !task.isCancelled else { return }
         stopRequested.insert(name)
         task.cancel()
@@ -243,7 +243,7 @@ public actor AutomationService {
             try await runs.add(run)
             return runId
         } catch {
-            log.error("Failed to record automation run - \(error)")
+            log.error("Failed to record automation run", metadata: ["automation": "\(automation.name)", "error": "\(error)"])
             return nil
         }
     }
@@ -253,7 +253,7 @@ public actor AutomationService {
         do {
             try await runs.finish(runId, outcome: outcome, endedAt: Date(), errorDescription: error)
         } catch {
-            log.error("Failed to finish automation run - \(error)")
+            log.error("Failed to finish automation run", metadata: ["runId": "\(runId)", "error": "\(error)"])
         }
     }
 }

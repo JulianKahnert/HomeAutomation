@@ -96,7 +96,7 @@ struct HomeEventProcessingJob: Job, Log {
     }
 
     private func handle(_ event: HomeEvent) async {
-        log.debug("trigger automation with \(event.description)")
+        log.debug("Trigger automation", metadata: ["event": "\(event.description)"])
 
         // add item to history
         if case .change(let item) = event {

@@ -123,6 +123,11 @@ struct EntityCharacteristicView: View {
                 Spacer()
                 Label(String(format: "%+.1f °C", offset), systemImage: "plusminus")
             }
+        case .deadline:
+            if let deadline = item.deadline {
+                Spacer()
+                Label(deadline.displayText, systemImage: "timer")
+            }
         case .valve:
             if let valveOpen = item.valveOpen {
                 Spacer()

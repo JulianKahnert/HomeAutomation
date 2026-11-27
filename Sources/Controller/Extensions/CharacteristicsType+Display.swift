@@ -52,6 +52,8 @@ extension CharacteristicsType {
             return "Valve Position"
         case .temperatureCalibration:
             return "Temperature Offset"
+        case .deadline:
+            return "Deadline"
         }
     }
 
@@ -76,6 +78,7 @@ extension CharacteristicsType {
         case .heatingMode: return "thermostat"
         case .valvePosition: return "spigot"
         case .temperatureCalibration: return "plusminus"
+        case .deadline: return "timer"
         }
     }
 }

@@ -131,7 +131,7 @@ struct StoragePolicy: Sendable, Equatable {
         case .brightness: .brightness
         case .colorTemperature: .colorTemperature
         case .airQualitySensor, .motionSensor, .contactSensor, .switcher, .color, .valve, .lock, .heating,
-             .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration: nil
+             .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration, .deadline: nil
         }
     }
 

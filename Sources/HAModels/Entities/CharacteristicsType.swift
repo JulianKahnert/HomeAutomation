@@ -21,6 +21,8 @@ public enum CharacteristicsType: String, Sendable, Codable, CaseIterable {
     /// Thermostat temperature offset in Celsius (Matter `LocalTemperatureCalibration`, the Eve app's
     /// "Temperaturabweichung"), stored in `temperatureCalibrationInC`.
     case temperatureCalibration
+    /// The deadline of a window (server-owned): none, running until a moment or overdue, stored in `deadline`.
+    case deadline
 }
 
 public extension CharacteristicsType {
@@ -37,7 +39,7 @@ public extension CharacteristicsType {
              .temperatureSensor, .relativeHumiditySensor,
              .heating, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration:
             return true
-        case .batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor:
+        case .batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor, .deadline:
             return false
         }
     }

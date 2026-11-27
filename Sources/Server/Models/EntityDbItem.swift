@@ -71,7 +71,14 @@ final class EntityChangeDbItem: Model, @unchecked Sendable {
         switch value {
         case .bool(let flag): number = flag ? 1 : 0
         case .number(let double): number = double
-        case .text(let string): text = string
+        case .text(let string):
+            // A deadline keeps its case in the text and its end in the number, in one row.
+            if let deadline = Deadline(text: string) {
+                text = deadline.caseName
+                number = deadline.end?.timeIntervalSince1970
+            } else {
+                text = string
+            }
         }
     }
 
@@ -81,6 +88,7 @@ final class EntityChangeDbItem: Model, @unchecked Sendable {
         case .bool: number.map { .bool($0 != 0) }
         case .number: number.map { .number($0) }
         case .text: text.map { .text($0) }
+        case .textWithNumber: text.flatMap { Deadline(caseName: $0, end: number) }.map { .text($0.text) }
         }
     }
 }

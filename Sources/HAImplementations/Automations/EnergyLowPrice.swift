@@ -56,8 +56,7 @@ public struct EnergyLowPrice: Automatable {
     /// The current price (state reported by the server's EnergyPriceJob), `nil` while none is known or the last report is
     /// too old: after a restart before the job ran, or while the source is down. Logs once per disturbance.
     func currentPrice(using homeManager: HomeManagable, now: Date) async -> Double? {
-        let price = await homeManager.states(of: CharacteristicsType.energyPrice.valueKind)
-            .first { $0.entityId == .electricityPrice }?.energyPriceInEURPerKWh
+        let price = try? await homeManager.getCurrentEntity(with: .electricityPrice).energyPriceInEURPerKWh
         if let price, let reported = await homeManager.lastReport(of: .electricityPrice), now.timeIntervalSince(reported) <= Self.maximumPriceAge {
             if await Self.missingPrice.recovered(name) {
                 log.info("The electricity price is known again", metadata: ["automation": "\(name)"])

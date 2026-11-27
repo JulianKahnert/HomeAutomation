@@ -47,7 +47,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
                 .filter(\.$id ~~ chunk)
                 .with(\.$entity)
                 .all()
-            items += changes.compactMap { Self.mapDbItem($0) }
+            items += changes.compactMap { EntityStorageItem(entity: $0.entity, change: $0) }
         }
         return items
     }
@@ -63,7 +63,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
             .sort(\.$id, .descending)
             .limit(limit)
             .all()
-            .compactMap { Self.mapDbItem($0, entity: entity) }
+            .compactMap { EntityStorageItem(entity: entity, change: $0) }
     }
 
     private func findEntity(_ entityId: EntityId) async throws -> EntityDbItem? {
@@ -181,7 +181,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
             .sort(\.$timestamp, .descending)
             .limit(limit)
             .all()
-            .compactMap { Self.mapDbItem($0, entity: entity) }
+            .compactMap { EntityStorageItem(entity: entity, change: $0) }
     }
 
     func getAllEntityIds() async throws -> [EntityId] {
@@ -193,14 +193,6 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
             return EntityId(placeId: entity.placeId, name: entity.serviceName,
                             characteristicsName: entity.characteristicsName, characteristic: type)
         }
-    }
-
-    static func mapDbItem(_ change: EntityChangeDbItem) -> EntityStorageItem? {
-        mapDbItem(change, entity: change.entity)
-    }
-
-    static func mapDbItem(_ change: EntityChangeDbItem, entity: EntityDbItem) -> EntityStorageItem? {
-        EntityStorageItem(entity: entity, change: change)
     }
 }
 

@@ -59,8 +59,7 @@ public extension HomeManagable {
             let history = await getFullEntityHistory(with: item.entityId, limit: 50)
             windows.append((item.entityId, deadline, WindowContentState.opened(end: end, history: history) ?? item.timestamp))
         }
-        let outdoor = await states(of: CharacteristicsType.temperatureSensor.valueKind)
-            .first { $0.entityId == .outdoorTemperature }?.temperatureInC?.value
+        let outdoor = try? await getCurrentEntity(with: .outdoorTemperature).temperatureInC?.value
         return WindowContentState(windows: windows, outdoorTemperature: outdoor)
     }
 }

@@ -13,7 +13,7 @@ import HAModels
 /// - While a deadline exists, every 15 minutes a quiet update refreshes the outdoor temperature.
 /// - With no window left, the Live Activity ends.
 ///
-/// Its lane collapses nothing and a trigger never cuts a run, so every change runs to its end in order.
+/// Its lane collapses nothing and waits for each run, so every change runs to its end in order, also while a send is slow.
 public struct WindowProjection: Automatable {
     public static let defaultName = "WindowProjection"
     /// The quiet refresh runs on every clock tick whose minute is a multiple of this.
@@ -24,6 +24,7 @@ public struct WindowProjection: Automatable {
     public private(set) var triggerEntityIds = Set<EntityId>()
     public var collapsesChanges: Bool { false }
     public var supersedesRunningRun: Bool { false }
+    public var runsEveryTrigger: Bool { true }
 
     public init(_ name: String = WindowProjection.defaultName) {
         self.name = name

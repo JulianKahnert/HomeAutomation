@@ -157,7 +157,7 @@ public actor AutomationService {
                 return
             }
 
-            if !automation.supersedesRunningRun, self.isRunning(automation.name) {
+            if !automation.supersedesRunningRun, !automation.runsEveryTrigger, self.isRunning(automation.name) {
                 self.log.info("Automation \(automation.name) is still running, not starting it again")
                 return
             }
@@ -188,6 +188,9 @@ public actor AutomationService {
                 }
             }
             self.set(task: task, with: automation.name)
+            if automation.runsEveryTrigger {
+                await task.value
+            }
         } catch {
             self.log.error("Automation shouldTrigger failed with error - \(error)")
         }

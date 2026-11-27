@@ -308,6 +308,7 @@ struct WindowProjectionTests {
         #expect(try await projection.shouldTrigger(with: .serverStarted, using: manager) == false)
         #expect(projection.collapsesChanges == false)
         #expect(projection.supersedesRunningRun == false)
+        #expect(projection.runsEveryTrigger)
     }
 }
 

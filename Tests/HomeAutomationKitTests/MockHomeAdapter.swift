@@ -223,6 +223,19 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     func lastReports() async -> [String: Date] { [:] }
 
+    /// Server-owned states reported by an automation under test, with the origin they were reported with.
+    @discardableResult
+    func report(_ entityId: EntityId, value: Value, origin: Origin) async -> Bool {
+        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else { return false }
+        return await addEntityHistory(item)
+    }
+
+    func states(of kind: ValueKind) async -> [EntityStorageItem] {
+        var latest: [EntityId: EntityStorageItem] = [:]
+        for item in storageItems { latest[item.entityId] = item }
+        return latest.values.filter { $0.entityId.characteristicType.valueKind == kind }
+    }
+
     func lastReport(of entityId: EntityId) async -> Date? { nil }
 
     func lastNotificationDate(id: String) async -> Date? {

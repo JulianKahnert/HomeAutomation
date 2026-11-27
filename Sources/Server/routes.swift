@@ -95,9 +95,14 @@ func routes(_ app: Application) throws {
             // referencing unknown entities fail at runtime and flood the critical-log notifier.
             req.logger.warning("⚠️ Accepting config with skipValidation=true - \(configEntityIds.count) referenced entities were NOT validated against HomeKit")
         } else {
-            let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
-
-            let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
+            // A server-owned entity is not in HomeKit, so the adapter cannot confirm it (ADR-009); with nothing
+            // else to check the adapter need not be online either.
+            let homeKitEntityIds = configEntityIds.filter { !$0.isServerOwned }
+            var missingEntityIds = homeKitEntityIds
+            if !homeKitEntityIds.isEmpty {
+                let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
+                missingEntityIds.subtract(foundEntityIds.map(\.entityId))
+            }
             guard missingEntityIds.isEmpty else {
                 throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
             }

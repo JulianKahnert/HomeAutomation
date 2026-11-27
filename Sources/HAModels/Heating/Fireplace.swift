@@ -46,10 +46,10 @@ public enum Fireplace {
     /// The state the server holds, since the last change of the entity (a repeated value keeps it). It does not
     /// depend on HomeKit: a degraded HomeKit stops the radiator writes, not the fire.
     /// - Throws: Any failure of reading the state; only an entity the server never held is `.off`.
-    public static func state(with hm: HomeManagable) async throws -> FireplaceState {
+    public static func state(with homeManager: HomeManagable) async throws -> FireplaceState {
         let item: EntityStorageItem
         do {
-            item = try await hm.getCurrentEntity(with: stateId)
+            item = try await homeManager.getCurrentEntity(with: stateId)
         } catch OptionalError.notFound {
             return .off
         }

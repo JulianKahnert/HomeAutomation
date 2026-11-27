@@ -122,8 +122,12 @@ struct WindowProjectionTests {
             EntityStorageItem(entityId: id, timestamp: opened, deadline: .running(until: end)),
             EntityStorageItem(entityId: id, timestamp: end, deadline: .overdue(since: end))
         ])
-        let restarted = await HomeManager(getAdapter: { nil }, storageRepo: stored, notificationSender: sender,
-                                          location: Location(latitude: 52.52, longitude: 13.405))
+        let restarted = await HomeManager(
+            getAdapter: { nil },
+            storageRepo: stored,
+            notificationSender: sender,
+            location: Location(latitude: 52.52, longitude: 13.405)
+        )
         await restarted.loadCurrentStates(timeout: .seconds(5))
 
         let window = try #require(await restarted.getWindowContentState().windows.first)
@@ -144,8 +148,12 @@ struct WindowProjectionTests {
             EntityStorageItem(entityId: id, timestamp: reopened, deadline: .running(until: end)),
             EntityStorageItem(entityId: id, timestamp: end, deadline: .overdue(since: end))
         ])
-        let restarted = await HomeManager(getAdapter: { nil }, storageRepo: stored, notificationSender: sender,
-                                          location: Location(latitude: 52.52, longitude: 13.405))
+        let restarted = await HomeManager(
+            getAdapter: { nil },
+            storageRepo: stored,
+            notificationSender: sender,
+            location: Location(latitude: 52.52, longitude: 13.405)
+        )
         await restarted.loadCurrentStates(timeout: .seconds(5))
 
         let window = try #require(await restarted.getWindowContentState().windows.first)

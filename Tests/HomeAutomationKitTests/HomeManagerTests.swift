@@ -149,8 +149,12 @@ private final class RecordingLogHandler: LogHandler, @unchecked Sendable {
 }
 
 /// Polls until `condition` holds and records an issue when it does not within `timeout`.
-private func eventually(timeout: Duration = .seconds(5), _ comment: Comment, sourceLocation: SourceLocation = #_sourceLocation,
-                        _ condition: () async -> Bool) async {
+private func eventually(
+    timeout: Duration = .seconds(5),
+    _ comment: Comment,
+    sourceLocation: SourceLocation = #_sourceLocation,
+    _ condition: () async -> Bool
+) async {
     let deadline = ContinuousClock.now + timeout
     while ContinuousClock.now < deadline {
         if await condition() { return }

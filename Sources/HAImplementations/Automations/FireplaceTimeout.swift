@@ -51,8 +51,8 @@ public struct FireplaceTimeout: Automatable {
         return parts.joined(separator: " und ")
     }
 
-    private func hasExpired(at date: Date, using hm: HomeManagable) async throws -> Bool {
-        guard let endsAt = try await Fireplace.state(with: hm).endsAt else { return false }
+    private func hasExpired(at date: Date, using homeManager: HomeManagable) async throws -> Bool {
+        guard let endsAt = try await Fireplace.state(with: homeManager).endsAt else { return false }
         return date >= endsAt
     }
 }

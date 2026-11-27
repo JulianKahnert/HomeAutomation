@@ -115,16 +115,71 @@ public struct ValueDescriptor: Sendable, Equatable {
         }
     }
 
-    private static func bool(_ type: CharacteristicsType, _ yes: String, _ no: String, isSettableFromApp: Bool = false) -> ValueDescriptor {
-        ValueDescriptor(kind: type.valueKind, shape: .bool, unit: nil, display: .boolean(trueLabel: yes, falseLabel: no),
-                        storage: .state, constraint: .none, isSettableFromApp: isSettableFromApp)
+    private static let lightStorage = StorageRule(
+        storageClass: .analog,
+        deadBand: nil,
+        rawRetentionDays: 90,
+        hourlyRollup: true,
+        validRange: 0...100_000
+    )
+
+    private static let carbonDioxideStorage = StorageRule(
+        storageClass: .analog,
+        deadBand: .init(absoluteChange: 25, maxInterval: .seconds(15 * 60)),
+        rawRetentionDays: 90,
+        hourlyRollup: true,
+        validRange: 1...100_000
+    )
+
+    private static let airQualityStorage = StorageRule(
+        storageClass: .enumeration,
+        deadBand: nil,
+        rawRetentionDays: nil,
+        hourlyRollup: false,
+        validRange: nil
+    )
+
+    private static func bool(_ type: CharacteristicsType, _ trueLabel: String, _ falseLabel: String, isSettableFromApp: Bool = false) -> ValueDescriptor {
+        ValueDescriptor(
+            kind: type.valueKind,
+            shape: .bool,
+            unit: nil,
+            display: .boolean(trueLabel: trueLabel, falseLabel: falseLabel),
+            storage: .state,
+            constraint: .none,
+            isSettableFromApp: isSettableFromApp
+        )
     }
 
-    private static func number(_ type: CharacteristicsType, unit: String?, digits: Int = 0,
-                               storage: StorageRule = .analog, constraint: Constraint = .none,
-                               isSettableFromApp: Bool = false) -> ValueDescriptor {
-        ValueDescriptor(kind: type.valueKind, shape: .number, unit: unit, display: .number(fractionDigits: digits),
-                        storage: storage, constraint: constraint, isSettableFromApp: isSettableFromApp)
+    private static func number(
+        _ type: CharacteristicsType,
+        unit: String?,
+        digits: Int = 0,
+        storage: StorageRule = .analog,
+        constraint: Constraint = .none,
+        isSettableFromApp: Bool = false
+    ) -> ValueDescriptor {
+        ValueDescriptor(
+            kind: type.valueKind,
+            shape: .number,
+            unit: unit,
+            display: .number(fractionDigits: digits),
+            storage: storage,
+            constraint: constraint,
+            isSettableFromApp: isSettableFromApp
+        )
+    }
+
+    private static func structured(_ type: CharacteristicsType, shape: Shape, display: Display, constraint: Constraint) -> ValueDescriptor {
+        ValueDescriptor(
+            kind: type.valueKind,
+            shape: shape,
+            unit: nil,
+            display: display,
+            storage: .state,
+            constraint: constraint,
+            isSettableFromApp: false
+        )
     }
 
     public static func descriptor(for type: CharacteristicsType) -> ValueDescriptor {
@@ -142,13 +197,9 @@ public struct ValueDescriptor: Sendable, Equatable {
         case .heating:
             return bool(type, "heating", "idle")
         case .lightSensor:
-            return number(type, unit: "lx", storage: StorageRule(storageClass: .analog, deadBand: nil, rawRetentionDays: 90,
-                                                                  hourlyRollup: true, validRange: 0...100_000))
+            return number(type, unit: "lx", storage: lightStorage)
         case .carbonDioxideSensorId:
-            return number(type, unit: "ppm", storage: StorageRule(storageClass: .analog,
-                                                                   deadBand: .init(absoluteChange: 25, maxInterval: .seconds(15 * 60)),
-                                                                   rawRetentionDays: 90, hourlyRollup: true, validRange: 1...100_000),
-                          constraint: .wholeNumber)
+            return number(type, unit: "ppm", storage: carbonDioxideStorage, constraint: .wholeNumber)
         case .temperatureSensor:
             return number(type, unit: "°C", digits: 1)
         case .relativeHumiditySensor:
@@ -162,9 +213,7 @@ public struct ValueDescriptor: Sendable, Equatable {
         case .colorTemperature:
             return number(type, unit: nil, digits: 2)
         case .airQualitySensor:
-            return number(type, unit: nil, storage: StorageRule(storageClass: .enumeration, deadBand: nil,
-                                                                 rawRetentionDays: nil, hourlyRollup: false, validRange: nil),
-                          constraint: .wholeNumber)
+            return number(type, unit: nil, storage: airQualityStorage, constraint: .wholeNumber)
         case .targetTemperature:
             return number(type, unit: "°C", digits: 1, storage: .state, isSettableFromApp: true)
         case .heatingMode:
@@ -176,11 +225,9 @@ public struct ValueDescriptor: Sendable, Equatable {
         case .energyPrice:
             return number(type, unit: "€/kWh", digits: 3)
         case .deadline:
-            return ValueDescriptor(kind: type.valueKind, shape: .textWithNumber, unit: nil, display: .deadline,
-                                   storage: .state, constraint: .deadlineText, isSettableFromApp: false)
+            return structured(type, shape: .textWithNumber, display: .deadline, constraint: .deadlineText)
         case .color:
-            return ValueDescriptor(kind: type.valueKind, shape: .text, unit: nil, display: .color,
-                                   storage: .state, constraint: .colorText, isSettableFromApp: false)
+            return structured(type, shape: .text, display: .color, constraint: .colorText)
         }
     }
 }

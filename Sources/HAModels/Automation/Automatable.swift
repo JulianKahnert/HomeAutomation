@@ -46,6 +46,10 @@ public protocol Automatable: Sendable, Codable {
     /// Off for work that must finish, such as the database upkeep.
     var supersedesRunningRun: Bool { get }
 
+    /// Whether several waiting changes of the same entity in this automation's lane collapse to the newest.
+    /// Off for lanes that must see every change (projections). Events without a state never collapse.
+    var collapsesChanges: Bool { get }
+
     /// Extra detail appended to the generic trigger summary, e.g. the sensor value that decided it.
     func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String?
 }
@@ -54,6 +58,8 @@ public extension Automatable {
     var recordsRuns: Bool { true }
 
     var supersedesRunningRun: Bool { true }
+
+    var collapsesChanges: Bool { true }
 
     func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String? { nil }
 

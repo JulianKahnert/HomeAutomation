@@ -97,6 +97,15 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          }
      }
 
+     private struct EventLoopGaugeKey: StorageKey {
+         typealias Value = EventLoopGauge
+     }
+
+     var eventLoopGauge: EventLoopGauge? {
+         get { self.storage[EventLoopGaugeKey.self] }
+         set { self.storage[EventLoopGaugeKey.self] = newValue }
+     }
+
      private struct SchedulerKey: StorageKey {
          typealias Value = Scheduler
      }

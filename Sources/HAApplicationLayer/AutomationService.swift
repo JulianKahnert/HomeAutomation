@@ -16,6 +16,23 @@ public actor AutomationService {
     private let repository: any AutomationRepository
     /// The deployed automation instances; `isActive` is their active state.
     public private(set) var automations: [any Automatable]
+    /// One lane per automation name: the events it still has to check, in the order they happened.
+    private final class Lane {
+        var pending: [(event: HomeEvent, enqueuedAt: Date)] = []
+        /// When the event whose `shouldTrigger` is running entered the lane.
+        var inFlight: Date?
+        var worker: Task<Void, Never>?
+        var reported = false
+
+        var isBusy: Bool { worker != nil }
+
+        func age(now: Date) -> TimeInterval {
+            guard let oldest = inFlight ?? pending.first?.enqueuedAt else { return 0 }
+            return max(0, now.timeIntervalSince(oldest))
+        }
+    }
+
+    private var lanes: [String: Lane] = [:]
     /// Automations the server itself needs (e.g. the database cleanup). They are added when a deploy or the
     /// stored config lacks them, and keep their active state like any other automation.
     private let builtIns: [any Automatable]
@@ -64,53 +81,115 @@ public actor AutomationService {
         try await repository.save(automations)
     }
 
+    /// Hands the event to the lane of every active automation and returns without waiting for any `shouldTrigger`.
     public func trigger(with event: HomeEvent) async {
-        let automations = self.automations
+        let now = Date()
+        for automation in automations where automation.isActive {
+            enqueue(event, enqueuedAt: now, into: automation)
+        }
+    }
 
-        await withDiscardingTaskGroup { group in
-            for automation in automations where automation.isActive {
-                group.addTask {
-                    do {
-                        guard try await automation.shouldTrigger(with: event, using: self.homeManager) else {
-                            return
+    /// Waits until every lane is empty and idle (for tests).
+    public func waitUntilIdle() async {
+        while lanes.values.contains(where: { $0.isBusy }) {
+            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+    }
+
+    /// The age of the oldest event each lane has not finished checking, in seconds; 0 for an idle lane.
+    public func laneAges(now: Date = Date()) -> [String: TimeInterval] {
+        var ages: [String: TimeInterval] = [:]
+        for automation in automations {
+            ages[automation.name] = lanes[automation.name]?.age(now: now) ?? 0
+        }
+        return ages
+    }
+
+    /// Logs one critical message per backlog naming each automation whose lane is older than `limit`.
+    /// The lane is reported again only after it has drained.
+    public func reportBacklogs(olderThan limit: TimeInterval, now: Date = Date()) {
+        for (name, lane) in lanes {
+            let age = lane.age(now: now)
+            if age > limit {
+                guard !lane.reported else { continue }
+                lane.reported = true
+                log.critical("Automation lane is backed up", metadata: ["automation": "\(name)", "ageSeconds": "\(Int(age))", "waiting": "\(lane.pending.count)"])
+            } else if !lane.isBusy {
+                lane.reported = false
+            }
+        }
+    }
+
+    private func enqueue(_ event: HomeEvent, enqueuedAt: Date, into automation: any Automatable) {
+        let lane = lanes[automation.name] ?? Lane()
+        lanes[automation.name] = lane
+        if automation.collapsesChanges, case .change(let item) = event {
+            lane.pending.removeAll { entry in
+                if case .change(let waiting) = entry.event { return waiting.entityId == item.entityId }
+                return false
+            }
+        }
+        lane.pending.append((event, enqueuedAt))
+        guard lane.worker == nil else { return }
+        let name = automation.name
+        lane.worker = Task { await self.work(lane: name) }
+    }
+
+    /// Works through one lane in order; each event waits for the `shouldTrigger` of the one before it.
+    private func work(lane name: String) async {
+        guard let lane = lanes[name] else { return }
+        while !lane.pending.isEmpty {
+            let entry = lane.pending.removeFirst()
+            lane.inFlight = entry.enqueuedAt
+            if let automation = automations.first(where: { $0.name == name }), automation.isActive {
+                await process(entry.event, with: automation)
+            }
+            lane.inFlight = nil
+        }
+        lane.reported = false
+        lane.worker = nil
+    }
+
+    private func process(_ event: HomeEvent, with automation: any Automatable) async {
+        do {
+            guard try await automation.shouldTrigger(with: event, using: self.homeManager) else {
+                return
+            }
+
+            if !automation.supersedesRunningRun, self.isRunning(automation.name) {
+                self.log.info("Automation \(automation.name) is still running, not starting it again")
+                return
+            }
+
+            self.log.info("Running automation \(automation.name)")
+            let runId = automation.recordsRuns ? UUID() : nil
+            let task = Task {
+                // Persisted alongside `execute`: the database must never delay the first command.
+                let recording = Task { await self.record(runId, of: automation, for: event) }
+                do {
+                    try await AutomationRunContext.$runId.withValue(runId) {
+                        try await AutomationRunContext.$event.withValue(event) {
+                            try await automation.execute(using: self.homeManager)
                         }
-
-                        if !automation.supersedesRunningRun, await self.isRunning(automation.name) {
-                            self.log.info("Automation \(automation.name) is still running, not starting it again")
-                            return
-                        }
-
-                        self.log.info("Running automation \(automation.name)")
-                        let runId = automation.recordsRuns ? UUID() : nil
-                        let task = Task {
-                            // Persisted alongside `execute`: the database must never delay the first command.
-                            let recording = Task { await self.record(runId, of: automation, for: event) }
-                            do {
-                                try await AutomationRunContext.$runId.withValue(runId) {
-                                    try await AutomationRunContext.$event.withValue(event) {
-                                        try await automation.execute(using: self.homeManager)
-                                    }
-                                }
-                                await self.finish(await recording.value, outcome: .completed)
-                            } catch is CancellationError {
-                                let stopped = await self.consumeStopRequest(for: automation.name)
-                                await self.finish(await recording.value, outcome: stopped ? .stopped : .superseded)
-                            } catch {
-                                self.log.error("Automation failed with error - \(error)")
-                                await self.finish(await recording.value, outcome: .failed, error: String(describing: error))
-                            }
-
-                            // cancel the current task after completion to get correct results of getActiveAutomationNames
-                            withUnsafeCurrentTask { currentTask in
-                                currentTask?.cancel()
-                            }
-                        }
-                        await self.set(task: task, with: automation.name)
-                    } catch {
-                        self.log.error("Automation shouldTrigger failed with error - \(error)")
                     }
+                    await self.finish(await recording.value, outcome: .completed)
+                } catch is CancellationError {
+                    let stopped = await self.consumeStopRequest(for: automation.name)
+                    await self.finish(await recording.value, outcome: stopped ? .stopped : .superseded)
+                } catch {
+                    self.log.error("Automation failed with error - \(error)")
+                    await self.finish(await recording.value, outcome: .failed, error: String(describing: error))
+                }
+
+                // cancel the current task after completion to get correct results of getActiveAutomationNames
+                withUnsafeCurrentTask { currentTask in
+                    currentTask?.cancel()
                 }
             }
+            self.set(task: task, with: automation.name)
+        } catch {
+            self.log.error("Automation shouldTrigger failed with error - \(error)")
         }
     }
 

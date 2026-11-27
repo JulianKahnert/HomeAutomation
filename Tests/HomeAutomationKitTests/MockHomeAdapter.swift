@@ -202,10 +202,11 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     private(set) var sentNotificationTitles: [String] = []
     private(set) var overdueWindowIds: [EntityId] = []
 
-    /// The notifications `sendNotification` was asked to send.
+    /// The notifications `deliver` was asked to send.
     private(set) var sentNotifications: [(title: String, message: String, id: String, category: String?)] = []
 
-    func sendNotification(title: String, message: String, id: String, category: String?) async {
+    func deliver(_ delivery: Delivery) async {
+        guard case let .push(title, message, id, category) = delivery else { return }
         sentNotificationTitles.append(title)
         sentNotifications.append((title, message, id, category))
         notificationDates[id] = Date()

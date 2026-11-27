@@ -49,8 +49,9 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async
     func getLocation() async -> Location
-    /// - Parameter category: The notification category of the app, which gives the push its actions; `nil` for none.
-    func sendNotification(title: String, message: String, id: String, category: String?) async
+    /// Hands a push or Live Activity update over to the notification adapter. Deliveries leave in the order
+    /// they were handed over, also when one send is slow; a failed send is logged, not thrown.
+    func deliver(_ delivery: Delivery) async
     /// Marks an offenes Fenster überschritten once its Fensterschließzeit has passed; the Live Activity alerts once.
     func markWindowOverdue(entityId: EntityId) async
     /// The window Live Activity's content state, as the server last built it.
@@ -60,12 +61,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func clearActionLog() async
     /// Whether HomeKit works end to end; shared by `/health` and the `HealthCheck` automation.
     func homeKitHealth() async -> HomeKitHealth
-}
-
-extension HomeManagable {
-    public func sendNotification(title: String, message: String, id: String) async {
-        await sendNotification(title: title, message: message, id: id, category: nil)
-    }
 }
 
 public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equatable {

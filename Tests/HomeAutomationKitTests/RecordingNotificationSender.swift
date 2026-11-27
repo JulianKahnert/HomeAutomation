@@ -5,6 +5,7 @@
 
 import Foundation
 import HAModels
+@testable import HAApplicationLayer
 
 /// Records what leaves the server through ``NotificationSender``, so window tests can assert
 /// on the Live Activity updates without APNS.
@@ -50,5 +51,16 @@ actor RecordingNotificationSender: NotificationSender {
 
     func endAllLiveActivities(ofActivityType activityType: String) async {
         events.append(.end(activityType: activityType))
+    }
+}
+
+extension WindowManager {
+    /// A window manager that delivers through `sender`, like the one inside the `HomeManager`.
+    init(notificationSender: any NotificationSender,
+         now: @escaping @Sendable () -> Date = { Date() },
+         outdoorTemperature: @escaping @Sendable () async -> Double? = { nil },
+         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
+        let queue = DeliveryQueue(sender: notificationSender)
+        self.init(deliver: { await queue.deliver($0) }, now: now, outdoorTemperature: outdoorTemperature, sleep: sleep)
     }
 }

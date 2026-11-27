@@ -785,6 +785,9 @@ components:
         valveOpen:
           type: boolean
           description: Valve open state (if applicable).
+        origin:
+          type: string
+          description: Where the change came from, `homekit`, `server` or the name of a polling job. Absent for an item that is no single change, such as an hourly aggregate.
       required:
         - timestamp
 

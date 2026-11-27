@@ -33,6 +33,8 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     public let heatingMode: HeatingMode?
     public let valvePositionPercent: Int?
     public let temperatureCalibrationInC: Double?
+    /// Where the change came from; `nil` for an item that is no single change, such as an hourly aggregate.
+    public let origin: String?
 
     public init(
         id: UUID = UUID(),
@@ -58,7 +60,8 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         targetTemperatureInC: Double? = nil,
         heatingMode: HeatingMode? = nil,
         valvePositionPercent: Int? = nil,
-        temperatureCalibrationInC: Double? = nil
+        temperatureCalibrationInC: Double? = nil,
+        origin: String? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -84,6 +87,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         self.heatingMode = heatingMode
         self.valvePositionPercent = valvePositionPercent
         self.temperatureCalibrationInC = temperatureCalibrationInC
+        self.origin = origin
     }
 }
 
@@ -111,7 +115,8 @@ extension EntityHistoryItem {
                   targetTemperatureInC: item.targetTemperatureInC,
                   heatingMode: item.heatingMode,
                   valvePositionPercent: item.valvePositionPercent,
-                  temperatureCalibrationInC: item.temperatureCalibrationInC)
+                  temperatureCalibrationInC: item.temperatureCalibrationInC,
+                  origin: item.origin.rawValue)
     }
 
     /// Human-readable description of the primary value

@@ -267,7 +267,8 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                  targetTemperatureInC: item.targetTemperatureInC,
                                  heatingMode: heatingMode(of: item),
                                  valvePositionPercent: item.valvePositionPercent,
-                                 temperatureCalibrationInC: item.temperatureCalibrationInC)
+                                 temperatureCalibrationInC: item.temperatureCalibrationInC,
+                                 origin: Origin(rawValue: item.origin))
     }
 
     static func map(_ item: EntityStorageItem) -> EntityStorageDbItem {
@@ -297,7 +298,8 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                                    targetTemperatureInC: item.targetTemperatureInC,
                                    heatingMode: item.heatingMode?.rawValue,
                                    valvePositionPercent: item.valvePositionPercent,
-                                   temperatureCalibrationInC: item.temperatureCalibrationInC)
+                                   temperatureCalibrationInC: item.temperatureCalibrationInC,
+                                   origin: item.origin.rawValue)
     }
 }
 

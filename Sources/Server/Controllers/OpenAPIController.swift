@@ -412,7 +412,8 @@ extension Components.Schemas.EntityHistoryItem {
                   carbonDioxideSensorId: item.carbonDioxideSensorId,
                   pmDensity: item.pmDensity,
                   airQuality: item.airQuality,
-                  valveOpen: item.valveOpen)
+                  valveOpen: item.valveOpen,
+                  origin: item.origin.rawValue)
     }
 }
 

@@ -146,6 +146,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(AddTemperatureCalibration())
     app.migrations.add(CreateHeatingWrite())
     app.migrations.add(CreateFireplaceSwitch())
+    app.migrations.add(AddOrigin())
 
     // Run migrations automatically
     try await app.autoMigrate()

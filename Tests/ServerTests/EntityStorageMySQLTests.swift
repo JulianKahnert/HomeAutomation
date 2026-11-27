@@ -26,19 +26,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         var tls = TLSConfiguration.makeClientConfiguration()
         tls.certificateVerification = .none
         app.databases.use(.mysql(hostname: "127.0.0.1", port: port, username: "u", password: "p", database: "t", tlsConfiguration: tls), as: .mysql)
-        app.migrations.add(CreateEntityStorageDbItem())
-        app.migrations.add(AddSensorFields())
-        app.migrations.add(CreateAutomationRun())
-        app.migrations.add(AddLookupIndexes())
-        app.migrations.add(AddHeatingControlFields())
-        app.migrations.add(CreateWeatherHour())
-        app.migrations.add(CreateEntityHourlyAggregate())
-        app.migrations.add(AddTemperatureCalibration())
-        app.migrations.add(CreateHeatingWrite())
-        app.migrations.add(AddOrigin())
-        app.migrations.add(CreateJournal())
-        app.migrations.add(CreateNarrowStorage())
-        app.migrations.add(DropEntityItems())
+        for migration in ServerMigrations.all { app.migrations.add(migration) }
         try await app.autoMigrate()
     }
 

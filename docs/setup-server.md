@@ -46,7 +46,7 @@ LOG_LEVEL=trace docker-compose up app
 # debug logs on top of the configured level
 HA_DEBUG_LOGGING=1 docker-compose up app
 
-# run migration
+# run migration (the server also migrates on start; a new, empty database gets the one initial schema)
 docker-compose run migrate
 
 # show logs

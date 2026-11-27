@@ -12,6 +12,10 @@ let package = Package(
             name: "HomeAutomationKit",
             targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "StarActorSystem"]
         ),
+        .library(
+            name: "ControllerKit",
+            targets: ["Controller"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.4"),
@@ -120,6 +124,18 @@ let package = Package(
                 .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
             ]
         ),
+        .target(
+            name: "Controller",
+            dependencies: [
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+                "HAModels",
+                "Shared",
+                "ServerClient",
+            ],
+            path: "Sources/Controller"
+        ),
         .testTarget(
             name: "SharedTests",
             dependencies: [
@@ -136,6 +152,14 @@ let package = Package(
                 "HAImplementations",
                 "HAApplicationLayer"
             ]
+        ),
+        .testTarget(
+            name: "ControllerTests",
+            dependencies: [
+                "Controller",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
+            ],
+            path: "Tests/ControllerTests"
         ),
         .testTarget(
             name: "ServerTests",
@@ -158,31 +182,3 @@ let package = Package(
         ),
     ]
 )
-
-// The app layer needs SwiftUI and TCA, which Linux does not have: there the package holds only what the server
-// and its tests build (the Docker image, scripts/run-mysql-tests.sh).
-#if !os(Linux)
-package.products.append(.library(name: "ControllerKit", targets: ["Controller"]))
-package.targets.append(contentsOf: [
-        .target(
-            name: "Controller",
-            dependencies: [
-                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
-                .product(name: "Dependencies", package: "swift-dependencies"),
-                .product(name: "Sharing", package: "swift-sharing"),
-                "HAModels",
-                "Shared",
-                "ServerClient",
-            ],
-            path: "Sources/Controller"
-        ),
-        .testTarget(
-            name: "ControllerTests",
-            dependencies: [
-                "Controller",
-                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            path: "Tests/ControllerTests"
-        )
-])
-#endif

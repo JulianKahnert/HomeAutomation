@@ -64,7 +64,7 @@ struct GoldenThunkIDTests {
 
         let (_, eventContinuation) = AsyncStream.makeStream(of: HomeEvent.self)
         _ = serverSystem.makeActor(id: .homeEventReceiver) {
-            HomeEventReceiver(continuation: eventContinuation, actorSystem: serverSystem)
+            HomeEventReceiver(emit: { eventContinuation.yield($0) }, actorSystem: serverSystem)
         }
         _ = adapterSystem.makeActor(id: .homeKitCommandReceiver) {
             HomeKitCommandReceiver(actorSystem: adapterSystem, adapter: FakeHomeKitAdapter())

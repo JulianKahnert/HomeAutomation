@@ -93,9 +93,16 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          typealias Value = EventLoopGauge
      }
 
-     var eventLoopGauge: EventLoopGauge? {
-         get { self.storage[EventLoopGaugeKey.self] }
-         set { self.storage[EventLoopGaugeKey.self] = newValue }
+     var eventLoopGauge: EventLoopGauge {
+         if let gauge = self.storage[EventLoopGaugeKey.self] { return gauge }
+         let gauge = EventLoopGauge()
+         self.storage[EventLoopGaugeKey.self] = gauge
+         return gauge
+     }
+
+     /// Where producers yield events, so the gauge sees how long they wait.
+     var homeEventSink: HomeEventSink {
+         HomeEventSink(continuation: homeEventsContinuation, gauge: eventLoopGauge)
      }
 
      private struct SchedulerKey: StorageKey {

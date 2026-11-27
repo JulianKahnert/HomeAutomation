@@ -50,7 +50,7 @@ func routes(_ app: Application) throws {
                 // Last success per scheduled job, so a dead source is visible (nil until first success).
                 let jobs = await scheduler?.lastSuccesses ?? [:]
                 let body = HealthDTO(jobs: jobs.mapValues { $0.formatted(.iso8601) },
-                                     loopAgeSeconds: await gauge?.age() ?? 0,
+                                     loopAgeSeconds: gauge.age(),
                                      laneAgeSeconds: await automationService.laneAges(),
                                      lastReports: await homeManager.lastReports().mapValues { $0.formatted(.iso8601) })
                 let response = Response(status: .ok)
@@ -111,7 +111,7 @@ func routes(_ app: Application) throws {
         await req.application.homeAutomationConfigService.set(location: configDTO.location)
         try await req.application.automationService.deploy(configDTO.automations.map(\.automation))
         // After the config is stored, so automations that react see the new one.
-        req.application.homeEventsContinuation.yield(.configDeployed)
+        req.application.homeEventSink.yield(.configDeployed)
 
         return configDTO
     }
@@ -129,7 +129,7 @@ func routes(_ app: Application) throws {
 /// Body of `GET /health`: the last success of every scheduled job (ISO 8601) and the ages of the event loop and every lane.
 struct HealthDTO: Content {
     let jobs: [String: String]
-    /// How long the event loop has been on its current event.
+    /// The age of the oldest event the event loop has not finished, in the stream or being handled; 0 when idle.
     let loopAgeSeconds: Double
     /// Per automation: the age of the oldest event its lane has not finished checking; 0 when idle.
     let laneAgeSeconds: [String: Double]

@@ -12,19 +12,19 @@ import Shared
 
 struct ClockJob: Job, Log {
     let location: Location
-    let homeEventsContinuation: AsyncStream<HomeEvent>.Continuation
+    let homeEventSink: HomeEventSink
 
     func run() async {
         log.debug("Starting ClockJob")
         for await date in Timer.publish(every: .minutes(1)) {
             // trigger stream event
-            homeEventsContinuation.yield(.time(date: date))
+            homeEventSink.yield(.time(date: date))
 
             // trigger sunset/sunrise event
             if Sun.sunriseElevation(for: date, latitude: location.latitude, longitude: location.longitude) == .horizon {
-                homeEventsContinuation.yield(.sunrise)
+                homeEventSink.yield(.sunrise)
             } else if Sun.sunsetElevation(for: date, latitude: location.latitude, longitude: location.longitude) == .horizon {
-                homeEventsContinuation.yield(.sunset)
+                homeEventSink.yield(.sunset)
             }
         }
     }

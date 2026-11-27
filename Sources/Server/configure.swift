@@ -134,22 +134,9 @@ public func configure(_ app: Application) async throws {
             connectionPoolTimeout: .seconds(10)
         ), as: .mysql)
 
-    app.migrations.add(CreateEntityStorageDbItem())
-    app.migrations.add(DeviceTokenItem())
-    app.migrations.add(AddSensorFields())
-    app.migrations.add(CreateConfigItem())
-    app.migrations.add(CreateAutomationRun())
-    app.migrations.add(AddLookupIndexes())
-    app.migrations.add(AddHeatingControlFields())
-    app.migrations.add(CreateWeatherHour())
-    app.migrations.add(CreateEntityHourlyAggregate())
-    app.migrations.add(AddTemperatureCalibration())
-    app.migrations.add(CreateHeatingWrite())
-    app.migrations.add(AddOrigin())
-    app.migrations.add(CreateJournal())
-    app.migrations.add(CreateNarrowStorage())
-    app.migrations.add(DropEntityItems())
-    app.migrations.add(MoveHeatingWritesToJournal())
+    for migration in ServerMigrations.all {
+        app.migrations.add(migration)
+    }
 
     // Run migrations automatically
     try await app.autoMigrate()

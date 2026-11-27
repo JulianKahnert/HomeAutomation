@@ -27,7 +27,6 @@ struct AppFeature: Sendable {
         var selectedTab: Tab = .overview
         var overview = OverviewFeature.State()
         var automations = AutomationsFeature.State()
-        var rooms = RoomsFeature.State()
         var heating = HeatingFeature.State()
         var settings = SettingsFeature.State()
 
@@ -41,7 +40,6 @@ struct AppFeature: Sendable {
     enum Tab: Sendable, Equatable, CaseIterable {
         case overview
         case automations
-        case rooms
         case heating
         case settings
 
@@ -49,7 +47,6 @@ struct AppFeature: Sendable {
             switch self {
             case .overview: return "Overview"
             case .automations: return "Automations"
-            case .rooms: return "Rooms"
             case .heating: return "Heating"
             case .settings: return "Settings"
             }
@@ -59,7 +56,6 @@ struct AppFeature: Sendable {
             switch self {
             case .overview: return "house"
             case .automations: return "lamp.floor"
-            case .rooms: return "square.grid.2x2"
             case .heating: return "thermometer.high"
             case .settings: return "gear"
             }
@@ -72,7 +68,6 @@ struct AppFeature: Sendable {
         case selectedTabChanged(Tab)
         case overview(OverviewFeature.Action)
         case automations(AutomationsFeature.Action)
-        case rooms(RoomsFeature.Action)
         case heating(HeatingFeature.Action)
         case settings(SettingsFeature.Action)
 
@@ -111,10 +106,6 @@ struct AppFeature: Sendable {
             AutomationsFeature()
         }
 
-        Scope(\.rooms, action: \.rooms) {
-            RoomsFeature()
-        }
-
         Scope(\.heating, action: \.heating) {
             HeatingFeature()
         }
@@ -137,9 +128,6 @@ struct AppFeature: Sendable {
                 return .none
 
             case .automations:
-                return .none
-
-            case .rooms:
                 return .none
 
             case .heating:
@@ -224,7 +212,6 @@ struct AppFeature: Sendable {
                 return .merge(
                     .send(.overview(.refresh)),
                     .send(.automations(.refresh)),
-                    .send(.rooms(.refresh)),
                     .send(.heating(.refresh)),
                     .send(.refreshWindowStates),
                     .send(.startMonitoringLiveActivities),
@@ -263,14 +250,6 @@ struct AppView: View {
                 AutomationsView(
                     store: store.scope(\.automations, action: \.automations)
                 )
-            }
-
-            Tab(
-                AppFeature.Tab.rooms.title,
-                systemImage: AppFeature.Tab.rooms.systemImage,
-                value: AppFeature.Tab.rooms
-            ) {
-                RoomsView(store: store.scope(\.rooms, action: \.rooms))
             }
 
             Tab(

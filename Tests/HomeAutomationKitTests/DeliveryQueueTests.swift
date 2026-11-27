@@ -94,7 +94,6 @@ private actor GatedSender: NotificationSender {
         if failFirst && titles.count == 1 { throw Failure() }
     }
 
-    func clearNotification(id: String) async throws {}
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
                                                                        activityName: String,
                                                                        options: LiveActivityOptions) async {}

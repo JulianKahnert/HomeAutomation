@@ -48,12 +48,6 @@ actor DeliveryQueue: Log {
             } catch {
                 log.warning("Failed to send notification", metadata: ["id": "\(id)", "error": "\(error)"])
             }
-        case .clearPush(let id):
-            do {
-                try await sender.clearNotification(id: id)
-            } catch {
-                log.warning("Failed to clear notification", metadata: ["id": "\(id)", "error": "\(error)"])
-            }
         case let .liveActivity(contentState, activityName, options):
             await sender.startOrUpdateLiveActivity(contentState: contentState, activityName: activityName, options: options)
         case .endLiveActivities(let activityType):

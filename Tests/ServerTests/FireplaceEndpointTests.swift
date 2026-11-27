@@ -143,7 +143,6 @@ struct EmptyStorage: StorageRepository {
 }
 struct SilentSender: NotificationSender {
     func sendNotification(title: String, message: String, id: String, category: String?) async throws {}
-    func clearNotification(id: String) async throws {}
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String, options: LiveActivityOptions) async {}
     func endAllLiveActivities(ofActivityType activityType: String) async {}
 }

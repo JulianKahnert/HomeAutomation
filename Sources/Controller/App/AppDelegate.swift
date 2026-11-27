@@ -56,28 +56,6 @@ extension AppDelegate: UIApplicationDelegate {
         return true
     }
 
-    public func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
-        logger.info("didReceiveRemoteNotification called")
-
-        // Background push sent by the server when a window closes.
-        // Remove the matching "window open" notification identified by its threadIdentifier.
-        if let clearId = userInfo["clearNotificationId"] as? String {
-            logger.info("Clearing notification with threadIdentifier: \(clearId)")
-            let center = UNUserNotificationCenter.current()
-            let delivered = await center.deliveredNotifications()
-            let idsToRemove = delivered
-                .filter { $0.request.content.threadIdentifier == clearId }
-                .map(\.request.identifier)
-            if !idsToRemove.isEmpty {
-                center.removeDeliveredNotifications(withIdentifiers: idsToRemove)
-                logger.info("Removed \(idsToRemove.count) notification(s)")
-            }
-            return .newData
-        }
-
-        return .noData
-    }
-
     public func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         logger.info("Registered for remote notifications")
         let token = PushToken(deviceName: PushToken.currentDeviceName,

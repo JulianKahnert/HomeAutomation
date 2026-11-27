@@ -32,8 +32,6 @@ private actor SlowSender: NotificationSender {
 
     func sendNotification(title: String, message: String, id: String, category: String?) async throws {}
 
-    nonisolated func clearNotification(id: String) async throws {}
-
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
                                                                        activityName: String,
                                                                        options: LiveActivityOptions) async {

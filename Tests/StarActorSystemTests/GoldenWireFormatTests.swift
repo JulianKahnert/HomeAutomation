@@ -23,13 +23,48 @@ struct GoldenWireFormatTests {
 
     @Test("Golden hello envelope JSON")
     func goldenHello() throws {
-        let json = try encodeSorted(.hello(Hello(protocolVersion: 2)))
-        #expect(json == #"{"hello":{"_0":{"protocolVersion":2}}}"#)
+        let json = try encodeSorted(.hello(Hello(protocolVersion: StarActorSystem.protocolVersion)))
+        #expect(json == #"{"hello":{"_0":{"protocolVersion":3}}}"#)
     }
 
-    @Test("The protocol version is 2 since the thermostat calls")
-    func protocolVersionIsTwo() {
-        #expect(StarActorSystem.protocolVersion == 2)
+    @Test("The protocol version is 3 since the value kind and value wire shape")
+    func protocolVersionIsThree() {
+        #expect(StarActorSystem.protocolVersion == 3)
+    }
+
+    @Test("Golden entity state JSON carries value kind and value")
+    func goldenEntityState() throws {
+        let id = EntityId(placeId: "Bad OG", name: "Sensor", characteristicsName: nil, characteristic: .temperatureSensor)
+        let date = Date(timeIntervalSinceReferenceDate: 1000)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let item = EntityStorageItem(entityId: id, timestamp: date, temperatureInC: .init(value: 21.5, unit: .celsius), origin: .homekit)
+        let json = try #require(String(bytes: try encoder.encode(item), encoding: .utf8))
+        #expect(json == #"{"entityId":{"characteristicType":"temperatureSensor","name":"Sensor","placeId":"Bad OG"},"kind":"temperatureSensor","origin":"homekit","timestamp":1000,"value":{"number":{"_0":21.5}}}"#)
+        let text = EntityStorageItem(entityId: id, timestamp: date, color: RGB(red: 0.5, green: 0.25, blue: 1), origin: .homekit)
+        #expect(String(bytes: try encoder.encode(text), encoding: .utf8)?.contains(#""value":{"text":{"_0":"0.5 0.25 1.0"}}"#) == true)
+    }
+
+    @Test("Every value kind survives the wire with the same value")
+    func entityStateRoundTrip() throws {
+        for type in CharacteristicsType.allCases {
+            let id = EntityId(placeId: "p", name: "e", characteristicsName: nil, characteristic: type)
+            let value: Value = switch type.valueKind.descriptor?.shape {
+            case .bool: .bool(true)
+            case .text: .text("0.1 0.25 0.9")
+            default: type == .heatingMode ? .number(1) : .number(3)
+            }
+            let item = try #require(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSinceReferenceDate: 5), kind: type.valueKind, value: value, origin: .homekit))
+            let back = try JSONDecoder().decode(EntityStorageItem.self, from: try JSONEncoder().encode(item))
+            #expect(back == item, "\(type)")
+            #expect(back.genericValue?.value == value, "\(type)")
+        }
+    }
+
+    @Test("An unknown value kind fails to decode")
+    func unknownKindFails() {
+        let json = #"{"entityId":{"characteristicType":"temperatureSensor","name":"S","placeId":"p"},"kind":"future","origin":"homekit","timestamp":1,"value":{"number":{"_0":1}}}"#
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(EntityStorageItem.self, from: Data(json.utf8)) }
     }
 
     @Test("Golden thermostat and thermostat reply JSON")

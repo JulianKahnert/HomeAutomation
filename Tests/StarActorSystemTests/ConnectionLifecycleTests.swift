@@ -157,7 +157,7 @@ struct ConnectionLifecycleTests {
             Issue.record("expected hello reply, got \(reply)")
             return
         }
-        #expect(hello.protocolVersion == 2)
+        #expect(hello.protocolVersion == StarActorSystem.protocolVersion)
         #expect(server.isConnected)
     }
 

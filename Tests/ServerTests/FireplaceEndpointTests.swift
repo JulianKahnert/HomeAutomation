@@ -22,8 +22,8 @@ final class FireplaceEndpointTests: XCTestCase {
         app.environment.arguments = ["serve"]
         app.authToken = token
         app.authDisabled = false
-        app.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405),
-                                                                      automations: [], persist: { _ in })
+        app.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405), persist: { _ in })
+        app.automationService = try await makeAutomationService(automations: [])
         app.starActorSystem = StarActorSystem(name: "fireplace-tests")
         switches = FireplaceSwitches()
         events = EventLog()
@@ -151,7 +151,7 @@ private final class EventLog: @unchecked Sendable {
     func append(_ fireplaceSwitch: FireplaceSwitch) { lock.withLock { switches.append(fireplaceSwitch) } }
 }
 
-private struct EmptyStorage: StorageRepository {
+struct EmptyStorage: StorageRepository {
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? { nil }
     func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? { nil }
     func getAllCurrent() async throws -> [EntityStorageItem] { [] }
@@ -159,7 +159,7 @@ private struct EmptyStorage: StorageRepository {
     func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] { [] }
     func getAllEntityIds() async throws -> [EntityId] { [] }
 }
-private struct SilentSender: NotificationSender {
+struct SilentSender: NotificationSender {
     func sendNotification(title: String, message: String, id: String, category: String?) async throws {}
     func clearNotification(id: String) async throws {}
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String, options: LiveActivityOptions) async {}

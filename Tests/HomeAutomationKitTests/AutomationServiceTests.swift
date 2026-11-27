@@ -47,7 +47,39 @@ struct AutomationServiceTests {
     let homeManager = MockHomeAdapter()
 
     private func makeService(_ automation: TestAutomation) throws -> AutomationService {
-        try AutomationService(using: homeManager, runs: repository, getAutomations: { @Sendable in [automation] })
+        try AutomationService(using: homeManager, runs: repository, automations: [automation])
+    }
+
+    @Test func deployKeepsTheActiveStateOfKnownAutomationsAndStoresThem() async throws {
+        let store = InMemoryAutomationRepository()
+        var known = TestAutomation(name: "known", mode: .complete)
+        known.isActive = false
+        let service = try AutomationService(using: homeManager, runs: repository, automations: [known], repository: store)
+
+        try await service.deploy([TestAutomation(name: "known", mode: .complete), TestAutomation(name: "new", mode: .complete)])
+
+        #expect(await service.automations.map(\.isActive) == [false, true])
+        #expect(await store.saved.map(\.name) == ["known", "new"])
+    }
+
+    @Test func switchingAnAutomationStoresItsActiveState() async throws {
+        let store = InMemoryAutomationRepository()
+        let service = try AutomationService(using: homeManager, runs: repository, automations: [TestAutomation(name: "a", mode: .complete)], repository: store)
+
+        try await service.setAutomationActive(with: "a", to: false)
+
+        #expect(await service.automations.map(\.isActive) == [false])
+        #expect(await store.saved.map(\.isActive) == [false])
+    }
+
+    @Test func aDeactivatedAutomationDoesNotRun() async throws {
+        let service = try makeService(TestAutomation(name: "a", mode: .complete))
+        try await service.setAutomationActive(with: "a", to: false)
+
+        await service.trigger(with: .sunrise)
+
+        #expect(await service.getActiveAutomationNames().isEmpty)
+        #expect(await repository.runs.isEmpty)
     }
 
     @Test func completedRunRecordsTriggerAndEnd() async throws {

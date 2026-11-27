@@ -13,20 +13,50 @@ public actor AutomationService {
     private let log = Logger(label: "AutomationManager")
     private let homeManager: HomeManagable
     private let runs: AutomationRunRepository
-    private let getAutomations: () async -> [any Automatable]
+    private let repository: any AutomationRepository
+    /// The deployed automation instances; `isActive` is their active state.
+    public private(set) var automations: [any Automatable]
     private var runningTasks: [String: Task<Void, Never>] = [:]
     /// Names whose current task was cancelled by `stopAutomation`, so its run ends as `stopped`
     /// rather than `superseded`.
     private var stopRequested: Set<String> = []
 
-    public init(using homeManager: HomeManagable, runs: AutomationRunRepository, getAutomations: @escaping () async -> [any Automatable]) throws {
+    public init(using homeManager: HomeManagable,
+                runs: AutomationRunRepository,
+                automations: [any Automatable] = [],
+                repository: any AutomationRepository = InMemoryAutomationRepository()) throws {
         self.homeManager = homeManager
         self.runs = runs
-        self.getAutomations = getAutomations
+        self.automations = automations
+        self.repository = repository
+    }
+
+    /// Replaces the deployed automations and stores them. An automation that was deployed before keeps its active state.
+    public func deploy(_ newAutomations: [any Automatable]) async throws {
+        let previous = automations
+        automations = newAutomations.map { automation in
+            var automation = automation
+            if let existing = previous.first(where: { $0.name == automation.name }) {
+                automation.isActive = existing.isActive
+            }
+            return automation
+        }
+        try await repository.save(automations)
+    }
+
+    public func setAutomationActive(with name: String, to value: Bool) async throws {
+        automations = automations.map { automation in
+            var automation = automation
+            if automation.name == name {
+                automation.isActive = value
+            }
+            return automation
+        }
+        try await repository.save(automations)
     }
 
     public func trigger(with event: HomeEvent) async {
-        let automations = await getAutomations()
+        let automations = self.automations
 
         await withDiscardingTaskGroup { group in
             for automation in automations where automation.isActive {

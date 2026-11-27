@@ -242,7 +242,8 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - home automation setup
 
-    app.homeAutomationConfigService = await HomeAutomationConfigService.load(from: { app.db })
+    let loadedConfig = await HomeAutomationConfigService.load(from: { app.db })
+    app.homeAutomationConfigService = loadedConfig.service
     let notificationSender = PushNotifcationService(database: { app.db },
                                                     apnsClient: apnsClient,
                                                     notificationTopic: notificationTopic)
@@ -281,9 +282,8 @@ public func configure(_ app: Application) async throws {
     try await app.automationRunRepository.markRunningAsInterrupted()
     let automationService = try AutomationService(using: homeManager,
                                                   runs: app.automationRunRepository,
-                                                  getAutomations: {
-        await app.homeAutomationConfigService.automations
-    })
+                                                  automations: loadedConfig.automations,
+                                                  repository: app.homeAutomationConfigService)
     app.automationService = automationService
 
     // MARK: - register jobs

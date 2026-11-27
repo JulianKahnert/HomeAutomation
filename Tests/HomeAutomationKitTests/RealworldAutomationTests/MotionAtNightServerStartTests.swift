@@ -28,7 +28,7 @@ struct MotionAtNightServerStartTests {
             EntityStorageItem(entityId: light.switchId, isDeviceOn: false)
         ]
         let automation = MotionAtNight("motion-at-night", colorTemperatureDelay: .zero, motionSensors: [motion], lightSensor: motion, lights: [light], minBrightness: 0.1)
-        let service = try AutomationService(using: homeManager, runs: runs, getAutomations: { @Sendable in [automation] })
+        let service = try AutomationService(using: homeManager, runs: runs, automations: [automation])
 
         await service.trigger(with: .serverStarted)
 

@@ -34,6 +34,8 @@ final class EntityStorageMySQLTests: XCTestCase {
         app.migrations.add(AddTemperatureCalibration())
         app.migrations.add(CreateHeatingWrite())
         app.migrations.add(CreateFireplaceSwitch())
+        app.migrations.add(AddOrigin())
+        app.migrations.add(CreateNarrowStorage())
         try await app.autoMigrate()
     }
 
@@ -44,44 +46,30 @@ final class EntityStorageMySQLTests: XCTestCase {
         }
     }
 
-    func testHeatingFieldsRoundTripThroughTinyIntColumns() async throws {
+    func testHeatingFieldsRoundTrip() async throws {
         let repository = app.entityStorageDbRepository
-        let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .valvePosition)
-        for (offset, values) in [(0, (.off, 0)), (1, (.auto, 100)), (2, (nil, nil))] as [(Int, (HeatingMode?, Int?))] {
-            try await repository.add(EntityStorageItem(entityId: id,
-                                                       timestamp: Date(timeIntervalSince1970: Double(1_000 + offset)),
-                                                       heatingMode: values.0,
-                                                       valvePositionPercent: values.1))
+        let mode = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .heatingMode)
+        let valve = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .valvePosition)
+        let calibration = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .temperatureCalibration)
+        for (offset, values) in [(0, (HeatingMode.off, 0, -2.5)), (1, (.auto, 100, 0.3))] {
+            let timestamp = Date(timeIntervalSince1970: Double(1_000 + offset))
+            try await repository.add(EntityStorageItem(entityId: mode, timestamp: timestamp, heatingMode: values.0))
+            try await repository.add(EntityStorageItem(entityId: valve, timestamp: timestamp, valvePositionPercent: values.1))
+            try await repository.add(EntityStorageItem(entityId: calibration, timestamp: timestamp, temperatureCalibrationInC: values.2))
         }
 
-        let items = try await repository.getHistory(for: id, startDate: nil, endDate: nil, cursor: nil, limit: 10)
+        let modes = try await repository.getHistory(for: mode, startDate: nil, endDate: nil, cursor: nil, limit: 10)
+        let valves = try await repository.getHistory(for: valve, startDate: nil, endDate: nil, cursor: nil, limit: 10)
+        let calibrations = try await repository.getHistory(for: calibration, startDate: nil, endDate: nil, cursor: nil, limit: 10)
 
-        XCTAssertEqual(items.map(\.heatingMode), [nil, .auto, .off])
-        XCTAssertEqual(items.map(\.valvePositionPercent), [nil, 100, 0])
-    }
-
-    func testTemperatureCalibrationRoundTrips() async throws {
-        let repository = app.entityStorageDbRepository
-        let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .temperatureCalibration)
-        for (offset, value) in [(0, -2.5), (1, 0.3), (2, nil)] as [(Int, Double?)] {
-            try await repository.add(EntityStorageItem(entityId: id,
-                                                       timestamp: Date(timeIntervalSince1970: Double(1_000 + offset)),
-                                                       temperatureCalibrationInC: value))
-        }
-
-        let items = try await repository.getHistory(for: id, startDate: nil, endDate: nil, cursor: nil, limit: 10)
-
-        XCTAssertEqual(items.map(\.temperatureCalibrationInC), [nil, 0.3, -2.5])
+        XCTAssertEqual(modes.map(\.heatingMode), [.auto, .off])
+        XCTAssertEqual(valves.map(\.valvePositionPercent), [100, 0])
+        XCTAssertEqual(calibrations.map(\.temperatureCalibrationInC), [0.3, -2.5])
     }
 
     func testUnknownHeatingModeIsReadAsNil() async throws {
         let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .heatingMode)
-        try await EntityStorageDbItem(timestamp: Date(timeIntervalSince1970: 1_000),
-                                      entityPlaceId: id.placeId,
-                                      entityServiceName: id.name,
-                                      entityCharacteristicType: id.characteristicType.rawValue,
-                                      heatingMode: 9)
-            .save(on: app.db)
+        try await insertChange(id, at: 1_000, .number(9))
 
         let item = try await app.entityStorageDbRepository.getCurrent(id)
 
@@ -89,12 +77,29 @@ final class EntityStorageMySQLTests: XCTestCase {
         XCTAssertNil(item?.heatingMode)
     }
 
-    func testColumnsAreNarrowIntegers() async throws {
-        let sql = try XCTUnwrap(app.db as? SQLDatabase)
-        let rows = try await sql.raw("SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityItems' AND COLUMN_NAME IN ('heatingMode', 'valvePositionPercent')").all()
-        let types = try Dictionary(uniqueKeysWithValues: rows.map { (try $0.decode(column: "COLUMN_NAME", as: String.self), try $0.decode(column: "COLUMN_TYPE", as: String.self)) })
-        XCTAssertEqual(types["heatingMode"], "tinyint")
-        XCTAssertEqual(types["valvePositionPercent"], "tinyint unsigned")
+    func testEveryValueKindIsStoredAndReadBackUnchanged() async throws {
+        let repository = app.entityStorageDbRepository
+        for (index, sample) in EntityStorageMappingTests.samples.enumerated() {
+            let id = EntityId(placeId: "Room", name: "Device\(index)", characteristicsName: "Name", characteristic: sample.0)
+            let item = try XCTUnwrap(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_000), kind: sample.0.valueKind, value: sample.1, origin: .job("valves")))
+            try await repository.add(item)
+
+            let restored = try await repository.getCurrent(id)
+
+            XCTAssertEqual(restored, item, "\(sample.0)")
+        }
+    }
+
+    func testOldTableIsNotWritten() async throws {
+        let repository = app.entityStorageDbRepository
+        let id = EntityId(placeId: "Hall", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
+        try await repository.add(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_000), isDeviceOn: true))
+
+        let old = try await EntityStorageDbItem.query(on: app.db).count()
+        let entities = try await EntityDbItem.query(on: app.db).count()
+        let changes = try await EntityChangeDbItem.query(on: app.db).count()
+
+        XCTAssertEqual([old, entities, changes], [0, 1, 1])
     }
 
     func testGetAllEntityIdsReturnsEachEntityOnceWithItsName() async throws {
@@ -122,12 +127,9 @@ final class EntityStorageMySQLTests: XCTestCase {
         try await repository.add(EntityStorageItem(entityId: contact, timestamp: Date(timeIntervalSince1970: 3_000), isContactOpen: true))
         try await repository.add(EntityStorageItem(entityId: lamp, timestamp: Date(timeIntervalSince1970: 2_000), isDeviceOn: true))
         try await repository.add(EntityStorageItem(entityId: lamp, timestamp: Date(timeIntervalSince1970: 1_500), isDeviceOn: false))
-        try await EntityStorageDbItem(timestamp: Date(timeIntervalSince1970: 4_000),
-                                      entityPlaceId: "Hall",
-                                      entityServiceName: "Gone",
-                                      entityCharacteristicType: "noLongerKnown",
-                                      isDeviceOn: true)
-            .save(on: app.db)
+        let gone = EntityDbItem(placeId: "Hall", serviceName: "Gone", characteristicType: "noLongerKnown", characteristicsName: nil)
+        try await gone.save(on: app.db)
+        try await EntityChangeDbItem(entityId: gone.requireID(), timestamp: Date(timeIntervalSince1970: 4_000), value: .bool(true), origin: "homekit").save(on: app.db)
 
         let items = try await repository.getAllCurrent().sorted { $0.entityId.placeId < $1.entityId.placeId }
 
@@ -142,13 +144,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         let repository = app.entityStorageDbRepository
         let lamp = EntityId(placeId: "Hall", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
         for (id, isDeviceOn) in [("00000000-0000-0000-0000-000000000002", true), ("00000000-0000-0000-0000-000000000001", false)] {
-            let row = EntityStorageDbItem(timestamp: Date(timeIntervalSince1970: 1_000),
-                                          entityPlaceId: "Hall",
-                                          entityServiceName: "Lamp",
-                                          entityCharacteristicType: CharacteristicsType.switcher.rawValue,
-                                          isDeviceOn: isDeviceOn)
-            row.id = UUID(uuidString: id)
-            try await row.save(on: app.db)
+            try await insertChange(lamp, at: 1_000, .bool(isDeviceOn), changeId: UUID(uuidString: id))
         }
 
         let all = try await repository.getAllCurrent()
@@ -164,14 +160,24 @@ final class EntityStorageMySQLTests: XCTestCase {
     private let hour = Date(timeIntervalSince1970: 1_699_999_200)
 
     private func insertRaw(_ id: EntityId, minutes: Double, co2: Int? = nil, lux: Double? = nil, isOn: Bool? = nil) async throws {
-        try await EntityStorageDbItem(timestamp: hour.addingTimeInterval(minutes * 60),
-                                      entityPlaceId: id.placeId,
-                                      entityServiceName: id.name,
-                                      entityCharacteristicType: id.characteristicType.rawValue,
-                                      illuminanceInLux: lux,
-                                      isDeviceOn: isOn,
-                                      carbonDioxideSensorId: co2)
-            .save(on: app.db)
+        let value: Value = co2.map { .number(Double($0)) } ?? lux.map { .number($0) } ?? .bool(isOn ?? false)
+        try await insertChange(id, at: hour.timeIntervalSince1970 + minutes * 60, value)
+    }
+
+    /// Writes a change row directly, past the repository's dead band.
+    private func insertChange(_ id: EntityId, at seconds: Double, _ value: Value, changeId: UUID? = nil) async throws {
+        let entity: EntityDbItem
+        if let existing = try await EntityDbItem.query(on: app.db)
+            .filter(\.$placeId == id.placeId).filter(\.$serviceName == id.name)
+            .filter(\.$characteristicType == id.characteristicType.rawValue).first() {
+            entity = existing
+        } else {
+            entity = EntityDbItem(placeId: id.placeId, serviceName: id.name, characteristicType: id.characteristicType.rawValue, characteristicsName: id.characteristicsName)
+            try await entity.save(on: app.db)
+        }
+        let change = try EntityChangeDbItem(entityId: entity.requireID(), timestamp: Date(timeIntervalSince1970: seconds), value: value, origin: "homekit")
+        change.id = changeId
+        try await change.save(on: app.db)
     }
 
     func testCO2WriteSkipsValuesInsideTheDeadBand() async throws {
@@ -255,10 +261,10 @@ final class EntityStorageMySQLTests: XCTestCase {
         XCTAssertEqual(noisy, [EntityRowCount(placeId: "Kueche", serviceName: "Air", characteristicType: "carbonDioxideSensorId", rows: 6)])
     }
 
-    func testTypeTimestampIndexServesTheRollupSelection() async throws {
+    func testChangeIndexServesTheEntityLookup() async throws {
         let sql = try XCTUnwrap(app.db as? SQLDatabase)
-        let rows = try await sql.raw("SELECT COLUMN_NAME FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityItems' AND INDEX_NAME = 'idx_entityItems_type_timestamp' ORDER BY SEQ_IN_INDEX").all()
-        XCTAssertEqual(try rows.map { try $0.decode(column: "COLUMN_NAME", as: String.self) }, ["entityCharacteristicType", "timestamp"])
+        let rows = try await sql.raw("SELECT COLUMN_NAME FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityChanges' AND INDEX_NAME = 'idx_entityChanges_entity_timestamp' ORDER BY SEQ_IN_INDEX").all()
+        XCTAssertEqual(try rows.map { try $0.decode(column: "COLUMN_NAME", as: String.self) }, ["entityId", "timestamp"])
     }
 
     // MARK: - weather

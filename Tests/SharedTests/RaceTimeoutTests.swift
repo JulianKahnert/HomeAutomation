@@ -15,22 +15,22 @@ struct RaceTimeoutTests {
         defer { release.finish() }
 
         await #expect(throws: TimedOut.self) {
-            try await raceTimeout(.milliseconds(20), timeoutError: { TimedOut() }) {
+            try await raceTimeout(.milliseconds(20), timeoutError: { TimedOut() }, operation: {
                 // Ignores cancellation: only the gate ends it, and the gate stays closed until the test ends.
                 for await _ in gate {}
                 return 1
-            }
+            })
         }
     }
 
     @Test func returnsTheResultOfAFastOperation() async throws {
-        let value = try await raceTimeout(.seconds(5), timeoutError: { TimedOut() }) { 42 }
+        let value = try await raceTimeout(.seconds(5), timeoutError: { TimedOut() }, operation: { 42 })
         #expect(value == 42)
     }
 
     @Test func rethrowsTheErrorOfTheOperation() async {
         await #expect(throws: CancellationError.self) {
-            try await raceTimeout(.seconds(5), timeoutError: { TimedOut() }) { throw CancellationError() }
+            try await raceTimeout(.seconds(5), timeoutError: { TimedOut() }, operation: { throw CancellationError() })
         }
     }
 }

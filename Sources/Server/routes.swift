@@ -32,7 +32,7 @@ func routes(_ app: Application) throws {
         // Race the health checks against a hard timeout so the Docker healthcheck always gets a
         // fast, definitive answer (503 peer-not-up / 504 timeout) instead of hanging.
         // Not a task group: it waits for every child, and a stuck query does not react to cancellation.
-        return try await raceTimeout(.seconds(5), timeoutError: { Abort(.gatewayTimeout, reason: "Health check timed out") }) {
+        return try await raceTimeout(.seconds(5), timeoutError: { Abort(.gatewayTimeout, reason: "Health check timed out") }, operation: {
             try await sql.raw("SELECT 1").run()
 
             let connectionStatus = system.latestConnectionStatus
@@ -53,7 +53,7 @@ func routes(_ app: Application) throws {
             let response = Response(status: .ok)
             try response.content.encode(body, as: .json)
             return response
-        }
+        })
     }
 
     authenticatedRoutes.get("config") { req in

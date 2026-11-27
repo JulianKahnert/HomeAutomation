@@ -260,9 +260,9 @@ struct HomeManagerTests {
         let id = holidayId
 
         // Both tasks queue on the manager at once; the first suspends at the command cache, the second runs then.
-        let on = Task { try await homeManager.report(id, value: .bool(true)) }
-        let off = Task { try await homeManager.report(id, value: .bool(false)) }
-        _ = try await (on.value, off.value)
+        let turnedOn = Task { try await homeManager.report(id, value: .bool(true)) }
+        let turnedOff = Task { try await homeManager.report(id, value: .bool(false)) }
+        _ = try await (turnedOn.value, turnedOff.value)
 
         // Whichever report ran first, each event carries the state its own report set, and the last one is the state that holds.
         let events = seen.withLock { $0 }

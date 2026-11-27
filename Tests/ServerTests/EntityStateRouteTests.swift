@@ -94,6 +94,20 @@ final class EntityStateRouteTests: XCTestCase {
         XCTAssertNil(homekit)
     }
 
+    func testAServerOwnedEntityOutsideTheRegistryIsRefusedAndUnchanged() async throws {
+        let planTarget = EntityId.serverOwned(name: "livingRoom", characteristic: .targetTemperature)
+        let (status, _) = try await put(body(name: "livingRoom", type: "targetTemperature", value: "25"))
+        XCTAssertEqual(status, .forbidden)
+        let state = try? await app.homeManager.getCurrentEntity(with: planTarget)
+        XCTAssertNil(state)
+        // a computed state that already exists stays as it is
+        await app.homeManager.report(planTarget, value: .number(21))
+        let (again, _) = try await put(body(name: "livingRoom", type: "targetTemperature", value: "25"))
+        XCTAssertEqual(again, .forbidden)
+        let held = try await app.homeManager.getCurrentEntity(with: planTarget)
+        XCTAssertEqual(held.genericValue?.value, .number(21))
+    }
+
     func testAValueOfTheWrongShapeIsRefused() async throws {
         let (status, _) = try await put(body(value: "42"))
         XCTAssertEqual(status, .badRequest)

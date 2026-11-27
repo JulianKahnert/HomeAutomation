@@ -285,7 +285,7 @@ paths:
       summary: Set the state of a server-owned entity
       description: |
         The one general route for the app to set a state the server owns (placeId `server`). Only entities
-        whose value kind is marked settable from the app are accepted; any other entity is refused and stays
+        that are declared settable from the app are accepted; any other entity is refused and stays
         unchanged. The state holds at once: the answer and every later read show it. Asking for the value the
         entity already has changes nothing (`changed` is false). The change counts with origin `app`.
       operationId: setEntityState

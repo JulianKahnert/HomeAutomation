@@ -269,8 +269,8 @@ struct OpenAPIController: APIProtocol {
         let entityId = EntityId(placeId: body.entityId.placeId, name: body.entityId.name,
                                 characteristicsName: characteristicsName, characteristic: type)
 
-        // Only a server-owned entity of a kind the descriptor marks as settable; anything else stays unchanged.
-        guard entityId.isServerOwned, type.valueKind.descriptor?.appSettable == true else { return .forbidden }
+        // Only an entity in the registry; any other one, server-owned or not, stays unchanged.
+        guard AppSettableEntities.contains(entityId) else { return .forbidden }
         let value: Value
         switch body.value {
         case .case1(let bool): value = .bool(bool)

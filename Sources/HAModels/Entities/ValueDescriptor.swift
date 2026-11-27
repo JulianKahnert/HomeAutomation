@@ -58,8 +58,6 @@ public struct ValueDescriptor: Sendable, Equatable {
     public let unit: String?
     public let display: Display
     public let storage: StorageRule
-    /// Whether the app may set a server-owned entity of this kind through the general route.
-    public private(set) var appSettable = false
 
     private static func bool(_ type: CharacteristicsType, _ yes: String, _ no: String) -> ValueDescriptor {
         ValueDescriptor(kind: type.valueKind, shape: .bool, unit: nil, display: .boolean(trueLabel: yes, falseLabel: no), storage: .state)
@@ -70,16 +68,7 @@ public struct ValueDescriptor: Sendable, Equatable {
         ValueDescriptor(kind: type.valueKind, shape: .number, unit: unit, display: .number(fractionDigits: digits), storage: storage)
     }
 
-    /// Kinds a server-owned entity can hold that the user sets in the app: a switch (fireplace), a mode, a target.
-    private static let appSettableTypes: [CharacteristicsType] = [.switcher, .heatingMode, .targetTemperature]
-
     public static func descriptor(for type: CharacteristicsType) -> ValueDescriptor {
-        var descriptor = table(for: type)
-        descriptor.appSettable = appSettableTypes.contains(type)
-        return descriptor
-    }
-
-    private static func table(for type: CharacteristicsType) -> ValueDescriptor {
         switch type {
         case .motionSensor: bool(type, "motion", "no motion")
         case .contactSensor: bool(type, "open", "closed")

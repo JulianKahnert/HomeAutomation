@@ -84,6 +84,10 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// Thermostat temperature offset in Celsius, already included in the temperature it reports
     public let temperatureCalibrationInC: Double?
 
+    /// Where this change came from. It is no part of the value: two items that differ only in
+    /// timestamp and origin carry the same information (see `HomeManager.addEntityHistory`).
+    public var origin: Origin
+
     public var description: String {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -117,7 +121,8 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         targetTemperatureInC: Double? = nil,
         heatingMode: HeatingMode? = nil,
         valvePositionPercent: Int? = nil,
-        temperatureCalibrationInC: Double? = nil
+        temperatureCalibrationInC: Double? = nil,
+        origin: Origin = .homekit
     ) {
         self.entityId = entityId
         self.timestamp = timestamp
@@ -141,6 +146,7 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         self.heatingMode = heatingMode
         self.valvePositionPercent = valvePositionPercent
         self.temperatureCalibrationInC = temperatureCalibrationInC
+        self.origin = origin
     }
 
     /// Retrieves a non-optional value for a given optional property key path

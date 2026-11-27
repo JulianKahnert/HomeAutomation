@@ -485,6 +485,26 @@ struct HomeManagerTests {
         #expect(await homeManager.homeKitHealth() == .healthy)
     }
 
+    @Test("A change of another origin is no sign of life for HomeKit", arguments: [Origin.server, Origin.job("valves")])
+    func foreignOriginIsNoSignOfLife(origin: Origin) async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .accessDenied()))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        await homeManager.perform(.turnOff(switchId))
+        #expect(await homeManager.homeKitHealth() != .healthy)
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: false, origin: origin)))
+
+        #expect(await homeManager.homeKitHealth() != .healthy)
+    }
+
+    @Test("A replay is dropped whatever its origin", arguments: [Origin.homekit, Origin.server, Origin.job("valves")])
+    func replayIsDroppedWhateverItsOrigin(origin: Origin) async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true, origin: origin)) == false)
+    }
+
     @Test("A replay that contradicts the last command lets the command be sent again")
     func replayIsCheckedAgainstLastCommand() async {
         let probe = AdapterProbe()

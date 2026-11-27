@@ -342,8 +342,11 @@ public final class HomeManager: HomeManagable {
     @discardableResult
     public func addEntityHistory(_ item: EntityStorageItem) async -> Bool {
         log.debug("Adding entity item to storage \(item.entityId)")
-        // Every change event counts, a value-identical replay too: it proves HomeKit still delivers.
-        liveness.recordEvent(at: Date())
+        // Every report from HomeKit counts, a value-identical replay too: it proves HomeKit still delivers.
+        // A change of another origin (server, polling job) proves nothing about HomeKit.
+        if item.origin == .homekit {
+            liveness.recordEvent(at: Date())
+        }
         reportedEntities.insert(item.entityId)
 
         // `EntityStorageItem` is Equatable including its timestamp, so align it before comparing —
@@ -352,6 +355,7 @@ public final class HomeManager: HomeManagable {
         let didChange: Bool
         if var knownItem = currentStates[item.entityId] {
             knownItem.timestamp = item.timestamp
+            knownItem.origin = item.origin
             didChange = knownItem != item
         } else {
             didChange = true
@@ -427,6 +431,7 @@ public final class HomeManager: HomeManagable {
         if var currentItem = try await storageRepo.getCurrent(item.entityId) {
             // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
             currentItem.timestamp = item.timestamp
+            currentItem.origin = item.origin
             guard item != currentItem else { return }
         }
         try await storageRepo.add(item)

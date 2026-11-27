@@ -13,7 +13,7 @@ import Shared
 
 /// Stores the Open-Meteo weather of the configured location once an hour as one `weatherHours` row
 /// per hour, so heating data can be compared with the weather.
-struct OutdoorTemperatureJob: Job, Log {
+struct OutdoorTemperatureJob: ScheduledJob, Log {
     let location: Location
     let hours: any WeatherHourStoring
     var fetch: @Sendable (URL) async throws -> Data = { url in
@@ -114,15 +114,13 @@ struct OutdoorTemperatureJob: Job, Log {
         }
     }
 
-    func run() async {
-        log.info("Starting OutdoorTemperatureJob - will run every hour")
-        while !Task.isCancelled {
-            do {
-                try await recordOnce()
-            } catch {
-                log.error("Failed to record weather: \(error)")
-            }
-            try? await Task.sleep(for: .hours(1))
-        }
+    // MARK: ScheduledJob
+
+    let name = "OutdoorTemperatureJob"
+    let cadence: Duration = .hours(1)
+    let runsAtStart = true
+
+    func run(plannedAt: Date) async throws {
+        try await recordOnce(now: plannedAt)
     }
 }

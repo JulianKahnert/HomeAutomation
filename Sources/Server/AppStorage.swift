@@ -97,6 +97,19 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          }
      }
 
+     private struct SchedulerKey: StorageKey {
+         typealias Value = Scheduler
+     }
+
+     var scheduler: Scheduler? {
+         get {
+             self.storage[SchedulerKey.self]
+         }
+         set {
+             self.storage[SchedulerKey.self] = newValue
+         }
+     }
+
      private struct HomeEventReceiverKey: StorageKey {
          typealias Value = HomeEventReceiver
      }

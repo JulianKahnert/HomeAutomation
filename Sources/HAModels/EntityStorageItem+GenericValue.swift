@@ -106,3 +106,38 @@ public extension EntityStorageItem {
         }
     }
 }
+
+/// The wire form (protocol version 3): entity, timestamp, value kind, one value and origin. The typed fields
+/// do not cross the wire; `lastReport` is memory only and stays off it.
+extension EntityStorageItem {
+    private enum WireKeys: String, CodingKey {
+        case entityId, timestamp, kind, value, origin
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: WireKeys.self)
+        let entityId = try container.decode(EntityId.self, forKey: .entityId)
+        let timestamp = try container.decode(Date.self, forKey: .timestamp)
+        let origin = try container.decodeIfPresent(Origin.self, forKey: .origin) ?? .homekit
+        guard let kind = try container.decodeIfPresent(ValueKind.self, forKey: .kind) else {
+            self.init(entityId: entityId, timestamp: timestamp, origin: origin)
+            return
+        }
+        let value = try container.decode(Value.self, forKey: .value)
+        guard let item = EntityStorageItem(entityId: entityId, timestamp: timestamp, kind: kind, value: value, origin: origin) else {
+            throw DecodingError.dataCorruptedError(forKey: .value, in: container, debugDescription: "Value does not fit the value kind \(kind.rawValue)")
+        }
+        self = item
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: WireKeys.self)
+        try container.encode(entityId, forKey: .entityId)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(origin, forKey: .origin)
+        if let generic = genericValue {
+            try container.encode(generic.kind, forKey: .kind)
+            try container.encode(generic.value, forKey: .value)
+        }
+    }
+}

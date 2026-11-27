@@ -192,7 +192,7 @@ public actor InMemoryJournalStore: JournalStore {
 
     public func deleteEntries(olderThan date: Date) async throws {
         runStore = runStore.filter { $0.value.startedAt >= date }
-        commandStore.removeAll { $0.timestamp < date }
+        commandStore.removeAll { $0.timestamp < date && $0.reason == nil }
         pushStore.removeAll { $0.timestamp < date }
     }
 }

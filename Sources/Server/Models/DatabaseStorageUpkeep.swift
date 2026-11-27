@@ -18,7 +18,9 @@ import Shared
 ///   indefinitely for now.
 /// - `rollup`: condenses the raw rows of every type whose ``StoragePolicy`` has an hourly rollup (lux, CO₂)
 ///   once they pass their raw retention, into `entityHourlyAggregates`, and deletes them.
-/// - `journal`: deletes journal entries (runs, commands, pushes) older than 30 days.
+/// - `journal`: deletes journal entries (runs, commands, pushes) older than 30 days, except the radiator
+///   commands with a heating reason (plan, window, fireplace, system): like the heating writes of the entity
+///   rows they are kept for good.
 struct DatabaseStorageUpkeep: StorageUpkeep, Log {
     static let journalRetentionDays = 30
 

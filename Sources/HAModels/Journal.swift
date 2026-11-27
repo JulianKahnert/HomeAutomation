@@ -50,7 +50,8 @@ public protocol JournalStore: AutomationRunRepository {
     func addPush(_ push: JournalPush) async throws
     /// Newest first.
     func pushes(runId: UUID?) async throws -> [JournalPush]
-    /// Removes entries of every kind that are older than `date`.
+    /// Removes entries of every kind that are older than `date`, except the radiator commands that carry a
+    /// heating reason: those are kept for good, so the last command of every radiator survives any cleanup.
     func deleteEntries(olderThan date: Date) async throws
 }
 

@@ -89,6 +89,24 @@ struct JournalTests {
         #expect(await journal.commands(limit: nil, runId: nil).count == 1)
         #expect(await journal.pushes(runId: nil).map(\.title) == ["n"])
     }
+
+    @Test("deleteEntries keeps radiator commands with a heating reason for good, and with them the last command of every radiator")
+    func deleteEntriesKeepsHeatingCommands() async throws {
+        let store = InMemoryJournalStore()
+        let now = Date(timeIntervalSince1970: 100_000_000)
+        let old = now.addingTimeInterval(-400 * 86_400)
+        let older = now.addingTimeInterval(-500 * 86_400)
+        try await store.addCommand(ActionLogItem(timestamp: older, action: .setTargetTemperature(radiator, celsius: 19), hasCacheHit: false, reason: .plan))
+        try await store.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(radiator, celsius: 21), hasCacheHit: false, reason: .fireplace))
+        try await store.addCommand(ActionLogItem(timestamp: old, action: .turnOn(switchId), hasCacheHit: false))
+
+        try await store.deleteEntries(olderThan: now.addingTimeInterval(-30 * 86_400))
+
+        let kept = try await store.commands(limit: nil, runId: nil)
+        #expect(Set(kept.compactMap(\.reason)) == [.fireplace, .plan])
+        #expect(kept.allSatisfy { $0.reason != nil })
+        #expect(try await store.lastHeatingCommands().first?.value == 21)
+    }
 }
 
 private struct StoreError: Error {}

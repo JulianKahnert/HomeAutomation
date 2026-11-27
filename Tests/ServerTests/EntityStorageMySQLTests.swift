@@ -372,4 +372,20 @@ final class EntityStorageMySQLTests: XCTestCase {
         XCTAssertEqual(ranged.map(\.reason), [.window])
         XCTAssertNil(ranged.first?.planTargetInC)
     }
+
+    func testJournalCleanupKeepsHeatingCommandsForGood() async throws {
+        let journal = JournalDbRepository(database: { self.app.db })
+        let kitchen = EntityId(placeId: "Kitchen", name: "Radiator", characteristicsName: nil, characteristic: .targetTemperature)
+        let old = Date(timeIntervalSince1970: 1_000)
+        try await journal.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(kitchen, celsius: 21), hasCacheHit: false, reason: .plan))
+        try await journal.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(kitchen, celsius: 18), hasCacheHit: false))
+        try await journal.addPush(JournalPush(timestamp: old, runId: nil, title: "t", message: "m", pushId: "p"))
+
+        try await journal.deleteEntries(olderThan: Date())
+
+        let commands = try await journal.commands(limit: nil, runId: nil)
+        XCTAssertEqual(commands.map(\.reason), [.plan])
+        let pushes = try await journal.pushes(runId: nil)
+        XCTAssertTrue(pushes.isEmpty)
+    }
 }

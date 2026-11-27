@@ -59,4 +59,14 @@ struct ValveJobTests {
         let job = ValveJob(listThermostats: { throw Asleep() }, readThermostat: { _ in [] }, feed: { _ in })
         await #expect(throws: Asleep.self) { try await job.run(plannedAt: Date()) }
     }
+
+    @Test func theRunFailsWhenNoThermostatCouldBeRead() async {
+        let job = ValveJob(listThermostats: { [bath, kitchen] }, readThermostat: { _ in throw Asleep() }, feed: { _ in })
+        await #expect(throws: ValveJob.NoThermostatReadableError.self) { try await job.run(plannedAt: Date()) }
+    }
+
+    @Test func aRunWithNoThermostatsSucceeds() async throws {
+        let job = ValveJob(listThermostats: { [] }, readThermostat: { _ in throw Asleep() }, feed: { _ in })
+        try await job.run(plannedAt: Date())
+    }
 }

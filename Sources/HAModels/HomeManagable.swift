@@ -57,7 +57,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
     ///   - entityId: A server-owned entity: `entityId.isServerOwned`.
     ///   - value: Must fit the shape of the entity's value kind.
     ///   - origin: `server` (default) or `app`.
-    /// - Returns: Whether the state changed. `false` too for a value that does not fit or an entity that is not server-owned (logged).
     /// - Returns: `true` when the state changed, `false` when the value was the one it already had.
     /// - Throws: ``ReportError`` for a report that is refused: an entity that is not server-owned, a value that does
     ///   not fit the kind. That is a programmer error of the caller, not an outcome.

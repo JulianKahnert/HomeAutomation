@@ -113,20 +113,4 @@ struct StatusStreamTests {
         }
         #expect(!received)
     }
-
-    @Test("isReconnect truth table", arguments: [
-        (ConnectionStatus.up, ConnectionStatus?.none, true),
-        (.up, .connecting, true),
-        (.up, .error, true),
-        (.up, .up, false),
-        (.connecting, .none, false),
-        (.connecting, .up, false),
-        (.connecting, .error, false),
-        (.error, .none, false),
-        (.error, .up, false),
-        (.error, .connecting, false)
-    ])
-    func isReconnect(status: ConnectionStatus, previous: ConnectionStatus?, expected: Bool) {
-        #expect(status.isReconnect(from: previous) == expected)
-    }
 }

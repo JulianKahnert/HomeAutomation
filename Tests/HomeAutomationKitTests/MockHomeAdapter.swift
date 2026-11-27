@@ -116,10 +116,6 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return Set(items)
     }
 
-    func getEntityStream() async -> AsyncStream<EntityStorageItem> {
-        return entityStream
-    }
-
     func findEntity(_ entity: EntityId) async throws {
     }
 

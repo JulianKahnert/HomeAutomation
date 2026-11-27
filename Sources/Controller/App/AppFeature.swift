@@ -65,7 +65,6 @@ struct AppFeature: Sendable {
     // MARK: - Action
 
     enum Action: Sendable, BindableAction {
-        case selectedTabChanged(Tab)
         case overview(OverviewFeature.Action)
         case automations(AutomationsFeature.Action)
         case heating(HeatingFeature.Action)
@@ -73,7 +72,6 @@ struct AppFeature: Sendable {
 
         // Live Activities & Push Notifications
         case startMonitoringLiveActivities
-        case stopMonitoringLiveActivities
         case registerPushToken(PushToken)
         case clearDeliveredNotifications
 
@@ -116,10 +114,6 @@ struct AppFeature: Sendable {
 
         Reduce { state, action in
             switch action {
-            case let .selectedTabChanged(tab):
-                state.selectedTab = tab
-                return .none
-
             case let .overview(.delegate(.openAutomation(name))):
                 state.selectedTab = .automations
                 return .send(.automations(.openAutomation(name)))
@@ -161,11 +155,6 @@ struct AppFeature: Sendable {
                     }
                 }
                 .cancellable(id: CancelID.liveActivityMonitoring, cancelInFlight: true)
-
-            case .stopMonitoringLiveActivities:
-                return .run { _ in
-                    await liveActivity.stopActivity()
-                }
 
             // MARK: - Push Notifications
 

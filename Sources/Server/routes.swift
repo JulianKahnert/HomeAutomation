@@ -16,10 +16,6 @@ func routes(_ app: Application) throws {
     let authenticatedRoutes = app.grouped(authMiddleware)
 
     // Manual routes - now protected
-    authenticatedRoutes.get { _ async in
-        "It works!"
-    }
-
     // Adapter WebSocket transport for the StarActorSystem (see ADR-001 in the knowledge base)
     registerAdapterWebSocket(on: authenticatedRoutes, system: app.starActorSystem)
 

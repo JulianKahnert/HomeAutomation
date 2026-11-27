@@ -204,8 +204,4 @@ public struct EntityHistoryResponse: Sendable, Codable, Equatable {
         self.items = items
         self.nextCursor = nextCursor
     }
-
-    public var hasMore: Bool {
-        nextCursor != nil
-    }
 }

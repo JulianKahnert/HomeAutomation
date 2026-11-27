@@ -12,18 +12,6 @@ let package = Package(
             name: "HomeAutomationKit",
             targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "StarActorSystem"]
         ),
-        .library(
-            name: "HAShared",
-            targets: ["HAModels", "HAImplementations"]
-        ),
-        .library(
-            name: "ControllerKit",
-            targets: ["Controller"]
-        ),
-        .executable(
-            name: "home",
-            targets: ["HomeCLI"]
-        ),
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.4"),
@@ -52,8 +40,7 @@ let package = Package(
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "fix/linux-foundation-networking"),
         // Capped at 7.x: vapor/apns 5.1.0 requires apnswift 7.0.1..<8.0.0.
-        .package(url: "https://github.com/swift-server-community/APNSwift", exact: "7.1.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2")
+        .package(url: "https://github.com/swift-server-community/APNSwift", exact: "7.1.0")
     ],
     targets: [
         .executableTarget(
@@ -133,25 +120,6 @@ let package = Package(
                 .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
             ]
         ),
-        .target(
-            name: "Controller",
-            dependencies: [
-                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
-                .product(name: "Dependencies", package: "swift-dependencies"),
-                .product(name: "Sharing", package: "swift-sharing"),
-                "HAModels",
-                "Shared",
-                "ServerClient",
-            ],
-            path: "Sources/Controller"
-        ),
-        .executableTarget(
-            name: "HomeCLI",
-            dependencies: [
-                "Shared",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ]
-        ),
         .testTarget(
             name: "SharedTests",
             dependencies: [
@@ -168,14 +136,6 @@ let package = Package(
                 "HAImplementations",
                 "HAApplicationLayer"
             ]
-        ),
-        .testTarget(
-            name: "ControllerTests",
-            dependencies: [
-                "Controller",
-                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            path: "Tests/ControllerTests"
         ),
         .testTarget(
             name: "ServerTests",
@@ -198,3 +158,31 @@ let package = Package(
         ),
     ]
 )
+
+// The app layer needs SwiftUI and TCA, which Linux does not have: there the package holds only what the server
+// and its tests build (the Docker image, scripts/run-mysql-tests.sh).
+#if !os(Linux)
+package.products.append(.library(name: "ControllerKit", targets: ["Controller"]))
+package.targets.append(contentsOf: [
+        .target(
+            name: "Controller",
+            dependencies: [
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+                "HAModels",
+                "Shared",
+                "ServerClient",
+            ],
+            path: "Sources/Controller"
+        ),
+        .testTarget(
+            name: "ControllerTests",
+            dependencies: [
+                "Controller",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
+            ],
+            path: "Tests/ControllerTests"
+        )
+])
+#endif

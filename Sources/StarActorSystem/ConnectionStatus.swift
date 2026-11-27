@@ -16,8 +16,4 @@ public enum ConnectionStatus: String, Codable, Sendable {
     case connecting
     case error
 
-    /// True when this transition into `.up` comes from a not-up state (including the very first one).
-    public func isReconnect(from previous: ConnectionStatus?) -> Bool {
-        self == .up && previous != .up
-    }
 }

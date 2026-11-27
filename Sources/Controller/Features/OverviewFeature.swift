@@ -59,6 +59,8 @@ struct OverviewFeature: Sendable {
     @Dependency(\.date.now) var now
     @Dependency(\.serverClient) var serverClient
 
+    private enum CancelID { case refresh }
+
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
@@ -88,6 +90,8 @@ struct OverviewFeature: Sendable {
                         )
                     }))
                 }
+                // The timer, pull-to-refresh and the other tabs all refresh: only the newest answer may land.
+                .cancellable(id: CancelID.refresh, cancelInFlight: true)
 
             case let .refreshResponse(.success(snapshot)):
                 state.error = nil

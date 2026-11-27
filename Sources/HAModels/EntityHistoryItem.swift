@@ -61,10 +61,12 @@ extension EntityHistoryItem {
         number(type).flatMap { Int(exactly: $0) }
     }
 
-    private var colorComponents: [Float]? {
+    /// The colour of a colour value (the text "r g b" with components 0...1); `nil` for every other value.
+    public var rgb: RGB? {
         guard valueKind == CharacteristicsType.color.rawValue, case .text(let text)? = value else { return nil }
         let parts = text.split(separator: " ").compactMap { Float($0) }
-        return parts.count == 3 ? parts : nil
+        guard parts.count == 3 else { return nil }
+        return RGB(red: parts[0], green: parts[1], blue: parts[2])
     }
 
     public var motionDetected: Bool? { bool(.motionSensor) }
@@ -72,9 +74,6 @@ extension EntityHistoryItem {
     public var isDeviceOn: Bool? { bool(.switcher) }
     public var brightness: Int? { int(.brightness) }
     public var colorTemperature: Float? { number(.colorTemperature).map(Float.init) }
-    public var colorRed: Float? { colorComponents?[0] }
-    public var colorGreen: Float? { colorComponents?[1] }
-    public var colorBlue: Float? { colorComponents?[2] }
     public var isContactOpen: Bool? { bool(.contactSensor) }
     public var isDoorLocked: Bool? { bool(.lock) }
     public var stateOfCharge: Int? { int(.batterySensor) }
@@ -175,9 +174,8 @@ extension EntityHistoryItem {
             return "Mode \(heatingMode.name)"
         }
         // Color as hue
-        if let colorRed, let colorGreen, let colorBlue {
-            let hue = Double(RGB(red: colorRed, green: colorGreen, blue: colorBlue).hue)
-            return "\(String(format: "%.0f", hue))° hue"
+        if let rgb {
+            return "\(String(format: "%.0f", Double(rgb.hue)))° hue"
         }
         return "No data"
     }

@@ -11,7 +11,7 @@ import Testing
 
 struct StatusStreamTests {
 
-    private func helloFrame(version: Int = 1) throws -> Data {
+    private func helloFrame(version: Int = StarActorSystem.protocolVersion) throws -> Data {
         try JSONEncoder().encode(WireEnvelope.hello(Hello(protocolVersion: version)))
     }
 

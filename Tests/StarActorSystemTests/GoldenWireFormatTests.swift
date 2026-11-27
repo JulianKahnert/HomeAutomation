@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import HAModels
 @testable import StarActorSystem
 import Testing
 
@@ -22,8 +23,26 @@ struct GoldenWireFormatTests {
 
     @Test("Golden hello envelope JSON")
     func goldenHello() throws {
-        let json = try encodeSorted(.hello(Hello(protocolVersion: 1)))
-        #expect(json == #"{"hello":{"_0":{"protocolVersion":1}}}"#)
+        let json = try encodeSorted(.hello(Hello(protocolVersion: 2)))
+        #expect(json == #"{"hello":{"_0":{"protocolVersion":2}}}"#)
+    }
+
+    @Test("The protocol version is 2 since the thermostat calls")
+    func protocolVersionIsTwo() {
+        #expect(StarActorSystem.protocolVersion == 2)
+    }
+
+    @Test("Golden thermostat and thermostat reply JSON")
+    func goldenThermostat() throws {
+        let thermostat = Thermostat(placeId: "Bad OG", name: "Eve Thermo", characteristicsName: "Heizung")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        #expect(String(bytes: try encoder.encode(thermostat), encoding: .utf8)
+                == #"{"characteristicsName":"Heizung","name":"Eve Thermo","placeId":"Bad OG"}"#)
+        let bare = try encoder.encode(Thermostat(placeId: "a", name: "b", characteristicsName: nil))
+        #expect(String(bytes: bare, encoding: .utf8) == #"{"name":"b","placeId":"a"}"#)
+        let decoded = try JSONDecoder().decode(Thermostat.self, from: Data(#"{"characteristicsName":"Heizung","name":"Eve Thermo","placeId":"Bad OG","future":1}"#.utf8))
+        #expect(decoded == thermostat)
     }
 
     @Test("Golden call envelope JSON")

@@ -41,6 +41,10 @@ public protocol HomeManagable: EntityValidator, Sendable {
     /// `nil` when the fireplace already had that state.
     func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
+    /// Asks the adapter which thermostats it can read; throws while the adapter is not connected.
+    func listThermostats() async throws -> [Thermostat]
+    /// Asks the adapter to read one thermostat: its valve position and offset as items. Does not store them.
+    func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem]
     /// - Returns: Whether the item carries new information, i.e. differs in value — not just in
     ///   timestamp — from the last known state of that entity.
     @discardableResult

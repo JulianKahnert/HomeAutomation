@@ -14,6 +14,9 @@ public protocol HomeKitAdapterable: EntityValidator, Sendable {
 
     func perform(_ action: HomeManagableAction) async throws
     func trigger(scene sceneName: String) async throws
+
+    func listThermostats() async throws -> [Thermostat]
+    func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem]
 }
 
 #if canImport(HomeKit)
@@ -205,6 +208,14 @@ public final class HomeKitAdapter: HomeKitAdapterable {
             await homeKitHomeManager.handleCommandFailure(error)
             throw error
         }
+    }
+
+    public func listThermostats() async throws -> [Thermostat] {
+        try await homeKitHomeManager.listThermostats()
+    }
+
+    public func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem] {
+        try await homeKitHomeManager.readThermostat(thermostat)
     }
 
     /// Attention: This call might take a while so be carefull with it

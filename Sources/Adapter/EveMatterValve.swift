@@ -48,23 +48,3 @@ enum EveMatterValve {
         return Double(rawValue) / 10
     }
 }
-
-/// Remembers the last raw reading sent per entity (valve percent, calibration in 0.1 °C), so the adapter
-/// sends a value only when it changed.
-struct MatterReadingChangeDetector: Sendable {
-    private var lastSent: [EntityId: Int] = [:]
-
-    init() {}
-
-    /// Whether `reading` differs from the last value recorded for `entityId`; records it when it does.
-    mutating func recordIfChanged(_ reading: Int, for entityId: EntityId) -> Bool {
-        guard lastSent[entityId] != reading else { return false }
-        lastSent[entityId] = reading
-        return true
-    }
-
-    /// Forgets every recorded value, so the next reading of each entity counts as a change.
-    mutating func reset() {
-        lastSent.removeAll()
-    }
-}

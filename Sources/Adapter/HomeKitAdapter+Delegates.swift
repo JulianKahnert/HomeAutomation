@@ -42,7 +42,7 @@ extension HomeKitAdapter {
         private let resubscribeRequests = ResubscribeRequests()
 
         #if canImport(Matter)
-        /// Eve Thermos paired over Matter report their valve position and temperature offset only there, see `EveMatterValvePoller`.
+        /// Eve Thermos paired over Matter report their valve position and temperature offset only there; the server asks for it, see `EveMatterValvePoller`.
         private let eveMatterValvePoller = EveMatterValvePoller()
         #endif
 
@@ -59,7 +59,6 @@ extension HomeKitAdapter {
 
             startManagerResets()
             #if canImport(Matter)
-            startEveMatterValvePolling()
             #endif
         }
 
@@ -107,9 +106,6 @@ extension HomeKitAdapter {
         /// Request a full entity refresh without waiting for the debounce delay — a reconnect resync
         /// must not be deferred or coalesced away — but still serialized against a running refresh.
         func updateEntitiesNow() async {
-            #if canImport(Matter)
-            await eveMatterValvePoller.resendOnNextPoll()
-            #endif
             await entityUpdateDebouncer.runNow()
         }
 
@@ -242,27 +238,23 @@ extension HomeKitAdapter {
             }
         }
 
-        #if canImport(Matter)
-        private func startEveMatterValvePolling() {
-            Task { [weak self] in
-                while true {
-                    guard await self?.pollEveMatterValves() != nil else { return }
-                    do {
-                        try await Task.sleep(for: EveMatterValvePoller.pollInterval)
-                    } catch {
-                        return
-                    }
-                }
-            }
+        func listThermostats() async throws -> [Thermostat] {
+            #if canImport(Matter)
+            let homes = await homesPublisher.get()
+            return await eveMatterValvePoller.thermostats(in: homes)
+            #else
+            return []
+            #endif
         }
 
-        private func pollEveMatterValves() async {
+        func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem] {
+            #if canImport(Matter)
             let homes = await homesPublisher.get()
-            for item in await eveMatterValvePoller.poll(homes: homes) {
-                entityStreamContinuation.yield(item)
-            }
+            return try await eveMatterValvePoller.read(thermostat, homes: homes)
+            #else
+            throw OptionalError.notFound
+            #endif
         }
-        #endif
 
         @MainActor
         private func resetManager() {

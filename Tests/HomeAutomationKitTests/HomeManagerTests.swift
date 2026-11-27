@@ -56,6 +56,20 @@ private actor AdapterProbe {
         completedPerforms += 1
     }
 
+    /// The thermostats the adapter lists, and the items it answers for each; a thermostat without items throws.
+    var thermostats: [Thermostat] = []
+    var thermostatItems: [Thermostat: [EntityStorageItem]] = [:]
+
+    func setThermostats(_ items: [Thermostat: [EntityStorageItem]]) {
+        thermostats = Array(items.keys)
+        thermostatItems = items
+    }
+
+    func readThermostat(_ thermostat: Thermostat) throws -> [EntityStorageItem] {
+        guard let items = thermostatItems[thermostat] else { throw FakeAdapterError.unreachable }
+        return items
+    }
+
     func find(_ entityId: EntityId) {
         foundEntities.append(entityId)
     }
@@ -99,6 +113,12 @@ private distributed actor FakeEntityAdapter: EntityAdapterable {
     }
 
     distributed func trigger(scene sceneName: String) async throws {}
+
+    distributed func listThermostats() async throws -> [Thermostat] { await probe.thermostats }
+
+    distributed func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem] {
+        try await probe.readThermostat(thermostat)
+    }
 }
 
 struct HomeManagerTests {
@@ -126,6 +146,22 @@ struct HomeManagerTests {
                                  onFireplaceSwitch: onFireplaceSwitch,
                                  retryTicks: retryTicks,
                                  persistRetryDelays: persistRetryDelays)
+    }
+
+    // MARK: - thermostats
+
+    @Test("The home manager lists the adapter's thermostats and reads one per call")
+    func readsOneThermostatPerCall() async throws {
+        let probe = AdapterProbe()
+        let bath = Thermostat(placeId: "bath", name: "Thermo", characteristicsName: nil)
+        let valve = EntityId(placeId: "bath", name: "Thermo", characteristicsName: nil, characteristic: .valvePosition)
+        await probe.setThermostats([bath: [EntityStorageItem(entityId: valve, valvePositionPercent: 40)]])
+        let homeManager = await makeHomeManager(probe: probe)
+
+        #expect(try await homeManager.listThermostats() == [bath])
+        #expect(try await homeManager.readThermostat(bath).first?.valvePositionPercent == 40)
+        let asleep = Thermostat(placeId: "kitchen", name: "Thermo", characteristicsName: nil)
+        await #expect(throws: FakeAdapterError.self) { try await homeManager.readThermostat(asleep) }
     }
 
     // MARK: - command deduplication

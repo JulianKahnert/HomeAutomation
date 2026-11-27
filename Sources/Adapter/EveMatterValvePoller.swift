@@ -9,19 +9,21 @@ import HAModels
 import HomeKit
 import Logging
 import Matter
+import Shared
 import Synchronization
 
 private let log = Logger(label: "EveMatterValvePoller")
 
-/// Reads the valve position and temperature offset of every Eve Thermo paired over Matter and turns changed
-/// values into `valvePosition` and `temperatureCalibration` items.
+/// Reads the valve position and temperature offset of one Eve Thermo paired over Matter on request and turns
+/// them into `valvePosition` and `temperatureCalibration` items.
 ///
-/// Polls instead of subscribing: the home's Matter controller is an XPC proxy of `homed`, on which only
+/// Reads instead of subscribing: the home's Matter controller is an XPC proxy of `homed`, on which only
 /// `MTRBaseDevice` reads are proven to work, and a subscription would take one of the few subscription
 /// slots of a battery-powered Thread device on HomeKit's fabric for a value that moves slowly.
+/// The server decides when to read, detects changes and keeps the error book; this type only reads.
 actor EveMatterValvePoller {
-    static let pollInterval: Duration = .seconds(5 * 60)
-    /// A Thread device that is asleep or unreachable may never answer; the next accessory must not wait for it.
+    /// A Thread device that is asleep or unreachable may never answer. All reads of one thermostat together
+    /// stay within this limit.
     static let readTimeout: Duration = .seconds(30)
 
     private struct MatterNode: Hashable {
@@ -29,160 +31,80 @@ actor EveMatterValvePoller {
         let nodeID: UInt64
     }
 
-    /// One attribute of one node, so a lasting failure of one read does not hide the recovery of another.
-    private struct MatterRead: Hashable {
-        let node: MatterNode
-        let attribute: String
-    }
-
-    private var changeDetector = MatterReadingChangeDetector()
     /// Whether endpoint 1 of a node has the Thermostat cluster; fixed while the accessory stays paired.
     private var isThermostatByNode: [MatterNode: Bool] = [:]
-    /// Nodes whose Thermostat `ClusterRevision` was logged; read once, it only changes with a firmware update.
-    private var loggedClusterRevisionNodes: Set<MatterNode> = []
-    /// Reads whose last attempt failed, so a lasting failure logs one warning instead of one per poll.
-    private var failingReads: Set<MatterRead> = []
 
-    /// Sends every value on the next poll, e.g. after a reconnect to the server.
-    func resendOnNextPoll() {
-        changeDetector.reset()
-    }
-
-    /// Reads all Eve Thermos of `homes` and returns an item for each value that changed since it was last returned.
-    func poll(homes: [HMHome]) async -> [EntityStorageItem] {
-        var items: [EntityStorageItem] = []
+    /// The Matter accessories of `homes` that have a heating service and are not known to be no thermostat.
+    func thermostats(in homes: [HMHome]) -> [Thermostat] {
+        var result: [Thermostat] = []
         for home in homes {
-            let candidates = home.accessories.filter { $0.matterNodeID != nil && $0.heatingService != nil }
-            guard !candidates.isEmpty else { continue }
-
-            let controllerID = home.matterControllerID
-            let controller = MTRDeviceController.sharedController(withID: controllerID as NSString,
-                                                                  xpcConnect: home.matterControllerXPCConnectBlock)
-            for accessory in candidates {
-                items += await readThermostat(accessory, controllerID: controllerID, controller: controller)
+            for accessory in home.accessories where accessory.matterNodeID != nil && accessory.heatingService != nil {
+                guard let nodeID = accessory.matterNodeID, let placeId = accessory.room?.name else { continue }
+                let node = MatterNode(controllerID: home.matterControllerID, nodeID: nodeID)
+                guard isThermostatByNode[node] != false else { continue }
+                result.append(Thermostat(placeId: placeId, name: accessory.name, characteristicsName: accessory.heatingService?.name))
             }
         }
-        return items
+        return result
     }
 
-    private func readThermostat(_ accessory: HMAccessory, controllerID: String, controller: MTRDeviceController) async -> [EntityStorageItem] {
-        guard let nodeID = accessory.matterNodeID,
-              let placeId = accessory.room?.name else { return [] }
+    /// Reads one thermostat. Throws when it does not answer in time; returns no item for a Matter accessory
+    /// that is no thermostat.
+    func read(_ thermostat: Thermostat, homes: [HMHome]) async throws -> [EntityStorageItem] {
+        guard let home = homes.first(where: { home in home.accessories.contains { $0.matches(thermostat) } }),
+              let accessory = home.accessories.first(where: { $0.matches(thermostat) }),
+              let nodeID = accessory.matterNodeID else { throw OptionalError.notFound }
+        let controllerID = home.matterControllerID
         let node = MatterNode(controllerID: controllerID, nodeID: nodeID)
-        let metadata: Logger.Metadata = [
-            "room": "\(placeId)",
-            "accessory": "\(accessory.name)",
-            "matterNodeId": "\(String(nodeID, radix: 16))"
-        ]
+        let controller = MTRDeviceController.sharedController(withID: controllerID as NSString,
+                                                              xpcConnect: home.matterControllerXPCConnectBlock)
         let device = MTRBaseDevice(nodeID: NSNumber(value: nodeID), controller: controller)
+        let deadline = ContinuousClock.now + Self.readTimeout
 
-        guard await isThermostat(node: node, device: device, metadata: metadata) == true else { return [] }
-        // An unreachable Thermo already cost one read timeout; the calibration read would only add another.
-        guard let rawValvePosition = await read("valvePosition",
-                                                of: node,
-                                                device: device,
-                                                clusterID: EveMatterValve.clusterID,
-                                                attributeID: EveMatterValve.valvePositionAttributeID,
-                                                metadata: metadata,
-                                                parse: Self.unsignedInteger) else { return [] }
-        await logThermostatClusterRevisionOnce(node: node, device: device, metadata: metadata)
-        let rawCalibration = await read("localTemperatureCalibration",
-                                        of: node,
-                                        device: device,
-                                        clusterID: EveMatterValve.thermostatClusterID,
-                                        attributeID: EveMatterValve.localTemperatureCalibrationAttributeID,
-                                        metadata: metadata,
-                                        parse: Self.signedInteger)
+        if isThermostatByNode[node] == nil {
+            let clusterIDs = try await read(device,
+                                            EveMatterValve.descriptorClusterID,
+                                            EveMatterValve.serverListAttributeID,
+                                            deadline: deadline,
+                                            parse: Self.unsignedIntegerArray)
+            isThermostatByNode[node] = EveMatterValve.isThermostat(serverClusterIDs: clusterIDs.map { UInt32(truncatingIfNeeded: $0) })
+        }
+        guard isThermostatByNode[node] == true else { return [] }
 
-        let characteristicsName = accessory.heatingService?.name
+        let rawValvePosition = try await read(device,
+                                              EveMatterValve.clusterID,
+                                              EveMatterValve.valvePositionAttributeID,
+                                              deadline: deadline,
+                                              parse: Self.unsignedInteger)
+        // The offset is a bonus: a missing answer must not hide the valve position.
+        let rawCalibration = try? await read(device,
+                                             EveMatterValve.thermostatClusterID,
+                                             EveMatterValve.localTemperatureCalibrationAttributeID,
+                                             deadline: deadline,
+                                             parse: Self.signedInteger)
+
         var items: [EntityStorageItem] = []
         if let percent = EveMatterValve.percent(fromRawValue: rawValvePosition) {
-            let entityId = EntityId(placeId: placeId, name: accessory.name, characteristicsName: characteristicsName, characteristic: .valvePosition)
-            if changeDetector.recordIfChanged(percent, for: entityId) {
-                items.append(EntityStorageItem(entityId: entityId, valvePositionPercent: percent))
-            }
+            let entityId = EntityId(placeId: thermostat.placeId, name: thermostat.name, characteristicsName: thermostat.characteristicsName, characteristic: .valvePosition)
+            items.append(EntityStorageItem(entityId: entityId, valvePositionPercent: percent))
         } else {
-            log.warning("Eve valve position out of range, skipped", metadata: metadata.merging(["rawValue": "\(rawValvePosition)"]) { _, new in new })
+            log.warning("Eve valve position out of range, skipped", metadata: ["thermostat": "\(thermostat)", "rawValue": "\(rawValvePosition)"])
         }
-        if let rawCalibration {
-            if let offset = EveMatterValve.calibrationInC(fromRawValue: rawCalibration) {
-                let entityId = EntityId(placeId: placeId, name: accessory.name, characteristicsName: characteristicsName, characteristic: .temperatureCalibration)
-                // Compared in raw 0.1 °C steps, so floating point never fakes a change.
-                if changeDetector.recordIfChanged(Int(rawCalibration), for: entityId) {
-                    items.append(EntityStorageItem(entityId: entityId, temperatureCalibrationInC: offset))
-                }
-            } else {
-                log.warning("Eve temperature calibration out of range, skipped", metadata: metadata.merging(["rawValue": "\(rawCalibration)"]) { _, new in new })
-            }
+        if let rawCalibration, let offset = EveMatterValve.calibrationInC(fromRawValue: rawCalibration) {
+            let entityId = EntityId(placeId: thermostat.placeId, name: thermostat.name, characteristicsName: thermostat.characteristicsName, characteristic: .temperatureCalibration)
+            items.append(EntityStorageItem(entityId: entityId, temperatureCalibrationInC: offset))
         }
-        log.debug("Read Eve Thermo over Matter", metadata: metadata.merging([
-            "valvePositionRaw": "\(rawValvePosition)",
-            "temperatureCalibrationRaw": "\(rawCalibration.map(String.init(describing:)) ?? "nil")",
-            "changedTypes": "\(items.map(\.entityId.characteristicType.rawValue).joined(separator: ","))"
-        ]) { _, new in new })
         return items
     }
 
-    /// Reads one attribute, logging a failure once per lasting outage; `nil` when the read failed.
-    private func read<Value: Sendable>(_ attribute: String,
-                                       of node: MatterNode,
-                                       device: MTRBaseDevice,
-                                       clusterID: UInt32,
-                                       attributeID: UInt32,
-                                       metadata: Logger.Metadata,
-                                       parse: @escaping @Sendable (Any?) throws -> Value) async -> Value? {
-        let matterRead = MatterRead(node: node, attribute: attribute)
-        let readMetadata = metadata.merging(["attribute": "\(attribute)"]) { _, new in new }
-        do {
-            let value = try await readAttribute(device: device, clusterID: clusterID, attributeID: attributeID, parse: parse)
-            if failingReads.remove(matterRead) != nil {
-                log.info("Eve Thermo attribute readable again over Matter", metadata: readMetadata)
-            }
-            return value
-        } catch {
-            let errorMetadata = readMetadata.merging(["error": "\(error)"]) { _, new in new }
-            if failingReads.insert(matterRead).inserted {
-                log.warning("Failed to read Eve Thermo attribute over Matter", metadata: errorMetadata)
-            } else {
-                log.debug("Eve Thermo attribute still not readable over Matter", metadata: errorMetadata)
-            }
-            return nil
-        }
-    }
-
-    /// Logs the Thermostat cluster revision once per node: it tells whether the calibration is limited to ±2.5 °C.
-    private func logThermostatClusterRevisionOnce(node: MatterNode, device: MTRBaseDevice, metadata: Logger.Metadata) async {
-        guard !loggedClusterRevisionNodes.contains(node) else { return }
-        guard let revision = await read("thermostatClusterRevision",
-                                        of: node,
-                                        device: device,
-                                        clusterID: EveMatterValve.thermostatClusterID,
-                                        attributeID: EveMatterValve.clusterRevisionAttributeID,
-                                        metadata: metadata,
-                                        parse: Self.unsignedInteger) else { return }
-        loggedClusterRevisionNodes.insert(node)
-        log.info("Eve Thermo Thermostat cluster revision", metadata: metadata.merging(["clusterRevision": "\(revision)"]) { _, new in new })
-    }
-
-    /// Whether endpoint 1 of the node serves the Thermostat cluster; `nil` when the Descriptor read failed.
-    private func isThermostat(node: MatterNode, device: MTRBaseDevice, metadata: Logger.Metadata) async -> Bool? {
-        if let isThermostat = isThermostatByNode[node] {
-            return isThermostat
-        }
-        guard let clusterIDs = await read("serverList",
-                                          of: node,
-                                          device: device,
-                                          clusterID: EveMatterValve.descriptorClusterID,
-                                          attributeID: EveMatterValve.serverListAttributeID,
-                                          metadata: metadata,
-                                          parse: Self.unsignedIntegerArray) else { return nil }
-        let isThermostat = EveMatterValve.isThermostat(serverClusterIDs: clusterIDs.map { UInt32(truncatingIfNeeded: $0) })
-        isThermostatByNode[node] = isThermostat
-        log.debug("Classified Matter accessory", metadata: metadata.merging([
-            "isThermostat": "\(isThermostat)",
-            "serverClusters": "\(clusterIDs.map { "0x" + String($0, radix: 16) }.joined(separator: ","))"
-        ]) { _, new in new })
-        return isThermostat
+    private func read<Value: Sendable>(_ device: MTRBaseDevice,
+                                       _ clusterID: UInt32,
+                                       _ attributeID: UInt32,
+                                       deadline: ContinuousClock.Instant,
+                                       parse: @escaping @Sendable (Any?) throws -> Value) async throws -> Value {
+        let remaining = ContinuousClock.now.duration(to: deadline)
+        guard remaining > .zero else { throw EveMatterReadError.timeout }
+        return try await readAttribute(device: device, clusterID: clusterID, attributeID: attributeID, timeout: remaining, parse: parse)
     }
 }
 
@@ -210,10 +132,11 @@ extension EveMatterValvePoller {
     private func readAttribute<Value: Sendable>(device: MTRBaseDevice,
                                                 clusterID: UInt32,
                                                 attributeID: UInt32,
+                                                timeout: Duration,
                                                 parse: @escaping @Sendable (Any?) throws -> Value) async throws -> Value {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Value, any Error>) in
             let completion = ReadCompletion(continuation)
-            completion.startTimeout(after: Self.readTimeout)
+            completion.startTimeout(after: timeout)
             device.readAttributes(withEndpointID: NSNumber(value: EveMatterValve.endpointID),
                                   clusterID: NSNumber(value: clusterID),
                                   attributeID: NSNumber(value: attributeID),
@@ -305,6 +228,10 @@ private final class ReadCompletion<Value: Sendable>: Sendable {
 }
 
 private extension HMAccessory {
+    func matches(_ thermostat: Thermostat) -> Bool {
+        matterNodeID != nil && room?.name == thermostat.placeId && name == thermostat.name && heatingService?.name == thermostat.characteristicsName
+    }
+
     /// The HeaterCooler or Thermostat service, whose name the other heating entities of the accessory carry.
     var heatingService: HMService? {
         services.first { HeatingControlCharacteristic.isHeatingService($0.serviceType) }

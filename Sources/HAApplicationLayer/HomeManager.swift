@@ -16,7 +16,6 @@ public final class HomeManager: HomeManagable {
     nonisolated private static let maxAttempts = 3
 
     private let log = Logger(label: "HomeManager")
-    private let windowManager: WindowManager
     private let commandCache: CommandCache
     private let journal: Journal
 
@@ -76,8 +75,6 @@ public final class HomeManager: HomeManagable {
     ///   - onReportedChange: Called with each changed state set by `report`; the server yields `HomeEvent.change`.
     ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
     ///     than there are delays.
-    ///   - outdoorTemperature: The latest stored outdoor temperature reading in °C, `nil` without one;
-    ///     shown in the window Live Activity.
     public init(getAdapter: @escaping () async -> (any EntityAdapterable)?,
                 storageRepo: StorageRepository,
                 notificationSender: NotificationSender,
@@ -89,14 +86,9 @@ public final class HomeManager: HomeManagable {
                 onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
                 onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
                 retryTicks: AsyncStream<Void>? = nil,
-                persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
-                outdoorTemperature: @escaping @Sendable () async -> Double? = { nil }) {
+                persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)]) {
         let deliveries = DeliveryQueue(sender: notificationSender)
         self.deliveries = deliveries
-        self.windowManager = WindowManager(deliver: { delivery in
-            Self.record(delivery, in: journal)
-            await deliveries.deliver(delivery)
-        }, outdoorTemperature: outdoorTemperature)
         self.journal = journal
         self.commandCache = commandCache
         self.fireplaceSwitches = fireplaceSwitches
@@ -570,18 +562,6 @@ public final class HomeManager: HomeManagable {
     public func deliver(_ delivery: Delivery) async {
         Self.record(delivery, in: journal)
         await deliveries.deliver(delivery)
-    }
-
-    public func markWindowOverdue(entityId: EntityId) async {
-        await windowManager.markWindowOverdue(entityId: entityId)
-    }
-
-    public func getWindowContentState() async -> WindowContentState {
-        await windowManager.contentState()
-    }
-
-    public func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
-        await windowManager.setWindowOpenState(entityId: entityId, to: state)
     }
 
     public func homeKitHealth() async -> HomeKitHealth {

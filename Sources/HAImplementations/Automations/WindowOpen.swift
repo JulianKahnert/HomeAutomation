@@ -46,7 +46,7 @@ public struct WindowOpen: Automatable {
         try await execute(using: hm, on: AutomationRunContext.event, now: Date(), sleep: { try await Task.sleep(for: $0) })
     }
 
-    /// Registers the open window and marks it überschritten at its Fensterschließzeit.
+    /// Reports the open window's deadline and its überschritten state at the Fensterschließzeit.
     ///
     /// - On a report (`event`) the window opened `now`. On a server start it has been open since the timestamp
     ///   of its contact's current state, so the Live Activity keeps its real opening time and the run waits
@@ -59,21 +59,18 @@ public struct WindowOpen: Automatable {
         // Clear window state when window closes early
         guard isWindowOpen else {
             log.debug("Skipping 'WindowOpen' automation, window is closed")
-            await hm.setWindowOpenState(entityId: windowContact.contactSensorId, to: nil)
             await reportDeadline(.none, using: hm)
             return
         }
 
-        // A window already registered keeps its opening time: a replay of "open" (the adapter's resync after
+        // A window whose deadline is already stored keeps it: a replay of "open" (the adapter's resync after
         // a server start) must not restart its Lüftungslimit.
         let closeBy: Date
-        if let registered = await registeredWindow(using: hm) {
-            closeBy = registered.closeBy
+        if let stored = await storedDeadline(using: hm)?.end {
+            closeBy = stored
         } else {
             let opened = event == .serverStarted ? contact.timestamp : now
-            let state = WindowOpenState(entityId: windowContact.contactSensorId, opened: opened, maxOpenDuration: notificationWait.timeInterval)
-            await hm.setWindowOpenState(entityId: windowContact.contactSensorId, to: state)
-            closeBy = state.closeBy
+            closeBy = opened.addingTimeInterval(notificationWait.timeInterval)
         }
 
         await reportDeadline(.running(until: closeBy), using: hm)
@@ -84,10 +81,9 @@ public struct WindowOpen: Automatable {
             try await sleep(.seconds(remaining))
         }
 
-        // The Live Activity marks the window überschritten and alerts the resident.
-        log.debug("Fensterschließzeit reached, marking window überschritten")
+        // The window projection shows the window überschritten and alerts the resident.
+        log.debug("Fensterschließzeit reached, reporting the window überschritten")
         await reportDeadline(.overdue(since: closeBy), using: hm)
-        await hm.markWindowOverdue(entityId: windowContact.contactSensorId)
     }
 
     /// The server-owned entity that holds this window's deadline, one per window.
@@ -109,9 +105,10 @@ public struct WindowOpen: Automatable {
         await hm.report(deadlineId, value: .text(deadline.text))
     }
 
-    /// This offene Fenster as the Live Activity shows it, `nil` when it is not registered.
-    private func registeredWindow(using hm: HomeManagable) async -> WindowContentState.Window? {
-        let id = WindowContentState.Window.id(room: windowContact.contactSensorId.placeId, name: windowContact.contactSensorId.name)
-        return await hm.getWindowContentState().windows.first { $0.id == id }
+    /// The deadline this window holds, `nil` when none is stored or it is `none`.
+    private func storedDeadline(using hm: HomeManagable) async -> Deadline? {
+        let deadline = await hm.states(of: CharacteristicsType.deadline.valueKind)
+            .first { $0.entityId == deadlineId }?.deadline
+        return deadline?.end == nil ? nil : deadline
     }
 }

@@ -24,7 +24,8 @@ extension AutomationInfo {
         "Turn": ("Schedule", "clock", "Schedule"),
         "TurnOnForDuration": ("Light", "timer", "Device change"),
         "UpsertScene": ("Scene", "sparkles", "Manual"),
-        "WindowOpen": ("Window", "window.casement", "Window contact")
+        "WindowOpen": ("Window", "window.casement", "Window contact"),
+        "WindowProjection": ("Window", "rectangle.badge.clock", "Window deadlines")
     ]
 
     var typeLabel: String {

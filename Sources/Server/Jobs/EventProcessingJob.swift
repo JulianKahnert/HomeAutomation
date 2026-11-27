@@ -47,7 +47,10 @@ struct HomeEventProcessingJob: Job, Log {
             // A value-identical replay carries no new information: the adapter re-yields its
             // full entity state on every rescan (reconnect resync, reachability flap), and
             // triggering on those would supersede running automations for nothing.
-            guard await homeManager.addEntityHistory(item) else { return }
+            // A server-owned state was checked and set when it was reported; checking it again would find it equal.
+            if !item.origin.isCheckedAtSource {
+                guard await homeManager.addEntityHistory(item) else { return }
+            }
         }
 
         // hand the event to the lane of every active automation

@@ -51,7 +51,8 @@ func routes(_ app: Application) throws {
                 let jobs = await scheduler?.lastSuccesses ?? [:]
                 let body = HealthDTO(jobs: jobs.mapValues { $0.formatted(.iso8601) },
                                      loopAgeSeconds: await gauge?.age() ?? 0,
-                                     laneAgeSeconds: await automationService.laneAges())
+                                     laneAgeSeconds: await automationService.laneAges(),
+                                     lastReports: await homeManager.lastReports().mapValues { $0.formatted(.iso8601) })
                 let response = Response(status: .ok)
                 try response.content.encode(body, as: .json)
                 return response
@@ -94,9 +95,14 @@ func routes(_ app: Application) throws {
             // referencing unknown entities fail at runtime and flood the critical-log notifier.
             req.logger.warning("⚠️ Accepting config with skipValidation=true - \(configEntityIds.count) referenced entities were NOT validated against HomeKit")
         } else {
-            let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
-
-            let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
+            // A server-owned entity is not in HomeKit, so the adapter cannot confirm it (ADR-009); with nothing
+            // else to check the adapter need not be online either.
+            let homeKitEntityIds = configEntityIds.filter { !$0.isServerOwned }
+            var missingEntityIds = homeKitEntityIds
+            if !homeKitEntityIds.isEmpty {
+                let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
+                missingEntityIds.subtract(foundEntityIds.map(\.entityId))
+            }
             guard missingEntityIds.isEmpty else {
                 throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
             }
@@ -127,4 +133,7 @@ struct HealthDTO: Content {
     let loopAgeSeconds: Double
     /// Per automation: the age of the oldest event its lane has not finished checking; 0 when idle.
     let laneAgeSeconds: [String: Double]
+    /// Per reporting source (`homekit`, `server`, a job name): when it last reported, a replay included (ISO 8601).
+    /// A source is missing after a restart until its first report.
+    let lastReports: [String: String]
 }

@@ -35,6 +35,9 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     public let temperatureCalibrationInC: Double?
     /// Where the change came from; `nil` for an item that is no single change, such as an hourly aggregate.
     public let origin: String?
+    /// When the entity last reported, a replay included. Only set on the newest item of a history, and only while the
+    /// server holds it in memory; `nil` after a restart until the first report.
+    public let lastReport: Date?
     /// The generic form of the value: its value kind (`ValueKind.rawValue`) and the value. A kind this build does
     /// not know still arrives here, with its raw value.
     public let valueKind: String?
@@ -66,6 +69,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         valvePositionPercent: Int? = nil,
         temperatureCalibrationInC: Double? = nil,
         origin: String? = nil,
+        lastReport: Date? = nil,
         valueKind: String? = nil,
         value: Value? = nil
     ) {
@@ -94,6 +98,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
         self.valvePositionPercent = valvePositionPercent
         self.temperatureCalibrationInC = temperatureCalibrationInC
         self.origin = origin
+        self.lastReport = lastReport
         if let valueKind, let value {
             self.valueKind = valueKind
             self.value = value
@@ -176,6 +181,7 @@ extension EntityHistoryItem {
                   valvePositionPercent: item.valvePositionPercent,
                   temperatureCalibrationInC: item.temperatureCalibrationInC,
                   origin: item.origin.rawValue,
+                  lastReport: item.lastReport,
                   valueKind: item.genericValue?.kind.rawValue,
                   value: item.genericValue?.value)
     }

@@ -29,6 +29,8 @@ public final class HomeManager: HomeManagable {
     private let storageUpkeep: (any StorageUpkeep)?
     /// Tells the automations about a switch of the fireplace; the server yields `HomeEvent.fireplaceChanged`.
     private let onFireplaceSwitch: @Sendable (FireplaceSwitch) -> Void
+    /// Hands a changed, already checked server-owned state to the event stream (`report`).
+    private let onReportedChange: @Sendable (EntityStorageItem) -> Void
     /// The newest fireplace switch, loaded once from the database. It also holds a switch the database could
     /// not save, so an end of the fireplace stays an end and `FireplaceTimeout` does not repeat itself.
     private var fireplace: FireplaceSwitch??
@@ -46,6 +48,9 @@ public final class HomeManager: HomeManagable {
     /// The entities a source reported in this process; a state merely loaded from the database does not
     /// prove the entity still exists in HomeKit.
     private var reportedEntities: Set<EntityId> = []
+    /// When each source (the origin of a report) last reported, a replay included. Memory only: empty after a
+    /// restart until the first report, so a silent source differs from an unchanged one.
+    private var lastReportBySource: [Origin: Date] = [:]
     /// One retry slot per entity: a newer failed action replaces an older queued one, so the newest
     /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
     /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
@@ -70,6 +75,7 @@ public final class HomeManager: HomeManagable {
     ///   - fireplaceSwitches: Where the fireplace switches are stored; `nil` keeps them in memory only.
     ///   - storageUpkeep: What the database upkeep steps do; `nil` does nothing.
     ///   - onFireplaceSwitch: Called after each switch of the fireplace, to tell the automations.
+    ///   - onReportedChange: Called with each changed state set by `report`; the server yields `HomeEvent.change`.
     ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
     ///     than there are delays.
     ///   - outdoorTemperature: The latest stored outdoor temperature reading in °C, `nil` without one;
@@ -84,6 +90,7 @@ public final class HomeManager: HomeManagable {
                 fireplaceSwitches: (any FireplaceRepository)? = nil,
                 storageUpkeep: (any StorageUpkeep)? = nil,
                 onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
+                onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
                 retryTicks: AsyncStream<Void>? = nil,
                 persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
                 outdoorTemperature: @escaping @Sendable () async -> Double? = { nil }) {
@@ -99,6 +106,7 @@ public final class HomeManager: HomeManagable {
         self.fireplaceSwitches = fireplaceSwitches
         self.storageUpkeep = storageUpkeep
         self.onFireplaceSwitch = onFireplaceSwitch
+        self.onReportedChange = onReportedChange
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
         self.location = location
@@ -243,6 +251,14 @@ public final class HomeManager: HomeManagable {
         // Memory only, so a decision never waits for the database: an entity neither loaded at the start nor
         // reported since is unknown.
         throw OptionalError.notFound
+    }
+
+    public func lastReports() -> [String: Date] {
+        Dictionary(uniqueKeysWithValues: lastReportBySource.map { ($0.key.rawValue, $0.value) })
+    }
+
+    public func lastReport(of entityId: EntityId) -> Date? {
+        currentStates[entityId]?.lastReport
     }
 
     public func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem? {
@@ -402,6 +418,27 @@ public final class HomeManager: HomeManagable {
     }
 
     @discardableResult
+    public func report(_ entityId: EntityId, value: Value, origin: Origin) async -> Bool {
+        guard entityId.isServerOwned else {
+            log.error("Refusing to report \(entityId): it is not a server-owned entity")
+            return false
+        }
+        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
+            log.error("Refusing to report \(entityId): the value \(value) does not fit its value kind")
+            return false
+        }
+        // No suspension point between the check, the state and the yield: the state holds before the event
+        // reaches the stream, and two reports of one entity cannot interleave.
+        guard await addEntityHistory(item) else { return false }
+        onReportedChange(currentStates[entityId] ?? item)
+        return true
+    }
+
+    public func states(of kind: ValueKind) async -> [EntityStorageItem] {
+        currentStates.values.filter { $0.entityId.characteristicType.valueKind == kind }
+    }
+
+    @discardableResult
     public func addEntityHistory(_ item: EntityStorageItem) async -> Bool {
         log.debug("Adding entity item to storage \(item.entityId)")
         // Every report from HomeKit counts, a value-identical replay too: it proves HomeKit still delivers.
@@ -410,6 +447,8 @@ public final class HomeManager: HomeManagable {
             liveness.recordEvent(at: Date())
         }
         reportedEntities.insert(item.entityId)
+        let reportedAt = Date()
+        lastReportBySource[item.origin] = reportedAt
 
         // `EntityStorageItem` is Equatable including its timestamp, so align it before comparing —
         // only the values decide whether this is new information. An unknown entity counts as a
@@ -418,6 +457,7 @@ public final class HomeManager: HomeManagable {
         if var knownItem = currentStates[item.entityId] {
             knownItem.timestamp = item.timestamp
             knownItem.origin = item.origin
+            knownItem.lastReport = item.lastReport
             didChange = knownItem != item
         } else {
             didChange = true
@@ -425,8 +465,12 @@ public final class HomeManager: HomeManagable {
 
         // A replay keeps the known state, so its timestamp stays the time of the last change.
         if didChange {
-            currentStates[item.entityId] = item
+            var state = item
+            state.lastReport = reportedAt
+            currentStates[item.entityId] = state
             remember(reading: item)
+        } else {
+            currentStates[item.entityId]?.lastReport = reportedAt
         }
 
         // A freshly observed state can reveal that the device drifted away from what the server last

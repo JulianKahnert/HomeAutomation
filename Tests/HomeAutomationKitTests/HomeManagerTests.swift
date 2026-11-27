@@ -10,6 +10,7 @@ import Foundation
 import HAApplicationLayer
 @testable import HAImplementations
 import HAModels
+import Synchronization
 import Testing
 
 private enum FakeAdapterError: Error {
@@ -132,6 +133,7 @@ struct HomeManagerTests {
                                  heatingWrites: (any HeatingWriteRepository)? = nil,
                                  fireplaceSwitches: (any FireplaceRepository)? = nil,
                                  onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
+                                 onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
                                  retryTicks: AsyncStream<Void> = AsyncStream { _ in },
                                  persistRetryDelays: [Duration] = [.zero, .zero],
                                  journal: Journal = Journal(store: InMemoryJournalStore())) async -> HomeManager {
@@ -144,8 +146,107 @@ struct HomeManagerTests {
                                  heatingWrites: heatingWrites,
                                  fireplaceSwitches: fireplaceSwitches,
                                  onFireplaceSwitch: onFireplaceSwitch,
+                                 onReportedChange: onReportedChange,
                                  retryTicks: retryTicks,
                                  persistRetryDelays: persistRetryDelays)
+    }
+
+    // MARK: - server-owned entities
+
+    private let holidayId = EntityId.serverOwned(name: "holiday", characteristic: .switcher)
+    private let priceId = EntityId.serverOwned(name: "price", characteristic: .temperatureSensor)
+
+    @Test("A report tells whether the state changed and a repeated value changes nothing and keeps the timestamp")
+    func reportTellsWhetherItChanged() async throws {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+
+        #expect(await homeManager.report(holidayId, value: .bool(true)))
+        let first = try await homeManager.getCurrentEntity(with: holidayId)
+        try await Task.sleep(for: .milliseconds(20))
+
+        #expect(await homeManager.report(holidayId, value: .bool(true)) == false)
+        #expect(try await homeManager.getCurrentEntity(with: holidayId).timestamp == first.timestamp)
+        #expect(await homeManager.report(holidayId, value: .bool(false)))
+        #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == false)
+    }
+
+    @Test("The new state holds before the changed event is handed on")
+    func stateHoldsBeforeTheEvent() async throws {
+        let seen = Mutex<[EntityStorageItem]>([])
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), onReportedChange: { item in seen.withLock { $0.append(item) } })
+
+        await homeManager.report(holidayId, value: .bool(true))
+        await homeManager.report(holidayId, value: .bool(true))
+
+        let events = seen.withLock { $0 }
+        #expect(events.count == 1)
+        #expect(events.first?.origin == .server)
+        #expect(events.first?.isDeviceOn == true)
+        #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == true)
+    }
+
+    @Test("A report carries its origin and is no sign of life for HomeKit")
+    func reportIsNoSignOfLife() async throws {
+        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .accessDenied()))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        await homeManager.perform(.turnOff(switchId))
+        #expect(await homeManager.homeKitHealth() != .healthy)
+
+        await homeManager.report(holidayId, value: .bool(true), origin: .app)
+
+        #expect(try await homeManager.getCurrentEntity(with: holidayId).origin == .app)
+        #expect(await homeManager.homeKitHealth() != .healthy)
+        #expect(await homeManager.lastReports().keys.contains("app"))
+    }
+
+    @Test("A server-owned state survives a restart and is stored once")
+    func reportSurvivesARestart() async throws {
+        let storage = RecordingStorageRepository()
+        let beforeRestart = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        await beforeRestart.report(priceId, value: .number(0.31))
+        await storage.waitForAdds(1)
+
+        let afterRestart = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        await afterRestart.loadCurrentStates(timeout: .seconds(2))
+
+        #expect(try await afterRestart.getCurrentEntity(with: priceId).temperatureInC?.value == 0.31)
+        #expect(await afterRestart.report(priceId, value: .number(0.31)) == false)
+        #expect(await storage.added.count == 1)
+    }
+
+    @Test("A failing database does not undo the state")
+    func failingDatabaseKeepsTheState() async throws {
+        let storage = RecordingStorageRepository(failingAdds: 100)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+
+        #expect(await homeManager.report(holidayId, value: .bool(true)))
+
+        #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == true)
+        #expect(await homeManager.report(holidayId, value: .bool(true)) == false)
+    }
+
+    @Test("The facade reads all states of one value kind")
+    func statesOfOneKind() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+        let guestsId = EntityId.serverOwned(name: "guests", characteristic: .switcher)
+        await homeManager.report(holidayId, value: .bool(true))
+        await homeManager.report(guestsId, value: .bool(false))
+        await homeManager.report(priceId, value: .number(0.3))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+
+        let switches = await homeManager.states(of: ValueKind(.switcher)).map(\.entityId)
+
+        #expect(Set(switches) == [holidayId, guestsId, switchId])
+        #expect(await homeManager.states(of: ValueKind(.temperatureSensor)).map(\.entityId) == [priceId])
+    }
+
+    @Test("A report is refused for an entity that is not server-owned or a value that does not fit")
+    func reportRefusesWhatDoesNotFit() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+
+        #expect(await homeManager.report(switchId, value: .bool(true)) == false)
+        #expect(await homeManager.report(holidayId, value: .number(1)) == false)
+        #expect(await homeManager.states(of: ValueKind(.switcher)).isEmpty)
     }
 
     // MARK: - thermostats
@@ -539,6 +640,45 @@ struct HomeManagerTests {
         #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: false, origin: origin)))
 
         #expect(await homeManager.homeKitHealth() != .healthy)
+    }
+
+    @Test("A replay refreshes the last report time and leaves the time of the last change")
+    func replayRefreshesLastReport() async throws {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+        let changed = Date(timeIntervalSinceNow: -3_600)
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: changed, isDeviceOn: true))
+        let first = try #require(await homeManager.lastReport(of: switchId))
+
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(), isDeviceOn: true)) == false)
+
+        let state = try await homeManager.getCurrentEntity(with: switchId)
+        #expect(state.timestamp == changed)
+        #expect(try #require(state.lastReport) > first)
+    }
+
+    @Test("After a restart the last report time is unknown until the first report")
+    func lastReportUnknownAfterRestart() async throws {
+        let storage = MockStorageRepository(items: [EntityStorageItem(entityId: switchId, timestamp: Date(timeIntervalSinceNow: -60), isDeviceOn: true)])
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        await homeManager.loadCurrentStates(timeout: .seconds(5))
+
+        #expect(try await homeManager.getCurrentEntity(with: switchId).isDeviceOn == true)
+        #expect(await homeManager.lastReport(of: switchId) == nil)
+        #expect(await homeManager.lastReports().isEmpty)
+
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        #expect(await homeManager.lastReport(of: switchId) != nil)
+    }
+
+    @Test("The last report is kept per reporting source")
+    func lastReportPerSource() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true, origin: .job("valves")))
+
+        let reports = await homeManager.lastReports()
+        #expect(Set(reports.keys) == ["homekit", "valves"])
     }
 
     @Test("A replay is dropped whatever its origin", arguments: [Origin.homekit, Origin.server, Origin.job("valves")])

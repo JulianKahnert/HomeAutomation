@@ -19,6 +19,11 @@ public protocol EntityValidator {
 @HomeManagerActor
 public protocol HomeManagable: EntityValidator, Sendable {
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem
+    /// When each reporting source (an origin: `homekit`, `server` or a job name) last reported, a replay included.
+    /// Memory only, so a source is missing after a restart until its first report.
+    func lastReports() async -> [String: Date]
+    /// When the entity last reported, a replay included; `nil` while unknown (after a restart until its first report).
+    func lastReport(of entityId: EntityId) async -> Date?
     func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem?
     /// The last state of the entity the database holds, past the in-memory cache. After a restart the
     /// adapter's resync refreshes the cache with a new timestamp; only the database still knows since
@@ -50,6 +55,22 @@ public protocol HomeManagable: EntityValidator, Sendable {
     @discardableResult
     func addEntityHistory(_ item: EntityStorageItem) async -> Bool
 
+    /// Reports a state the server keeps itself (a server-owned entity, glossary). Checks the value against the
+    /// current state and sets it at once, so it holds before the event stream distributes it; stores it (history,
+    /// API, restart) and, when it changed, yields an already checked `HomeEvent.change` with `origin`. A repeated
+    /// value changes nothing and keeps the timestamp. A failing database does not undo the state. It is a report,
+    /// not a command (ADR-003): devices stay with `perform`. Only counts as a sign of life for HomeKit with origin
+    /// `homekit`, which it never has.
+    /// - Parameters:
+    ///   - entityId: A server-owned entity: `entityId.isServerOwned`.
+    ///   - value: Must fit the shape of the entity's value kind.
+    ///   - origin: `server` (default) or `app`.
+    /// - Returns: Whether the state changed. `false` too for a value that does not fit or an entity that is not server-owned (logged).
+    @discardableResult
+    func report(_ entityId: EntityId, value: Value, origin: Origin) async -> Bool
+    /// The current states of all entities of one value kind, in no particular order; from memory.
+    func states(of kind: ValueKind) async -> [EntityStorageItem]
+
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async
     func getLocation() async -> Location
@@ -67,6 +88,14 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func homeKitHealth() async -> HomeKitHealth
     /// Runs one step of the database upkeep (cleanup, rollup). A no-op where the host has no database upkeep.
     func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws
+}
+
+public extension HomeManagable {
+    /// Reports with origin `server`.
+    @discardableResult
+    func report(_ entityId: EntityId, value: Value) async -> Bool {
+        await report(entityId, value: value, origin: .server)
+    }
 }
 
 public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equatable {

@@ -107,7 +107,7 @@ extension EntityStorageItem {
         let origin = Origin(rawValue: change.origin)
         let shape = ValueDescriptor.descriptor(for: type).shape
         if let value = change.value(shape: shape),
-           let item = EntityStorageItem(entityId: entityId, timestamp: change.timestamp, kind: type.valueKind, value: value, origin: origin) {
+           let item = EntityStorageItem(entityId: entityId, timestamp: change.timestamp, value: value, origin: origin) {
             self = item
         } else {
             self = EntityStorageItem(entityId: entityId, timestamp: change.timestamp, origin: origin)

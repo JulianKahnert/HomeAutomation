@@ -285,7 +285,7 @@ struct HomeManagerTests {
 
         await #expect(throws: CancellationError.self) { try await task.value }
         #expect(seen.withLock { $0 } == 0)
-        #expect(await homeManager.states(of: ValueKind(.switcher)).isEmpty)
+        #expect(await homeManager.states(of: .switcher).isEmpty)
     }
 
     @Test("A report carries its origin and is no sign of life for HomeKit")
@@ -337,10 +337,10 @@ struct HomeManagerTests {
         try await homeManager.report(priceId, value: .number(0.3))
         await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
 
-        let switches = await homeManager.states(of: ValueKind(.switcher)).map(\.entityId)
+        let switches = await homeManager.states(of: .switcher).map(\.entityId)
 
         #expect(Set(switches) == [holidayId, guestsId, switchId])
-        #expect(await homeManager.states(of: ValueKind(.temperatureSensor)).map(\.entityId) == [priceId])
+        #expect(await homeManager.states(of: .temperatureSensor).map(\.entityId) == [priceId])
     }
 
     @Test("A refused report throws: an entity that is not server-owned, a value that does not fit")
@@ -349,7 +349,7 @@ struct HomeManagerTests {
 
         await #expect(throws: ReportError.notServerOwned(switchId)) { try await homeManager.report(switchId, value: .bool(true)) }
         await #expect(throws: ReportError.valueDoesNotFit(holidayId)) { try await homeManager.report(holidayId, value: .number(1)) }
-        #expect(await homeManager.states(of: ValueKind(.switcher)).isEmpty)
+        #expect(await homeManager.states(of: .switcher).isEmpty)
     }
 
     // MARK: - thermostats

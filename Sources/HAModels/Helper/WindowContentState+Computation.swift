@@ -52,7 +52,7 @@ public extension HomeManagable {
     /// The window Live Activity's content state, computed from the window deadlines and the outdoor temperature.
     /// The one computation behind the Live Activity and `GET /windowstates`.
     func getWindowContentState() async -> WindowContentState {
-        let deadlines = await states(of: CharacteristicsType.deadline.valueKind)
+        let deadlines = await states(of: .deadline)
         var windows: [(deadlineId: EntityId, deadline: Deadline, opened: Date)] = []
         for item in deadlines {
             guard let deadline = item.deadline, let end = deadline.end else { continue }

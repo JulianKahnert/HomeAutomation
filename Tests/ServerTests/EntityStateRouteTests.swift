@@ -66,7 +66,7 @@ final class EntityStateRouteTests: XCTestCase {
         XCTAssertEqual(answer["changed"] as? Bool, true)
         XCTAssertEqual(answer["origin"] as? String, Origin.app.rawValue)
         let held = try await app.homeManager.getCurrentEntity(with: settable)
-        XCTAssertEqual(held.genericValue?.value, .bool(true))
+        XCTAssertEqual(held.value, .bool(true))
         XCTAssertEqual(held.origin, .app)
     }
 
@@ -100,7 +100,7 @@ final class EntityStateRouteTests: XCTestCase {
         XCTAssertEqual(status, .ok)
         XCTAssertEqual(answer["value"] as? Double, 25)
         let held = try await app.homeManager.getCurrentEntity(with: target)
-        XCTAssertEqual(held.genericValue?.value, .number(25))
+        XCTAssertEqual(held.value, .number(25))
     }
 
     func testOnlySwitchHeatingModeAndTargetTemperatureAreSettableKinds() {

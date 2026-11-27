@@ -67,7 +67,6 @@ public struct ValueDescriptor: Sendable, Equatable {
         case deadlineText
     }
 
-    public let kind: ValueKind
     public let shape: Shape
     /// Unit symbol, `nil` for unitless kinds.
     public let unit: String?
@@ -130,7 +129,6 @@ public struct ValueDescriptor: Sendable, Equatable {
 
     private static func bool(_ type: CharacteristicsType, _ trueLabel: String, _ falseLabel: String, isSettableFromApp: Bool = false) -> ValueDescriptor {
         ValueDescriptor(
-            kind: type.valueKind,
             shape: .bool,
             unit: nil,
             display: .boolean(trueLabel: trueLabel, falseLabel: falseLabel),
@@ -149,7 +147,6 @@ public struct ValueDescriptor: Sendable, Equatable {
         isSettableFromApp: Bool = false
     ) -> ValueDescriptor {
         ValueDescriptor(
-            kind: type.valueKind,
             shape: .number,
             unit: unit,
             display: .number(fractionDigits: digits),
@@ -161,7 +158,6 @@ public struct ValueDescriptor: Sendable, Equatable {
 
     private static func structured(_ type: CharacteristicsType, shape: Shape, display: Display, constraint: Constraint) -> ValueDescriptor {
         ValueDescriptor(
-            kind: type.valueKind,
             shape: shape,
             unit: nil,
             display: display,

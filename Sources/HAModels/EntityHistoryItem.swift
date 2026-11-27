@@ -16,7 +16,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     /// When the entity last reported, a replay included. Only set on the newest item of a history, and only while the
     /// server holds it in memory; `nil` after a restart until the first report.
     public let lastReport: Date?
-    /// The value kind (`ValueKind.rawValue`) and the value. A kind this build does not know still arrives here, with
+    /// The value kind (the raw value of the `CharacteristicsType`) and the value. A kind this build does not know still arrives here, with
     /// its raw value. The typed accessors below derive from the pair.
     public let valueKind: String?
     public let value: Value?
@@ -91,7 +91,7 @@ extension EntityHistoryItem {
 
     /// The descriptor of the value kind; `nil` for a kind this build does not know.
     public var descriptor: ValueDescriptor? {
-        valueKind.flatMap { ValueKind(rawValue: $0).descriptor }
+        valueKind.flatMap(CharacteristicsType.init(rawValue:)).map(ValueDescriptor.descriptor(for:))
     }
 
     /// The raw value as text, for a kind without a descriptor.
@@ -110,7 +110,7 @@ extension EntityHistoryItem {
 
     /// Human-readable description of the primary value
     public var valueDescription: String {
-        if let valueKind, ValueKind(rawValue: valueKind).descriptor == nil, let rawValueDescription {
+        if let valueKind, descriptor == nil, let rawValueDescription {
             return "\(valueKind): \(rawValueDescription)"
         }
         if valueKind == CharacteristicsType.deadline.rawValue, case .text(let text) = value, let deadline = Deadline(text: text) {

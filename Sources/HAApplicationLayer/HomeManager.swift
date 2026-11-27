@@ -369,7 +369,7 @@ public final class HomeManager: HomeManagable {
         // atomic with the write: the lane cancels the old run before the new one starts.
         try Task.checkCancellation()
         guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
-        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
+        guard let item = EntityStorageItem(entityId: entityId, value: value, origin: origin) else {
             throw ReportError.valueDoesNotFit(entityId)
         }
         // No suspension point between the check, the state, the persist and the emit: the state holds before the
@@ -382,8 +382,8 @@ public final class HomeManager: HomeManagable {
         return changed != nil
     }
 
-    public func states(of kind: ValueKind) async -> [EntityStorageItem] {
-        currentStates.values.filter { $0.entityId.characteristicType.valueKind == kind }
+    public func states(of type: CharacteristicsType) async -> [EntityStorageItem] {
+        currentStates.values.filter { $0.entityId.characteristicType == type }
     }
 
     @discardableResult

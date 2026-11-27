@@ -31,8 +31,8 @@ struct EntityStorageMappingTests {
     @Test("every value kind is stored and read back unchanged", arguments: samples)
     func roundTrip(type: CharacteristicsType, value: Value) throws {
         let id = EntityId(placeId: "Kitchen", name: "Device", characteristicsName: "Name", characteristic: type)
-        let item = try #require(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_735_333_200), kind: type.valueKind, value: value, origin: .server))
-        let stored = try #require(item.value(of: type))
+        let item = try #require(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_735_333_200), value: value, origin: .server))
+        let stored = try #require(item.value)
         let entity = EntityDbItem(placeId: id.placeId, serviceName: id.name, characteristicType: type.rawValue, characteristicsName: id.characteristicsName)
         let change = EntityChangeDbItem(entityId: UUID(), timestamp: item.timestamp, value: stored, origin: item.origin.rawValue)
 
@@ -40,7 +40,7 @@ struct EntityStorageMappingTests {
 
         #expect(restored == item)
         #expect(restored.origin == .server)
-        #expect(restored.value(of: type) == value)
+        #expect(restored.value == value)
     }
 
     @Test("a deadline is one row: the number for the end, the text for the case")
@@ -74,14 +74,5 @@ struct EntityStorageMappingTests {
         let entity = EntityDbItem(placeId: "Hall", serviceName: "Gone", characteristicType: "noLongerKnown", characteristicsName: nil)
         let change = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .bool(true), origin: "homekit")
         #expect(EntityStorageItem(entity: entity, change: change) == nil)
-    }
-
-    @Test("value(of:) ignores values of other kinds")
-    func valueOfType() {
-        let id = EntityId(placeId: "A", name: "B", characteristicsName: nil, characteristic: .temperatureSensor)
-        let item = EntityStorageItem(entityId: id, temperatureInC: .init(value: 20, unit: .celsius))
-        #expect(item.value(of: .temperatureSensor) == .number(20))
-        #expect(item.value(of: .relativeHumiditySensor) == nil)
-        #expect(item.value(of: .motionSensor) == nil)
     }
 }

@@ -97,7 +97,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
     }
 
     func add(_ item: EntityStorageItem) async throws {
-        guard let value = item.value(of: item.entityId.characteristicType) else {
+        guard let value = item.value else {
             log.warning("Item without a value for its type is not stored", metadata: ["entityId": "\(item.entityId)"])
             return
         }

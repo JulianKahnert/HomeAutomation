@@ -63,8 +63,8 @@ public protocol HomeManagable: EntityValidator, Sendable {
     ///   not fit the kind. That is a programmer error of the caller, not an outcome.
     @discardableResult
     func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool
-    /// The current states of all entities of one value kind, in no particular order; from memory.
-    func states(of kind: ValueKind) async -> [EntityStorageItem]
+    /// The current states of all entities of one characteristic type, in no particular order; from memory.
+    func states(of type: CharacteristicsType) async -> [EntityStorageItem]
 
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async

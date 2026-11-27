@@ -39,7 +39,7 @@ struct WindowProjectionTests {
     private func report(_ deadline: Deadline, _ name: String, in room: String) async throws -> EntityStorageItem {
         let id = Self.deadlineId(name, in: room)
         try await manager.report(id, value: .text(deadline.text))
-        let item = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id })
+        let item = try #require(await manager.states(of: .deadline).first { $0.entityId == id })
         try await AutomationRunContext.$event.withValue(.change(entity: item)) {
             try await projection.execute(using: manager)
         }
@@ -56,7 +56,7 @@ struct WindowProjectionTests {
 
     private func markOverdue(_ name: String, in room: String) async throws {
         let id = Self.deadlineId(name, in: room)
-        let end = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id }?.deadline?.end)
+        let end = try #require(await manager.states(of: .deadline).first { $0.entityId == id }?.deadline?.end)
         try await report(.overdue(since: end), name, in: room)
     }
 
@@ -218,9 +218,9 @@ struct WindowProjectionTests {
         try await open("Fenster", in: "Küche", minutesAfterStart: 0)
         try await open("Tür", in: "Flur", minutesAfterStart: 1)
         let id = Self.deadlineId("Tür", in: "Flur")
-        let end = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id }?.deadline?.end)
+        let end = try #require(await manager.states(of: .deadline).first { $0.entityId == id }?.deadline?.end)
         try await manager.report(id, value: .text(Deadline.overdue(since: end).text))
-        let overdue = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id })
+        let overdue = try #require(await manager.states(of: .deadline).first { $0.entityId == id })
         try await manager.report(id, value: .text(Deadline.none.text))
 
         try await AutomationRunContext.$event.withValue(.change(entity: overdue)) {

@@ -201,16 +201,16 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     @discardableResult
     func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
         guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
-        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
+        guard let item = EntityStorageItem(entityId: entityId, value: value, origin: origin) else {
             throw ReportError.valueDoesNotFit(entityId)
         }
         return await addEntityHistory(item)
     }
 
-    func states(of kind: ValueKind) async -> [EntityStorageItem] {
+    func states(of type: CharacteristicsType) async -> [EntityStorageItem] {
         var latest: [EntityId: EntityStorageItem] = [:]
         for item in storageItems { latest[item.entityId] = item }
-        return latest.values.filter { $0.entityId.characteristicType.valueKind == kind }
+        return latest.values.filter { $0.entityId.characteristicType == type }
     }
 
     /// When each entity last reported, for a test that places a report in the past.

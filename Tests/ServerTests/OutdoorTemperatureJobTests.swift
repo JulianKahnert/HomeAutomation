@@ -70,10 +70,12 @@ struct OutdoorTemperatureJobTests {
     }
 
     @Test func historyItemExposesHeatingFields() {
-        let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .valvePosition)
-        #expect(EntityHistoryItem(EntityStorageItem(entityId: id, targetTemperatureInC: 20.5)).targetTemperatureInC == 20.5)
-        #expect(EntityHistoryItem(EntityStorageItem(entityId: id, heatingMode: .heat)).heatingMode == .heat)
-        #expect(EntityHistoryItem(EntityStorageItem(entityId: id, valvePositionPercent: 35)).valvePositionPercent == 35)
+        func id(_ type: CharacteristicsType) -> EntityId {
+            EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: type)
+        }
+        #expect(EntityHistoryItem(EntityStorageItem(entityId: id(.targetTemperature), targetTemperatureInC: 20.5)).targetTemperatureInC == 20.5)
+        #expect(EntityHistoryItem(EntityStorageItem(entityId: id(.heatingMode), heatingMode: .heat)).heatingMode == .heat)
+        #expect(EntityHistoryItem(EntityStorageItem(entityId: id(.valvePosition), valvePositionPercent: 35)).valvePositionPercent == 35)
     }
 
     @Test(arguments: HeatingMode.allCases)

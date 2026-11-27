@@ -180,7 +180,7 @@ struct OpenAPIController: APIProtocol {
                                 characteristicsName: characteristicsName, characteristic: type)
 
         // Only a server-owned entity of a kind the descriptor lets the app set; any other one stays unchanged.
-        guard entityId.isServerOwned, type.valueKind.descriptor?.isSettableFromApp == true else { return .forbidden }
+        guard entityId.isServerOwned, ValueDescriptor.descriptor(for: type).isSettableFromApp else { return .forbidden }
         let value = Value(body.value)
         let homeManager = request.application.homeManager
         let changed: Bool
@@ -197,12 +197,12 @@ struct OpenAPIController: APIProtocol {
             request.logger.error("Failed to read the state that was just set", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
             throw Abort(.internalServerError)
         }
-        guard let state = item.genericValue?.value else {
+        guard let state = item.value else {
             request.logger.error("The state that was just set has no value", metadata: ["entityId": "\(entityId)"])
             throw Abort(.internalServerError)
         }
         return .ok(.init(body: .json(.init(entityId: .init(entityId),
-                                           valueKind: type.valueKind.rawValue,
+                                           valueKind: type.rawValue,
                                            value: .init(state),
                                            changed: changed,
                                            origin: item.origin.rawValue,

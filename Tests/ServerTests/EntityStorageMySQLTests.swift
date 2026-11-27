@@ -106,7 +106,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         let repository = app.entityStorageDbRepository
         for (index, sample) in EntityStorageMappingTests.samples.enumerated() {
             let id = EntityId(placeId: "Room", name: "Device\(index)", characteristicsName: "Name", characteristic: sample.0)
-            let item = try XCTUnwrap(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_000), kind: sample.0.valueKind, value: sample.1, origin: .job("valves")))
+            let item = try XCTUnwrap(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_000), value: sample.1, origin: .job("valves")))
             try await repository.add(item)
 
             let restored = try await repository.getCurrent(id)

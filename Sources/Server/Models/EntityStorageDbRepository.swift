@@ -103,7 +103,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
         }
         let entity = try await entity(for: item.entityId)
         guard try await passesDeadBand(value, at: item.timestamp, of: entity) else { return }
-        try await EntityChangeDbItem(entityId: entity.requireID(), timestamp: item.timestamp, value: value, origin: item.origin.rawValue)
+        try await EntityChangeDbItem(entityId: entity.requireID(), timestamp: item.timestamp, value: value, shape: ValueDescriptor.descriptor(for: item.entityId.characteristicType).shape, origin: item.origin.rawValue)
             .save(on: database())
         if item.entityId.characteristicType.isHeatingRelated {
             log.debug("Stored heating entity item", metadata: ["entityId": "\(item.entityId)", "value": "\(value)"])

@@ -202,7 +202,7 @@ final class EntityStorageMySQLTests: XCTestCase {
             entity = EntityDbItem(placeId: id.placeId, serviceName: id.name, characteristicType: id.characteristicType.rawValue, characteristicsName: id.characteristicsName)
             try await entity.save(on: app.db)
         }
-        let change = try EntityChangeDbItem(entityId: entity.requireID(), timestamp: Date(timeIntervalSince1970: seconds), value: value, origin: "homekit")
+        let change = try EntityChangeDbItem(entityId: entity.requireID(), timestamp: Date(timeIntervalSince1970: seconds), value: value, shape: ValueDescriptor.descriptor(for: id.characteristicType).shape, origin: "homekit")
         change.id = changeId
         try await change.save(on: app.db)
     }

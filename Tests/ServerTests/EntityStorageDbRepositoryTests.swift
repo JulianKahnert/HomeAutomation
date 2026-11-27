@@ -34,7 +34,7 @@ struct EntityStorageMappingTests {
         let item = try #require(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_735_333_200), value: value, origin: .server))
         let stored = try #require(item.value)
         let entity = EntityDbItem(placeId: id.placeId, serviceName: id.name, characteristicType: type.rawValue, characteristicsName: id.characteristicsName)
-        let change = EntityChangeDbItem(entityId: UUID(), timestamp: item.timestamp, value: stored, origin: item.origin.rawValue)
+        let change = EntityChangeDbItem(entityId: UUID(), timestamp: item.timestamp, value: stored, shape: ValueDescriptor.descriptor(for: type).shape, origin: item.origin.rawValue)
 
         let restored = try #require(EntityStorageItem(entity: entity, change: change))
 
@@ -45,8 +45,8 @@ struct EntityStorageMappingTests {
 
     @Test("a deadline is one row: the number for the end, the text for the case")
     func deadlineColumns() {
-        let row = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .text("overdue 1800000000.0"), origin: "server")
-        let none = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .text("none"), origin: "server")
+        let row = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .text("overdue 1800000000.0"), shape: .textWithNumber, origin: "server")
+        let none = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .text("none"), shape: .textWithNumber, origin: "server")
         #expect(row.number == 1_800_000_000 && row.text == "overdue")
         #expect(none.number == nil && none.text == "none")
     }

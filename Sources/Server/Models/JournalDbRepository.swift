@@ -95,6 +95,43 @@ struct JournalDbRepository: JournalStore {
         return try await query.all().map { try $0.toCommand() }
     }
 
+    func heatingCommands(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem] {
+        var query = entries(.command)
+            .filter(\.$entityPlaceId == placeId)
+            .filter(\.$reason != nil)
+            .filter(\.$status == ActionLogItem.Status.executed.rawValue)
+        if let startDate {
+            query = query.filter(\.$timestamp >= startDate)
+        }
+        if let endDate {
+            query = query.filter(\.$timestamp < endDate)
+        }
+        return try await query.sort(\.$timestamp, .ascending).all().map { try $0.toCommand() }
+    }
+
+    func lastHeatingCommands() async throws -> [ActionLogItem] {
+        let radiators = try await entries(.command)
+            .filter(\.$reason != nil)
+            .filter(\.$status == ActionLogItem.Status.executed.rawValue)
+            .field(\.$entityPlaceId)
+            .field(\.$entityName)
+            .unique()
+            .all()
+        var commands: [ActionLogItem] = []
+        for radiator in radiators {
+            guard let placeId = radiator.entityPlaceId, let name = radiator.entityName else { continue }
+            let last = try await entries(.command)
+                .filter(\.$entityPlaceId == placeId)
+                .filter(\.$entityName == name)
+                .filter(\.$reason != nil)
+                .filter(\.$status == ActionLogItem.Status.executed.rawValue)
+                .sort(\.$timestamp, .descending)
+                .first()
+            if let last { commands.append(try last.toCommand()) }
+        }
+        return commands
+    }
+
     func clearCommands() async throws {
         try await entries(.command).delete()
     }

@@ -289,17 +289,16 @@ struct RoomHeatingTests {
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false), .setHeating(right.heatingId, active: false)])
     }
 
-    @Test("A switch point while the room is off records the new plan target for the history without sending it")
+    @Test("A switch point while the room is off reports the new plan target without sending it")
     func switchPointWhileOffRecordsPlan() async throws {
         let switchPoint = date(day: 18, hour: 22)
         setWindow(windowA, open: true, at: switchPoint.addingTimeInterval(-3600))
 
         try await room().execute(using: homeManager, now: switchPoint, sleep: { _ in })
 
-        let recorded = homeManager.heatingWrites.filter { !$0.sentToDevice }
-        #expect(recorded.count == 2)
-        #expect(recorded.allSatisfy { $0.reason == .plan && $0.planTargetInC == 17 && $0.timestamp == switchPoint })
-        #expect(Set(recorded.map(\.entityId.name)) == ["Left", "Right"])
+        let planTargets = homeManager.storageItems.filter { $0.entityId == HeatingRoomSources.planTargetId(placeId: "Kitchen") }
+        #expect(planTargets.map(\.targetTemperatureInC) == [17])
+        #expect(planTargets.first?.origin == .server)
         // nothing but the off writes went to the adapter, and the last write that reached a radiator is still the off write
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false), .setHeating(right.heatingId, active: false)])
         #expect(await homeManager.lastHeatingWrite(of: left.heatingId)?.isActive == false)
@@ -317,7 +316,7 @@ struct RoomHeatingTests {
         try await task.value
 
         #expect(targets() == [17, 17])
-        #expect(homeManager.heatingWrites.allSatisfy { $0.sentToDevice }, "the radiators never went off")
+        #expect(homeManager.heatingWrites.allSatisfy { $0.isActive != false }, "the radiators never went off")
     }
 
     @Test("A time event processed after its minute still writes its switch point")
@@ -329,13 +328,15 @@ struct RoomHeatingTests {
         #expect(targets() == [21, 21])
     }
 
-    @Test("A deploy or a window change while the room is off records no plan target")
+    @Test("A window change while the room is off sends nothing and reports the unchanged plan target once")
     func onlySwitchPointsRecordPlan() async throws {
         setWindow(windowA, open: true, at: noon.addingTimeInterval(-3600))
 
         try await room().execute(using: homeManager, now: noon, sleep: { _ in })
 
-        #expect(homeManager.heatingWrites.allSatisfy { $0.sentToDevice })
+        #expect(targets().isEmpty)
+        let planTargets = homeManager.storageItems.filter { $0.entityId == HeatingRoomSources.planTargetId(placeId: "Kitchen") }
+        #expect(planTargets.count == 1)
     }
 
     @Test("Another room's window does not trigger the room")

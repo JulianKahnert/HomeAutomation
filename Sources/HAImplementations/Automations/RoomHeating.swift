@@ -113,15 +113,16 @@ public struct RoomHeating: Automatable {
     /// - A radiator without: the plan target at a switch point (reason `plan`), when the contact that took
     ///   it off just closed (reason of the contact: back to the plan at once, not to an old manual value),
     ///   and `system` after a deploy (`isDeploy`), also while other radiators of the room are off. A switch
-    ///   point while a radiator is off records the plan target for the history without sending it. A radiator
-    ///   that no switch point, no closing and no deploy concerns keeps its value.
+    ///   point reports the room's plan target as a server-owned entity first (also while every radiator is off),
+    ///   so the plan line of the Heizung tab follows the plan. A radiator that no switch point, no closing and no deploy concerns keeps its value.
     func execute(using hm: HomeManagable, now: Date, isDeploy: Bool = AutomationRunContext.isConfigDeploy,
                  sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) async throws {
         let isSwitchPoint = effectivePlan.switchPoint(at: now) != nil
-        let off = try await switchOff(from: now, sleep: sleep, using: hm)
-        if isSwitchPoint {
-            await recordPlanTargetWhileOff(of: radiators.filter { off.contains($0.heatingId) }, at: now, using: hm)
+        if let target = effectivePlan.planTarget(at: now) {
+            // an unchanged target is no change: the history keeps only the switch points that moved it
+            await hm.report(HeatingRoomSources.planTargetId(placeId: placeId), value: .number(target))
         }
+        let off = try await switchOff(from: now, sleep: sleep, using: hm)
         // A radiator whose contact closed within its delay never went off: it follows the plan like the others.
         await writePlan(to: radiators.filter { !off.contains($0.heatingId) }, now: now, isSwitchPoint: isSwitchPoint, isDeploy: isDeploy, using: hm)
     }
@@ -176,16 +177,6 @@ public struct RoomHeating: Automatable {
             await HeatingWriteContext.withReason(reason, planTargetInC: target) {
                 await radiator.setTarget(target, with: hm)
             }
-        }
-    }
-
-    /// A switch point while a radiator is off writes nothing to it, but the plan history has to follow the
-    /// plan (glossary: plan target): it records the new plan target as a write that was not sent.
-    private func recordPlanTargetWhileOff(of offRadiators: [Radiator], at now: Date, using hm: HomeManagable) async {
-        guard let target = effectivePlan.planTarget(at: now) else { return }
-        for radiator in offRadiators {
-            await hm.record(HeatingWrite(timestamp: now, entityId: radiator.targetTemperatureId, reason: .plan, actionName: "setTargetTemperature",
-                                         targetTemperatureInC: target, planTargetInC: target, sentToDevice: false))
         }
     }
 

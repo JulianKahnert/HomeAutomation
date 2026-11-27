@@ -43,7 +43,15 @@ public struct HeatingRoomSources: Sendable, Equatable {
     public var shortName: String?
     public let radiators: [Radiator]
     public var roomSensor: EntityId?
-    /// Fallback for plan targets before the first plan write in a range.
+    /// The plan target of the room as a server-owned entity: `RoomHeating` reports it at every switch point, its
+    /// history is the plan line.
+    public var planTargetId: EntityId { Self.planTargetId(placeId: placeId) }
+
+    public static func planTargetId(placeId: String) -> EntityId {
+        .serverOwned(name: placeId, characteristic: .targetTemperature)
+    }
+
+    /// Fallback for plan targets before the first plan target was reported.
     public var plan: HeatingPlan?
     /// Whether the room lists the fireplace as a contact (glossary: fireplace mode).
     public var followsFireplace: Bool
@@ -65,7 +73,7 @@ public struct HeatingRoomSources: Sendable, Equatable {
 /// resampled as "last value at or before the grid point".
 public struct HeatingRoomDetailBuilder: Sendable {
     private let storage: any StorageRepository
-    private let writes: any HeatingWriteRepository
+    private let writes: any HeatingCommandSource
     private let fireplace: (any FireplaceRepository)?
     private let now: @Sendable () -> Date
     private let sensorFailureLimit: TimeInterval
@@ -83,7 +91,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
     ///     last report: an unchanged value that still reports shows no gap, a silent sensor does.
     ///   - lastReport: When an entity last reported (memory of the server); `nil` when unknown, as after a restart.
     public init(storage: any StorageRepository,
-                writes: any HeatingWriteRepository,
+                writes: any HeatingCommandSource,
                 fireplace: (any FireplaceRepository)? = nil,
                 now: @escaping @Sendable () -> Date = { Date() },
                 sensorFailureLimit: TimeInterval = 6 * 3_600,
@@ -108,6 +116,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
         let thermostatTemps = try await room.radiators.asyncMap { try await series($0.temperatureId, from: start, to: end) { $0.temperatureInC?.value } }
         let valves = try await room.radiators.asyncMap { try await series($0.valvePositionId, from: start, to: end) { $0.valvePositionPercent.map(Double.init) } }
         let sensorTemps = try await room.roomSensor.asyncFlatMap { try await series($0, from: start, to: end) { $0.temperatureInC?.value } }
+        let planItems = try await items(room.planTargetId, from: start, to: end).compactMap { item in item.targetTemperatureInC.map { (item.timestamp, $0) } }
         var contactItems: [EntityId: [EntityStorageItem]] = [:]
         var targetItems: [String: [EntityStorageItem]] = [:]
         if includeEvents {
@@ -122,11 +131,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
         // starts with the stored state before it, but no further back than `writeLookback`.
         let earliest = (contactItems.values.flatMap { $0 } + targetItems.values.flatMap { $0 }).map(\.timestamp).min() ?? start
         let firstWrite = max(min(start, earliest), start.addingTimeInterval(-Self.writeLookback))
-        let allWrites = try await writes.writes(placeId: room.placeId, startDate: firstWrite, endDate: end)
-        // The plan target at the range start is the one of the latest plan write before it, so a target set
-        // yesterday holds without loading the whole history.
-        let before = try await writes.lastPlanWrite(placeId: room.placeId, before: start)
-        let planWrites = (before.map { [$0] } ?? []) + allWrites.filter { $0.planTargetInC != nil && $0.timestamp >= start }
+        let allWrites = await writes.writes(placeId: room.placeId, startDate: firstWrite, endDate: end)
 
         let samples = grid.map { date -> HeatingSample in
             let ist: Double?
@@ -136,7 +141,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
                 let values = thermostatTemps.compactMap { $0.value(at: date, limit: sensorFailureLimit) }
                 ist = values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
             }
-            let planned = planWrites.last { $0.timestamp <= date }?.planTargetInC ?? room.plan?.planTarget(at: date, calendar: calendar)
+            let planned = planItems.last { $0.0 <= date }?.1 ?? room.plan?.planTarget(at: date, calendar: calendar)
             let valveValues = room.radiators.indices.map { index -> Double? in
                 // A radiator whose own temperature went silent shows no valve either.
                 if !thermostatTemps[index].isEmpty, thermostatTemps[index].value(at: date, limit: sensorFailureLimit) == nil { return nil }
@@ -145,9 +150,9 @@ public struct HeatingRoomDetailBuilder: Sendable {
             return HeatingSample(date: date, ist: ist, sollPlan: planned, valves: valveValues)
         }
 
-        // Only what reached a radiator is an event: a plan target recorded while the room was off is not.
+        // Only what reached a radiator is an event: the journal rows are the executed commands.
         let events = includeEvents
-            ? HeatingEventBuilder(room: room, writes: allWrites.filter(\.sentToDevice), contactItems: contactItems, targetItems: targetItems,
+            ? HeatingEventBuilder(room: room, writes: allWrites, contactItems: contactItems, targetItems: targetItems,
                                   start: start, end: end).events()
             : []
 

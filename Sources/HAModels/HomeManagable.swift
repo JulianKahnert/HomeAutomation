@@ -36,8 +36,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
     /// The newest write that reached `radiator` (matched by room and name, whatever the characteristic),
     /// `nil` when there is none or the server does not record them.
     func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite?
-    /// Records a write of the plan history that sends nothing (`HeatingWrite.sentToDevice` is `false`).
-    func record(_ write: HeatingWrite) async
     /// The command queued to be sent again for `entityId` after it failed, `nil` when none waits.
     func queuedRetry(of entityId: EntityId) async -> HomeManagableAction?
     /// The newest switch of the fireplace (glossary: fireplace mode), `nil` when it was never switched.

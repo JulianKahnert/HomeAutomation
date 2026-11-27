@@ -32,7 +32,7 @@ struct HeatingRoomDetailTests {
     }
 
     private func builder(_ items: [EntityStorageItem], writes: [HeatingWrite] = []) -> HeatingRoomDetailBuilder {
-        HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: InMemoryHeatingWriteRepository(writes), now: { now })
+        HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items + writes.compactMap { $0.planTargetItem() }), writes: InMemoryHeatingCommands(writes), now: { now })
     }
 
     @Test("the grid has 5 minute steps for 2 h and 24 h and 30 minute steps for 7 d")
@@ -80,7 +80,7 @@ struct HeatingRoomDetailTests {
         let items = [temp(thermoA, 110, 20)]
         func detail(reportedMinutesAgo: Double?) async throws -> HeatingRoomDetail {
             let reportedAt = reportedMinutesAgo.map { now.addingTimeInterval(-$0 * 60) }
-            return try await HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: InMemoryHeatingWriteRepository([]),
+            return try await HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: InMemoryHeatingCommands(),
                                                       now: { now }, sensorFailureLimit: 30 * 60, lastReport: { _ in reportedAt })
                 .detail(for: sources, range: .twoHours)
         }
@@ -96,7 +96,7 @@ struct HeatingRoomDetailTests {
     func gaps() async throws {
         let b = builder([temp(thermoA, 110, 20)])
         let detail = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: [temp(thermoA, 110, 20)]),
-                                              writes: InMemoryHeatingWriteRepository([]), now: { now }, sensorFailureLimit: 30 * 60)
+                                              writes: InMemoryHeatingCommands(), now: { now }, sensorFailureLimit: 30 * 60)
         let result = try await detail.detail(for: sources, range: .twoHours)
         #expect(result.samples[0].ist == nil)
         #expect(result.samples[2].ist == 20)
@@ -150,8 +150,8 @@ struct HeatingRoomDetailTests {
     func boundedWriteHistory() async throws {
         let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)
         let old = HeatingWrite(timestamp: now.addingTimeInterval(-30 * 86_400), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 19, planTargetInC: 19)
-        let repository = InMemoryHeatingWriteRepository([old])
-        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: [temp(thermoA, 30, 20)]), writes: repository, now: { now })
+        let repository = InMemoryHeatingCommands([old])
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: [temp(thermoA, 30, 20)] + [old.planTargetItem()].compactMap { $0 }), writes: repository, now: { now })
 
         let detail = try await builder.detail(for: sources, range: .twoHours)
 
@@ -159,13 +159,13 @@ struct HeatingRoomDetailTests {
         #expect(!(await repository.requestedStarts).contains { $0 == nil })
     }
 
-    @Test("a plan target recorded while the room was off still moves the plan line")
+    @Test("a plan target reported while the room was off still moves the plan line")
     func unsentPlanWriteMovesPlan() async throws {
         let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)
         let off = HeatingWrite(timestamp: now.addingTimeInterval(-7_200), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 21, planTargetInC: 21)
-        let unsent = HeatingWrite(timestamp: now.addingTimeInterval(-3_600), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 17, planTargetInC: 17, sentToDevice: false)
+        let unsent = EntityStorageItem(entityId: sources.planTargetId, timestamp: now.addingTimeInterval(-3_600), targetTemperatureInC: 17, origin: .server)
 
-        let detail = try await builder([temp(thermoA, 30, 20)], writes: [off, unsent]).detail(for: sources, range: .day)
+        let detail = try await builder([temp(thermoA, 30, 20), unsent], writes: [off]).detail(for: sources, range: .day)
 
         #expect(detail.samples.last?.sollPlan == 17)
         #expect(detail.samples.last?.delta == 3)

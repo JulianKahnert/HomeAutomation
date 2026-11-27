@@ -39,7 +39,7 @@ struct HeatingEventsTests {
         // the fireplace states are the server's own switches, the rest the stored entity states
         let switches = items.filter { $0.entityId == fireplace }.compactMap { item in item.isDeviceOn.map { FireplaceSwitch(timestamp: item.timestamp, isOn: $0) } }
         let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items.filter { $0.entityId != fireplace }),
-                                               writes: InMemoryHeatingWriteRepository(writes),
+                                               writes: InMemoryHeatingCommands(writes),
                                                fireplace: InMemoryFireplaceRepository(switches),
                                                now: { now })
         return try await builder.detail(for: sources(contacts: contacts), range: range).events
@@ -56,12 +56,12 @@ struct HeatingEventsTests {
         #expect(!found[0].reason.isEmpty)
     }
 
-    @Test("a plan target recorded without sending it is no event and no manual change")
-    func unsentPlanWrite() async throws {
-        let unsent = HeatingWrite(timestamp: ago(60), entityId: target, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 17, planTargetInC: 17, sentToDevice: false)
-        let items = [EntityStorageItem(entityId: target, timestamp: ago(120), targetTemperatureInC: 21)]   // the radiator was not told
+    @Test("a plan target reported without sending it is no event and no manual change")
+    func unsentPlanTarget() async throws {
+        let planTarget = EntityStorageItem(entityId: sources().planTargetId, timestamp: ago(60), targetTemperatureInC: 17, origin: .server)
+        let items = [EntityStorageItem(entityId: target, timestamp: ago(120), targetTemperatureInC: 21), planTarget]   // the radiator was not told
 
-        #expect(try await events(items, writes: [unsent]).isEmpty)
+        #expect(try await events(items).isEmpty)
     }
 
     @Test("two events of one source in the same second do not share an id")
@@ -205,15 +205,11 @@ struct HeatingEventsTests {
 }
 
 /// Answers no writes and remembers from when each query asked.
-private actor WriteQueryLog: HeatingWriteRepository {
+private actor WriteQueryLog: HeatingCommandSource {
     private(set) var startDates: [Date?] = []
 
-    func add(_ write: HeatingWrite) async throws {}
-    func writes(placeId: String, startDate: Date?, endDate: Date?) async throws -> [HeatingWrite] {
+    func writes(placeId: String, startDate: Date?, endDate: Date?) async -> [HeatingWrite] {
         startDates.append(startDate)
         return []
     }
-    func lastPlanWrite(placeId: String, before date: Date) async throws -> HeatingWrite? { nil }
-    func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite? { nil }
-    func lastWrites() async throws -> [HeatingWrite] { [] }
 }

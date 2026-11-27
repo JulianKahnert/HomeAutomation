@@ -360,22 +360,26 @@ final class EntityStorageMySQLTests: XCTestCase {
         XCTAssertEqual(latest, 6.5)
     }
 
-    func testHeatingWritesAreQueryableByRoomAndTimeRange() async throws {
-        let repository = app.heatingWriteRepository
+    func testHeatingCommandsAreQueryableByRoomAndTimeRange() async throws {
+        let repository = app.journalRepository
         let kitchen = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .targetTemperature)
         let bath = EntityId(placeId: "Bath", name: "Thermo", characteristicsName: nil, characteristic: .targetTemperature)
-        func write(_ id: EntityId, at seconds: Double, reason: HeatingWriteReason, plan: Double?) -> HeatingWrite {
-            HeatingWrite(timestamp: Date(timeIntervalSince1970: seconds), entityId: id, reason: reason, actionName: "setTargetTemperature", targetTemperatureInC: 21, planTargetInC: plan)
+        func command(_ id: EntityId, at seconds: Double, reason: HeatingWriteReason?, plan: Double?) -> ActionLogItem {
+            ActionLogItem(timestamp: Date(timeIntervalSince1970: seconds), action: .setTargetTemperature(id, celsius: 21), hasCacheHit: false, reason: reason, planTargetInC: plan)
         }
-        try await repository.add(write(kitchen, at: 3_000, reason: .system, plan: 21))
-        try await repository.add(write(kitchen, at: 1_000, reason: .plan, plan: 21))
-        try await repository.add(write(kitchen, at: 2_000, reason: .window, plan: nil))
-        try await repository.add(write(bath, at: 2_000, reason: .plan, plan: 22))
+        try await repository.addCommand(command(kitchen, at: 3_000, reason: .system, plan: 21))
+        try await repository.addCommand(command(kitchen, at: 1_000, reason: .plan, plan: 21))
+        try await repository.addCommand(command(kitchen, at: 2_000, reason: .window, plan: nil))
+        try await repository.addCommand(command(kitchen, at: 2_500, reason: nil, plan: nil))
+        try await repository.addCommand(command(bath, at: 2_000, reason: .plan, plan: 22))
 
-        let all = try await repository.writes(placeId: "Kitchen", startDate: nil, endDate: nil)
+        let all = try await repository.heatingCommands(placeId: "Kitchen", startDate: nil, endDate: nil)
         XCTAssertEqual(all.map(\.reason), [.plan, .window, .system])
+        XCTAssertEqual(all.first?.value, 21)
+        let lastPerRadiator = try await repository.lastHeatingCommands()
+        XCTAssertEqual(Set(lastPerRadiator.map(\.entityId.placeId)), ["Kitchen", "Bath"])
 
-        let ranged = try await repository.writes(placeId: "Kitchen", startDate: Date(timeIntervalSince1970: 1_500), endDate: Date(timeIntervalSince1970: 3_000))
+        let ranged = try await repository.heatingCommands(placeId: "Kitchen", startDate: Date(timeIntervalSince1970: 1_500), endDate: Date(timeIntervalSince1970: 3_000))
         XCTAssertEqual(ranged.map(\.reason), [.window])
         XCTAssertNil(ranged.first?.planTargetInC)
     }

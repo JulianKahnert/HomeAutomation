@@ -285,7 +285,7 @@ struct RoomHeatingFireplaceRadiatorsTests {
                                                               .setHeating(door.heatingId, active: true), .setTargetTemperature(door.targetTemperatureId, celsius: target)])
     }
 
-    @Test("A switch point while the fireplace burns writes the plan to the other radiators and records it for the listed ones")
+    @Test("A switch point while the fireplace burns writes the plan to the other radiators and reports the plan target")
     func switchPointMixed() async throws {
         let switchPoint = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 18, hour: 22)) ?? .distantPast
         setFireplace(on: true, at: switchPoint.addingTimeInterval(-3600))
@@ -294,8 +294,7 @@ struct RoomHeatingFireplaceRadiatorsTests {
 
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(fireside.heatingId, active: false),
                                                               .setHeating(door.heatingId, active: true), .setTargetTemperature(door.targetTemperatureId, celsius: 17)])
-        let recorded = homeManager.heatingWrites.filter { !$0.sentToDevice }
-        #expect(recorded.map(\.entityId.name) == ["Fireside"])
+        #expect(homeManager.storageItems.filter { $0.entityId == HeatingRoomSources.planTargetId(placeId: "Cellar") }.map(\.targetTemperatureInC) == [17])
     }
 
     @Test("A contact without radiators switches all of them off, and the list survives the configuration JSON")

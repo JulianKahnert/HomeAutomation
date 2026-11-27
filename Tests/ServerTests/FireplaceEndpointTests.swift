@@ -32,7 +32,6 @@ final class FireplaceEndpointTests: XCTestCase {
                                             storageRepo: EmptyStorage(),
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 52.52, longitude: 13.405),
-                                            actionLogManager: ActionLogManager(),
                                             fireplaceSwitches: switches,
                                             onFireplaceSwitch: { [events] in events?.append($0) })
         try routes(app)

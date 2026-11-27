@@ -265,6 +265,33 @@ paths:
         "400":
           description: Bad request - invalid parameters.
 
+  /entities/state:
+    put:
+      summary: Set the state of a server-owned entity
+      description: |
+        The one general route for the app to set a state the server owns (placeId `server`). Only entities
+        that are declared settable from the app are accepted; any other entity is refused and stays
+        unchanged. The state holds at once: the answer and every later read show it. Asking for the value the
+        entity already has changes nothing (`changed` is false). The change counts with origin `app`.
+      operationId: setEntityState
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetEntityStateRequest"
+      responses:
+        "200":
+          description: The state of the entity after the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityState"
+        "400":
+          description: The value does not fit the value kind of the entity.
+        "403":
+          description: The entity is not settable from the app.
+
   /entities/history:
     get:
       summary: Get entity history
@@ -657,6 +684,48 @@ components:
         - placeId
         - name
         - characteristicType
+
+    SetEntityStateRequest:
+      type: object
+      properties:
+        entityId:
+          $ref: "#/components/schemas/EntityId"
+        value:
+          description: The new value; its shape follows the value kind (boolean, number or text).
+          oneOf:
+            - type: boolean
+            - type: number
+            - type: string
+      required:
+        - entityId
+        - value
+
+    EntityState:
+      type: object
+      properties:
+        entityId:
+          $ref: "#/components/schemas/EntityId"
+        valueKind:
+          type: string
+        value:
+          description: The state after the request.
+          oneOf:
+            - type: boolean
+            - type: number
+            - type: string
+        changed:
+          type: boolean
+          description: False when the entity already had this value.
+        origin:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - entityId
+        - valueKind
+        - value
+        - changed
 
     SetLightRequest:
       type: object

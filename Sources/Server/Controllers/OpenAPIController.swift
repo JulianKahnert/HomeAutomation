@@ -239,6 +239,35 @@ struct OpenAPIController: APIProtocol {
         return .ok
     }
 
+    // MARK: - /entities/state
+
+    func setEntityState(_ input: Operations.SetEntityState.Input) async throws -> Operations.SetEntityState.Output {
+        guard case .json(let body) = input.body else { throw Abort(.badRequest) }
+        guard let type = CharacteristicsType(rawValue: body.entityId.characteristicType) else { return .badRequest }
+        let characteristicsName = body.entityId.characteristicsName.flatMap { $0.isEmpty ? nil : $0 }
+        let entityId = EntityId(placeId: body.entityId.placeId, name: body.entityId.name,
+                                characteristicsName: characteristicsName, characteristic: type)
+
+        // Only an entity in the registry; any other one, server-owned or not, stays unchanged.
+        guard AppSettableEntities.contains(entityId) else { return .forbidden }
+        let value: Value
+        switch body.value {
+        case .case1(let bool): value = .bool(bool)
+        case .case2(let number): value = .number(number)
+        case .case3(let text): value = .text(text)
+        }
+        let homeManager = request.application.homeManager
+        let changed = await homeManager.report(entityId, value: value, origin: .app)
+        guard let item = try? await homeManager.getCurrentEntity(with: entityId),
+              let state = item.genericValue?.value else { return .badRequest }
+        return .ok(.init(body: .json(.init(entityId: .init(entityId),
+                                           valueKind: type.valueKind.rawValue,
+                                           value: .init(state),
+                                           changed: changed,
+                                           origin: item.origin.rawValue,
+                                           timestamp: item.timestamp))))
+    }
+
     // MARK: - /entities/history
 
     func getEntityHistory(_ input: Operations.GetEntityHistory.Input) async throws -> Operations.GetEntityHistory.Output {
@@ -384,6 +413,16 @@ extension Components.Schemas.EntityHistoryItem {
                   timestamp: item.timestamp,
                   origin: item.origin.rawValue,
                   lastReport: item.lastReport)
+    }
+}
+
+extension Components.Schemas.EntityState.ValuePayload {
+    init(_ value: Value) {
+        switch value {
+        case .bool(let bool): self = .case1(bool)
+        case .number(let number): self = .case2(number)
+        case .text(let text): self = .case3(text)
+        }
     }
 }
 

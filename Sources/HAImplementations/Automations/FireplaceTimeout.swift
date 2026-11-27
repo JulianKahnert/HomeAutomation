@@ -35,9 +35,9 @@ public struct FireplaceTimeout: Automatable {
         // look again: the fireplace may have gone off since the trigger
         guard await hasExpired(at: now, using: hm),
               await hm.switchFireplace(isOn: false, at: now) != nil else { return }
-        await hm.sendNotification(title: "Kamin aus",
-                                  message: "Der Kamin war \(Self.durationText(Fireplace.maxDuration)) an und wurde ausgeschaltet. Die Heizkörper folgen wieder dem Plan.",
-                                  id: Fireplace.notificationId)
+        await hm.deliver(.push(title: "Kamin aus",
+                               message: "Der Kamin war \(Self.durationText(Fireplace.maxDuration)) an und wurde ausgeschaltet. Die Heizkörper folgen wieder dem Plan.",
+                               id: Fireplace.notificationId))
     }
 
     /// The duration in German for the push, rounded to whole minutes: "2 Stunden", "1 Stunde und 30 Minuten", "45 Minuten".

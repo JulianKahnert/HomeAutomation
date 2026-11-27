@@ -129,7 +129,7 @@ struct FireplaceReminderTests {
 
     @Test("The end push of the fireplace does not count against the rate limit")
     func otherPushIgnored() async throws {
-        await homeManager.sendNotification(title: "Kamin aus", message: "", id: Fireplace.notificationId)
+        await homeManager.deliver(.push(title: "Kamin aus", message: "", id: Fireplace.notificationId))
         let event = feed([reading(18.0, minutesAgo: 25), reading(20.0, minutesAgo: 0)])
 
         #expect(try await reminder().shouldTrigger(with: event, using: homeManager))

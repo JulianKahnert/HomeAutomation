@@ -13,8 +13,6 @@ import Testing
 @MainActor
 @Suite("OverviewFeature")
 struct OverviewFeatureTests {
-    private let light = EntityId(placeId: "Bath", name: "Mirror", characteristicsName: nil, characteristic: .switcher)
-
     private func run(_ outcome: AutomationRun.Outcome, error: String? = nil) -> AutomationRun {
         AutomationRun(
             automationName: "Night Light",
@@ -25,33 +23,10 @@ struct OverviewFeatureTests {
         )
     }
 
-    private func command(_ status: ActionLogItem.Status) -> ActionLogItem {
-        ActionLogItem(
-            id: UUID(),
-            timestamp: Date(timeIntervalSince1970: 0),
-            entityId: light,
-            actionName: "on",
-            detailDescription: "turnOn",
-            hasCacheHit: false,
-            status: status
-        )
-    }
-
-    @Test("hints come from failed runs and failed commands per device")
-    func hintsFromFailures() {
-        var state = OverviewFeature.State()
-        state.recentRuns = [run(.failed, error: "not reachable"), run(.completed)]
-        state.recentActions = [command(.failed), command(.failed), command(.executed)]
-
-        #expect(state.hints == ["Night Light failed: not reachable", "Mirror (Bath): 2 failed commands"])
-    }
-
-    @Test("refresh fills the status, drops commands older than a day and sorts the shared automations")
+    @Test("refresh fills the status and sorts the shared automations")
     func refreshFillsSnapshot() async {
         let now = Date(timeIntervalSince1970: 100_000)
         let completed = run(.completed)
-        // Stamped at 1970, long before the 24 hour window.
-        let oldCommand = command(.executed)
         let alpha = AutomationInfo(name: "Alpha", isActive: true, isRunning: false)
         let zebra = AutomationInfo(name: "Zebra", isActive: true, isRunning: false)
         let store = TestStore(initialState: OverviewFeature.State()) {
@@ -60,7 +35,6 @@ struct OverviewFeatureTests {
             $0.date.now = now
             $0.serverClient.getAutomations = { [zebra, alpha] }
             $0.serverClient.getRecentRuns = { _, _ in [completed] }
-            $0.serverClient.getActions = { _, _ in [oldCommand] }
         }
 
         await store.send(.refresh)
@@ -68,7 +42,6 @@ struct OverviewFeatureTests {
             $0.isHealthy = true
             $0.lastUpdated = now
             $0.recentRuns = [completed]
-            $0.recentActions = []
             $0.$automations.withLock { $0 = [alpha, zebra] }
         }
     }

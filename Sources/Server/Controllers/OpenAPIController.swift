@@ -170,40 +170,6 @@ struct OpenAPIController: APIProtocol {
                                            staleDateIsoTimeStamp: contentState.staleDate?.ISO8601Format()))))
     }
 
-    // MARK: - /actions
-
-    func getActions(_ input: Operations.GetActions.Input) async throws -> Operations.GetActions.Output {
-        var runId: UUID?
-        if let runIdString = input.query.runId {
-            guard let parsed = UUID(uuidString: runIdString) else {
-                throw Abort(.badRequest, reason: "Invalid runId: \(runIdString)")
-            }
-            runId = parsed
-        }
-
-        let actionItems = await request.application.homeManager.getActionLog(limit: input.query.limit, runId: runId)
-
-        let schemaItems = actionItems.map { item in
-            Components.Schemas.ActionLogItem(id: item.id.uuidString,
-                                             timestamp: item.timestamp,
-                                             entityId: .init(item.entityId),
-                                             actionName: item.actionName,
-                                             detailDescription: item.detailDescription,
-                                             hasCacheHit: item.hasCacheHit,
-                                             runId: item.runId?.uuidString,
-                                             status: item.status.flatMap { .init(rawValue: $0.rawValue) },
-                                             reason: item.reason.flatMap { .init(rawValue: $0.rawValue) },
-                                             planTargetInC: item.planTargetInC)
-        }
-
-        return .ok(.init(body: .json(schemaItems)))
-    }
-
-    func clearActions(_ input: Operations.ClearActions.Input) async throws -> Operations.ClearActions.Output {
-        await request.application.homeManager.clearActionLog()
-        return .ok
-    }
-
     // MARK: - /lights/set
 
     func setLightProperties(_ input: Operations.SetLightProperties.Input) async throws -> Operations.SetLightProperties.Output {

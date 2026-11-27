@@ -2,7 +2,7 @@
 //  RunDetailFeature.swift
 //  Controller
 //
-//  One automation run with the commands it sent
+//  One automation run
 //
 
 import ComposableArchitecture
@@ -16,44 +16,25 @@ struct RunDetailFeature: Sendable {
     @ObservableState
     struct State: Equatable, Sendable {
         let run: AutomationRun
-        var actions: [ActionLogItem] = []
-        var error: String?
     }
 
     enum Action: Sendable {
-        case actionsResponse(Result<[ActionLogItem], Error>)
         case delegate(Delegate)
         case openAutomationButtonTapped
-        case task
 
         enum Delegate: Sendable {
             case openAutomation(String)
         }
     }
 
-    @Dependency(\.serverClient) var serverClient
-
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case let .actionsResponse(.success(actions)):
-                state.actions = actions
-                return .none
-
-            case let .actionsResponse(.failure(error)):
-                state.error = "Failed to load commands: \(error.localizedDescription)"
-                return .none
-
             case .delegate:
                 return .none
 
             case .openAutomationButtonTapped:
                 return .send(.delegate(.openAutomation(state.run.automationName)))
-
-            case .task:
-                return .run { [runId = state.run.id] send in
-                    await send(.actionsResponse(Result { try await serverClient.getActions(nil, runId) }))
-                }
             }
         }
     }
@@ -91,27 +72,12 @@ struct RunDetailView<EntityDestination>: View {
             }
 
             Section {
-                ForEach(store.actions) { item in
-                    ActionRow(item: item)
-                }
-            } header: {
-                Text("Commands")
-            } footer: {
-                if let error = store.error {
-                    Text(error).foregroundStyle(.red)
-                } else if store.actions.isEmpty {
-                    Text("No commands recorded. Commands of runs before the last server restart are gone.")
-                }
-            }
-
-            Section {
                 Button("Open Automation") {
                     store.send(.openAutomationButtonTapped)
                 }
             }
         }
         .navigationTitle("Run")
-        .task { await store.send(.task).finish() }
     }
 }
 

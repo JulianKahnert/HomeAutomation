@@ -14,7 +14,6 @@ import SwiftUI
 
 @Reducer
 enum SettingsPath {
-    case commandLog(ActionsFeature)
     case logs(LogViewerFeature)
 }
 
@@ -214,9 +213,6 @@ struct SettingsView: View {
                 #endif
 
                 Section("Diagnostics") {
-                    NavigationLink(state: SettingsPath.State.commandLog(ActionsFeature.State())) {
-                        Label("Command Log", systemImage: "list.bullet.clipboard")
-                    }
                     NavigationLink(state: SettingsPath.State.logs(LogViewerFeature.State())) {
                         Label("App Logs", systemImage: "doc.text.magnifyingglass")
                     }
@@ -231,8 +227,6 @@ struct SettingsView: View {
             }
         } destination: { pathStore in
             switch pathStore.case {
-            case let .commandLog(commandLogStore):
-                ActionsView(store: commandLogStore)
             case let .logs(logStore):
                 LogViewerFeatureView(store: logStore)
             }

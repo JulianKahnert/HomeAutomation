@@ -35,7 +35,7 @@ struct RoomHeatingFireplaceTests {
 
     /// The server switched the radiator off for `reason` at `date`.
     private func seedOff(reason: HeatingWriteReason, at date: Date) {
-        homeManager.heatingWrites.append(HeatingWrite(timestamp: date, entityId: left.heatingId, reason: reason, actionName: "setHeating", isActive: false))
+        homeManager.heatingWrites.append(seededWrite(timestamp: date, entityId: left.heatingId, reason: reason, actionName: "setHeating", isActive: false))
     }
 
     private func change(_ id: EntityId) -> HomeEvent {
@@ -62,7 +62,7 @@ struct RoomHeatingFireplaceTests {
         try await room().execute(using: homeManager, now: noon, sleep: { _ in Issue.record("the fireplace has no delay") })
 
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false)])
-        #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .fireplace) })
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .fireplace })
     }
 
     @Test("The fireplace going off returns the room to its plan at once, with reason fireplace")
@@ -77,7 +77,7 @@ struct RoomHeatingFireplaceTests {
 
         let target = plan.planTarget(at: end)!
         #expect(targets() == [target])
-        #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .fireplace, planTargetInC: target) })
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .fireplace })
     }
 
     @Test("Window and fireplace both on: the window closing keeps the room off")
@@ -136,7 +136,7 @@ struct RoomHeatingFireplaceTests {
 
         let target = plan.planTarget(at: end)!
         #expect(targets() == [target])
-        #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .fireplace, planTargetInC: target) })
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .fireplace })
     }
 
     @Test("An unreachable fireplace switch counts as off: the plan keeps running")
@@ -230,7 +230,7 @@ struct RoomHeatingFireplaceRadiatorsTests {
     }
 
     private func seedOff(_ radiator: Radiator, reason: HeatingWriteReason, at date: Date) {
-        homeManager.heatingWrites.append(HeatingWrite(timestamp: date, entityId: radiator.heatingId, reason: reason, actionName: "setHeating", isActive: false))
+        homeManager.heatingWrites.append(seededWrite(timestamp: date, entityId: radiator.heatingId, reason: reason, actionName: "setHeating", isActive: false))
     }
 
     @Test("The fireplace on switches only the listed radiators off")
@@ -240,7 +240,7 @@ struct RoomHeatingFireplaceRadiatorsTests {
         try await room().execute(using: homeManager, now: noon, sleep: { _ in })
 
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(fireside.heatingId, active: false)])
-        #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .fireplace) })
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .fireplace })
     }
 
     @Test("The fireplace going off returns only the listed radiators to the plan")
@@ -264,7 +264,7 @@ struct RoomHeatingFireplaceRadiatorsTests {
         try await room().execute(using: homeManager, now: noon, sleep: { _ in })
 
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(fireside.heatingId, active: false), .setHeating(door.heatingId, active: false)])
-        #expect(homeManager.performedActions.map { $0.heating?.reason } == [.window, .window])
+        #expect(homeManager.performedActions.map { $0.heating } == [.window, .window])
     }
 
     @Test("The window closing while the fireplace burns returns only the radiators the fireplace does not hold")
@@ -362,6 +362,24 @@ struct FireplaceTimeoutTests {
         #expect(homeManager.sentNotifications.map(\.title) == ["Kamin aus"])
         #expect(homeManager.sentNotifications.first?.id == Fireplace.notificationId)
         #expect(homeManager.sentNotifications.first?.message.contains(FireplaceTimeout.durationText(maxDuration)) == true)
+    }
+
+    @Test("A fireplace switched off and on again after the timeout read it is not ended by that run")
+    func restartBetweenReadAndReport() async throws {
+        setFireplace(on: true, at: start)
+        let now = start.addingTimeInterval(maxDuration)
+        let restartedAt = now.addingTimeInterval(-10)
+        let homeManager = self.homeManager
+        homeManager.afterNextRead = {
+            // the app ends the fireplace and starts it again: the stored switch-on time is new
+            homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: restartedAt.addingTimeInterval(-1), isOn: false))
+            homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: restartedAt, isOn: true))
+        }
+
+        try await FireplaceTimeout().execute(using: homeManager, now: now)
+
+        #expect(homeManager.fireplaceSwitches.last == FireplaceSwitch(timestamp: restartedAt, isOn: true))
+        #expect(homeManager.sentNotifications.isEmpty)
     }
 
     @Test("The push goes out once per time the fireplace was on, however many ticks follow")

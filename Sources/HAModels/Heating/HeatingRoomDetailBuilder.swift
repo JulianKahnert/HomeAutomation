@@ -112,7 +112,8 @@ public struct HeatingRoomDetailBuilder: Sendable {
         let thermostatTemps = try await room.radiators.asyncMap { try await series($0.temperatureId, from: start, to: end) { $0.temperatureInC?.value } }
         let valves = try await room.radiators.asyncMap { try await series($0.valvePositionId, from: start, to: end) { $0.valvePositionPercent.map(Double.init) } }
         let sensorTemps = try await room.roomSensor.asyncFlatMap { try await series($0, from: start, to: end) { $0.temperatureInC?.value } }
-        let planItems = try await items(room.planTargetId, from: start, to: end).compactMap { item in item.targetTemperatureInC.map { (item.timestamp, $0) } }
+        let planTargetItems = try await items(room.planTargetId, from: start, to: end)
+        let planItems = planTargetItems.compactMap { item in item.targetTemperatureInC.map { (item.timestamp, $0) } }
         var contactItems: [EntityId: [EntityStorageItem]] = [:]
         var targetItems: [String: [EntityStorageItem]] = [:]
         if includeEvents {
@@ -148,7 +149,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
 
         // Only what reached a radiator is an event: the journal rows are the executed commands.
         let events = includeEvents
-            ? HeatingEventBuilder(room: room, writes: allWrites, contactItems: contactItems, targetItems: targetItems,
+            ? HeatingEventBuilder(room: room, writes: allWrites, planTargetItems: planTargetItems, contactItems: contactItems, targetItems: targetItems,
                                   start: start, end: end).events()
             : []
 

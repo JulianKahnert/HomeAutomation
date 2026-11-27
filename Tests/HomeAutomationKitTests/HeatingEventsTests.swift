@@ -28,13 +28,13 @@ struct HeatingEventsTests {
     private var windowContact: HeatingRoomSources.Contact { .init(source: .window, name: "Fenster", entityId: window) }
     private var fireplaceContact: HeatingRoomSources.Contact { .init(source: .fireplace, name: "Kamin", entityId: fireplace) }
 
-    private func write(_ reason: HeatingWriteReason, _ minutes: Double, target value: Double? = nil, active: Bool? = nil, plan: Double? = nil) -> HeatingWrite {
-        HeatingWrite(timestamp: ago(minutes), entityId: value != nil ? target : heating, reason: reason,
+    private func write(_ reason: HeatingWriteReason, _ minutes: Double, target value: Double? = nil, active: Bool? = nil, plan: Double? = nil) -> HeatingFixture {
+        HeatingFixture(timestamp: ago(minutes), entityId: value != nil ? target : heating, reason: reason,
                      actionName: value != nil ? "setTargetTemperature" : "setHeating", isActive: active,
                      targetTemperatureInC: value, planTargetInC: plan)
     }
 
-    private func events(_ items: [EntityStorageItem] = [], writes: [HeatingWrite] = [], contacts: [HeatingRoomSources.Contact] = [],
+    private func events(_ items: [EntityStorageItem] = [], writes: [HeatingFixture] = [], contacts: [HeatingRoomSources.Contact] = [],
                         range: HeatingRange = .day) async throws -> [HeatingEvent] {
         let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items),
                                                writes: InMemoryHeatingCommands(writes),
@@ -59,6 +59,24 @@ struct HeatingEventsTests {
         let items = [EntityStorageItem(entityId: target, timestamp: ago(120), targetTemperatureInC: 21), planTarget]   // the radiator was not told
 
         #expect(try await events(items).isEmpty)
+    }
+
+    @Test("the plan target of a plan event comes from the plan-target history, not from the written value")
+    func planTargetFromHistory() async throws {
+        let planTarget = EntityStorageItem(entityId: sources().planTargetId, timestamp: ago(60), targetTemperatureInC: 22, origin: .server)
+        let found = try await events([planTarget], writes: [write(.plan, 60, target: 21)])
+
+        #expect(found.map(\.source) == [.plan])
+        #expect(found[0].title == "Plan 22,0 °C")
+    }
+
+    @Test("a plan target reported after the cluster began does not count")
+    func laterPlanTargetIgnored() async throws {
+        let later = EntityStorageItem(entityId: sources().planTargetId, timestamp: ago(30), targetTemperatureInC: 25, origin: .server)
+        let earlier = EntityStorageItem(entityId: sources().planTargetId, timestamp: ago(120), targetTemperatureInC: 20, origin: .server)
+        let found = try await events([earlier, later], writes: [write(.window, 60, target: 19)] + [write(.system, 60, target: 19)])
+
+        #expect(found.first { $0.source == .system }?.reason.contains("20,0 °C") == true)
     }
 
     @Test("two events of one source in the same second do not share an id")
@@ -210,7 +228,7 @@ struct HeatingEventsTests {
 private actor WriteQueryLog: HeatingCommandSource {
     private(set) var startDates: [Date?] = []
 
-    func writes(placeId: String, startDate: Date?, endDate: Date?) async -> [HeatingWrite] {
+    func writes(placeId: String, startDate: Date?, endDate: Date?) async -> [ActionLogItem] {
         startDates.append(startDate)
         return []
     }

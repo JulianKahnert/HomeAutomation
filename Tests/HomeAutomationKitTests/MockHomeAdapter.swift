@@ -23,7 +23,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     private let log = Logger(label: "MockHomeAdapter")
     private var traceMap: [String: Int] = [:]
     /// Every action `perform` ran, with the heating context it ran in.
-    var performedActions: [(action: HomeManagableAction, heating: HeatingWriteContext.Context?)] = []
+    var performedActions: [(action: HomeManagableAction, heating: HeatingWriteReason?)] = []
     /// Every action `perform` ran, in order, for a test that waits for one; it has a single reader.
     let performedActionStream: AsyncStream<HomeManagableAction>
     private let performedActionContinuation: AsyncStream<HomeManagableAction>.Continuation
@@ -40,8 +40,9 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         let item = storageItems.first(where: { $0.entityId == action.entityId })
         performedActions.append((action, HeatingWriteContext.current))
         performedActionContinuation.yield(action)
-        if let context = HeatingWriteContext.current, let write = HeatingWrite(action: action, context: context) {
-            heatingWrites.append(write)
+        if let reason = HeatingWriteContext.current {
+            let write = ActionLogItem(action: action, reason: reason)
+            if write.isExecutedHeatingWrite { heatingWrites.append(write) }
         }
 
         switch action {
@@ -122,17 +123,25 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     func trigger(scene sceneName: String) async {
     }
 
+    /// Runs once right after the next `getCurrentEntity`, with the value it returned: lets a test change the state
+    /// between a caller's read and its report.
+    var afterNextRead: (@HomeManagerActor () -> Void)?
+
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
         guard let item = storageItems.last(where: { $0.entityId == entityId }) else {
             throw OptionalError.notFound
+        }
+        if let hook = afterNextRead {
+            afterNextRead = nil
+            hook()
         }
         return item
     }
 
     /// The writes the server made to radiators: seeded by a test, and every action `perform` ran in a heating context.
-    var heatingWrites: [HeatingWrite] = []
+    var heatingWrites: [ActionLogItem] = []
 
-    func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
+    func lastHeatingWrite(of radiator: EntityId) async -> ActionLogItem? {
         heatingWrites.last { $0.placeId == radiator.placeId && $0.entityId.name == radiator.name }
     }
 
@@ -199,11 +208,12 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     /// Server-owned states reported by an automation under test, with the origin they were reported with.
     @discardableResult
-    func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
+    func report(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> Bool {
         guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
         guard let item = EntityStorageItem(entityId: entityId, value: value, origin: origin) else {
             throw ReportError.valueDoesNotFit(entityId)
         }
+        guard ifCurrent(storageItems.last { $0.entityId == entityId }) else { return false }
         return await addEntityHistory(item)
     }
 

@@ -113,7 +113,6 @@ struct InitialSchema: AsyncMigration {
             .field("errorDescription", .custom("TEXT"))
             .field("status", .string)
             .field("reason", .string)
-            .field("planTargetInC", .double)
             .field("pushId", .string)
             .field("commandValue", .double)
             .create()

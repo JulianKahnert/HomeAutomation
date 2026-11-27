@@ -238,6 +238,20 @@ struct HomeManagerTests {
         #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == false)
     }
 
+    @Test("A conditional report sees the state it replaces and changes nothing when the condition fails")
+    func conditionalReport() async throws {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+
+        #expect(try await homeManager.report(holidayId, value: .bool(true), origin: .server, ifCurrent: { $0 == nil }))
+        #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == true)
+
+        // the condition holds for an unknown entity only, so a second report is refused
+        #expect(try await homeManager.report(holidayId, value: .bool(false), origin: .server, ifCurrent: { $0 == nil }) == false)
+        #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == true)
+        #expect(try await homeManager.report(holidayId, value: .bool(false), origin: .server, ifCurrent: { $0?.isDeviceOn == true }))
+        #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == false)
+    }
+
     @Test("The new state holds before the changed event is handed on")
     func stateHoldsBeforeTheEvent() async throws {
         let seen = Mutex<[EntityStorageItem]>([])
@@ -439,18 +453,16 @@ struct HomeManagerTests {
         let journal = Journal(store: InMemoryJournalStore())
         let homeManager = await makeHomeManager(probe: AdapterProbe(), journal: journal)
 
-        await HeatingWriteContext.withReason(.plan, planTargetInC: 21) {
+        await HeatingWriteContext.withReason(.plan) {
             await homeManager.perform(.setTargetTemperature(radiator, celsius: 21.2))
         }
 
         await journal.flush()
         let logged = try #require(await journal.commands(limit: nil, runId: nil).first)
         #expect(logged.reason == .plan)
-        #expect(logged.planTargetInC == 21)
         let recorded = try #require(await journal.writes(placeId: "Kitchen", startDate: nil, endDate: nil).first)
         #expect(recorded.reason == .plan)
         #expect(recorded.targetTemperatureInC == 21.0)
-        #expect(recorded.planTargetInC == 21)
         #expect(await homeManager.lastHeatingWrite(of: radiator)?.targetTemperatureInC == 21.0)
         #expect(await journal.lastHeatingWrites().map(\.targetTemperatureInC) == [21.0])
     }
@@ -503,7 +515,7 @@ struct HomeManagerTests {
         let runId = UUID()
 
         await AutomationRunContext.$runId.withValue(runId) {
-            await HeatingWriteContext.withReason(.plan, planTargetInC: 19) {
+            await HeatingWriteContext.withReason(.plan) {
                 await homeManager.perform(.setTargetTemperature(radiator, celsius: 19))
             }
             await homeManager.perform(.turnOn(switchId))
@@ -529,7 +541,7 @@ struct HomeManagerTests {
         let journal = Journal(store: InMemoryJournalStore())
         let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), retryTicks: ticks, journal: journal)
 
-        await HeatingWriteContext.withReason(.plan, planTargetInC: 19) {
+        await HeatingWriteContext.withReason(.plan) {
             await homeManager.perform(.setTargetTemperature(radiator, celsius: 19))
         }
         tickContinuation.yield(())

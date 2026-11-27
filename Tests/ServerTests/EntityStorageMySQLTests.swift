@@ -8,9 +8,11 @@
 
 import Fluent
 import FluentMySQLDriver
+import HAApplicationLayer
 @testable import HAModels
 @testable import Server
 import SQLKit
+import StarActorSystem
 import XCTVapor
 
 final class EntityStorageMySQLTests: XCTestCase {
@@ -42,6 +44,41 @@ final class EntityStorageMySQLTests: XCTestCase {
             try await app.autoRevert()
             try await app.asyncShutdown()
         }
+    }
+
+    /// The history route answers from the database for history older than the 3 hours the HomeManager keeps in memory.
+    func testHistoryRouteReadsTheWholeHistoryFromTheDatabase() async throws {
+        app.environment.arguments = ["serve"]
+        app.authToken = "history-test-token"
+        app.authDisabled = false
+        app.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405), persist: { _ in })
+        app.automationService = try await makeAutomationService(automations: [])
+        app.starActorSystem = StarActorSystem(name: "history-tests")
+        let repository = app.entityStorageDbRepository
+        let homeManager = await HomeManager(getAdapter: { nil },
+                                            storageRepo: repository,
+                                            notificationSender: SilentSender(),
+                                            location: Location(latitude: 52.52, longitude: 13.405),
+                                            actionLogManager: ActionLogManager())
+        app.homeManager = homeManager
+        try routes(app)
+        let id = EntityId(placeId: "Kitchen", name: "Sensor", characteristicsName: nil, characteristic: .temperatureSensor)
+        let now = Date()
+        for (hoursAgo, value) in [(30.0, 17.0), (10.0, 18.0), (0.5, 19.0)] {
+            let item = EntityStorageItem(entityId: id,
+                                         timestamp: now.addingTimeInterval(-hoursAgo * 3600),
+                                         temperatureInC: Measurement(value: value, unit: .celsius))
+            try await repository.add(item)
+        }
+        await homeManager.loadCurrentStates(timeout: .seconds(5))
+
+        let path = "/entities/history?placeId=Kitchen&name=Sensor&characteristicType=\(CharacteristicsType.temperatureSensor.rawValue)"
+        let authorize: (inout XCTHTTPRequest) -> Void = { $0.headers.add(name: .authorization, value: "Bearer history-test-token") }
+        try await app.test(.GET, path, beforeRequest: authorize, afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok)
+            let body = try XCTUnwrap(String(data: Data(res.body.readableBytesView), encoding: .utf8))
+            XCTAssertEqual(body.components(separatedBy: "\"timestamp\"").count - 1, 3)
+        })
     }
 
     func testHeatingFieldsRoundTripThroughTinyIntColumns() async throws {

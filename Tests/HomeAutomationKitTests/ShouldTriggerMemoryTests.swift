@@ -68,7 +68,10 @@ struct ShouldTriggerMemoryTests {
     }
 
     private func automations() -> [any Automatable] {
-        [RoomHeating("heating", placeId: "Kitchen", radiators: [radiator], contacts: [.window(window), .fireplace()],
+        [RoomHeating("heating",
+                     placeId: "Kitchen",
+                     radiators: [radiator],
+                     contacts: [.window(window), .fireplace()],
                      configuration: HeatingConfiguration(standardPlan: HeatingPlan([]))),
          FireplaceReminder(roomSensor: roomSensor),
          MotionAtNight("motion", motionSensors: [motion], lightSensor: motion, lights: [light], minBrightness: 0.1)]
@@ -129,6 +132,25 @@ struct ShouldTriggerMemoryTests {
         #expect(await homeManager.lastHeatingWrite(of: radiator.heatingId) == later)
     }
 
+    @Test("The readings of the window survive a restart")
+    func readingsLoadedAtStart() async throws {
+        let stored = MockStorageRepository(items: [
+            EntityStorageItem(entityId: roomSensor, timestamp: Date().addingTimeInterval(-25 * 60), temperatureInC: Measurement(value: 18, unit: .celsius)),
+            EntityStorageItem(entityId: roomSensor, timestamp: Date().addingTimeInterval(-60), temperatureInC: Measurement(value: 19.5, unit: .celsius))
+        ])
+        let homeManager = await HomeManager(getAdapter: { nil },
+                                            storageRepo: stored,
+                                            notificationSender: MockNotificationSender(),
+                                            location: Location(latitude: 0, longitude: 0),
+                                            actionLogManager: ActionLogManager(),
+                                            retryTicks: AsyncStream { _ in })
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
+
+        let history = await homeManager.getEntityHistory(with: roomSensor, since: Date().addingTimeInterval(-30 * 60))
+
+        #expect(history.compactMap { $0.temperatureInC?.value } == [19.5, 18])
+    }
+
     @Test("The readings of the window are available from memory, newest first")
     func readingsFromMemory() async throws {
         let repositories = Repositories()
@@ -136,8 +158,10 @@ struct ShouldTriggerMemoryTests {
         await homeManager.loadCurrentStates(timeout: .seconds(2))
         await repositories.block()
         for (value, minutesAgo) in [(18.0, 50.0), (18.5, 20.0), (19.2, 0.0)] {
-            await homeManager.addEntityHistory(EntityStorageItem(entityId: roomSensor, timestamp: now.addingTimeInterval(-minutesAgo * 60),
-                                                                 temperatureInC: Measurement(value: value, unit: .celsius)))
+            let reading = EntityStorageItem(entityId: roomSensor,
+                                            timestamp: now.addingTimeInterval(-minutesAgo * 60),
+                                            temperatureInC: Measurement(value: value, unit: .celsius))
+            await homeManager.addEntityHistory(reading)
         }
 
         let history = await Decision.$isRunning.withValue(true) { await homeManager.getEntityHistory(with: roomSensor, since: now.addingTimeInterval(-30 * 60)) }

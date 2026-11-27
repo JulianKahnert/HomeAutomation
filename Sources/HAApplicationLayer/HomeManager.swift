@@ -175,6 +175,7 @@ public final class HomeManager: HomeManagable {
                 currentStates[item.entityId] = item
             }
             log.info("Loaded the stored entity states", metadata: ["count": "\(stored.count)"])
+            await loadRecentReadings(of: stored)
         case .failure(let error):
             log.critical("Started without the stored entity states, replays count as changes until each entity changes", metadata: ["error": "\(error)"])
         }
@@ -201,6 +202,22 @@ public final class HomeManager: HomeManagable {
                 if fireplace == nil { fireplace = .some(stored) }
             } catch {
                 log.error("Failed to read the fireplace state", metadata: ["error": "\(error)"])
+            }
+        }
+    }
+
+    /// Remembers the changes of the last `readingRetention` of every entity that changed within it, so the rise a
+    /// decision looks for survives a restart. A failed read leaves that entity without history.
+    private func loadRecentReadings(of stored: [EntityStorageItem]) async {
+        let cutoff = Date().addingTimeInterval(-Self.readingRetention)
+        for item in stored where item.timestamp >= cutoff {
+            do {
+                let history = try await storageRepo.getHistory(for: item.entityId, startDate: cutoff, endDate: nil, cursor: nil, limit: Self.readingLimit)
+                // changes reported while the load ran are newer and already in front
+                let known = Set((recentReadings[item.entityId] ?? []).map(\.timestamp))
+                recentReadings[item.entityId, default: []] += history.filter { !known.contains($0.timestamp) }
+            } catch {
+                log.error("Failed to load the recent readings", metadata: ["entityId": "\(item.entityId)", "error": "\(error)"])
             }
         }
     }

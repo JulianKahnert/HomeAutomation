@@ -9,7 +9,12 @@ import Foundation
 import HAModels
 import Testing
 
-/// Every repository answers while the server starts and counts the reads after it; a decision must make none.
+/// Whether the code running is a decision; the background save of a change reads the database on its own task.
+private enum Decision {
+    @TaskLocal static var isRunning = false
+}
+
+/// Every repository answers while the server starts and counts the reads a decision makes after it; it must make none.
 private actor Repositories: StorageRepository, HeatingWriteRepository, FireplaceRepository {
     private(set) var callsAfterStart = 0
     private var blocked = false
@@ -20,7 +25,7 @@ private actor Repositories: StorageRepository, HeatingWriteRepository, Fireplace
     }
 
     func block() { blocked = true }
-    private func touch() { if blocked { callsAfterStart += 1 } }
+    private func touch() { if blocked, Decision.isRunning { callsAfterStart += 1 } }
 
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? { touch(); return nil }
     func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? { touch(); return nil }
@@ -83,7 +88,9 @@ struct ShouldTriggerMemoryTests {
                                    .time(date: now), .fireplaceChanged(isOn: false), .fireplaceChanged(isOn: true), .sunset]
         for event in events { await homeManager.addEntityHistory(event.item) }
         for automation in automations() {
-            for event in events { _ = try? await automation.shouldTrigger(with: event, using: homeManager) }
+            for event in events {
+                _ = try? await Decision.$isRunning.withValue(true) { try await automation.shouldTrigger(with: event, using: homeManager) }
+            }
         }
 
         #expect(await repositories.callsAfterStart == 0)
@@ -102,7 +109,8 @@ struct ShouldTriggerMemoryTests {
 
         let automation = MotionAtNight("motion", motionSensors: [motion], lightSensor: motion, lights: [light], minBrightness: 0.1)
 
-        #expect(try await automation.shouldTrigger(with: .change(entity: moving), using: homeManager))
+        let triggers = try await Decision.$isRunning.withValue(true) { try await automation.shouldTrigger(with: .change(entity: moving), using: homeManager) }
+        #expect(triggers)
         #expect(await repositories.callsAfterStart == 0)
     }
 
@@ -132,7 +140,7 @@ struct ShouldTriggerMemoryTests {
                                                                  temperatureInC: Measurement(value: value, unit: .celsius)))
         }
 
-        let history = await homeManager.getEntityHistory(with: roomSensor, since: now.addingTimeInterval(-30 * 60))
+        let history = await Decision.$isRunning.withValue(true) { await homeManager.getEntityHistory(with: roomSensor, since: now.addingTimeInterval(-30 * 60)) }
 
         #expect(history.compactMap { $0.temperatureInC?.value } == [19.2, 18.5])
         #expect(await repositories.callsAfterStart == 0)

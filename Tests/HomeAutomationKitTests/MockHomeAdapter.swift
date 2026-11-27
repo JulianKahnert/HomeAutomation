@@ -128,8 +128,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
         guard let item = storageItems.last(where: { $0.entityId == entityId }) else {
-            struct EntityNotFoundError: Error {}
-            throw EntityNotFoundError()
+            throw OptionalError.notFound
         }
         return item
     }

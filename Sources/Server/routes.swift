@@ -22,16 +22,17 @@ func routes(_ app: Application) throws {
     // Adapter WebSocket transport for the StarActorSystem (see ADR-001 in the knowledge base)
     registerAdapterWebSocket(on: authenticatedRoutes, system: app.starActorSystem)
 
-    authenticatedRoutes.get("health") { req async throws -> HTTPStatus in
+    authenticatedRoutes.get("health") { req async throws -> Response in
         guard let sql = req.db as? any SQLDatabase else {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
         let system = req.application.starActorSystem
         let homeManager = req.application.homeManager
+        let scheduler = req.application.scheduler
 
         // Race the health checks against a hard timeout so the Docker healthcheck always gets a
         // fast, definitive answer (503 peer-not-up / 504 timeout) instead of hanging.
-        return try await withThrowingTaskGroup(of: HTTPStatus.self) { group in
+        return try await withThrowingTaskGroup(of: Response.self) { group in
             group.addTask {
                 try await sql.raw("SELECT 1").run()
 
@@ -44,7 +45,12 @@ func routes(_ app: Application) throws {
                 if case .degraded(let reason) = await homeManager.homeKitHealth() {
                     throw Abort(.serviceUnavailable, reason: "HomeKit degraded: \(reason)")
                 }
-                return .ok
+                // Last success per scheduled job, so a dead source is visible (nil until first success).
+                let jobs = await scheduler?.lastSuccesses ?? [:]
+                let body = HealthDTO(jobs: jobs.mapValues { $0.formatted(.iso8601) })
+                let response = Response(status: .ok)
+                try response.content.encode(body, as: .json)
+                return response
             }
             group.addTask {
                 try await Task.sleep(for: .seconds(5))
@@ -117,4 +123,9 @@ func routes(_ app: Application) throws {
 
     let handler = OpenAPIController()
     try handler.registerHandlers(on: transport)
+}
+
+/// Body of `GET /health`: the last success of every scheduled job (ISO 8601).
+struct HealthDTO: Content {
+    let jobs: [String: String]
 }

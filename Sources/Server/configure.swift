@@ -294,12 +294,17 @@ public func configure(_ app: Application) async throws {
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
-        OutdoorTemperatureJob(location: location, hours: weatherHours),
         DatabaseCleanupJob(entities: app.entityStorageDbRepository,
                            automationRuns: app.automationRunRepository,
                            noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
         EntityRollupJob(entities: app.entityStorageDbRepository)
     ]
+
+    let scheduler = Scheduler(jobs: [OutdoorTemperatureJob(location: location, hours: weatherHours)])
+    app.scheduler = scheduler
+    Task.detached {
+        await scheduler.run()
+    }
 
     Task.detached {
         await withTaskGroup(of: Void.self) { group in

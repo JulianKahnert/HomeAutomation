@@ -29,8 +29,12 @@ public protocol HomeManagable: EntityValidator, Sendable {
     /// adapter's resync refreshes the cache with a new timestamp; only the database still knows since
     /// when the state really holds. `nil` when the database has none.
     func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem?
-    /// The stored states of the entity since `since`, newest first; empty when the database has none.
+    /// The changes of the entity the server holds in memory since `since` (the last 3 hours), newest first; a decision
+    /// reads this, never the database. A longer history is ``getFullEntityHistory(with:limit:)``.
     func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem]
+    /// The last `limit` changes of the entity, newest first: the database's, joined with the memory's that may not be
+    /// stored yet. Reads the database, so only a run that may wait for it (not `shouldTrigger`) calls it.
+    func getFullEntityHistory(with entityId: EntityId, limit: Int) async -> [EntityStorageItem]
     /// When a notification with this id was last sent by this server process; `nil` if none was since the start.
     func lastNotificationDate(id: String) async -> Date?
     /// The newest write that reached `radiator` (matched by room and name, whatever the characteristic),
@@ -59,8 +63,11 @@ public protocol HomeManagable: EntityValidator, Sendable {
     ///   - value: Must fit the shape of the entity's value kind.
     ///   - origin: `server` (default) or `app`.
     /// - Returns: Whether the state changed. `false` too for a value that does not fit or an entity that is not server-owned (logged).
+    /// - Returns: `true` when the state changed, `false` when the value was the one it already had.
+    /// - Throws: ``ReportError`` for a report that is refused: an entity that is not server-owned, a value that does
+    ///   not fit the kind. That is a programmer error of the caller, not an outcome.
     @discardableResult
-    func report(_ entityId: EntityId, value: Value, origin: Origin) async -> Bool
+    func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool
     /// The current states of all entities of one value kind, in no particular order; from memory.
     func states(of kind: ValueKind) async -> [EntityStorageItem]
 
@@ -76,11 +83,17 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws
 }
 
+/// Why a report was refused.
+public enum ReportError: Error, Equatable {
+    case notServerOwned(EntityId)
+    case valueDoesNotFit(EntityId)
+}
+
 public extension HomeManagable {
     /// Reports with origin `server`.
     @discardableResult
-    func report(_ entityId: EntityId, value: Value) async -> Bool {
-        await report(entityId, value: value, origin: .server)
+    func report(_ entityId: EntityId, value: Value) async throws -> Bool {
+        try await report(entityId, value: value, origin: .server)
     }
 }
 

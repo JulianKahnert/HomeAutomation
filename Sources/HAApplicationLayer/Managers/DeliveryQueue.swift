@@ -5,13 +5,11 @@
 
 import Foundation
 import HAModels
-import Logging
+import Shared
 
 /// Sends ``Delivery`` values through the ``NotificationSender`` in the order they were handed over.
 /// It knows no feature: the caller supplies the content.
-actor DeliveryQueue {
-    private static let logger = Logger(label: "DeliveryQueue")
-
+actor DeliveryQueue: Log {
     private let sender: any NotificationSender
     /// The send that was handed over last; the next one waits for it, also while an earlier send is slow.
     private var tail: Task<Void, Never>?
@@ -41,17 +39,17 @@ actor DeliveryQueue {
         switch delivery {
         case let .push(title, message, id, category):
             do {
-                Self.logger.debug("Sending notification", metadata: ["title": "\(title)", "id": "\(id)"])
+                log.debug("Sending notification", metadata: ["title": "\(title)", "id": "\(id)"])
                 try await sender.sendNotification(title: title, message: message, id: id, category: category)
                 pushDates[id] = Date()
             } catch {
-                Self.logger.warning("Failed to send notification", metadata: ["id": "\(id)", "error": "\(error)"])
+                log.warning("Failed to send notification", metadata: ["id": "\(id)", "error": "\(error)"])
             }
         case .clearPush(let id):
             do {
                 try await sender.clearNotification(id: id)
             } catch {
-                Self.logger.warning("Failed to clear notification", metadata: ["id": "\(id)", "error": "\(error)"])
+                log.warning("Failed to clear notification", metadata: ["id": "\(id)", "error": "\(error)"])
             }
         case let .liveActivity(contentState, activityName, options):
             await sender.startOrUpdateLiveActivity(contentState: contentState, activityName: activityName, options: options)

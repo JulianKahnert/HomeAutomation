@@ -21,7 +21,7 @@ struct OutdoorTemperatureJob: ScheduledJob, Log {
     let location: Location
     let hours: any WeatherHourStoring
     /// Reports a value of a server-owned entity (`HomeManagable.report`).
-    var report: @Sendable (EntityId, Value, Origin) async -> Bool = { _, _, _ in true }
+    var report: @Sendable (EntityId, Value, Origin) async throws -> Bool = { _, _, _ in true }
     var fetch: @Sendable (URL) async throws -> Data = { url in
         try await URLSession.shared.data(from: url).0
     }
@@ -64,7 +64,7 @@ struct OutdoorTemperatureJob: ScheduledJob, Log {
         let hours = try Self.parse(data, locationKey: Self.locationKey(for: location), fetchedAt: now)
         try await self.hours.upsert(hours)
         if let current = Self.currentTemperature(in: hours, at: now) {
-            _ = await report(Self.entityId, .number(current), .job(name))
+            _ = try await report(Self.entityId, .number(current), .job(name))
         }
         return hours
     }

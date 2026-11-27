@@ -10,6 +10,7 @@ import Foundation
 import HAApplicationLayer
 @testable import HAImplementations
 import HAModels
+import Logging
 import Synchronization
 import Testing
 
@@ -122,6 +123,46 @@ private distributed actor FakeEntityAdapter: EntityAdapterable {
     }
 }
 
+/// Keeps every log line a logger wrote, so a test can read them.
+private final class RecordingLogHandler: LogHandler, @unchecked Sendable {
+    struct Line: Sendable {
+        let level: Logger.Level
+        let message: String
+        let metadata: Logger.Metadata
+    }
+
+    private let lines = Mutex<[Line]>([])
+    var metadata = Logger.Metadata()
+    var logLevel = Logger.Level.trace
+
+    var recorded: [Line] { lines.withLock { $0 } }
+
+    subscript(metadataKey key: String) -> Logger.Metadata.Value? {
+        get { metadata[key] }
+        set { metadata[key] = newValue }
+    }
+
+    func log(event: LogEvent) {
+        let merged = metadata.merging(event.metadata ?? [:]) { _, new in new }
+        lines.withLock { $0.append(Line(level: event.level, message: "\(event.message)", metadata: merged)) }
+    }
+}
+
+/// Polls until `condition` holds and records an issue when it does not within `timeout`.
+private func eventually(
+    timeout: Duration = .seconds(5),
+    _ comment: Comment,
+    sourceLocation: SourceLocation = #_sourceLocation,
+    _ condition: () async -> Bool
+) async {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+        if await condition() { return }
+        try? await Task.sleep(for: .milliseconds(2))
+    }
+    Issue.record("Did not happen within \(timeout): \(comment)", sourceLocation: sourceLocation)
+}
+
 struct HomeManagerTests {
 
     private let switchId = EntityId(placeId: "room", name: "light", characteristicsName: nil, characteristic: .switcher)
@@ -133,7 +174,8 @@ struct HomeManagerTests {
                                  onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
                                  retryTicks: AsyncStream<Void> = AsyncStream { _ in },
                                  persistRetryDelays: [Duration] = [.zero, .zero],
-                                 journal: Journal = Journal(store: InMemoryJournalStore())) async -> HomeManager {
+                                 journal: Journal = Journal(store: InMemoryJournalStore()),
+                                 logger: Logger = Logger(label: "HomeManagerTests")) async -> HomeManager {
         let adapter = FakeEntityAdapter(actorSystem: LocalTestingDistributedActorSystem(), probe: probe)
         return await HomeManager(getAdapter: { adapter },
                                  storageRepo: storageRepo,
@@ -142,7 +184,15 @@ struct HomeManagerTests {
                                  journal: journal,
                                  onReportedChange: onReportedChange,
                                  retryTicks: retryTicks,
-                                 persistRetryDelays: persistRetryDelays)
+                                 persistRetryDelays: persistRetryDelays,
+                                 logger: logger)
+    }
+
+    private static func setHeatingActions(_ actions: [HomeManagableAction]) -> [HomeManagableAction] {
+        actions.filter { action in
+            guard case .setHeating = action else { return false }
+            return true
+        }
     }
 
     // MARK: - server-owned entities
@@ -154,13 +204,13 @@ struct HomeManagerTests {
     func reportTellsWhetherItChanged() async throws {
         let homeManager = await makeHomeManager(probe: AdapterProbe())
 
-        #expect(await homeManager.report(holidayId, value: .bool(true)))
+        #expect(try await homeManager.report(holidayId, value: .bool(true)))
         let first = try await homeManager.getCurrentEntity(with: holidayId)
         try await Task.sleep(for: .milliseconds(20))
 
-        #expect(await homeManager.report(holidayId, value: .bool(true)) == false)
+        #expect(try await homeManager.report(holidayId, value: .bool(true)) == false)
         #expect(try await homeManager.getCurrentEntity(with: holidayId).timestamp == first.timestamp)
-        #expect(await homeManager.report(holidayId, value: .bool(false)))
+        #expect(try await homeManager.report(holidayId, value: .bool(false)))
         #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == false)
     }
 
@@ -169,8 +219,8 @@ struct HomeManagerTests {
         let seen = Mutex<[EntityStorageItem]>([])
         let homeManager = await makeHomeManager(probe: AdapterProbe(), onReportedChange: { item in seen.withLock { $0.append(item) } })
 
-        await homeManager.report(holidayId, value: .bool(true))
-        await homeManager.report(holidayId, value: .bool(true))
+        try await homeManager.report(holidayId, value: .bool(true))
+        try await homeManager.report(holidayId, value: .bool(true))
 
         let events = seen.withLock { $0 }
         #expect(events.count == 1)
@@ -186,7 +236,7 @@ struct HomeManagerTests {
         await homeManager.perform(.turnOff(switchId))
         #expect(await homeManager.homeKitHealth() != .healthy)
 
-        await homeManager.report(holidayId, value: .bool(true), origin: .app)
+        try await homeManager.report(holidayId, value: .bool(true), origin: .app)
 
         #expect(try await homeManager.getCurrentEntity(with: holidayId).origin == .app)
         #expect(await homeManager.homeKitHealth() != .healthy)
@@ -197,14 +247,14 @@ struct HomeManagerTests {
     func reportSurvivesARestart() async throws {
         let storage = RecordingStorageRepository()
         let beforeRestart = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
-        await beforeRestart.report(priceId, value: .number(0.31))
+        try await beforeRestart.report(priceId, value: .number(0.31))
         await storage.waitForAdds(1)
 
         let afterRestart = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
         await afterRestart.loadCurrentStates(timeout: .seconds(2))
 
         #expect(try await afterRestart.getCurrentEntity(with: priceId).temperatureInC?.value == 0.31)
-        #expect(await afterRestart.report(priceId, value: .number(0.31)) == false)
+        #expect(try await afterRestart.report(priceId, value: .number(0.31)) == false)
         #expect(await storage.added.count == 1)
     }
 
@@ -213,19 +263,19 @@ struct HomeManagerTests {
         let storage = RecordingStorageRepository(failingAdds: 100)
         let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
 
-        #expect(await homeManager.report(holidayId, value: .bool(true)))
+        #expect(try await homeManager.report(holidayId, value: .bool(true)))
 
         #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == true)
-        #expect(await homeManager.report(holidayId, value: .bool(true)) == false)
+        #expect(try await homeManager.report(holidayId, value: .bool(true)) == false)
     }
 
     @Test("The facade reads all states of one value kind")
-    func statesOfOneKind() async {
+    func statesOfOneKind() async throws {
         let homeManager = await makeHomeManager(probe: AdapterProbe())
         let guestsId = EntityId.serverOwned(name: "guests", characteristic: .switcher)
-        await homeManager.report(holidayId, value: .bool(true))
-        await homeManager.report(guestsId, value: .bool(false))
-        await homeManager.report(priceId, value: .number(0.3))
+        try await homeManager.report(holidayId, value: .bool(true))
+        try await homeManager.report(guestsId, value: .bool(false))
+        try await homeManager.report(priceId, value: .number(0.3))
         await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
 
         let switches = await homeManager.states(of: ValueKind(.switcher)).map(\.entityId)
@@ -234,12 +284,12 @@ struct HomeManagerTests {
         #expect(await homeManager.states(of: ValueKind(.temperatureSensor)).map(\.entityId) == [priceId])
     }
 
-    @Test("A report is refused for an entity that is not server-owned or a value that does not fit")
-    func reportRefusesWhatDoesNotFit() async {
+    @Test("A refused report throws: an entity that is not server-owned, a value that does not fit")
+    func reportRefusesWhatDoesNotFit() async throws {
         let homeManager = await makeHomeManager(probe: AdapterProbe())
 
-        #expect(await homeManager.report(switchId, value: .bool(true)) == false)
-        #expect(await homeManager.report(holidayId, value: .number(1)) == false)
+        await #expect(throws: ReportError.notServerOwned(switchId)) { try await homeManager.report(switchId, value: .bool(true)) }
+        await #expect(throws: ReportError.valueDoesNotFit(holidayId)) { try await homeManager.report(holidayId, value: .number(1)) }
         #expect(await homeManager.states(of: ValueKind(.switcher)).isEmpty)
     }
 
@@ -372,6 +422,33 @@ struct HomeManagerTests {
         #expect(await failingManager.lastHeatingWrite(of: radiator) == nil)
     }
 
+    @Test("Every command writes one server log line with entity, action, reason and run, a cache hit included")
+    func everyCommandIsOneLogLine() async {
+        let handler = RecordingLogHandler()
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), logger: Logger(label: "test", factory: { _ in handler }))
+        let runId = UUID()
+
+        await AutomationRunContext.$runId.withValue(runId) {
+            await HeatingWriteContext.withReason(.plan, planTargetInC: 19) {
+                await homeManager.perform(.setTargetTemperature(radiator, celsius: 19))
+            }
+            await homeManager.perform(.turnOn(switchId))
+            await homeManager.perform(.turnOn(switchId))
+        }
+
+        let lines = handler.recorded.filter { $0.message == "Command" }
+        #expect(lines.count == 3)
+        #expect(lines.allSatisfy { $0.level == .info })
+        #expect(lines[0].metadata["entity"] == "\(radiator)")
+        #expect(lines[0].metadata["action"] == "\(HomeManagableAction.setTargetTemperature(radiator, celsius: 19).actionName)")
+        #expect(lines[0].metadata["reason"] == "plan")
+        #expect(lines[0].metadata["run"] == "\(runId.uuidString)")
+        #expect(lines[1].metadata["reason"] == "none")
+        #expect(lines[1].metadata["entity"] == "\(switchId)")
+        #expect(lines[1].metadata["cacheHit"] == "false")
+        #expect(lines[2].metadata["cacheHit"] == "true")
+    }
+
     @Test("A retried radiator write keeps its reason")
     func retryKeepsHeatingReason() async {
         let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
@@ -382,9 +459,11 @@ struct HomeManagerTests {
             await homeManager.perform(.setTargetTemperature(radiator, celsius: 19))
         }
         tickContinuation.yield(())
-        try? await Task.sleep(for: .milliseconds(200))
+        await eventually("the retry is journaled") {
+            await journal.flush()
+            return await journal.commands(limit: nil, runId: nil).count == 2
+        }
 
-        await journal.flush()
         let reasons = await journal.commands(limit: nil, runId: nil).map(\.reason)
         #expect(reasons == [.plan, .plan])
     }
@@ -395,7 +474,8 @@ struct HomeManagerTests {
     func failingCommandIsDroppedAfterThreeAttempts() async {
         let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
         let probe = AdapterProbe(failure: .unreachable)
-        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks)
+        let handler = RecordingLogHandler()
+        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks, logger: Logger(label: "test", factory: { _ in handler }))
 
         await homeManager.perform(.turnOn(switchId))
         #expect(await probe.startedPerforms == 1)
@@ -404,9 +484,10 @@ struct HomeManagerTests {
         for _ in 0..<5 {
             tickContinuation.yield(())
         }
-        await probe.waitForPerforms(3)
-
-        try? await Task.sleep(for: .milliseconds(200))
+        // giving up is the last thing the third attempt does; later ticks find nothing queued
+        await eventually("the command is given up") {
+            handler.recorded.contains { $0.message == "Giving up on action" }
+        }
         #expect(await probe.startedPerforms == 3)
     }
 
@@ -425,9 +506,11 @@ struct HomeManagerTests {
             tickContinuation.yield(())
         }
         await probe.waitForPerforms(3)
-        try? await Task.sleep(for: .milliseconds(200))
+        await eventually("all three attempts are journaled") {
+            await journal.flush()
+            return await journal.commands(limit: nil, runId: runId).count == 3
+        }
 
-        await journal.flush()
         let log = await journal.commands(limit: nil, runId: runId)
         #expect(log.count == 3)
         #expect(log.allSatisfy { $0.status == .failed })
@@ -461,9 +544,9 @@ struct HomeManagerTests {
         await homeManager.perform(.turnOn(switchId))
         await homeManager.perform(.turnOff(switchId))
 
+        // one tick replays the one queued command once, so the third attempt is the last
         tickContinuation.yield(())
         await probe.waitForPerforms(3)
-        try? await Task.sleep(for: .milliseconds(200))
 
         #expect(await probe.performedActions == [.turnOn(switchId), .turnOff(switchId), .turnOff(switchId)])
     }
@@ -474,14 +557,18 @@ struct HomeManagerTests {
         let probe = AdapterProbe(failure: .unreachable)
         let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks)
 
+        let brightnessId = EntityId(placeId: "room", name: "light", characteristicsName: nil, characteristic: .brightness)
+
         await homeManager.perform(.turnOff(switchId))   // fails and is queued
+        await homeManager.perform(.setBrightness(brightnessId, 0.4))   // fails and is queued, another entity
         await probe.setFailure(nil)
-        await homeManager.perform(.turnOn(switchId))    // reaches the device
+        await homeManager.perform(.turnOn(switchId))    // reaches the device, drops the queued off
 
+        // one tick replays everything queued; the brightness retry shows the tick was handled
         tickContinuation.yield(())
-        try? await Task.sleep(for: .milliseconds(200))
+        await probe.waitForPerforms(4)
 
-        #expect(await probe.performedActions == [.turnOff(switchId), .turnOn(switchId)])
+        #expect(await probe.performedActions == [.turnOff(switchId), .setBrightness(brightnessId, 0.4), .turnOn(switchId), .setBrightness(brightnessId, 0.4)])
     }
 
     @Test("An off that failed and waits for its retry is replaced when the window closes, so the room does not go off after the closing")
@@ -509,8 +596,10 @@ struct HomeManagerTests {
         // the adapter is back: the retries replay what the closing wrote, not the off
         await probe.setFailure(nil)
         tickContinuation.yield(())
-        try? await Task.sleep(for: .milliseconds(200))
-        let heating = await probe.performedActions.filter { if case .setHeating = $0 { true } else { false } }
+        await eventually("both retries ran") {
+            Self.setHeatingActions(await probe.performedActions).count == 3
+        }
+        let heating = Self.setHeatingActions(await probe.performedActions)
         #expect(heating == [.setHeating(thermo.heatingId, active: false), .setHeating(thermo.heatingId, active: true), .setHeating(thermo.heatingId, active: true)])
         #expect(await homeManager.queuedRetry(of: thermo.heatingId) == nil)
     }
@@ -521,14 +610,14 @@ struct HomeManagerTests {
     func fireplaceRepeatedOnKeepsStart() async throws {
         let homeManager = await makeHomeManager(probe: AdapterProbe())
 
-        #expect(await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app))
-        let since = try #require(await Fireplace.state(with: homeManager).since)
+        #expect(try await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app))
+        let since = try #require(try await Fireplace.state(with: homeManager).since)
         try await Task.sleep(for: .milliseconds(20))
-        #expect(await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app) == false)
+        #expect(try await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app) == false)
 
-        #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: since))
-        #expect(await homeManager.report(Fireplace.stateId, value: .bool(false), origin: .server))
-        #expect(await Fireplace.state(with: homeManager) == .off)
+        #expect(try await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: since))
+        #expect(try await homeManager.report(Fireplace.stateId, value: .bool(false), origin: .server))
+        #expect(try await Fireplace.state(with: homeManager) == .off)
         #expect(try await homeManager.getCurrentEntity(with: Fireplace.stateId).origin == .server)
     }
 
@@ -939,10 +1028,13 @@ private actor RecordingStorageRepository: StorageRepository {
         []
     }
 
-    func waitForAdds(_ count: Int, timeout: Duration = .seconds(30)) async {
+    func waitForAdds(_ count: Int, timeout: Duration = .seconds(30), sourceLocation: SourceLocation = #_sourceLocation) async {
         let deadline = ContinuousClock.now + timeout
         while added.count < count, ContinuousClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(5))
+        }
+        if added.count < count {
+            Issue.record("Expected \(count) stored items within \(timeout), saw \(added.count)", sourceLocation: sourceLocation)
         }
     }
 

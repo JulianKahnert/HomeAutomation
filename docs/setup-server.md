@@ -60,3 +60,7 @@ swift build
 TZ=Europe/Berlin swift run Server serve
 TZ=Europe/Berlin swift run Server serve
 ```
+
+## MySQL tests
+
+`EntityStorageMySQLTests` run only against a throwaway MySQL (`HA_TEST_MYSQL_PORT` set); without it they are skipped, so `swift test` does not cover the MySQL-only queries (the journal cleanup, the narrow storage). `scripts/run-mysql-tests.sh [git-ref]` runs them with Docker alone: it starts `mysql:9` and builds and tests inside the Swift image of the Dockerfile's build stage (`swift:6.4-noble`; keep the two tags equal). The log goes to `mysql-tests.log`. Never point the tests at a real database: they create and fill the tables.

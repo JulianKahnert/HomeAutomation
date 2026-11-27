@@ -224,7 +224,7 @@ public func configure(_ app: Application) async throws {
     let actorSystem = StarActorSystem(name: "server", logger: app.logger)
     app.starActorSystem = actorSystem
     let eventReceiver = actorSystem.makeActor(id: .homeEventReceiver) {
-        HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: actorSystem)
+        HomeEventReceiver(emit: { [sink = app.homeEventSink] in sink.yield($0) }, actorSystem: actorSystem)
     }
     app.homeEventReceiver = eventReceiver
 
@@ -255,8 +255,8 @@ public func configure(_ app: Application) async throws {
                                         storageUpkeep: DatabaseStorageUpkeep(entities: app.entityStorageDbRepository,
                                                                              journal: journal,
                                                                              noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
-                                        onReportedChange: { [continuation = app.homeEventsContinuation] item in
-        continuation.yield(.change(entity: item))
+                                        onReportedChange: { [sink = app.homeEventSink] item in
+        sink.yield(.change(entity: item))
     })
     app.homeManager = homeManager
     // Before the event processing job starts and before `.serverStarted`, which reads current states.
@@ -272,11 +272,10 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - register jobs
 
-    let gauge = EventLoopGauge()
-    app.eventLoopGauge = gauge
+    let gauge = app.eventLoopGauge
     let jobs: [any Job] = [
         ClockJob(location: location,
-                 homeEventsContinuation: app.homeEventsContinuation),
+                 homeEventSink: app.homeEventSink),
         HomeEventProcessingJob(gauge: gauge,
                                homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
@@ -285,12 +284,12 @@ public func configure(_ app: Application) async throws {
 
     let valveJob = ValveJob(listThermostats: { try await homeManager.listThermostats() },
                             readThermostat: { try await homeManager.readThermostat($0) },
-                            feed: { [continuation = app.homeEventsContinuation] in continuation.yield(.change(entity: $0)) })
-    let report: @Sendable (EntityId, Value, Origin) async -> Bool = { [homeManager] in
-        await homeManager.report($0, value: $1, origin: $2)
+                            feed: { [sink = app.homeEventSink] in sink.yield(.change(entity: $0)) })
+    let report: @Sendable (EntityId, Value, Origin) async throws -> Bool = { [homeManager] in
+        try await homeManager.report($0, value: $1, origin: $2)
     }
     var scheduledJobs: [any ScheduledJob] = [OutdoorTemperatureJob(location: location, hours: weatherHours, report: report),
-                                             LaneBacklogJob(automationService: automationService),
+                                             LaneBacklogJob(automationService: automationService, gauge: gauge),
                                              valveJob]
     if let tibber = TibberService() {
         scheduledJobs.append(EnergyPriceJob(currentPrice: { date in
@@ -315,7 +314,7 @@ public func configure(_ app: Application) async throws {
     }
 
     // Once per process start; the stream buffers it until the event processing job runs.
-    app.homeEventsContinuation.yield(.serverStarted)
+    app.homeEventSink.yield(.serverStarted)
 
     // MARK: - register routes
 

@@ -152,9 +152,15 @@ struct JournalDbRepository: JournalStore {
 
     // MARK: - cleanup
 
+    /// Command entries with a heating reason stay for good (the last command of every radiator survives).
     func deleteEntries(olderThan date: Date) async throws {
         try await JournalDbItem.query(on: database())
             .filter(\.$timestamp < date)
+            .group(.or) { notHeatingCommand in
+                notHeatingCommand
+                    .filter(\.$kind != JournalKind.command.rawValue)
+                    .filter(\.$reason == nil)
+            }
             .delete()
     }
 }

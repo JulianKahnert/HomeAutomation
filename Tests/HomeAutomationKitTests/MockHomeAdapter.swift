@@ -128,8 +128,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
         guard let item = storageItems.last(where: { $0.entityId == entityId }) else {
-            struct EntityNotFoundError: Error {}
-            throw EntityNotFoundError()
+            throw OptionalError.notFound
         }
         return item
     }
@@ -217,8 +216,11 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     /// Server-owned states reported by an automation under test, with the origin they were reported with.
     @discardableResult
-    func report(_ entityId: EntityId, value: Value, origin: Origin) async -> Bool {
-        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else { return false }
+    func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
+        guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
+        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
+            throw ReportError.valueDoesNotFit(entityId)
+        }
         return await addEntityHistory(item)
     }
 
@@ -228,7 +230,10 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return latest.values.filter { $0.entityId.characteristicType.valueKind == kind }
     }
 
-    func lastReport(of entityId: EntityId) async -> Date? { nil }
+    /// When each entity last reported, for a test that places a report in the past.
+    var lastReports: [EntityId: Date] = [:]
+
+    func lastReport(of entityId: EntityId) async -> Date? { lastReports[entityId] }
 
     func lastNotificationDate(id: String) async -> Date? {
         notificationDates[id]
@@ -236,6 +241,10 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] {
         storageItems.filter { $0.entityId == entityId && $0.timestamp >= since }.sorted { $0.timestamp > $1.timestamp }
+    }
+
+    func getFullEntityHistory(with entityId: EntityId, limit: Int) async -> [EntityStorageItem] {
+        Array(storageItems.filter { $0.entityId == entityId }.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 
     func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws {

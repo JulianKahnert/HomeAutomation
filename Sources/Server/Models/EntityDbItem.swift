@@ -85,10 +85,14 @@ final class EntityChangeDbItem: Model, @unchecked Sendable {
     /// The value in the shape of the kind's descriptor, `nil` when the column of that shape is empty.
     func value(shape: ValueDescriptor.Shape) -> Value? {
         switch shape {
-        case .bool: number.map { .bool($0 != 0) }
-        case .number: number.map { .number($0) }
-        case .text: text.map { .text($0) }
-        case .textWithNumber: text.flatMap { Deadline(caseName: $0, end: number) }.map { .text($0.text) }
+        case .bool:
+            return number.map { .bool($0 != 0) }
+        case .number:
+            return number.map { .number($0) }
+        case .text:
+            return text.map { .text($0) }
+        case .textWithNumber:
+            return text.flatMap { Deadline(caseName: $0, end: number) }.map { .text($0.text) }
         }
     }
 }

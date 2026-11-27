@@ -9,6 +9,11 @@ import Foundation
 import HAModels
 import Testing
 
+private extension Date {
+    /// The deadline text keeps whole seconds only.
+    var roundedToSecond: Date { Date(timeIntervalSince1970: timeIntervalSince1970.rounded()) }
+}
+
 @Suite("WindowProjection Live Activity updates")
 struct WindowProjectionTests {
     private static let start = Date(timeIntervalSince1970: 1_800_000_000)
@@ -33,7 +38,7 @@ struct WindowProjectionTests {
     @discardableResult
     private func report(_ deadline: Deadline, _ name: String, in room: String) async throws -> EntityStorageItem {
         let id = Self.deadlineId(name, in: room)
-        await manager.report(id, value: .text(deadline.text))
+        try await manager.report(id, value: .text(deadline.text))
         let item = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id })
         try await AutomationRunContext.$event.withValue(.change(entity: item)) {
             try await projection.execute(using: manager)
@@ -107,6 +112,55 @@ struct WindowProjectionTests {
         #expect(window.opened >= before && window.opened <= Date())
     }
 
+    @Test("an overdue window shows its opening time after a restart, when only the database holds the history")
+    func openedSurvivesARestart() async throws {
+        let base = Date(timeIntervalSinceNow: -86_400).roundedToSecond
+        let id = Self.deadlineId("Fenster", in: "Küche")
+        let end = base.addingTimeInterval(1_500)
+        let opened = base
+        let stored = MockStorageRepository(items: [
+            EntityStorageItem(entityId: id, timestamp: opened, deadline: .running(until: end)),
+            EntityStorageItem(entityId: id, timestamp: end, deadline: .overdue(since: end))
+        ])
+        let restarted = await HomeManager(
+            getAdapter: { nil },
+            storageRepo: stored,
+            notificationSender: sender,
+            location: Location(latitude: 52.52, longitude: 13.405)
+        )
+        await restarted.loadCurrentStates(timeout: .seconds(5))
+
+        let window = try #require(await restarted.getWindowContentState().windows.first)
+
+        #expect(window.isOverdue)
+        #expect(window.opened == opened)
+    }
+
+    @Test("a window reopened into a deadline that ran before shows the reopening as its opening time")
+    func openedIsTheLatestOpening() async throws {
+        let base = Date(timeIntervalSinceNow: -86_400).roundedToSecond
+        let id = Self.deadlineId("Fenster", in: "Küche")
+        let end = base.addingTimeInterval(1_500)
+        let reopened = base.addingTimeInterval(600)
+        let stored = MockStorageRepository(items: [
+            EntityStorageItem(entityId: id, timestamp: base, deadline: .running(until: end)),
+            EntityStorageItem(entityId: id, timestamp: base.addingTimeInterval(300), deadline: Deadline.none),
+            EntityStorageItem(entityId: id, timestamp: reopened, deadline: .running(until: end)),
+            EntityStorageItem(entityId: id, timestamp: end, deadline: .overdue(since: end))
+        ])
+        let restarted = await HomeManager(
+            getAdapter: { nil },
+            storageRepo: stored,
+            notificationSender: sender,
+            location: Location(latitude: 52.52, longitude: 13.405)
+        )
+        await restarted.loadCurrentStates(timeout: .seconds(5))
+
+        let window = try #require(await restarted.getWindowContentState().windows.first)
+
+        #expect(window.opened == reopened)
+    }
+
     @Test("closing a window updates the Live Activity, closing the last one ends it")
     func closingUpdatesAndClosingTheLastEnds() async throws {
         try await open("Fenster", in: "Küche", minutesAfterStart: 0)
@@ -165,9 +219,9 @@ struct WindowProjectionTests {
         try await open("Tür", in: "Flur", minutesAfterStart: 1)
         let id = Self.deadlineId("Tür", in: "Flur")
         let end = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id }?.deadline?.end)
-        await manager.report(id, value: .text(Deadline.overdue(since: end).text))
+        try await manager.report(id, value: .text(Deadline.overdue(since: end).text))
         let overdue = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id })
-        await manager.report(id, value: .text(Deadline.none.text))
+        try await manager.report(id, value: .text(Deadline.none.text))
 
         try await AutomationRunContext.$event.withValue(.change(entity: overdue)) {
             try await projection.execute(using: manager)
@@ -246,7 +300,7 @@ struct WindowProjectionTests {
         try await open("Fenster", in: "Küche", minutesAfterStart: 0)
         #expect(try #require(await sender.contentStates.last).outdoorTemperature == nil)
 
-        await manager.report(.outdoorTemperature, value: .number(7.5))
+        try await manager.report(.outdoorTemperature, value: .number(7.5))
         try await open("Tür", in: "Flur", minutesAfterStart: 1)
         #expect(try #require(await sender.contentStates.last).outdoorTemperature == 7.5)
     }
@@ -275,7 +329,7 @@ struct WindowProjectionTests {
     @Test("the quiet refresh sends priority 5 without an alert and with the current outdoor temperature")
     func quietRefreshIsLowPriority() async throws {
         try await open("Fenster", in: "Küche", minutesAfterStart: 0)
-        await manager.report(.outdoorTemperature, value: .number(5.5))
+        try await manager.report(.outdoorTemperature, value: .number(5.5))
 
         try await AutomationRunContext.$event.withValue(Self.clockTick(minute: 15)) {
             try await projection.execute(using: manager)
@@ -308,6 +362,7 @@ struct WindowProjectionTests {
         #expect(try await projection.shouldTrigger(with: .serverStarted, using: manager) == false)
         #expect(projection.collapsesChanges == false)
         #expect(projection.supersedesRunningRun == false)
+        #expect(projection.runsEveryTrigger)
     }
 }
 

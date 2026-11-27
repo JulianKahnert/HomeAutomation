@@ -40,36 +40,48 @@ public struct EnergyLowPrice: Automatable {
         return Calendar.current.component(.minute, from: date) == 3
     }
 
+    /// The price job reports every 15 minutes; a price older than two reports is no longer current.
+    static let maximumPriceAge: TimeInterval = 30 * 60
+    private static let missingPrice = Disturbances<String>()
+
     public func execute(using hm: HomeManagable) async throws {
         log.debug("Get price infos")
-        // The current price is state (reported by the server's EnergyPriceJob); Tibber only ranks today's slots.
-        guard let current = await hm.states(of: CharacteristicsType.energyPrice.valueKind)
-                .first(where: { $0.entityId == .electricityPrice })?.energyPriceInEURPerKWh else {
-            log.warning("No electricity price known, switching off")
-            await setSwitches(on: false, using: hm)
-            return
-        }
+        guard let current = await currentPrice(using: hm, now: Date()) else { return }
         guard let tibber = TibberService() else { return }
 
-        var prices = try await tibber.getCheapestPricesToday(for: dailyActivationDuration)
-
-        // if there is a threshold set, we must filter the prices first
-        if let thresholdInEUR {
-            prices = prices.filter { $0.price <= thresholdInEUR }
-        }
-
-        // The current slot is one of the cheapest when its price does not exceed the dearest of them.
-        let shouldTurnOnSwitches = Self.isCheap(current, among: prices.map(\.price))
-        if shouldTurnOnSwitches {
-            log.info("Starting switches as current price is \(current)€/kWh")
-        }
-        await setSwitches(on: shouldTurnOnSwitches, using: hm)
+        let slots = try await tibber.getCheapestPricesToday(for: dailyActivationDuration)
+        await apply(cheapestSlots: slots, currentPrice: current, now: Date(), using: hm)
     }
 
-    /// Whether `price` is within the cheapest slots, given their prices (already filtered by the threshold).
-    static func isCheap(_ price: Double, among cheapest: [Double]) -> Bool {
-        guard let dearest = cheapest.max() else { return false }
-        return price <= dearest
+    /// The current price (state reported by the server's EnergyPriceJob), `nil` while none is known or the last report is
+    /// too old: after a restart before the job ran, or while the source is down. Logs once per disturbance.
+    func currentPrice(using homeManager: HomeManagable, now: Date) async -> Double? {
+        let price = await homeManager.states(of: CharacteristicsType.energyPrice.valueKind)
+            .first { $0.entityId == .electricityPrice }?.energyPriceInEURPerKWh
+        if let price, let reported = await homeManager.lastReport(of: .electricityPrice), now.timeIntervalSince(reported) <= Self.maximumPriceAge {
+            if await Self.missingPrice.recovered(name) {
+                log.info("The electricity price is known again", metadata: ["automation": "\(name)"])
+            }
+            return price
+        }
+        if await Self.missingPrice.began(name) {
+            log.warning("No current electricity price known, leaving the switches as they are", metadata: ["automation": "\(name)"])
+        }
+        return nil
+    }
+
+    /// Switches on when the current time slot is one of the cheapest slots (those under the threshold, if one is set),
+    /// off otherwise. Tibber's ranking decides, so a tie in price never extends beyond `dailyActivationDuration`.
+    func apply(cheapestSlots: [TibberService.TodayPrice], currentPrice: Double, now: Date, using homeManager: HomeManagable) async {
+        var slots = cheapestSlots
+        if let thresholdInEUR {
+            slots = slots.filter { $0.price <= thresholdInEUR }
+        }
+        let shouldTurnOnSwitches = slots.contains { $0.time.contains(now) }
+        if shouldTurnOnSwitches {
+            log.info("Starting switches in a cheapest slot", metadata: ["priceInEURPerKWh": "\(currentPrice)"])
+        }
+        await setSwitches(on: shouldTurnOnSwitches, using: homeManager)
     }
 
     private func setSwitches(on: Bool, using hm: HomeManagable) async {

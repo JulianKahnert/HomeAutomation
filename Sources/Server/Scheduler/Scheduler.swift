@@ -82,7 +82,7 @@ actor Scheduler: Log {
 
     private func start(_ job: any ScheduledJob, plannedAt planned: Date) {
         guard running.insert(job.name).inserted else {
-            log.warning("Skipping \(job.name): the previous run is still running")
+            log.warning("Skipping a job: the previous run is still running", metadata: ["job": "\(job.name)"])
             return
         }
         Task {
@@ -95,14 +95,14 @@ actor Scheduler: Log {
             try await job.run(plannedAt: planned)
             successes[job.name] = clock.now
             if await disturbances.recovered(job.name) {
-                log.info("Job \(job.name) works again")
+                log.info("Job works again", metadata: ["job": "\(job.name)"])
             }
         } catch {
             // Once per disturbance: a source that stays down is not logged on every run.
             if await disturbances.began(job.name) {
-                log.error("Job \(job.name) failed: \(error)")
+                log.error("Job failed", metadata: ["job": "\(job.name)", "error": "\(error)"])
             } else {
-                log.debug("Job \(job.name) still failing: \(error)")
+                log.debug("Job still failing", metadata: ["job": "\(job.name)", "error": "\(error)"])
             }
         }
         running.remove(job.name)

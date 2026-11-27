@@ -30,17 +30,22 @@ extension EntityHistoryItem {
 
     /// The on/open/detected state of boolean values, `nil` for measurements.
     var stateValue: Bool? {
-        if case .bool(let bool) = value { bool } else { nil }
+        guard case .bool(let bool) = value else { return nil }
+        return bool
     }
 
     /// The value as a number for charts, from the value and its descriptor: a number as is, a Bool as 1 or 0,
     /// a colour as its hue, `nil` for a text that is no colour. A kind without a descriptor charts its raw number.
     public var primaryValue: Double? {
         switch value {
-        case .bool(let bool): bool ? 1.0 : 0.0
-        case .number(let number): number
-        case .text: descriptor?.display == .color ? hue : nil
-        case nil: nil
+        case .bool(let bool):
+            return bool ? 1.0 : 0.0
+        case .number(let number):
+            return number
+        case .text:
+            return descriptor?.display == .color ? hue : nil
+        case nil:
+            return nil
         }
     }
 }

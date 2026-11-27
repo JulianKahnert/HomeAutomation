@@ -24,7 +24,7 @@ public struct FireplaceTimeout: Automatable {
 
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
         guard case .time(let date) = event else { return false }
-        return await hasExpired(at: date, using: hm)
+        return try await hasExpired(at: date, using: hm)
     }
 
     public func execute(using hm: HomeManagable) async throws {
@@ -33,8 +33,8 @@ public struct FireplaceTimeout: Automatable {
 
     func execute(using hm: HomeManagable, now: Date) async throws {
         // look again: the fireplace may have gone off since the trigger
-        guard await hasExpired(at: now, using: hm),
-              await hm.report(Fireplace.stateId, value: .bool(false), origin: .server) else { return }
+        guard try await hasExpired(at: now, using: hm),
+              try await hm.report(Fireplace.stateId, value: .bool(false), origin: .server) else { return }
         await hm.deliver(.push(title: "Kamin aus",
                                message: "Der Kamin war \(Self.durationText(Fireplace.maxDuration)) an und wurde ausgeschaltet. Die Heizkörper folgen wieder dem Plan.",
                                id: Fireplace.notificationId))
@@ -51,8 +51,8 @@ public struct FireplaceTimeout: Automatable {
         return parts.joined(separator: " und ")
     }
 
-    private func hasExpired(at date: Date, using hm: HomeManagable) async -> Bool {
-        guard let endsAt = await Fireplace.state(with: hm).endsAt else { return false }
+    private func hasExpired(at date: Date, using homeManager: HomeManagable) async throws -> Bool {
+        guard let endsAt = try await Fireplace.state(with: homeManager).endsAt else { return false }
         return date >= endsAt
     }
 }

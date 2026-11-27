@@ -6,6 +6,7 @@
 import Foundation
 @testable import HAModels
 @testable import Server
+import Shared
 import Testing
 
 struct EnergyPriceJobTests {

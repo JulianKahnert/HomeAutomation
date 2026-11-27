@@ -46,6 +46,11 @@ public protocol Automatable: Sendable, Codable {
     /// Off for work that must finish, such as the database upkeep.
     var supersedesRunningRun: Bool { get }
 
+    /// Whether the lane waits for each run to end before it checks the next event, so every trigger runs to its
+    /// end in order (projections). Off by default: a trigger during a run is then dropped when the run must not
+    /// be cut (`supersedesRunningRun` off) or cuts it.
+    var runsEveryTrigger: Bool { get }
+
     /// Whether several waiting changes of the same entity in this automation's lane collapse to the newest.
     /// Off for lanes that must see every change (projections). Events without a state never collapse.
     var collapsesChanges: Bool { get }
@@ -60,6 +65,8 @@ public extension Automatable {
     var supersedesRunningRun: Bool { true }
 
     var collapsesChanges: Bool { true }
+
+    var runsEveryTrigger: Bool { false }
 
     func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String? { nil }
 

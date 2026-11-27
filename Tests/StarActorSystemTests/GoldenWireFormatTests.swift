@@ -49,11 +49,12 @@ struct GoldenWireFormatTests {
     func entityStateRoundTrip() throws {
         for type in CharacteristicsType.allCases {
             let id = EntityId(placeId: "p", name: "e", characteristicsName: nil, characteristic: type)
-            let value: Value = switch type.valueKind.descriptor?.shape {
-            case .bool: .bool(true)
-            case .text: .text("0.1 0.25 0.9")
-            case .textWithNumber: .text("running 1800000000.0")
-            default: type == .heatingMode ? .number(1) : .number(3)
+            let value: Value
+            switch type.valueKind.descriptor?.shape {
+            case .bool: value = .bool(true)
+            case .text: value = .text("0.1 0.25 0.9")
+            case .textWithNumber: value = .text("running 1800000000.0")
+            default: value = type == .heatingMode ? .number(1) : .number(3)
             }
             let item = try #require(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSinceReferenceDate: 5), kind: type.valueKind, value: value, origin: .homekit))
             let back = try JSONDecoder().decode(EntityStorageItem.self, from: try JSONEncoder().encode(item))

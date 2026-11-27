@@ -90,10 +90,10 @@ final class ServerOwnedEntityTests: XCTestCase {
         }
         defer { loop.cancel() }
 
-        await homeManager.report(holiday, value: .bool(true))
+        try await homeManager.report(holiday, value: .bool(true))
         // unchanged: no event
-        await homeManager.report(holiday, value: .bool(true))
-        await homeManager.report(holiday, value: .bool(false))
+        try await homeManager.report(holiday, value: .bool(true))
+        try await homeManager.report(holiday, value: .bool(false))
         try await waitUntil { seen.withLock { $0.count } >= 2 }
         await automationService.waitUntilIdle()
 
@@ -111,7 +111,7 @@ final class ServerOwnedEntityTests: XCTestCase {
                                             location: Location(latitude: 52.52, longitude: 13.405))
         app.homeManager = homeManager
 
-        await homeManager.report(holiday, value: .bool(true))
+        try await homeManager.report(holiday, value: .bool(true))
 
         // the background queue stores the report
         var body = Data()

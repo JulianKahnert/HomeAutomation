@@ -55,54 +55,179 @@ public struct ValueDescriptor: Sendable, Equatable {
         static let analog = StorageRule(storageClass: .analog, deadBand: nil, rawRetentionDays: nil, hourlyRollup: false, validRange: nil)
     }
 
+    /// What a value of the right shape must also satisfy to fit the kind.
+    public enum Constraint: Sendable, Equatable {
+        case none
+        /// A number without a fraction.
+        case wholeNumber
+        /// A number that is the raw value of a ``HeatingMode``.
+        case heatingMode
+        /// A text of three numbers, "red green blue".
+        case colorText
+        /// A text ``Deadline`` can parse.
+        case deadlineText
+    }
+
     public let kind: ValueKind
     public let shape: Shape
     /// Unit symbol, `nil` for unitless kinds.
     public let unit: String?
     public let display: Display
     public let storage: StorageRule
+    public let constraint: Constraint
+    /// Whether the app may set a state of this kind through `PUT /entities/state` (the route still accepts only
+    /// server-owned entities).
+    public let isSettableFromApp: Bool
 
-    private static func bool(_ type: CharacteristicsType, _ yes: String, _ no: String) -> ValueDescriptor {
-        ValueDescriptor(kind: type.valueKind, shape: .bool, unit: nil, display: .boolean(trueLabel: yes, falseLabel: no), storage: .state)
+    /// Whether `value` fits the kind: the right shape and its constraint.
+    public func accepts(_ value: Value) -> Bool {
+        switch (shape, value) {
+        case (.bool, .bool):
+            return true
+        case (.number, .number(let number)):
+            return accepts(number: number)
+        case (.text, .text(let text)), (.textWithNumber, .text(let text)):
+            return accepts(text: text)
+        default:
+            return false
+        }
     }
 
-    private static func number(_ type: CharacteristicsType, unit: String?, digits: Int = 0,
-                               storage: StorageRule = .analog) -> ValueDescriptor {
-        ValueDescriptor(kind: type.valueKind, shape: .number, unit: unit, display: .number(fractionDigits: digits), storage: storage)
+    private func accepts(number: Double) -> Bool {
+        switch constraint {
+        case .wholeNumber:
+            return Int(exactly: number) != nil
+        case .heatingMode:
+            return Int(exactly: number).flatMap(HeatingMode.init(rawValue:)) != nil
+        default:
+            return true
+        }
+    }
+
+    private func accepts(text: String) -> Bool {
+        switch constraint {
+        case .colorText:
+            return text.split(separator: " ").compactMap { Float($0) }.count == 3
+        case .deadlineText:
+            return Deadline(text: text) != nil
+        default:
+            return true
+        }
+    }
+
+    private static let lightStorage = StorageRule(
+        storageClass: .analog,
+        deadBand: nil,
+        rawRetentionDays: 90,
+        hourlyRollup: true,
+        validRange: 0...100_000
+    )
+
+    private static let carbonDioxideStorage = StorageRule(
+        storageClass: .analog,
+        deadBand: .init(absoluteChange: 25, maxInterval: .seconds(15 * 60)),
+        rawRetentionDays: 90,
+        hourlyRollup: true,
+        validRange: 1...100_000
+    )
+
+    private static let airQualityStorage = StorageRule(
+        storageClass: .enumeration,
+        deadBand: nil,
+        rawRetentionDays: nil,
+        hourlyRollup: false,
+        validRange: nil
+    )
+
+    private static func bool(_ type: CharacteristicsType, _ trueLabel: String, _ falseLabel: String, isSettableFromApp: Bool = false) -> ValueDescriptor {
+        ValueDescriptor(
+            kind: type.valueKind,
+            shape: .bool,
+            unit: nil,
+            display: .boolean(trueLabel: trueLabel, falseLabel: falseLabel),
+            storage: .state,
+            constraint: .none,
+            isSettableFromApp: isSettableFromApp
+        )
+    }
+
+    private static func number(
+        _ type: CharacteristicsType,
+        unit: String?,
+        digits: Int = 0,
+        storage: StorageRule = .analog,
+        constraint: Constraint = .none,
+        isSettableFromApp: Bool = false
+    ) -> ValueDescriptor {
+        ValueDescriptor(
+            kind: type.valueKind,
+            shape: .number,
+            unit: unit,
+            display: .number(fractionDigits: digits),
+            storage: storage,
+            constraint: constraint,
+            isSettableFromApp: isSettableFromApp
+        )
+    }
+
+    private static func structured(_ type: CharacteristicsType, shape: Shape, display: Display, constraint: Constraint) -> ValueDescriptor {
+        ValueDescriptor(
+            kind: type.valueKind,
+            shape: shape,
+            unit: nil,
+            display: display,
+            storage: .state,
+            constraint: constraint,
+            isSettableFromApp: false
+        )
     }
 
     public static func descriptor(for type: CharacteristicsType) -> ValueDescriptor {
         switch type {
-        case .motionSensor: bool(type, "motion", "no motion")
-        case .contactSensor: bool(type, "open", "closed")
-        case .switcher: bool(type, "on", "off")
-        case .valve: bool(type, "open", "closed")
-        case .lock: bool(type, "locked", "unlocked")
-        case .heating: bool(type, "heating", "idle")
+        case .motionSensor:
+            return bool(type, "motion", "no motion")
+        case .contactSensor:
+            return bool(type, "open", "closed")
+        case .switcher:
+            return bool(type, "on", "off", isSettableFromApp: true)
+        case .valve:
+            return bool(type, "open", "closed")
+        case .lock:
+            return bool(type, "locked", "unlocked")
+        case .heating:
+            return bool(type, "heating", "idle")
         case .lightSensor:
-            number(type, unit: "lx", storage: StorageRule(storageClass: .analog, deadBand: nil, rawRetentionDays: 90,
-                                                           hourlyRollup: true, validRange: 0...100_000))
+            return number(type, unit: "lx", storage: lightStorage)
         case .carbonDioxideSensorId:
-            number(type, unit: "ppm", storage: StorageRule(storageClass: .analog,
-                                                            deadBand: .init(absoluteChange: 25, maxInterval: .seconds(15 * 60)),
-                                                            rawRetentionDays: 90, hourlyRollup: true, validRange: 1...100_000))
-        case .temperatureSensor: number(type, unit: "°C", digits: 1)
-        case .relativeHumiditySensor: number(type, unit: "%")
-        case .pmDensitySensor: number(type, unit: "µg/m³")
-        case .batterySensor: number(type, unit: "%")
-        case .brightness: number(type, unit: "%")
-        case .colorTemperature: number(type, unit: nil, digits: 2)
-        case .airQualitySensor: number(type, unit: nil, storage: StorageRule(storageClass: .enumeration, deadBand: nil,
-                                                                              rawRetentionDays: nil, hourlyRollup: false, validRange: nil))
-        case .targetTemperature: number(type, unit: "°C", digits: 1, storage: .state)
-        case .heatingMode: number(type, unit: nil, storage: .state)
-        case .valvePosition: number(type, unit: "%", storage: .state)
-        case .temperatureCalibration: number(type, unit: "°C", digits: 1, storage: .state)
-        case .energyPrice: number(type, unit: "€/kWh", digits: 3)
+            return number(type, unit: "ppm", storage: carbonDioxideStorage, constraint: .wholeNumber)
+        case .temperatureSensor:
+            return number(type, unit: "°C", digits: 1)
+        case .relativeHumiditySensor:
+            return number(type, unit: "%")
+        case .pmDensitySensor:
+            return number(type, unit: "µg/m³")
+        case .batterySensor:
+            return number(type, unit: "%", constraint: .wholeNumber)
+        case .brightness:
+            return number(type, unit: "%", constraint: .wholeNumber)
+        case .colorTemperature:
+            return number(type, unit: nil, digits: 2)
+        case .airQualitySensor:
+            return number(type, unit: nil, storage: airQualityStorage, constraint: .wholeNumber)
+        case .targetTemperature:
+            return number(type, unit: "°C", digits: 1, storage: .state, isSettableFromApp: true)
+        case .heatingMode:
+            return number(type, unit: nil, storage: .state, constraint: .heatingMode, isSettableFromApp: true)
+        case .valvePosition:
+            return number(type, unit: "%", storage: .state, constraint: .wholeNumber)
+        case .temperatureCalibration:
+            return number(type, unit: "°C", digits: 1, storage: .state)
+        case .energyPrice:
+            return number(type, unit: "€/kWh", digits: 3)
         case .deadline:
-            ValueDescriptor(kind: type.valueKind, shape: .textWithNumber, unit: nil, display: .deadline, storage: .state)
+            return structured(type, shape: .textWithNumber, display: .deadline, constraint: .deadlineText)
         case .color:
-            ValueDescriptor(kind: type.valueKind, shape: .text, unit: nil, display: .color, storage: .state)
+            return structured(type, shape: .text, display: .color, constraint: .colorText)
         }
     }
 }

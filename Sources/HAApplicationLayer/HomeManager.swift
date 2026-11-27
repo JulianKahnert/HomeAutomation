@@ -15,7 +15,7 @@ public final class HomeManager: HomeManagable {
     /// Number of times a command is sent to the adapter before it is dropped.
     nonisolated private static let maxAttempts = 3
 
-    private let log = Logger(label: "HomeManager")
+    private let log: Logger
     private let commandCache: CommandCache
     private let journal: Journal
 
@@ -67,6 +67,7 @@ public final class HomeManager: HomeManagable {
     ///   - onReportedChange: Called with each changed state set by `report`; the server yields `HomeEvent.change`.
     ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
     ///     than there are delays.
+    ///   - logger: Where the manager logs; a test passes one with its own handler to read the log lines.
     public init(getAdapter: @escaping () async -> (any EntityAdapterable)?,
                 storageRepo: StorageRepository,
                 notificationSender: NotificationSender,
@@ -76,7 +77,9 @@ public final class HomeManager: HomeManagable {
                 storageUpkeep: (any StorageUpkeep)? = nil,
                 onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
                 retryTicks: AsyncStream<Void>? = nil,
-                persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)]) {
+                persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
+                logger: Logger = Logger(label: "HomeManager")) {
+        self.log = logger
         let deliveries = DeliveryQueue(sender: notificationSender)
         self.deliveries = deliveries
         self.journal = journal
@@ -327,7 +330,7 @@ public final class HomeManager: HomeManagable {
             if nextAttempt < Self.maxAttempts {
                 failedActions[entityId] = (action, nextAttempt, runId, heating)
             } else {
-                log.critical("Giving up on action [\(action)] after \(Self.maxAttempts) attempts")
+                log.critical("Giving up on action", metadata: ["action": "\(action)", "attempts": "\(Self.maxAttempts)"])
             }
         }
     }
@@ -357,14 +360,10 @@ public final class HomeManager: HomeManagable {
     }
 
     @discardableResult
-    public func report(_ entityId: EntityId, value: Value, origin: Origin) async -> Bool {
-        guard entityId.isServerOwned else {
-            log.error("Refusing to report \(entityId): it is not a server-owned entity")
-            return false
-        }
+    public func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
+        guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
         guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
-            log.error("Refusing to report \(entityId): the value \(value) does not fit its value kind")
-            return false
+            throw ReportError.valueDoesNotFit(entityId)
         }
         // No suspension point between the check, the state and the yield: the state holds before the event
         // reaches the stream, and two reports of one entity cannot interleave.
@@ -507,6 +506,19 @@ public final class HomeManager: HomeManagable {
 
     public func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] {
         (recentReadings[entityId] ?? []).filter { $0.timestamp >= since }
+    }
+
+    public func getFullEntityHistory(with entityId: EntityId, limit: Int) async -> [EntityStorageItem] {
+        let recent = recentReadings[entityId] ?? []
+        var stored: [EntityStorageItem] = []
+        do {
+            stored = try await storageRepo.getHistory(for: entityId, startDate: nil, endDate: nil, cursor: nil, limit: limit)
+        } catch {
+            log.error("Failed to read the entity history", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
+        }
+        let known = Set(recent.map(\.timestamp))
+        let merged = recent + stored.filter { !known.contains($0.timestamp) }
+        return Array(merged.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 
     public func lastNotificationDate(id: String) async -> Date? {

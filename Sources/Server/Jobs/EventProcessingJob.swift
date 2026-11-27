@@ -10,15 +10,71 @@ import HAApplicationLayer
 import HAModels
 import Logging
 import Shared
+import Synchronization
 
-/// How long the event loop has been on its current event, for `/health`.
-actor EventLoopGauge {
-    private var startedAt: Date?
+/// How long the oldest event the event loop has not finished has been on its way, for `/health`: an event is
+/// stamped when it is yielded into the stream and counts until the loop has handled it, so the wait in the
+/// stream shows as well as a slow event.
+final class EventLoopGauge: Sendable {
+    private struct State {
+        var waiting: [Date] = []
+        var handling: Date?
+        var reported = false
+    }
 
-    func began(at date: Date = Date()) { startedAt = date }
-    func ended() { startedAt = nil }
+    private let state = Mutex(State())
+
+    /// An event was yielded into the stream.
+    func stamp(at date: Date = Date()) {
+        state.withLock { $0.waiting.append(date) }
+    }
+
+    /// The loop took the oldest waiting event.
+    func took() {
+        state.withLock { state in
+            guard !state.waiting.isEmpty else { return }
+            state.handling = state.waiting.removeFirst()
+        }
+    }
+
+    /// The loop is done with the event it took.
+    func finished() {
+        state.withLock { $0.handling = nil }
+    }
+
     func age(now: Date = Date()) -> TimeInterval {
-        startedAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
+        state.withLock { Self.age(of: $0, now: now) }
+    }
+
+    /// The age to log critical when it is above `limit` and not reported yet; `nil` otherwise. The backlog is
+    /// reported again only after it has drained.
+    func reportsBacklog(olderThan limit: TimeInterval, now: Date = Date()) -> TimeInterval? {
+        state.withLock { state in
+            let age = Self.age(of: state, now: now)
+            guard age > limit else {
+                if age == 0 { state.reported = false }
+                return nil
+            }
+            guard !state.reported else { return nil }
+            state.reported = true
+            return age
+        }
+    }
+
+    private static func age(of state: State, now: Date) -> TimeInterval {
+        guard let oldest = state.handling ?? state.waiting.first else { return 0 }
+        return max(0, now.timeIntervalSince(oldest))
+    }
+}
+
+/// Where everything that happens is yielded into the event stream; stamps each event for the ``EventLoopGauge``.
+struct HomeEventSink: Sendable {
+    let continuation: AsyncStream<HomeEvent>.Continuation
+    let gauge: EventLoopGauge
+
+    func yield(_ event: HomeEvent) {
+        gauge.stamp()
+        continuation.yield(event)
     }
 }
 
@@ -33,14 +89,14 @@ struct HomeEventProcessingJob: Job, Log {
         // `trigger(with:)` returns quickly — long-running `execute()` runs in the background inside
         // AutomationService — so a slow automation does not stall the loop.
         for await event in homeEventsStream {
-            await gauge.began()
+            gauge.took()
             await handle(event)
-            await gauge.ended()
+            gauge.finished()
         }
     }
 
     private func handle(_ event: HomeEvent) async {
-        log.debug("trigger automation with \(event.description)")
+        log.debug("Trigger automation", metadata: ["event": "\(event.description)"])
 
         // add item to history
         if case .change(let item) = event {

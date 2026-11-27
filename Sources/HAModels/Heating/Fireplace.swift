@@ -31,7 +31,7 @@ public enum Fireplace {
     /// The fireplace ends this long after it was switched on.
     public static let maxDuration: TimeInterval = 2 * 3600
 
-    /// The fireplace entity: server-owned, a switch (on = burning). The app may set it (`AppSettableEntities`).
+    /// The fireplace entity: server-owned, a switch (on = burning). The app may set it: a switch is a kind the app may set (``ValueDescriptor/isSettableFromApp``).
     public static let stateId = EntityId.serverOwned(name: "fireplace", characteristic: .switcher)
 
     /// Category of the push "Kamin an?"; the app registers its action under this name.
@@ -45,8 +45,15 @@ public enum Fireplace {
 
     /// The state the server holds, since the last change of the entity (a repeated value keeps it). It does not
     /// depend on HomeKit: a degraded HomeKit stops the radiator writes, not the fire.
-    public static func state(with hm: HomeManagable) async -> FireplaceState {
-        guard let item = try? await hm.getCurrentEntity(with: stateId), item.isDeviceOn == true else { return .off }
+    /// - Throws: Any failure of reading the state; only an entity the server never held is `.off`.
+    public static func state(with homeManager: HomeManagable) async throws -> FireplaceState {
+        let item: EntityStorageItem
+        do {
+            item = try await homeManager.getCurrentEntity(with: stateId)
+        } catch OptionalError.notFound {
+            return .off
+        }
+        guard item.isDeviceOn == true else { return .off }
         return FireplaceState(isOn: true, since: item.timestamp)
     }
 }

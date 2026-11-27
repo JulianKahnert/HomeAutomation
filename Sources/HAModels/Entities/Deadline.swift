@@ -17,31 +17,41 @@ public enum Deadline: Hashable, Sendable {
     /// The moment the deadline runs or ran until, `nil` for none.
     public var end: Date? {
         switch self {
-        case .none: nil
-        case .running(let until): until
-        case .overdue(let since): since
+        case .none:
+            return nil
+        case .running(let until):
+            return until
+        case .overdue(let since):
+            return since
         }
     }
 
     /// The case as stored in the text column.
     public var caseName: String {
         switch self {
-        case .none: "none"
-        case .running: "running"
-        case .overdue: "overdue"
+        case .none:
+            return "none"
+        case .running:
+            return "running"
+        case .overdue:
+            return "overdue"
         }
     }
 
     public var isOverdue: Bool {
-        if case .overdue = self { true } else { false }
+        guard case .overdue = self else { return false }
+        return true
     }
 
     /// How a deadline reads in a list: the case and, when it has one, the time of day of its end.
     public var displayText: String {
         switch self {
-        case .none: "No deadline"
-        case .running(let until): "Until \(until.formatted(date: .omitted, time: .shortened))"
-        case .overdue(let since): "Overdue since \(since.formatted(date: .omitted, time: .shortened))"
+        case .none:
+            return "No deadline"
+        case .running(let until):
+            return "Until \(until.formatted(date: .omitted, time: .shortened))"
+        case .overdue(let since):
+            return "Overdue since \(since.formatted(date: .omitted, time: .shortened))"
         }
     }
 

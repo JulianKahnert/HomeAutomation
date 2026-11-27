@@ -77,11 +77,17 @@ actor EveMatterValvePoller {
                                               deadline: deadline,
                                               parse: Self.unsignedInteger)
         // The offset is a bonus: a missing answer must not hide the valve position.
-        let rawCalibration = try? await read(device,
-                                             EveMatterValve.thermostatClusterID,
-                                             EveMatterValve.localTemperatureCalibrationAttributeID,
-                                             deadline: deadline,
-                                             parse: Self.signedInteger)
+        let rawCalibration: Int64?
+        do {
+            rawCalibration = try await read(device,
+                                            EveMatterValve.thermostatClusterID,
+                                            EveMatterValve.localTemperatureCalibrationAttributeID,
+                                            deadline: deadline,
+                                            parse: Self.signedInteger)
+        } catch {
+            log.debug("Eve valve offset not read, only the position is reported", metadata: ["thermostat": "\(thermostat)", "error": "\(error)"])
+            rawCalibration = nil
+        }
 
         var items: [EntityStorageItem] = []
         if let percent = EveMatterValve.percent(fromRawValue: rawValvePosition) {

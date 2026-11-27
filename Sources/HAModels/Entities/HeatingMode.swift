@@ -4,7 +4,7 @@
 //
 
 /// Thermostat target mode, HAP `TargetHeatingCoolingState`. The raw value is the HomeKit value and
-/// is what the database stores (`entityItems.heatingMode`, TINYINT).
+/// is what the database stores (`entityChanges.number`).
 ///
 /// A raw value outside 0...3 (a future HAP mode) has no case: the adapter and the database mapping
 /// turn it into `nil` and log it instead of crashing.

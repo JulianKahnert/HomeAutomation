@@ -33,7 +33,7 @@ public struct FireplaceReminder: Automatable {
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
         guard case .change(let item) = event, item.entityId == roomSensor,
               let current = item.temperatureInC?.value else { return false }
-        guard !(await Fireplace.state(with: hm).isOn) else { return false }
+        guard try await !Fireplace.state(with: hm).isOn else { return false }
         if let last = await hm.lastNotificationDate(id: Fireplace.reminderNotificationId),
            item.timestamp.timeIntervalSince(last) < minInterval { return false }
 

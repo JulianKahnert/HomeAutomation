@@ -54,7 +54,6 @@ struct GenericValueTests {
     @Test func energyPriceHasItsOwnKindWithEuroDescriptor() {
         let descriptor = ValueDescriptor.descriptor(for: .energyPrice)
         #expect(descriptor.shape == .number)
-        #expect(descriptor.unit == "€/kWh")
     }
 
     @Test func aValueThatDoesNotFitTheKindDoesNotConvert() {

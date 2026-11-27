@@ -25,6 +25,7 @@ public enum AnyAutomation: Codable, Sendable {
     case turn(Turn)
     case turnOnForDuration(TurnOnForDuration)
     case windowOpen(WindowOpen)
+    case windowProjection(WindowProjection)
     case upsertScene(UpsertScene)
     case triggerScene(TriggerScene)
 
@@ -47,6 +48,7 @@ public enum AnyAutomation: Codable, Sendable {
         case .setLightProperties(let setLightProperties): return setLightProperties
         case .turn(let turn): return turn
         case .windowOpen(let windowOpen): return windowOpen
+        case .windowProjection(let windowProjection): return windowProjection
         case .upsertScene(let upsertScene): return upsertScene
         case .triggerScene(let triggerScene): return triggerScene
         }
@@ -68,6 +70,7 @@ public enum AnyAutomation: Codable, Sendable {
             Turn.self,
             TurnOnForDuration.self,
             WindowOpen.self,
+            WindowProjection.self,
             UpsertScene.self,
             TriggerScene.self
         ]
@@ -107,6 +110,8 @@ public enum AnyAutomation: Codable, Sendable {
             return .turnOnForDuration(turnOnForDuration)
         } else if let windowOpen = automation as? WindowOpen {
             return .windowOpen(windowOpen)
+        } else if let windowProjection = automation as? WindowProjection {
+            return .windowProjection(windowProjection)
         } else if let upsertScene = automation as? UpsertScene {
             return .upsertScene(upsertScene)
         } else if let triggerScene = automation as? TriggerScene {

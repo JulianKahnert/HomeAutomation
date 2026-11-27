@@ -374,7 +374,7 @@ final class EntityStorageMySQLTests: XCTestCase {
     }
 
     func testJournalCleanupKeepsHeatingCommandsForGood() async throws {
-        let journal = JournalDbRepository(database: { self.app.db })
+        let journal = app.journalRepository
         let kitchen = EntityId(placeId: "Kitchen", name: "Radiator", characteristicsName: nil, characteristic: .targetTemperature)
         let old = Date(timeIntervalSince1970: 1_000)
         try await journal.addCommand(ActionLogItem(timestamp: old, action: .setTargetTemperature(kitchen, celsius: 21), hasCacheHit: false, reason: .plan))

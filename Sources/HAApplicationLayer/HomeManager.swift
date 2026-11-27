@@ -22,7 +22,7 @@ public final class HomeManager: HomeManagable {
     private let getAdapter: () async -> (any EntityAdapterable)?
     private let location: Location
     private let storageRepo: StorageRepository
-    private let notificationSender: NotificationSender
+    private let deliveries: DeliveryQueue
     private let heatingWrites: (any HeatingWriteRepository)?
     private let fireplaceSwitches: (any FireplaceRepository)?
     /// Tells the automations about a switch of the fireplace; the server yields `HomeEvent.fireplaceChanged`.
@@ -51,8 +51,6 @@ public final class HomeManager: HomeManagable {
     nonisolated private static let persistQueueLimit = 5_000
     /// States dropped since the queue last had room again; keeps a stuck database from flooding the log.
     private var droppedPersistItems = 0
-    /// When each notification id was last sent, for rate limits of automations.
-    private var notificationDates: [String: Date] = [:]
     private var liveness = HomeKitLiveness(startedAt: Date())
 
     /// - Parameters:
@@ -76,14 +74,15 @@ public final class HomeManager: HomeManagable {
                 retryTicks: AsyncStream<Void>? = nil,
                 persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
                 outdoorTemperature: @escaping @Sendable () async -> Double? = { nil }) {
-        self.windowManager = WindowManager(notificationSender: notificationSender, outdoorTemperature: outdoorTemperature)
+        let deliveries = DeliveryQueue(sender: notificationSender)
+        self.deliveries = deliveries
+        self.windowManager = WindowManager(deliver: { await deliveries.deliver($0) }, outdoorTemperature: outdoorTemperature)
         self.actionLogManager = actionLogManager
         self.heatingWrites = heatingWrites
         self.fireplaceSwitches = fireplaceSwitches
         self.onFireplaceSwitch = onFireplaceSwitch
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
-        self.notificationSender = notificationSender
         self.location = location
 
         let (persistStream, persistQueue) = AsyncStream<EntityStorageItem>.makeStream(bufferingPolicy: .bufferingNewest(Self.persistQueueLimit))
@@ -455,17 +454,11 @@ public final class HomeManager: HomeManagable {
     }
 
     public func lastNotificationDate(id: String) async -> Date? {
-        notificationDates[id]
+        await deliveries.lastPushDate(id: id)
     }
 
-    public func sendNotification(title: String, message: String, id: String, category: String?) async {
-        do {
-            log.debug("Sending notification \(title): \(message) [id: \(id)]")
-            try await notificationSender.sendNotification(title: title, message: message, id: id, category: category)
-            notificationDates[id] = Date()
-        } catch {
-            log.warning("Failed to send notification: \(error)")
-        }
+    public func deliver(_ delivery: Delivery) async {
+        await deliveries.deliver(delivery)
     }
 
     public func markWindowOverdue(entityId: EntityId) async {

@@ -16,7 +16,8 @@ actor WindowManager {
     /// While a window is open, a quiet update refreshes the outdoor temperature at this interval.
     static let refreshInterval: Duration = .seconds(15 * 60)
 
-    private let notificationSender: NotificationSender
+    /// Hands a delivery over to the notification adapter, through the `HomeManager`.
+    private let deliver: @Sendable (Delivery) async -> Void
     /// The current time. Injected so the überschritten transition and the stale date can be
     /// driven deterministically in tests.
     private let now: @Sendable () -> Date
@@ -30,11 +31,11 @@ actor WindowManager {
     /// The offenen Fenster whose Fensterschließzeit has passed.
     private var overdueWindowIds: Set<String> = []
 
-    init(notificationSender: any NotificationSender,
+    init(deliver: @escaping @Sendable (Delivery) async -> Void,
          now: @escaping @Sendable () -> Date = { Date() },
          outdoorTemperature: @escaping @Sendable () async -> Double? = { nil },
          sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
-        self.notificationSender = notificationSender
+        self.deliver = deliver
         self.now = now
         self.outdoorTemperature = outdoorTemperature
         self.sleep = sleep
@@ -63,7 +64,7 @@ actor WindowManager {
             Self.logger.info("All windows closed, ending Live Activities")
             refreshTask?.cancel()
             refreshTask = nil
-            await notificationSender.endAllLiveActivities(ofActivityType: WindowContentState.activityTypeName)
+            await deliver(.endLiveActivities(activityType: WindowContentState.activityTypeName))
         }
     }
 
@@ -146,8 +147,8 @@ actor WindowManager {
         Self.logger.debug("Start or update open window activity")
 
         let options = LiveActivityOptions(alert: alert, staleDate: contentState.staleDate, priority: priority)
-        await notificationSender.startOrUpdateLiveActivity(contentState: contentState,
-                                                           activityName: WindowContentState.activityTypeName,
-                                                           options: options)
+        await deliver(.liveActivity(contentState: contentState,
+                                    activityName: WindowContentState.activityTypeName,
+                                    options: options))
     }
 }

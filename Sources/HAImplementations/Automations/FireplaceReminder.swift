@@ -43,9 +43,9 @@ public struct FireplaceReminder: Automatable {
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        await hm.sendNotification(title: "Kamin an?",
-                                  message: "Heizkörper ausschalten",
-                                  id: Fireplace.reminderNotificationId,
-                                  category: Fireplace.notificationCategory)
+        await hm.deliver(.push(title: "Kamin an?",
+                               message: "Heizkörper ausschalten",
+                               id: Fireplace.reminderNotificationId,
+                               category: Fireplace.notificationCategory))
     }
 }

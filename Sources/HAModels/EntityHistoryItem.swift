@@ -48,11 +48,13 @@ extension EntityHistoryItem {
     }
 
     private func bool(_ type: CharacteristicsType) -> Bool? {
-        if valueKind == type.rawValue, case .bool(let bool)? = value { bool } else { nil }
+        guard valueKind == type.rawValue, case .bool(let bool)? = value else { return nil }
+        return bool
     }
 
     private func number(_ type: CharacteristicsType) -> Double? {
-        if valueKind == type.rawValue, case .number(let number)? = value { number } else { nil }
+        guard valueKind == type.rawValue, case .number(let number)? = value else { return nil }
+        return number
     }
 
     private func int(_ type: CharacteristicsType) -> Int? {
@@ -96,10 +98,14 @@ extension EntityHistoryItem {
     /// The raw value as text, for a kind without a descriptor.
     public var rawValueDescription: String? {
         switch value {
-        case .bool(let bool): String(bool)
-        case .number(let number): abs(number) < 1e15 && number.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(number)) : String(number)
-        case .text(let text): text
-        case nil: nil
+        case .bool(let bool):
+            return String(bool)
+        case .number(let number):
+            return abs(number) < 1e15 && number.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(number)) : String(number)
+        case .text(let text):
+            return text
+        case nil:
+            return nil
         }
     }
 

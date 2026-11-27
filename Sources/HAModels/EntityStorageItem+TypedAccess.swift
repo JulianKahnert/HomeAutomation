@@ -85,11 +85,13 @@ public extension EntityStorageItem {
 
 private extension EntityStorageItem {
     func bool(_ type: CharacteristicsType) -> Bool? {
-        if case .bool(let bool)? = value(of: type) { bool } else { nil }
+        guard case .bool(let bool)? = value(of: type) else { return nil }
+        return bool
     }
 
     func number(_ type: CharacteristicsType) -> Double? {
-        if case .number(let number)? = value(of: type) { number } else { nil }
+        guard case .number(let number)? = value(of: type) else { return nil }
+        return number
     }
 
     func int(_ type: CharacteristicsType) -> Int? {

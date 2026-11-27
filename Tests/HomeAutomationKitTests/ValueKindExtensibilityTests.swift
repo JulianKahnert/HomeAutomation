@@ -28,11 +28,12 @@ struct ValueKindExtensibilityTests {
     @Test(arguments: CharacteristicsType.allCases)
     func aKindTravelsWithItsDescriptorAlone(_ type: CharacteristicsType) throws {
         let descriptor = ValueDescriptor.descriptor(for: type)
-        let value: Value = switch descriptor.shape {
-        case .bool: .bool(true)
-        case .number: .number(type == .heatingMode ? 1 : 2)
-        case .text: .text("0.5 0.25 1.0")
-        case .textWithNumber: .text("running 1800000000.0")
+        let value: Value
+        switch descriptor.shape {
+        case .bool: value = .bool(true)
+        case .number: value = .number(type == .heatingMode ? 1 : 2)
+        case .text: value = .text("0.5 0.25 1.0")
+        case .textWithNumber: value = .text("running 1800000000.0")
         }
         let id = EntityId(placeId: "p", name: "e", characteristicsName: nil, characteristic: type)
         let item = try #require(EntityStorageItem(entityId: id, timestamp: date, kind: type.valueKind, value: value))

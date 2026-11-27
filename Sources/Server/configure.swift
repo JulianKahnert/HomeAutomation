@@ -147,6 +147,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateHeatingWrite())
     app.migrations.add(CreateFireplaceSwitch())
     app.migrations.add(AddOrigin())
+    app.migrations.add(CreateJournal())
     app.migrations.add(CreateNarrowStorage())
 
     // Run migrations automatically
@@ -253,7 +254,7 @@ public func configure(_ app: Application) async throws {
     // Wire up push notifications for CRITICAL log events
     await CriticalLogNotifier.shared.configure(notificationSender: notificationSender)
 
-    let actionLogManager = ActionLogManager()
+    let journal = Journal(store: app.journalRepository)
     let location = await app.homeAutomationConfigService.location
     let weatherHours = WeatherHourDbRepository(database: { app.db })
     let homeManager = await HomeManager(getAdapter: {
@@ -262,7 +263,7 @@ public func configure(_ app: Application) async throws {
                                         storageRepo: app.entityStorageDbRepository,
                                         notificationSender: notificationSender,
                                         location: app.homeAutomationConfigService.location,
-                                        actionLogManager: actionLogManager,
+                                        journal: journal,
                                         heatingWrites: app.heatingWriteRepository,
                                         fireplaceSwitches: app.fireplaceRepository,
                                         onFireplaceSwitch: { [continuation = app.homeEventsContinuation] fireplaceSwitch in
@@ -281,9 +282,9 @@ public func configure(_ app: Application) async throws {
     // Before the event processing job starts and before `.serverStarted`, which reads current states.
     await homeManager.loadCurrentStates(timeout: .seconds(10))
     // Runs still marked `running` belong to a previous server process that died mid-run.
-    try await app.automationRunRepository.markRunningAsInterrupted()
+    try await app.journalRepository.markRunningAsInterrupted()
     let automationService = try AutomationService(using: homeManager,
-                                                  runs: app.automationRunRepository,
+                                                  runs: app.journalRepository,
                                                   automations: loadedConfig.automations,
                                                   repository: app.homeAutomationConfigService)
     app.automationService = automationService
@@ -297,7 +298,7 @@ public func configure(_ app: Application) async throws {
                                automationService: automationService,
                                homeManager: app.homeManager),
         DatabaseCleanupJob(entities: app.entityStorageDbRepository,
-                           automationRuns: app.automationRunRepository,
+                           journal: journal,
                            noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
         EntityRollupJob(entities: app.entityStorageDbRepository)
     ]

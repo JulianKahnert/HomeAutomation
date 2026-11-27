@@ -33,7 +33,7 @@ struct OpenAPIController: APIProtocol {
 
     func getAutomations(_ input: Operations.GetAutomations.Input) async throws -> Operations.GetAutomations.Output {
         let automationNames = await request.application.automationService.getActiveAutomationNames()
-        let lastRuns = try await request.application.automationRunRepository.latestRunPerAutomation()
+        let lastRuns = try await request.application.journalRepository.latestRunPerAutomation()
         let automations = await request.application.automationService.automations
             .map { tmp in
                 Components.Schemas.Automation(name: tmp.name,
@@ -48,7 +48,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getAutomationRuns(_ input: Operations.GetAutomationRuns.Input) async throws -> Operations.GetAutomationRuns.Output {
-        let runs = try await request.application.automationRunRepository.runs(for: input.path.name,
+        let runs = try await request.application.journalRepository.runs(for: input.path.name,
                                                                               startDate: input.query.startDate,
                                                                               endDate: input.query.endDate,
                                                                               limit: Self.clampedLimit(input.query.limit))
@@ -56,7 +56,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getRecentRuns(_ input: Operations.GetRecentRuns.Input) async throws -> Operations.GetRecentRuns.Output {
-        let runs = try await request.application.automationRunRepository.latestRuns(since: input.query.since,
+        let runs = try await request.application.journalRepository.latestRuns(since: input.query.since,
                                                                                     limit: Self.clampedLimit(input.query.limit))
         return .ok(.init(body: .json(runs.map(Components.Schemas.AutomationRun.init))))
     }

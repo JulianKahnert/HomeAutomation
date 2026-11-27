@@ -16,7 +16,6 @@ private actor NoRuns: AutomationRunRepository {
     func latestRuns(since date: Date, limit: Int) async throws -> [AutomationRun] { [] }
     func latestRunPerAutomation() async throws -> [String: AutomationRun] { [:] }
     func markRunningAsInterrupted() async throws {}
-    func deleteRuns(olderThan date: Date) async throws {}
 }
 
 func makeAutomationService(automations: [any Automatable],
@@ -24,7 +23,6 @@ func makeAutomationService(automations: [any Automatable],
     let homeManager = await HomeManager(getAdapter: { nil },
                                         storageRepo: EmptyStorage(),
                                         notificationSender: SilentSender(),
-                                        location: Location(latitude: 52.52, longitude: 13.405),
-                                        actionLogManager: ActionLogManager())
+                                        location: Location(latitude: 52.52, longitude: 13.405))
     return try AutomationService(using: homeManager, runs: NoRuns(), automations: automations, repository: repository)
 }

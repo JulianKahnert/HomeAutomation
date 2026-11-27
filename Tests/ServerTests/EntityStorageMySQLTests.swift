@@ -35,6 +35,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         app.migrations.add(CreateHeatingWrite())
         app.migrations.add(CreateFireplaceSwitch())
         app.migrations.add(AddOrigin())
+        app.migrations.add(CreateJournal())
         app.migrations.add(CreateNarrowStorage())
         try await app.autoMigrate()
     }

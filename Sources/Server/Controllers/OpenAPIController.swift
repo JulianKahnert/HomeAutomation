@@ -181,12 +181,7 @@ struct OpenAPIController: APIProtocol {
 
         // Only a server-owned entity of a kind the descriptor lets the app set; any other one stays unchanged.
         guard entityId.isServerOwned, type.valueKind.descriptor?.isSettableFromApp == true else { return .forbidden }
-        let value: Value
-        switch body.value {
-        case .case1(let bool): value = .bool(bool)
-        case .case2(let number): value = .number(number)
-        case .case3(let text): value = .text(text)
-        }
+        let value = Value(body.value)
         let homeManager = request.application.homeManager
         let changed: Bool
         do {
@@ -366,7 +361,7 @@ extension Components.Schemas.EntityHistoryItem {
     }
 }
 
-extension Components.Schemas.EntityState.ValuePayload {
+extension Components.Schemas.Value {
     init(_ value: Value) {
         switch value {
         case .bool(let bool): self = .case1(bool)
@@ -376,12 +371,12 @@ extension Components.Schemas.EntityState.ValuePayload {
     }
 }
 
-extension Components.Schemas.EntityHistoryItem.ValuePayload {
-    init(_ value: Value) {
-        switch value {
-        case .bool(let bool): self = .case1(bool)
-        case .number(let number): self = .case2(number)
-        case .text(let text): self = .case3(text)
+extension Value {
+    init(_ payload: Components.Schemas.Value) {
+        switch payload {
+        case .case1(let bool): self = .bool(bool)
+        case .case2(let number): self = .number(number)
+        case .case3(let text): self = .text(text)
         }
     }
 }

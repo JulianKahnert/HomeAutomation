@@ -43,6 +43,7 @@ actor Scheduler: Log {
     private let jobs: [any ScheduledJob]
     private var running: Set<String> = []
     private var successes: [String: Date] = [:]
+    private let disturbances = Disturbances<String>()
 
     init(clock: any SchedulerClock = SystemSchedulerClock(), jobs: [any ScheduledJob]) {
         self.clock = clock
@@ -93,8 +94,16 @@ actor Scheduler: Log {
         do {
             try await job.run(plannedAt: planned)
             successes[job.name] = clock.now
+            if await disturbances.recovered(job.name) {
+                log.info("Job \(job.name) works again")
+            }
         } catch {
-            log.error("Job \(job.name) failed: \(error)")
+            // Once per disturbance: a source that stays down is not logged on every run.
+            if await disturbances.began(job.name) {
+                log.error("Job \(job.name) failed: \(error)")
+            } else {
+                log.debug("Job \(job.name) still failing: \(error)")
+            }
         }
         running.remove(job.name)
     }

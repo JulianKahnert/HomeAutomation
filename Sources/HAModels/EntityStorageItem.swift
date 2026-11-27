@@ -84,6 +84,9 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// Thermostat temperature offset in Celsius, already included in the temperature it reports
     public let temperatureCalibrationInC: Double?
 
+    /// Electricity price in EUR per kWh
+    public let energyPriceInEURPerKWh: Double?
+
     /// Where this change came from. It is no part of the value: two items that differ only in
     /// timestamp and origin carry the same information (see `HomeManager.addEntityHistory`).
     public var origin: Origin
@@ -127,6 +130,7 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         heatingMode: HeatingMode? = nil,
         valvePositionPercent: Int? = nil,
         temperatureCalibrationInC: Double? = nil,
+        energyPriceInEURPerKWh: Double? = nil,
         origin: Origin = .homekit,
         lastReport: Date? = nil
     ) {
@@ -152,6 +156,7 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         self.heatingMode = heatingMode
         self.valvePositionPercent = valvePositionPercent
         self.temperatureCalibrationInC = temperatureCalibrationInC
+        self.energyPriceInEURPerKWh = energyPriceInEURPerKWh
         self.origin = origin
         self.lastReport = lastReport
     }

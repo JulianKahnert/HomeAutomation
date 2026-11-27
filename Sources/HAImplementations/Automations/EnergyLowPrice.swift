@@ -42,6 +42,13 @@ public struct EnergyLowPrice: Automatable {
 
     public func execute(using hm: HomeManagable) async throws {
         log.debug("Get price infos")
+        // The current price is state (reported by the server's EnergyPriceJob); Tibber only ranks today's slots.
+        guard let current = await hm.states(of: CharacteristicsType.energyPrice.valueKind)
+                .first(where: { $0.entityId == .electricityPrice })?.energyPriceInEURPerKWh else {
+            log.warning("No electricity price known, switching off")
+            await setSwitches(on: false, using: hm)
+            return
+        }
         guard let tibber = TibberService() else { return }
 
         var prices = try await tibber.getCheapestPricesToday(for: dailyActivationDuration)
@@ -51,18 +58,24 @@ public struct EnergyLowPrice: Automatable {
             prices = prices.filter { $0.price <= thresholdInEUR }
         }
 
-        let shouldTurnOnSwitches: Bool
-        if let price = prices.first(where: { $0.time.contains(Date()) }) {
-            log.info("Starting switches as current price is \(price.price)€/kWh")
-            shouldTurnOnSwitches = true
-        } else {
-            shouldTurnOnSwitches = false
+        // The current slot is one of the cheapest when its price does not exceed the dearest of them.
+        let shouldTurnOnSwitches = Self.isCheap(current, among: prices.map(\.price))
+        if shouldTurnOnSwitches {
+            log.info("Starting switches as current price is \(current)€/kWh")
         }
+        await setSwitches(on: shouldTurnOnSwitches, using: hm)
+    }
 
+    /// Whether `price` is within the cheapest slots, given their prices (already filtered by the threshold).
+    static func isCheap(_ price: Double, among cheapest: [Double]) -> Bool {
+        guard let dearest = cheapest.max() else { return false }
+        return price <= dearest
+    }
+
+    private func setSwitches(on: Bool, using hm: HomeManagable) async {
         for enerySwitch in switches {
-            if shouldTurnOnSwitches {
+            if on {
                 await enerySwitch.turnOn(with: hm)
-//                await tibber?.sendNotification(title: "Low energy price", message: "\(Date().formatted())")
             } else {
                 await enerySwitch.turnOff(with: hm)
             }

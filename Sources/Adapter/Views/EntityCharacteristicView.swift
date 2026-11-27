@@ -123,6 +123,11 @@ struct EntityCharacteristicView: View {
                 Spacer()
                 Label(String(format: "%+.1f °C", offset), systemImage: "plusminus")
             }
+        case .energyPrice:
+            if let price = item.energyPriceInEURPerKWh {
+                Spacer()
+                Label(String(format: "%.3f €/kWh", price), systemImage: "bolt")
+            }
         case .valve:
             if let valveOpen = item.valveOpen {
                 Spacer()

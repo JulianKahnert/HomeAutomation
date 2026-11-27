@@ -275,14 +275,11 @@ public func configure(_ app: Application) async throws {
                                         onReportedChange: { [continuation = app.homeEventsContinuation] item in
         continuation.yield(.change(entity: item))
     },
-                                        outdoorTemperature: { [logger = app.logger] in
-        // The same rows the OutdoorTemperatureJob writes for this location.
-        do {
-            return try await weatherHours.latestTemperature(locationKey: OutdoorTemperatureJob.locationKey(for: location), at: Date())
-        } catch {
-            logger.error("Failed to read the outdoor temperature", metadata: ["error": "\(error)"])
-            return nil
-        }
+                                        outdoorTemperature: { [app] in
+        // The state the OutdoorTemperatureJob reports.
+        await app.homeManager.states(of: CharacteristicsType.temperatureSensor.valueKind)
+            .first { $0.entityId == OutdoorTemperatureJob.entityId }?
+            .temperatureInC?.value
     })
     app.homeManager = homeManager
     // Before the event processing job starts and before `.serverStarted`, which reads current states.
@@ -312,9 +309,18 @@ public func configure(_ app: Application) async throws {
     let valveJob = ValveJob(listThermostats: { try await homeManager.listThermostats() },
                             readThermostat: { try await homeManager.readThermostat($0) },
                             feed: { [continuation = app.homeEventsContinuation] in continuation.yield(.change(entity: $0)) })
-    let scheduler = Scheduler(jobs: [OutdoorTemperatureJob(location: location, hours: weatherHours),
-                                     LaneBacklogJob(automationService: automationService),
-                                     valveJob])
+    let report: @Sendable (EntityId, Value, Origin) async -> Bool = { [homeManager] in
+        await homeManager.report($0, value: $1, origin: $2)
+    }
+    var scheduledJobs: [any ScheduledJob] = [OutdoorTemperatureJob(location: location, hours: weatherHours, report: report),
+                                             LaneBacklogJob(automationService: automationService),
+                                             valveJob]
+    if let tibber = TibberService() {
+        scheduledJobs.append(EnergyPriceJob(currentPrice: { date in
+            try await tibber.getPricesToday().first { $0.time.contains(date) }?.price
+        }, report: report))
+    }
+    let scheduler = Scheduler(jobs: scheduledJobs)
     app.scheduler = scheduler
     Task.detached {
         await scheduler.run()

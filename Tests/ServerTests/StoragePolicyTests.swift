@@ -17,7 +17,7 @@ struct StoragePolicyTests {
 
     @Test(arguments: [CharacteristicsType.temperatureSensor, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration, .heating, .valve,
                       .relativeHumiditySensor, .contactSensor, .batterySensor, .lock, .motionSensor, .switcher,
-                      .brightness, .colorTemperature, .color, .airQualitySensor, .pmDensitySensor])
+                      .brightness, .colorTemperature, .color, .airQualitySensor, .pmDensitySensor, .energyPrice])
     func keepsRawForeverWithoutRollupOrDeadBand(_ type: CharacteristicsType) {
         let policy = StoragePolicy.policy(for: type)
         #expect(policy.rawRetentionDays == nil)

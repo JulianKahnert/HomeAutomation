@@ -14,6 +14,12 @@ public extension EntityId {
         EntityId(placeId: serverOwnedPlaceId, name: name, characteristicsName: nil, characteristic: characteristic)
     }
 
+    /// The current outdoor temperature, reported hourly by the server's `OutdoorTemperatureJob`.
+    static let outdoorTemperature = serverOwned(name: "outdoor", characteristic: .temperatureSensor)
+
+    /// The current electricity price, reported by the server's `EnergyPriceJob`.
+    static let electricityPrice = serverOwned(name: "electricityPrice", characteristic: .energyPrice)
+
     /// Whether the server keeps this entity itself. `POST /config` accepts it without HomeKit knowing it (ADR-009).
     var isServerOwned: Bool { placeId == Self.serverOwnedPlaceId }
 }

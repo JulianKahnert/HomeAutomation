@@ -31,6 +31,7 @@ public extension EntityStorageItem {
         if let heatingMode { return make(.heatingMode, .number(Double(heatingMode.rawValue))) }
         if let valvePositionPercent { return make(.valvePosition, .number(Double(valvePositionPercent))) }
         if let temperatureCalibrationInC { return make(.temperatureCalibration, .number(temperatureCalibrationInC)) }
+        if let energyPriceInEURPerKWh { return make(.energyPrice, .number(energyPriceInEURPerKWh)) }
         return nil
     }
 
@@ -72,6 +73,7 @@ public extension EntityStorageItem {
             created = int().flatMap(HeatingMode.init(rawValue:)).map { .init(entityId: entityId, timestamp: timestamp, heatingMode: $0, origin: origin) }
         case .valvePosition: created = int().map { .init(entityId: entityId, timestamp: timestamp, valvePositionPercent: $0, origin: origin) }
         case .temperatureCalibration: created = number().map { .init(entityId: entityId, timestamp: timestamp, temperatureCalibrationInC: $0, origin: origin) }
+        case .energyPrice: created = number().map { .init(entityId: entityId, timestamp: timestamp, energyPriceInEURPerKWh: $0, origin: origin) }
         }
         guard let created else { return nil }
         self = created
@@ -103,6 +105,7 @@ public extension EntityStorageItem {
         case .heatingMode: heatingMode.map { .number(Double($0.rawValue)) }
         case .valvePosition: valvePositionPercent.map { .number(Double($0)) }
         case .temperatureCalibration: temperatureCalibrationInC.map { .number($0) }
+        case .energyPrice: energyPriceInEURPerKWh.map { .number($0) }
         }
     }
 }

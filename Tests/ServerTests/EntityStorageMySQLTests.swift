@@ -60,8 +60,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         let homeManager = await HomeManager(getAdapter: { nil },
                                             storageRepo: repository,
                                             notificationSender: SilentSender(),
-                                            location: Location(latitude: 52.52, longitude: 13.405),
-                                            actionLogManager: ActionLogManager())
+                                            location: Location(latitude: 52.52, longitude: 13.405))
         app.homeManager = homeManager
         try routes(app)
         let id = EntityId(placeId: "Kitchen", name: "Sensor", characteristicsName: nil, characteristic: .temperatureSensor)

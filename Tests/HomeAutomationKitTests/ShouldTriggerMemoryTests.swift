@@ -61,7 +61,6 @@ struct ShouldTriggerMemoryTests {
                           storageRepo: repositories,
                           notificationSender: MockNotificationSender(),
                           location: Location(latitude: 0, longitude: 0),
-                          actionLogManager: ActionLogManager(),
                           heatingWrites: repositories,
                           fireplaceSwitches: repositories,
                           retryTicks: AsyncStream { _ in })
@@ -142,7 +141,6 @@ struct ShouldTriggerMemoryTests {
                                             storageRepo: stored,
                                             notificationSender: MockNotificationSender(),
                                             location: Location(latitude: 0, longitude: 0),
-                                            actionLogManager: ActionLogManager(),
                                             retryTicks: AsyncStream { _ in })
         await homeManager.loadCurrentStates(timeout: .seconds(2))
 

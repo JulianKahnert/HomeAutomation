@@ -148,6 +148,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateFireplaceSwitch())
     app.migrations.add(AddOrigin())
     app.migrations.add(CreateJournal())
+    app.migrations.add(CreateNarrowStorage())
 
     // Run migrations automatically
     try await app.autoMigrate()

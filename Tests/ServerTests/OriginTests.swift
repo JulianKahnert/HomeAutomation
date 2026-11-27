@@ -26,10 +26,12 @@ struct OriginTests {
     }
 
     @Test("A stored state keeps its origin", arguments: [Origin.homekit, Origin.server, Origin.job("valves")])
-    func storedStateKeepsOrigin(origin: Origin) {
+    func storedStateKeepsOrigin(origin: Origin) throws {
         let item = EntityStorageItem(entityId: entityId, isDeviceOn: true, origin: origin)
+        let entity = EntityDbItem(placeId: entityId.placeId, serviceName: entityId.name, characteristicType: entityId.characteristicType.rawValue, characteristicsName: entityId.characteristicsName)
+        let change = EntityChangeDbItem(entityId: UUID(), timestamp: item.timestamp, value: .bool(true), origin: item.origin.rawValue)
 
-        let restored = EntityStorageDbRepository.mapDbItem(EntityStorageDbRepository.map(item))
+        let restored = try #require(EntityStorageItem(entity: entity, change: change))
 
         #expect(restored.origin == origin)
     }

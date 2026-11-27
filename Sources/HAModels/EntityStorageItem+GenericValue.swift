@@ -77,3 +77,32 @@ public extension EntityStorageItem {
         self = created
     }
 }
+
+public extension EntityStorageItem {
+    /// The value of the field that belongs to `type`, `nil` when it is not set. Unlike ``genericValue`` it never
+    /// picks another field of the item.
+    func value(of type: CharacteristicsType) -> Value? {
+        switch type {
+        case .motionSensor: motionDetected.map { .bool($0) }
+        case .lightSensor: _illuminanceInLux.map { .number($0) }
+        case .switcher: isDeviceOn.map { .bool($0) }
+        case .brightness: brightness.map { .number(Double($0)) }
+        case .colorTemperature: colorTemperature.map { .number(Double($0)) }
+        case .color: color.map { .text("\($0.red) \($0.green) \($0.blue)") }
+        case .contactSensor: isContactOpen.map { .bool($0) }
+        case .lock: isDoorLocked.map { .bool($0) }
+        case .batterySensor: stateOfCharge.map { .number(Double($0)) }
+        case .heating: isHeaterActive.map { .bool($0) }
+        case .temperatureSensor: _temperatureInC.map { .number($0) }
+        case .relativeHumiditySensor: relativeHumidity.map { .number($0) }
+        case .carbonDioxideSensorId: carbonDioxideSensorId.map { .number(Double($0)) }
+        case .pmDensitySensor: pmDensity.map { .number($0) }
+        case .airQualitySensor: airQuality.map { .number(Double($0)) }
+        case .valve: valveOpen.map { .bool($0) }
+        case .targetTemperature: targetTemperatureInC.map { .number($0) }
+        case .heatingMode: heatingMode.map { .number(Double($0.rawValue)) }
+        case .valvePosition: valvePositionPercent.map { .number(Double($0)) }
+        case .temperatureCalibration: temperatureCalibrationInC.map { .number($0) }
+        }
+    }
+}

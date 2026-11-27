@@ -58,7 +58,7 @@ struct DatabaseStorageUpkeep: StorageUpkeep, Log {
     private func rollUp(now: Date) async {
         for target in StoragePolicy.rollupCutoffs(now: now) {
             do {
-                try await entities.rollUpHourly(type: target.type, column: target.column, validRange: target.validRange, olderThan: target.before)
+                try await entities.rollUpHourly(type: target.type, validRange: target.validRange, olderThan: target.before)
             } catch {
                 log.error("Hourly rollup of \(target.type.rawValue) failed: \(error)")
             }

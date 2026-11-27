@@ -31,7 +31,7 @@ struct GenericHistoryValueTests {
     }
 
     @Test func typedFieldsStillGiveTheGenericValue() {
-        let item = EntityHistoryItem(timestamp: date, temperatureInC: 19)
+        let item = EntityHistoryItem(timestamp: date, valueKind: "temperatureSensor", value: .number(19))
         #expect(item.valueKind == "temperatureSensor")
         #expect(item.value == .number(19))
         #expect(item.primaryValue == 19)

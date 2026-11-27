@@ -11,7 +11,7 @@ import Fluent
 /// Adds support for temperature, humidity, CO2, PM2.5, air quality, brightness, color temperature, color, and valve state
 struct AddSensorFields: AsyncMigration {
     func prepare(on database: Database) async throws {
-        try await database.schema(EntityStorageDbItem.schema)
+        try await database.schema(LegacyEntityItems.schema)
             .field("brightness", .int)
             .field("colorTemperature", .float)
             .field("colorRed", .float)
@@ -27,7 +27,7 @@ struct AddSensorFields: AsyncMigration {
     }
 
     func revert(on database: Database) async throws {
-        try await database.schema(EntityStorageDbItem.schema)
+        try await database.schema(LegacyEntityItems.schema)
             .deleteField("brightness")
             .deleteField("colorTemperature")
             .deleteField("colorRed")

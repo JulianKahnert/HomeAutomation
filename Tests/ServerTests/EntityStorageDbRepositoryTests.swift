@@ -66,12 +66,12 @@ struct EntityStorageMappingTests {
         #expect(EntityStorageItem(entity: entity, change: change) == nil)
     }
 
-    @Test("value(of:) ignores fields of other types")
+    @Test("value(of:) ignores values of other kinds")
     func valueOfType() {
         let id = EntityId(placeId: "A", name: "B", characteristicsName: nil, characteristic: .temperatureSensor)
-        let item = EntityStorageItem(entityId: id, temperatureInC: .init(value: 20, unit: .celsius), relativeHumidity: 40)
+        let item = EntityStorageItem(entityId: id, temperatureInC: .init(value: 20, unit: .celsius))
         #expect(item.value(of: .temperatureSensor) == .number(20))
-        #expect(item.value(of: .relativeHumiditySensor) == .number(40))
+        #expect(item.value(of: .relativeHumiditySensor) == nil)
         #expect(item.value(of: .motionSensor) == nil)
     }
 }

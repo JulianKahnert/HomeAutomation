@@ -12,7 +12,7 @@ struct StateIntervalsTests {
     private var end: Date { start.addingTimeInterval(1_000) }
 
     private func item(_ offset: TimeInterval, _ isOn: Bool?) -> EntityHistoryItem {
-        EntityHistoryItem(timestamp: start.addingTimeInterval(offset), isDeviceOn: isOn)
+        EntityHistoryItem(timestamp: start.addingTimeInterval(offset), valueKind: isOn == nil ? nil : "switcher", value: isOn.map { .bool($0) })
     }
 
     @Test func previousStateStartsAtLeftEdgeAndOpenEndClosesAtTo() {

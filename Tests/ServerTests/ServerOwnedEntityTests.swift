@@ -121,7 +121,8 @@ final class ServerOwnedEntityTests: XCTestCase {
         }
         let history = try JSONDecoder().decode(History.self, from: body)
         XCTAssertEqual(history.items.count, 1)
-        XCTAssertEqual(history.items.first?.isDeviceOn, true)
+        XCTAssertEqual(history.items.first?.valueKind, "switcher")
+        XCTAssertEqual(history.items.first?.value, true)
     }
 
     private func get(_ path: String) async throws -> Data {
@@ -145,7 +146,8 @@ final class ServerOwnedEntityTests: XCTestCase {
 
     private struct History: Decodable {
         struct Item: Decodable {
-            let isDeviceOn: Bool?
+            let valueKind: String?
+            let value: Bool?
         }
         let items: [Item]
     }

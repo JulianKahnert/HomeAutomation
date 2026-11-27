@@ -28,7 +28,7 @@ protocol EntityRetentionStore: Sendable {
 
     /// Aggregates the raw rows of `type` older than `date` per entity and hour, then deletes them,
     /// in one transaction. Values outside `validRange` are dropped.
-    func rollUpHourly(type: CharacteristicsType, column: StoragePolicy.ValueColumn, validRange: ClosedRange<Double>?, olderThan date: Date) async throws
+    func rollUpHourly(type: CharacteristicsType, validRange: ClosedRange<Double>?, olderThan date: Date) async throws
 
     /// Entities with more than `limit` rows since `date`. Types stay strings, so a type this server
     /// version does not know is counted too.

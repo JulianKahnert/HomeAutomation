@@ -18,8 +18,8 @@ struct EntityHistoryDetailFeatureTests {
     /// "missing element" warning); every page has to arrive from one effect.
     @Test("refresh loads every page from one effect")
     func refreshLoadsAllPages() async {
-        let first = EntityHistoryItem(timestamp: Date(timeIntervalSince1970: 10), temperatureInC: 21)
-        let second = EntityHistoryItem(timestamp: Date(timeIntervalSince1970: 5), temperatureInC: 20)
+        let first = EntityHistoryItem(timestamp: Date(timeIntervalSince1970: 10), valueKind: "temperatureSensor", value: .number(21))
+        let second = EntityHistoryItem(timestamp: Date(timeIntervalSince1970: 5), valueKind: "temperatureSensor", value: .number(20))
         let store = TestStore(initialState: EntityHistoryDetailFeature.State(entity: entity)) {
             EntityHistoryDetailFeature()
         } withDependencies: {

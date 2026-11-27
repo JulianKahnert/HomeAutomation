@@ -9,7 +9,7 @@ import Fluent
 
 struct CreateEntityStorageDbItem: AsyncMigration {
     func prepare(on database: Database) async throws {
-        try await database.schema(EntityStorageDbItem.schema)
+        try await database.schema(LegacyEntityItems.schema)
             .id()
             .field("timestamp", .datetime, .required)
             .field("entityPlaceId", .string, .required)
@@ -27,6 +27,6 @@ struct CreateEntityStorageDbItem: AsyncMigration {
     }
 
     func revert(on database: Database) async throws {
-        try await database.schema(EntityStorageDbItem.schema).delete()
+        try await database.schema(LegacyEntityItems.schema).delete()
     }
 }

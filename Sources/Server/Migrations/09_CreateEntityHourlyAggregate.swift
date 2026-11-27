@@ -30,7 +30,7 @@ struct CreateEntityHourlyAggregate: AsyncMigration {
 
         // Without it, selecting one type's old rows walks every old row of all types kept forever.
         try await Self.sqlDatabase(database).create(index: Self.typeTimestampIndex)
-            .on(EntityStorageDbItem.schema)
+            .on(LegacyEntityItems.schema)
             .column("entityCharacteristicType")
             .column("timestamp")
             .run()
@@ -38,7 +38,7 @@ struct CreateEntityHourlyAggregate: AsyncMigration {
 
     func revert(on database: Database) async throws {
         try await Self.sqlDatabase(database).drop(index: Self.typeTimestampIndex)
-            .on(EntityStorageDbItem.schema)
+            .on(LegacyEntityItems.schema)
             .run()
         try await database.schema(EntityHourlyAggregate.schema).delete()
     }

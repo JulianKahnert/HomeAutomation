@@ -39,6 +39,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         app.migrations.add(AddOrigin())
         app.migrations.add(CreateJournal())
         app.migrations.add(CreateNarrowStorage())
+        app.migrations.add(DropEntityItems())
         try await app.autoMigrate()
     }
 
@@ -127,12 +128,13 @@ final class EntityStorageMySQLTests: XCTestCase {
         }
     }
 
-    func testOldTableIsNotWritten() async throws {
+    func testOldTableIsGone() async throws {
         let repository = app.entityStorageDbRepository
         let id = EntityId(placeId: "Hall", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
         try await repository.add(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_000), isDeviceOn: true))
 
-        let old = try await EntityStorageDbItem.query(on: app.db).count()
+        let sql = try XCTUnwrap(app.db as? SQLDatabase)
+        let old = try await sql.raw("SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityItems'").all().count
         let entities = try await EntityDbItem.query(on: app.db).count()
         let changes = try await EntityChangeDbItem.query(on: app.db).count()
 
@@ -240,7 +242,6 @@ final class EntityStorageMySQLTests: XCTestCase {
         try await insertRaw(lux, minutes: 10, lux: 0)
 
         try await repository.rollUpHourly(type: .carbonDioxideSensorId,
-                                          column: .carbonDioxideSensorId,
                                           validRange: StoragePolicy.policy(for: .carbonDioxideSensorId).validRange,
                                           olderThan: hour.addingTimeInterval(2 * 3600))
 
@@ -261,9 +262,9 @@ final class EntityStorageMySQLTests: XCTestCase {
         let repository = app.entityStorageDbRepository
         let cutoff = hour.addingTimeInterval(3600)
         try await insertRaw(co2, minutes: 10, co2: 400)
-        try await repository.rollUpHourly(type: .carbonDioxideSensorId, column: .carbonDioxideSensorId, validRange: 1...100_000, olderThan: cutoff)
+        try await repository.rollUpHourly(type: .carbonDioxideSensorId, validRange: 1...100_000, olderThan: cutoff)
         try await insertRaw(co2, minutes: 30, co2: 800)
-        try await repository.rollUpHourly(type: .carbonDioxideSensorId, column: .carbonDioxideSensorId, validRange: 1...100_000, olderThan: cutoff)
+        try await repository.rollUpHourly(type: .carbonDioxideSensorId, validRange: 1...100_000, olderThan: cutoff)
 
         let aggregates = try await repository.hourlyAggregates(of: co2)
         XCTAssertEqual(aggregates, [EntityHourlyAggregate(entityId: co2, hourStart: hour, minValue: 400, meanValue: 600, maxValue: 800, lastValue: 800, valueCount: 2)])

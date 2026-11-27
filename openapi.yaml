@@ -265,21 +265,6 @@ paths:
         "400":
           description: Bad request - invalid parameters.
 
-  /entities:
-    get:
-      summary: Get entities with history
-      description: Retrieve a list of all entities that have historical data available.
-      operationId: getEntitiesWithHistory
-      responses:
-        "200":
-          description: A success response with all entities that have history.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/EntityInfo"
-
   /entities/history:
     get:
       summary: Get entity history
@@ -819,17 +804,6 @@ components:
       required:
         - items
 
-    EntityInfo:
-      type: object
-      properties:
-        id:
-          type: string
-          description: Unique identifier composed of placeId, name, and characteristic type.
-        entityId:
-          $ref: "#/components/schemas/EntityId"
-      required:
-        - id
-        - entityId
     HeatingRoomDetail:
       type: object
       required: [placeId, name, range, istSource, radiators, samples]

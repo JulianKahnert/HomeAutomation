@@ -96,27 +96,3 @@ struct RoomsFeatureTests {
         #expect(state.rooms.map(\.placeId) == ["Bath"])
     }
 }
-
-@Suite("ActionsFeature")
-struct ActionsFeatureTests {
-    @Test("command log filter matches status, falling back to the cache flag for old servers")
-    func filterMatchesStatus() {
-        let entityId = EntityId(placeId: "Hall", name: "Light", characteristicsName: nil, characteristic: .switcher)
-        func item(_ status: ActionLogItem.Status?, cached: Bool = false) -> ActionLogItem {
-            ActionLogItem(
-                id: UUID(),
-                timestamp: Date(),
-                entityId: entityId,
-                actionName: "on",
-                detailDescription: "turnOn",
-                hasCacheHit: cached,
-                status: status
-            )
-        }
-
-        #expect(ActionsFeature.Filter.fresh.matches(item(nil)))
-        #expect(ActionsFeature.Filter.cache.matches(item(.cacheHit, cached: true)))
-        #expect(ActionsFeature.Filter.failed.matches(item(.failed)))
-        #expect(!ActionsFeature.Filter.fresh.matches(item(.failed)))
-    }
-}

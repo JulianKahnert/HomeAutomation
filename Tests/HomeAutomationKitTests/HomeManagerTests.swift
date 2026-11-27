@@ -307,7 +307,7 @@ struct HomeManagerTests {
 
         #expect(await probe.startedPerforms == 0)
         await journal.flush()
-        #expect(await homeManager.getActionLog(limit: nil, runId: nil).isEmpty)
+        #expect(await journal.commands(limit: nil, runId: nil).isEmpty)
     }
 
     @Test("Cancelling a run does not abort a command that already started")
@@ -430,7 +430,7 @@ struct HomeManagerTests {
         try? await Task.sleep(for: .milliseconds(200))
 
         await journal.flush()
-        let log = await homeManager.getActionLog(limit: nil, runId: runId)
+        let log = await journal.commands(limit: nil, runId: runId)
         #expect(log.count == 3)
         #expect(log.allSatisfy { $0.status == .failed })
     }

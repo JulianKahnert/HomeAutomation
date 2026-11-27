@@ -37,12 +37,6 @@ struct ServerClientDependency: Sendable {
     /// Runs of all automations since a date, newest first
     var getRecentRuns: @Sendable (_ since: Date, _ limit: Int?) async throws -> [AutomationRun]
 
-    /// Get action log items, optionally only those sent by one run
-    var getActions: @Sendable (_ limit: Int?, _ runId: UUID?) async throws -> [ActionLogItem]
-
-    /// Clear all action log items
-    var clearActions: @Sendable () async throws -> Void
-
     /// Get the offenen Fenster as the server's Live Activity content state, in server order
     var getWindowContentState: @Sendable () async throws -> WindowContentState
 
@@ -92,8 +86,6 @@ extension ServerClientDependency: TestDependencyKey {
         isHealthy: { true },
         getRuns: { _, _, _, _ in [] },
         getRecentRuns: { _, _ in [] },
-        getActions: { _, _ in [] },
-        clearActions: { },
         getWindowContentState: { .empty },
         registerDevice: { _ in },
         getEntityIdsWithHistory: { [] },
@@ -120,19 +112,6 @@ extension ServerClientDependency: TestDependencyKey {
         isHealthy: { true },
         getRuns: { name, _, _, _ in previewRuns.filter { $0.automationName == name } },
         getRecentRuns: { _, _ in previewRuns },
-        getActions: { _, _ in
-            [
-                ActionLogItem(
-                    id: UUID(),
-                    timestamp: Date(),
-                    entityId: EntityId(placeId: "living-room", name: "Main Light", characteristicsName: "switcher", characteristic: .switcher),
-                    actionName: "Turn On",
-                    detailDescription: "Turned on living room light",
-                    hasCacheHit: false
-                )
-            ]
-        },
-        clearActions: { },
         getWindowContentState: {
             let opened = Date().addingTimeInterval(-3600)
             return WindowContentState(sortedWindows: [
@@ -282,12 +261,6 @@ extension ServerClientDependency: DependencyKey {
         },
         getRecentRuns: { since, limit in
             try await client.getRecentRuns(since: since, limit: limit)
-        },
-        getActions: { limit, runId in
-            try await client.getActions(limit: limit, runId: runId)
-        },
-        clearActions: {
-            try await client.clearActions()
         },
         getWindowContentState: {
             try await client.getWindowContentState()

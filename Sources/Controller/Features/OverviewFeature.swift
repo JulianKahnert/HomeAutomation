@@ -28,7 +28,6 @@ struct OverviewFeature: Sendable {
         var isHealthy: Bool
         var automations: [AutomationInfo]
         var runs: [AutomationRun]
-        var actions: [ActionLogItem]
     }
 
     @ObservableState
@@ -38,21 +37,8 @@ struct OverviewFeature: Sendable {
         var lastUpdated: Date?
         /// Last 24 hours, newest first.
         var recentRuns: [AutomationRun] = []
-        /// Last 24 hours, newest first.
-        var recentActions: [ActionLogItem] = []
         var error: String?
         var path = StackState<OverviewPath.State>()
-
-        /// Failed runs, then devices whose commands failed.
-        var hints: [String] {
-            let runs = recentRuns
-                .filter { $0.outcome == .failed }
-                .map { "\($0.automationName) failed: \($0.errorDescription ?? "unknown error")" }
-            let devices = Dictionary(grouping: recentActions.filter { $0.status == .failed }, by: \.entityId)
-                .map { "\($0.key.name) (\($0.key.placeId)): \($0.value.count) failed commands" }
-                .sorted()
-            return runs + devices
-        }
     }
 
     enum Action: Sendable {
@@ -95,12 +81,10 @@ struct OverviewFeature: Sendable {
                         async let isHealthy = serverClient.isHealthy()
                         async let automations = serverClient.getAutomations()
                         async let runs = serverClient.getRecentRuns(since, 200)
-                        async let actions = serverClient.getActions(1000, nil)
                         return try await Snapshot(
                             isHealthy: isHealthy,
                             automations: automations,
-                            runs: runs,
-                            actions: actions.filter { $0.timestamp >= since }
+                            runs: runs
                         )
                     }))
                 }
@@ -110,7 +94,6 @@ struct OverviewFeature: Sendable {
                 state.isHealthy = snapshot.isHealthy
                 state.lastUpdated = now
                 state.recentRuns = snapshot.runs
-                state.recentActions = snapshot.actions
                 state.$automations.withLock {
                     $0 = IdentifiedArrayOf(uniqueElements: snapshot.automations.sorted { $0.name < $1.name })
                 }
@@ -214,21 +197,8 @@ struct OverviewView: View {
                     }
                     NavigationLink(
                         "Show All",
-                        state: OverviewPath.State.feed(ActivityFeedFeature.State(runs: store.recentRuns, actions: store.recentActions))
+                        state: OverviewPath.State.feed(ActivityFeedFeature.State(runs: store.recentRuns))
                     )
-                }
-
-                if !store.hints.isEmpty {
-                    Section("Notices") {
-                        ForEach(store.hints, id: \.self) { hint in
-                            Label {
-                                Text(hint)
-                            } icon: {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundStyle(.red)
-                            }
-                        }
-                    }
                 }
             }
             .navigationTitle("Overview")

@@ -270,13 +270,6 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         windowOpenStates[entityId] = state
     }
 
-    func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {
-        return []
-    }
-
-    func clearActionLog() async {
-    }
-
     func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws {
         upkeepSteps.append(step)
     }

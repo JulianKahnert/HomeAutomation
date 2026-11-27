@@ -122,37 +122,6 @@ public struct ServerClient {
                                   staleDate: try body.staleDateIsoTimeStamp.map { try Date($0, strategy: .iso8601) })
     }
 
-    public func getActions(limit: Int? = nil, runId: UUID? = nil) async throws -> [ActionLogItem] {
-        let response = try await client.getActions(query: .init(limit: limit, runId: runId?.uuidString))
-        return try response.ok.body.json.compactMap { item -> ActionLogItem? in
-            guard let id = UUID(uuidString: item.id),
-                  let characteristic = CharacteristicsType(rawValue: item.entityId.characteristicType) else {
-                print("Failed to parse characteristic")
-                assertionFailure("Failed to parse characteristic")
-                return nil
-            }
-            let entityId = EntityId(placeId: item.entityId.placeId,
-                                    name: item.entityId.name,
-                                    characteristicsName: item.entityId.characteristicsName,
-                                    characteristic: characteristic)
-            return ActionLogItem(id: id,
-                                 timestamp: item.timestamp,
-                                 entityId: entityId,
-                                 actionName: item.actionName,
-                                 detailDescription: item.detailDescription,
-                                 hasCacheHit: item.hasCacheHit,
-                                 runId: item.runId.flatMap(UUID.init(uuidString:)),
-                                 status: item.status.flatMap { ActionLogItem.Status(rawValue: $0.rawValue) },
-                                 reason: item.reason.flatMap { HeatingWriteReason(rawValue: $0.rawValue) },
-                                 planTargetInC: item.planTargetInC)
-        }
-    }
-
-    public func clearActions() async throws {
-        let response = try await client.clearActions()
-        _ = try response.ok
-    }
-
     public func getEntityIdsWithHistory() async throws -> [EntityInfo] {
         let response = try await client.getEntitiesWithHistory()
         return try response.ok.body.json.compactMap { entity -> EntityInfo? in

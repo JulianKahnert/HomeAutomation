@@ -320,9 +320,15 @@ public final class HomeManager: HomeManagable {
                                   reason: heating?.reason,
                                   planTargetInC: heating?.planTargetInC)
         journal.recordCommand(entry)
+        log.info("Command", metadata: [
+            "entity": "\(action.entityId)",
+            "action": "\(action.actionName)",
+            "reason": "\(heating?.reason.rawValue ?? "none")",
+            "run": "\(runId?.uuidString ?? "none")",
+            "cacheHit": "\(hasCacheHit)"
+        ])
 
         if hasCacheHit {
-            log.info("Skipping duplicate command: [\(action)]")
             return
         }
 
@@ -595,14 +601,6 @@ public final class HomeManager: HomeManagable {
 
     public func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
         await windowManager.setWindowOpenState(entityId: entityId, to: state)
-    }
-
-    public func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {
-        await journal.commands(limit: limit, runId: runId)
-    }
-
-    public func clearActionLog() async {
-        await journal.clearCommands()
     }
 
     public func homeKitHealth() async -> HomeKitHealth {

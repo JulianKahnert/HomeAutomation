@@ -12,7 +12,7 @@ import Logging
 import SQLKit
 import Vapor
 
-final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
+final class EntityStorageDbRepository: StorageRepository, Sendable {
     /// Resolved per query: a captured `app.db` is bound to one event loop and so to that loop's
     /// connection pool, which would funnel every query of this long-lived repository through it.
     let database: @Sendable () -> any Database

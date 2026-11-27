@@ -85,6 +85,25 @@ struct SchedulerTests {
         task.cancel()
     }
 
+    @Test func aLateWakeUpSkipsTheMissedMinutes() async {
+        let clock = ManualClock(t0)
+        await clock.advance(to: t0)
+        let seen = Recorder()
+        let scheduler = Scheduler(clock: clock, jobs: [TestJob { seen.add($0) }])
+        let task = Task { await scheduler.run() }
+        await eventually { await clock.sleepingUntil == [Date(timeIntervalSince1970: 6060)] }
+
+        // Ten minutes late: the job runs once for the minute it woke for, then waits for the next full minute.
+        let late = Date(timeIntervalSince1970: 6060 + 600 + 20)
+        await clock.advance(to: late)
+        await eventually { seen.dates.count == 1 }
+
+        await eventually { await clock.sleepingUntil == [Date(timeIntervalSince1970: 6720)] }
+        #expect(await clock.sleepingUntil == [Date(timeIntervalSince1970: 6720)])
+        #expect(seen.dates == [Date(timeIntervalSince1970: 6060)])
+        task.cancel()
+    }
+
     @Test func cadenceSelectsTheMinutes() async {
         let seen = Recorder()
         let scheduler = Scheduler(clock: ManualClock(t0), jobs: [TestJob(cadence: .minutes(5)) { seen.add($0) }])

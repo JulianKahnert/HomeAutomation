@@ -1,6 +1,7 @@
 import HAImplementations
 import HAModels
 import OpenAPIVapor
+import Shared
 import SQLKit
 import Vapor
 
@@ -34,39 +35,28 @@ func routes(_ app: Application) throws {
 
         // Race the health checks against a hard timeout so the Docker healthcheck always gets a
         // fast, definitive answer (503 peer-not-up / 504 timeout) instead of hanging.
-        return try await withThrowingTaskGroup(of: Response.self) { group in
-            group.addTask {
-                try await sql.raw("SELECT 1").run()
+        // Not a task group: it waits for every child, and a stuck query does not react to cancellation.
+        return try await raceTimeout(.seconds(5), timeoutError: { Abort(.gatewayTimeout, reason: "Health check timed out") }) {
+            try await sql.raw("SELECT 1").run()
 
-                let connectionStatus = system.latestConnectionStatus
-                guard connectionStatus == .up else {
-                    throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(connectionStatus.rawValue)")
-                }
-
-                // The link can stay up while macOS has cut the adapter off from HomeKit.
-                if case .degraded(let reason) = await homeManager.homeKitHealth() {
-                    throw Abort(.serviceUnavailable, reason: "HomeKit degraded: \(reason)")
-                }
-                // Last success per scheduled job, so a dead source is visible (nil until first success).
-                let jobs = await scheduler?.lastSuccesses ?? [:]
-                let body = HealthDTO(jobs: jobs.mapValues { $0.formatted(.iso8601) },
-                                     loopAgeSeconds: gauge.age(),
-                                     laneAgeSeconds: await automationService.laneAges(),
-                                     lastReports: await homeManager.lastReports().mapValues { $0.formatted(.iso8601) })
-                let response = Response(status: .ok)
-                try response.content.encode(body, as: .json)
-                return response
-            }
-            group.addTask {
-                try await Task.sleep(for: .seconds(5))
-                throw Abort(.gatewayTimeout, reason: "Health check timed out")
+            let connectionStatus = system.latestConnectionStatus
+            guard connectionStatus == .up else {
+                throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(connectionStatus.rawValue)")
             }
 
-            defer { group.cancelAll() }
-            guard let result = try await group.next() else {
-                throw Abort(.internalServerError)
+            // The link can stay up while macOS has cut the adapter off from HomeKit.
+            if case .degraded(let reason) = await homeManager.homeKitHealth() {
+                throw Abort(.serviceUnavailable, reason: "HomeKit degraded: \(reason)")
             }
-            return result
+            // Last success per scheduled job, so a dead source is visible (nil until first success).
+            let jobs = await scheduler?.lastSuccesses ?? [:]
+            let body = HealthDTO(jobs: jobs.mapValues { $0.formatted(.iso8601) },
+                                 loopAgeSeconds: gauge.age(),
+                                 laneAgeSeconds: await automationService.laneAges(),
+                                 lastReports: await homeManager.lastReports().mapValues { $0.formatted(.iso8601) })
+            let response = Response(status: .ok)
+            try response.content.encode(body, as: .json)
+            return response
         }
     }
 

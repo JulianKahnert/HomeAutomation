@@ -5,6 +5,7 @@
 
 import Foundation
 import HAApplicationLayer
+import HAImplementations
 @testable import HAModels
 @testable import Server
 import Testing
@@ -109,20 +110,48 @@ struct StoragePolicyTests {
         #expect(exact.timeIntervalSince(co2.before) < 3600)
     }
 
-    @Test func cleanupJobDeletesOldJournalEntriesAndRollupJobCondensesLuxAndCO2() async {
+    @Test func upkeepStepsDeleteOldJournalEntriesAndCondenseLuxAndCO2() async throws {
         let store = RecordingRetentionStore()
         let runs = RecordingRunDeleter()
-        let journal = Journal(store: runs)
-        let job = DatabaseCleanupJob(entities: store,
-                                     journal: journal,
-                                     noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender()))
+        let upkeep = DatabaseStorageUpkeep(entities: store,
+                                           journal: Journal(store: runs),
+                                           noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender()))
 
-        await job.performCleanup(now: now)
-        await EntityRollupJob(entities: store).rollUpOnce(now: now)
+        try await upkeep.perform(.cleanup, now: now)
+        try await upkeep.perform(.rollup, now: now)
+        try await upkeep.perform(.journal, now: now)
 
         #expect(await store.deletedTypes.isEmpty)
         #expect(Set(await store.rolledUpTypes) == [.lightSensor, .carbonDioxideSensorId])
         #expect(await runs.deletedBefore == [now.addingTimeInterval(-30 * 86_400)])
+    }
+
+    @Test func cleanupAutomationDeletesJournalEntriesOlderThan30DaysAndKeepsNewerOnes() async throws {
+        let store = InMemoryJournalStore()
+        let journal = Journal(store: store)
+        let now = Date()
+        let trigger = AutomationTrigger(kind: .serverStart, entityId: nil, summary: "Server start")
+        let oldRun = AutomationRun(automationName: "Old", startedAt: now.addingTimeInterval(-31 * 86_400), trigger: trigger, outcome: .completed)
+        let newRun = AutomationRun(automationName: "New", startedAt: now.addingTimeInterval(-29 * 86_400), trigger: trigger, outcome: .completed)
+        try await store.add(oldRun)
+        try await store.add(newRun)
+        try await store.addPush(JournalPush(timestamp: now.addingTimeInterval(-31 * 86_400), runId: oldRun.id, title: "Old", message: "", pushId: "old"))
+        try await store.addPush(JournalPush(timestamp: now.addingTimeInterval(-29 * 86_400), runId: newRun.id, title: "New", message: "", pushId: "new"))
+        let homeManager = await HomeManager(getAdapter: { nil },
+                                            storageRepo: EmptyStorage(),
+                                            notificationSender: SilentSender(),
+                                            location: Location(latitude: 0, longitude: 0),
+                                            journal: journal,
+                                            storageUpkeep: DatabaseStorageUpkeep(entities: RecordingRetentionStore(),
+                                                                                 journal: journal,
+                                                                                 noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender())))
+
+        try await AutomationRunContext.$event.withValue(.serverStarted) {
+            try await DatabaseCleanup().execute(using: homeManager)
+        }
+
+        #expect(try await store.latestRuns(since: .distantPast, limit: 10).map(\.automationName) == ["New"])
+        #expect(try await store.pushes(runId: nil).map(\.pushId) == ["new"])
     }
 
     // MARK: - noise guard

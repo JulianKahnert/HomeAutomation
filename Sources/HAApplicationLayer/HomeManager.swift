@@ -26,6 +26,7 @@ public final class HomeManager: HomeManagable {
     private let deliveries: DeliveryQueue
     private let heatingWrites: (any HeatingWriteRepository)?
     private let fireplaceSwitches: (any FireplaceRepository)?
+    private let storageUpkeep: (any StorageUpkeep)?
     /// Tells the automations about a switch of the fireplace; the server yields `HomeEvent.fireplaceChanged`.
     private let onFireplaceSwitch: @Sendable (FireplaceSwitch) -> Void
     /// The newest fireplace switch, loaded once from the database. It also holds a switch the database could
@@ -59,6 +60,7 @@ public final class HomeManager: HomeManagable {
     ///     retries deterministically; the default is a 5s timer.
     ///   - heatingWrites: Where the writes to radiators are recorded with their reason; `nil` records none.
     ///   - fireplaceSwitches: Where the fireplace switches are stored; `nil` keeps them in memory only.
+    ///   - storageUpkeep: What the database upkeep steps do; `nil` does nothing.
     ///   - onFireplaceSwitch: Called after each switch of the fireplace, to tell the automations.
     ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
     ///     than there are delays.
@@ -72,6 +74,7 @@ public final class HomeManager: HomeManagable {
                 commandCache: CommandCache = CommandCache(),
                 heatingWrites: (any HeatingWriteRepository)? = nil,
                 fireplaceSwitches: (any FireplaceRepository)? = nil,
+                storageUpkeep: (any StorageUpkeep)? = nil,
                 onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
                 retryTicks: AsyncStream<Void>? = nil,
                 persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
@@ -86,6 +89,7 @@ public final class HomeManager: HomeManagable {
         self.commandCache = commandCache
         self.heatingWrites = heatingWrites
         self.fireplaceSwitches = fireplaceSwitches
+        self.storageUpkeep = storageUpkeep
         self.onFireplaceSwitch = onFireplaceSwitch
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
@@ -508,6 +512,10 @@ public final class HomeManager: HomeManagable {
     public func homeKitHealth() async -> HomeKitHealth {
         let isConnected = await getAdapter() != nil
         return liveness.evaluate(isConnected: isConnected, at: Date())
+    }
+
+    public func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws {
+        try await storageUpkeep?.perform(step, now: now)
     }
 
     private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?)] {

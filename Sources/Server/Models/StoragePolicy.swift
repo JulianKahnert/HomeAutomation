@@ -91,7 +91,7 @@ struct StoragePolicy: Sendable, Equatable {
     /// Values outside are sensor errors (CO₂ reports 0 ppm) and are left out of the rollup.
     let validRange: ClosedRange<Double>?
 
-    /// Rows stored per entity in 24 hours above which ``DatabaseCleanupJob`` suggests a dead band.
+    /// Rows stored per entity in 24 hours above which ``NoisyEntityWarner`` suggests a dead band.
     /// An `entityItems` row costs about 370 B (data plus index): 285 B measured in production
     /// (81 MB / 285k rows, Nov 2026) plus about 80 B for `idx_entityItems_type_timestamp` (measured on
     /// mysql:9). So 500 rows a day are 500 × 365 × 370 B ≈ 68 MB per entity and year, kept forever.

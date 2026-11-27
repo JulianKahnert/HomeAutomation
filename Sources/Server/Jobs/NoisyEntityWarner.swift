@@ -1,8 +1,6 @@
 //
-//  DatabaseCleanupJob.swift
+//  NoisyEntityWarner.swift
 //  HomeAutomationServer
-//
-//  Created by Claude on 11.11.25.
 //
 
 import Foundation
@@ -10,54 +8,6 @@ import HAApplicationLayer
 import HAModels
 import Logging
 import Shared
-
-/// Once a day: deletes raw entity rows past their type's retention in ``StoragePolicy``, old
-/// journal entries (runs, commands, pushes), and warns about entities that store too many rows.
-///
-/// Heating writes are deliberately kept for good as well: the rows are small and SQL queries over the long
-/// term are the point of recording them.
-///
-/// `weatherHours` are deliberately not touched here or by any other job: they are kept
-/// indefinitely for now.
-struct DatabaseCleanupJob: Job, Log {
-    private static let journalRetentionDays = 30
-    private static let cleanupInterval: Duration = .hours(24) // Run once per day
-
-    let entities: any EntityRetentionStore
-    let journal: Journal
-    let noisyEntityWarner: NoisyEntityWarner
-
-    func run() async {
-        log.info("Starting DatabaseCleanupJob - will run every 24 hours")
-
-        // Run initial cleanup immediately
-        await performCleanup()
-
-        // Schedule periodic cleanup every 24 hours
-        for await _ in Timer.publish(every: Self.cleanupInterval) {
-            await performCleanup()
-        }
-    }
-
-    func performCleanup(now: Date = Date()) async {
-        do {
-            for (type, cutoff) in StoragePolicy.cleanupCutoffs(now: now) {
-                log.info("Deleting \(type.rawValue) entries before \(cutoff)")
-                try await entities.deleteEntries(ofType: type, olderThan: cutoff)
-            }
-            try await journal.deleteEntries(olderThan: now.addingTimeInterval(-1 * Duration.days(Self.journalRetentionDays).timeInterval))
-            log.info("Database cleanup completed successfully")
-        } catch {
-            log.error("Database cleanup failed: \(error)")
-        }
-
-        do {
-            try await noisyEntityWarner.check(entities, now: now)
-        } catch {
-            log.error("Noisy entity check failed: \(error)")
-        }
-    }
-}
 
 /// Pushes a warning when an entity stored more than ``StoragePolicy/noisyEntityRowsPerDay`` rows in
 /// the last 24 hours, so a noisy sensor gets a dead band before it fills the database (CO₂ stored

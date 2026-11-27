@@ -265,6 +265,9 @@ public func configure(_ app: Application) async throws {
                                         journal: journal,
                                         heatingWrites: app.heatingWriteRepository,
                                         fireplaceSwitches: app.fireplaceRepository,
+                                        storageUpkeep: DatabaseStorageUpkeep(entities: app.entityStorageDbRepository,
+                                                                             journal: journal,
+                                                                             noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
                                         onFireplaceSwitch: { [continuation = app.homeEventsContinuation] fireplaceSwitch in
         continuation.yield(.fireplaceChanged(isOn: fireplaceSwitch.isOn))
     },
@@ -285,6 +288,7 @@ public func configure(_ app: Application) async throws {
     let automationService = try AutomationService(using: homeManager,
                                                   runs: app.journalRepository,
                                                   automations: loadedConfig.automations,
+                                                  builtIns: [DatabaseCleanup()],
                                                   repository: app.homeAutomationConfigService)
     app.automationService = automationService
 
@@ -295,11 +299,7 @@ public func configure(_ app: Application) async throws {
                  homeEventsContinuation: app.homeEventsContinuation),
         HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
-                               homeManager: app.homeManager),
-        DatabaseCleanupJob(entities: app.entityStorageDbRepository,
-                           journal: journal,
-                           noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
-        EntityRollupJob(entities: app.entityStorageDbRepository)
+                               homeManager: app.homeManager)
     ]
 
     let scheduler = Scheduler(jobs: [OutdoorTemperatureJob(location: location, hours: weatherHours)])

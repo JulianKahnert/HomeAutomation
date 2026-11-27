@@ -20,8 +20,8 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          EntityStorageDbRepository(database: { self.db })
      }
 
-     var automationRunRepository: AutomationRunDbRepository {
-         AutomationRunDbRepository(database: { self.db })
+     var journalRepository: JournalDbRepository {
+         JournalDbRepository(database: { self.db })
      }
 
      var heatingWriteRepository: HeatingWriteDbRepository {

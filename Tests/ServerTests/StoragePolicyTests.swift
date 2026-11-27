@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import HAApplicationLayer
 @testable import HAModels
 @testable import Server
 import Testing
@@ -108,11 +109,12 @@ struct StoragePolicyTests {
         #expect(exact.timeIntervalSince(co2.before) < 3600)
     }
 
-    @Test func cleanupJobDeletesOnlyRunsAndRollupJobCondensesLuxAndCO2() async {
+    @Test func cleanupJobDeletesOldJournalEntriesAndRollupJobCondensesLuxAndCO2() async {
         let store = RecordingRetentionStore()
         let runs = RecordingRunDeleter()
+        let journal = Journal(store: runs)
         let job = DatabaseCleanupJob(entities: store,
-                                     automationRuns: runs,
+                                     journal: journal,
                                      noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender()))
 
         await job.performCleanup(now: now)
@@ -185,7 +187,7 @@ private actor RecordingNotificationSender: NotificationSender {
     func endAllLiveActivities(ofActivityType activityType: String) async {}
 }
 
-private actor RecordingRunDeleter: AutomationRunRepository {
+private actor RecordingRunDeleter: JournalStore {
     private(set) var deletedBefore: [Date] = []
 
     func add(_ run: AutomationRun) async throws {}
@@ -194,7 +196,13 @@ private actor RecordingRunDeleter: AutomationRunRepository {
     func latestRuns(since date: Date, limit: Int) async throws -> [AutomationRun] { [] }
     func latestRunPerAutomation() async throws -> [String: AutomationRun] { [:] }
     func markRunningAsInterrupted() async throws {}
-    func deleteRuns(olderThan date: Date) async throws {
+    func addCommand(_ command: ActionLogItem) async throws {}
+    func setCommandStatus(_ id: UUID, to status: ActionLogItem.Status) async throws {}
+    func commands(limit: Int?, runId: UUID?) async throws -> [ActionLogItem] { [] }
+    func clearCommands() async throws {}
+    func addPush(_ push: JournalPush) async throws {}
+    func pushes(runId: UUID?) async throws -> [JournalPush] { [] }
+    func deleteEntries(olderThan date: Date) async throws {
         deletedBefore.append(date)
     }
 }

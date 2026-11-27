@@ -7,11 +7,17 @@ import Foundation
 import HAApplicationLayer
 import HAImplementations
 import HAModels
+import Synchronization
 import Testing
 
 /// Triggers on every event; `execute` behaves according to `mode`.
 private struct TestAutomation: Automatable {
-    enum Mode: Codable { case complete, fail, waitForCancellation }
+    enum Mode: Codable { case complete, fail, waitForCancellation, swallowCancellationOnce }
+    /// Tells the first `execute` of a `swallowCancellationOnce` automation from the later ones.
+    final class FirstRun: Sendable {
+        private let isFirst = Mutex(true)
+        func take() -> Bool { isFirst.withLock { defer { $0 = false }; return $0 } }
+    }
     struct Failure: Error {}
 
     var isActive = true
@@ -23,6 +29,7 @@ private struct TestAutomation: Automatable {
     var triggerEntityIds: Set<EntityId> { [] }
     /// Receives the run id seen inside `execute`; not part of the config.
     var onExecute: (@Sendable (UUID?) -> Void)?
+    var firstRun = FirstRun()
 
     enum CodingKeys: CodingKey { case isActive, name, mode, recordsRuns, summaryDetail }
 
@@ -39,6 +46,13 @@ private struct TestAutomation: Automatable {
             throw Failure()
         case .waitForCancellation:
             try await Task.sleep(for: .seconds(3600))
+        case .swallowCancellationOnce:
+            if firstRun.take() {
+                // The run ends normally although it was told to stop.
+                try? await Task.sleep(for: .seconds(3600))
+            } else {
+                try await Task.sleep(for: .seconds(3600))
+            }
         }
     }
 }
@@ -144,6 +158,24 @@ struct AutomationServiceTests {
 
         let run = try #require(await repository.nextFinishedRun())
         #expect(run.outcome == .stopped)
+    }
+
+    @Test func aStopThatTheRunSwallowsDoesNotLabelALaterSupersededRunAsStopped() async throws {
+        let service = try makeService(TestAutomation(name: "a", mode: .swallowCancellationOnce))
+
+        await service.trigger(with: .sunrise)
+        await service.waitUntilIdle()
+        await service.stopAutomation(with: "a")
+        let first = try #require(await repository.nextFinishedRun())
+        #expect(first.outcome == .completed)
+
+        await service.trigger(with: .sunset)
+        await service.waitUntilIdle()
+        await service.trigger(with: .sunrise)
+
+        let second = try #require(await repository.nextFinishedRun())
+        #expect(second.outcome == .superseded)
+        await service.stopAutomation(with: "a")
     }
 
     @Test func throwingExecuteEndsTheRunAsFailed() async throws {

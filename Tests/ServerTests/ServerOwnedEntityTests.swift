@@ -160,7 +160,7 @@ private struct RecordingAutomation: Automatable {
     let entityId: EntityId
     let onTrigger: @Sendable (EntityStorageItem) -> Void
     var triggerEntityIds: Set<EntityId> { [entityId] }
-    var collapsesChanges: Bool { false }
+    var lanePolicy: LanePolicy { .runEach }
 
     init(entityId: EntityId, onTrigger: @escaping @Sendable (EntityStorageItem) -> Void) {
         self.entityId = entityId

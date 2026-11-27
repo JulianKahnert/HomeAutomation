@@ -22,9 +22,7 @@ public struct WindowProjection: Automatable {
     public var isActive = true
     public let name: String
     public private(set) var triggerEntityIds = Set<EntityId>()
-    public var collapsesChanges: Bool { false }
-    public var supersedesRunningRun: Bool { false }
-    public var runsEveryTrigger: Bool { true }
+    public var lanePolicy: LanePolicy { .runEach }
 
     public init(_ name: String = WindowProjection.defaultName) {
         self.name = name

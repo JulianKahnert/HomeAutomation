@@ -34,12 +34,12 @@ private actor LaneProbe {
 private struct LaneAutomation: Automatable {
     var isActive = true
     let name: String
-    var collapsesChanges = true
+    var lanePolicy = LanePolicy.supersede
     var triggerEntityIds: Set<EntityId> { [] }
     var probe: LaneProbe?
     var recordsRuns: Bool { false }
 
-    enum CodingKeys: CodingKey { case isActive, name, collapsesChanges }
+    enum CodingKeys: CodingKey { case isActive, name }
 
     func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
         await probe?.check(event)
@@ -132,7 +132,7 @@ struct AutomationLaneTests {
     @Test func aLaneCanBeNonCollapsing() async throws {
         let probe = LaneProbe()
         await probe.hold()
-        let service = try makeService([LaneAutomation(name: "a", collapsesChanges: false, probe: probe)])
+        let service = try makeService([LaneAutomation(name: "a", lanePolicy: .runEach, probe: probe)])
 
         await service.trigger(with: .sunrise)
         await probe.waitForSeen(1)

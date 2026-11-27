@@ -18,8 +18,8 @@ struct DeliveryQueueTests {
         let first = Task { await queue.deliver(.push(title: "first", message: "", id: "a")) }
         await sender.waitUntilFirstSendStarted()
         let second = Task { await queue.deliver(.push(title: "second", message: "", id: "b")) }
-        // give the second hand-over time to reach the queue while the first send is still blocked
-        try? await Task.sleep(for: .milliseconds(50))
+        // the second hand-over reaches the queue while the first send is still blocked
+        while await queue.handedOver < 2 { await Task.yield() }
         await sender.openGate()
         await first.value
         await second.value

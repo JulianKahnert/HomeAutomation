@@ -24,7 +24,7 @@ private struct TestAutomation: Automatable {
     let name: String
     let mode: Mode
     var recordsRuns = true
-    var supersedesRunningRun = true
+    var lanePolicy = LanePolicy.supersede
     var summaryDetail: String?
     var triggerEntityIds: Set<EntityId> { [] }
     /// Receives the run id seen inside `execute`; not part of the config.
@@ -124,7 +124,7 @@ struct AutomationServiceTests {
 
     @Test func aTriggerDoesNotCutARunOfAnAutomationThatDoesNotSupersede() async throws {
         var automation = TestAutomation(name: "a", mode: .waitForCancellation)
-        automation.supersedesRunningRun = false
+        automation.lanePolicy = .skipWhileRunning
         let service = try makeService(automation)
 
         await service.trigger(with: .sunrise)

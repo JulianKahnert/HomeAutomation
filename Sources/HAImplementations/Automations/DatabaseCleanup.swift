@@ -19,7 +19,7 @@ public struct DatabaseCleanup: Automatable {
     public var isActive = true
     public let name: String
     public private(set) var triggerEntityIds = Set<EntityId>()
-    public var supersedesRunningRun: Bool { false }
+    public var lanePolicy: LanePolicy { .skipWhileRunning }
 
     public init(_ name: String = DatabaseCleanup.defaultName) {
         self.name = name

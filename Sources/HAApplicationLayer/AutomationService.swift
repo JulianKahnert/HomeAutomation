@@ -126,7 +126,7 @@ public actor AutomationService {
     private func enqueue(_ event: HomeEvent, enqueuedAt: Date, into automation: any Automatable) {
         let lane = lanes[automation.name] ?? Lane()
         lanes[automation.name] = lane
-        if automation.collapsesChanges, case .change(let item) = event {
+        if automation.lanePolicy != .runEach, case .change(let item) = event {
             lane.pending.removeAll { entry in
                 if case .change(let waiting) = entry.event { return waiting.entityId == item.entityId }
                 return false
@@ -159,7 +159,7 @@ public actor AutomationService {
                 return
             }
 
-            if !automation.supersedesRunningRun, !automation.runsEveryTrigger, self.isRunning(automation.name) {
+            if automation.lanePolicy == .skipWhileRunning, self.isRunning(automation.name) {
                 self.log.info("Automation is still running, not starting it again", metadata: ["automation": "\(automation.name)"])
                 return
             }
@@ -193,7 +193,7 @@ public actor AutomationService {
                 }
             }
             self.set(task: task, token: token, with: automation.name)
-            if automation.runsEveryTrigger {
+            if automation.lanePolicy == .runEach {
                 await task.value
             }
         } catch {

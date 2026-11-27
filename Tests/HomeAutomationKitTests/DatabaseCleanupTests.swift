@@ -42,6 +42,6 @@ struct DatabaseCleanupTests {
     }
 
     @Test func doesNotCutARunningRun() {
-        #expect(DatabaseCleanup().supersedesRunningRun == false)
+        #expect(DatabaseCleanup().lanePolicy == .skipWhileRunning)
     }
 }

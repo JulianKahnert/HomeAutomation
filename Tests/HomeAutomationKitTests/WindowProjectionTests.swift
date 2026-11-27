@@ -360,9 +360,7 @@ struct WindowProjectionTests {
         #expect(try await projection.shouldTrigger(with: .change(entity: deadline), using: manager))
         #expect(try await projection.shouldTrigger(with: .change(entity: other), using: manager) == false)
         #expect(try await projection.shouldTrigger(with: .serverStarted, using: manager) == false)
-        #expect(projection.collapsesChanges == false)
-        #expect(projection.supersedesRunningRun == false)
-        #expect(projection.runsEveryTrigger)
+        #expect(projection.lanePolicy == .runEach)
     }
 }
 

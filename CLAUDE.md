@@ -12,7 +12,7 @@
 ```
 
 - **Server** — Vapor app (runs as Docker container, Swift 6.2, Ubuntu Noble, jemalloc). HTTP API (OpenAPI), MySQL persistence, database migrations, scheduled jobs, APNS push notifications, automations engine. Configured via [HomeAutomation-config-template](https://github.com/JulianKahnert/HomeAutomation-config-template).
-- **Adapter** (FlowKit Adapter / HomeKitAdapterApp) — Bridges HomeKit entities to the Server via the in-repo `StarActorSystem` (distributed actors over an authenticated WebSocket, `/adapter/v1` on port 8080; see ADR-001 in the knowledge base). No business logic; reads HomeKit characteristics and forwards state.
+- **Adapter** (FlowKit Adapter) — Bridges HomeKit entities to the Server via the in-repo `StarActorSystem` (distributed actors over an authenticated WebSocket, `/adapter/v1` on port 8080; see ADR-001 in the knowledge base). No business logic; reads HomeKit characteristics and forwards state.
 - **Controller** (FlowKit Controller) — iOS app using TCA (The Composable Architecture). Activates/deactivates automations, shows switched devices, entity state history charts, window Live Activities. Communicates with Server via generated OpenAPI client.
 
 ## Build Commands
@@ -167,7 +167,6 @@ AUTH_TOKEN=your-secure-token-here
 
 - `FlowKitAdapter/` — Xcode project for HomeKit Adapter iOS/macOS app
 - `FlowKitController/` — Xcode project for Controller iOS app + widget extension
-- `HomeKitAdapterApp/` — Alternative adapter app target
 
 ### Tests (`Tests/`)
 

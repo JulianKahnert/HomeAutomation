@@ -67,7 +67,7 @@ func routes(_ app: Application) throws {
 
     authenticatedRoutes.get("config") { req in
         let location = await req.application.homeAutomationConfigService.location
-        let automations = await req.application.homeAutomationConfigService.automations.map(AnyAutomation.create(from:))
+        let automations = await req.application.automationService.automations.map(AnyAutomation.create(from:))
 
         return ConfigDTO(location: location, automations: automations)
     }
@@ -98,17 +98,8 @@ func routes(_ app: Application) throws {
             }
         }
 
-        let previousAutomations = await req.application.homeAutomationConfigService.automations
-        let automations = configDTO.automations
-            .map(\.automation)
-            .map { automation in
-                var automation = automation
-                guard let foundAutomation = previousAutomations.first(where: { $0.name == automation.name }) else { return automation }
-                automation.isActive = foundAutomation.isActive
-                return automation
-            }
-
-        try await req.application.homeAutomationConfigService.set(location: configDTO.location, automations: automations)
+        await req.application.homeAutomationConfigService.set(location: configDTO.location)
+        try await req.application.automationService.deploy(configDTO.automations.map(\.automation))
         // After the config is stored, so automations that react see the new one.
         req.application.homeEventsContinuation.yield(.configDeployed)
 

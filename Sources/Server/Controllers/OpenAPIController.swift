@@ -34,7 +34,7 @@ struct OpenAPIController: APIProtocol {
     func getAutomations(_ input: Operations.GetAutomations.Input) async throws -> Operations.GetAutomations.Output {
         let automationNames = await request.application.automationService.getActiveAutomationNames()
         let lastRuns = try await request.application.automationRunRepository.latestRunPerAutomation()
-        let automations = await request.application.homeAutomationConfigService.automations
+        let automations = await request.application.automationService.automations
             .map { tmp in
                 Components.Schemas.Automation(name: tmp.name,
                                               isActive: tmp.isActive,
@@ -67,7 +67,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        try await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: true)
+        try await request.application.automationService.setAutomationActive(with: name, to: true)
         return .ok
     }
 
@@ -77,7 +77,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        try await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: false)
+        try await request.application.automationService.setAutomationActive(with: name, to: false)
         return .ok
     }
 
@@ -334,7 +334,7 @@ struct OpenAPIController: APIProtocol {
 
     /// The heating automations of the deployed configuration.
     private func heatingRooms() async -> [RoomHeating] {
-        await request.application.homeAutomationConfigService.automations.compactMap { $0 as? RoomHeating }
+        await request.application.automationService.automations.compactMap { $0 as? RoomHeating }
     }
 
     /// Both heating endpoints cut the days by the local clock of the house, Europe/Berlin.

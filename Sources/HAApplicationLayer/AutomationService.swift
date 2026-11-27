@@ -8,6 +8,7 @@
 import Foundation
 import HAModels
 import Logging
+import Shared
 
 public actor AutomationService {
     private let log = Logger(label: "AutomationManager")
@@ -22,13 +23,12 @@ public actor AutomationService {
         /// When the event whose `shouldTrigger` is running entered the lane.
         var inFlight: Date?
         var worker: Task<Void, Never>?
-        var reported = false
+        var backlog = BacklogReporter()
 
         var isBusy: Bool { worker != nil }
 
         func age(now: Date) -> TimeInterval {
-            guard let oldest = inFlight ?? pending.first?.enqueuedAt else { return 0 }
-            return max(0, now.timeIntervalSince(oldest))
+            BacklogReporter.age(ofOldest: inFlight ?? pending.first?.enqueuedAt, now: now)
         }
     }
 
@@ -112,14 +112,8 @@ public actor AutomationService {
     /// The lane is reported again only after it has drained.
     public func reportBacklogs(olderThan limit: TimeInterval, now: Date = Date()) {
         for (name, lane) in lanes {
-            let age = lane.age(now: now)
-            if age > limit {
-                guard !lane.reported else { continue }
-                lane.reported = true
-                log.critical("Automation lane is backed up", metadata: ["automation": "\(name)", "ageSeconds": "\(Int(age))", "waiting": "\(lane.pending.count)"])
-            } else if !lane.isBusy {
-                lane.reported = false
-            }
+            guard let age = lane.backlog.report(age: lane.age(now: now), olderThan: limit) else { continue }
+            log.critical("Automation lane is backed up", metadata: ["automation": "\(name)", "ageSeconds": "\(Int(age))", "waiting": "\(lane.pending.count)"])
         }
     }
 
@@ -149,7 +143,6 @@ public actor AutomationService {
             }
             lane.inFlight = nil
         }
-        lane.reported = false
         lane.worker = nil
     }
 

@@ -65,34 +65,3 @@ struct AutomationsFeatureTests {
         }
     }
 }
-
-@Suite("RoomsFeature")
-struct RoomsFeatureTests {
-    private let entities = [
-        EntityInfo.preview(placeId: "Kitchen", name: "Ceiling"),
-        EntityInfo.preview(placeId: "Kitchen", name: "Window", type: .contactSensor),
-        EntityInfo.preview(placeId: "Bath", name: "Mirror")
-    ]
-
-    @Test("rooms are listed alphabetically with all their devices")
-    func roomsGroupDevices() {
-        var state = RoomsFeature.State()
-        state.entities = entities
-
-        #expect(state.rooms.map(\.placeId) == ["Bath", "Kitchen"])
-        #expect(state.rooms[1].entities.map(\.entityId.name) == ["Ceiling", "Window"])
-    }
-
-    @Test("search matches room names and device names, keeping the whole room")
-    func searchKeepsWholeRoom() {
-        var state = RoomsFeature.State()
-        state.entities = entities
-
-        state.searchText = "window"
-        #expect(state.rooms.map(\.placeId) == ["Kitchen"])
-        #expect(state.rooms[0].entities.count == 2)
-
-        state.searchText = "bath"
-        #expect(state.rooms.map(\.placeId) == ["Bath"])
-    }
-}

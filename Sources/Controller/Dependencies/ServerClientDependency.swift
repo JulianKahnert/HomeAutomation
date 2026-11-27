@@ -43,9 +43,6 @@ struct ServerClientDependency: Sendable {
     /// Register device for push notifications
     var registerDevice: @Sendable (_ token: PushToken) async throws -> Void
 
-    /// Get all entity IDs that have historical data
-    var getEntityIdsWithHistory: @Sendable () async throws -> [EntityInfo]
-
     /// Get entity history with optional time range and pagination
     var getEntityHistory: @Sendable (
         _ entityId: EntityId,
@@ -88,7 +85,6 @@ extension ServerClientDependency: TestDependencyKey {
         getRecentRuns: { _, _ in [] },
         getWindowContentState: { .empty },
         registerDevice: { _ in },
-        getEntityIdsWithHistory: { [] },
         getEntityHistory: { _, _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) },
         getRoomHistory: { _, _, _, _ in [] },
         getHeatingOverview: { HeatingOverview(rooms: []) },
@@ -126,16 +122,6 @@ extension ServerClientDependency: TestDependencyKey {
             ])
         },
         registerDevice: { _ in },
-        getEntityIdsWithHistory: {
-            [
-                EntityInfo(
-                    entityId: EntityId(placeId: "living-room", name: "Motion Sensor", characteristicsName: "motionSensor", characteristic: .motionSensor)
-                ),
-                EntityInfo(
-                    entityId: EntityId(placeId: "bedroom", name: "Light Sensor", characteristicsName: "lightSensor", characteristic: .lightSensor)
-                )
-            ]
-        },
         getEntityHistory: { entityId, _, _, _, _, _ in
             // Generate realistic data based on entity type
             let items: [EntityHistoryItem]
@@ -267,9 +253,6 @@ extension ServerClientDependency: DependencyKey {
         },
         registerDevice: { token in
             try await client.register(token: token)
-        },
-        getEntityIdsWithHistory: {
-            try await client.getEntityIdsWithHistory()
         },
         getEntityHistory: { entityId, startDate, endDate, cursor, limit, includePrevious in
             try await client.getEntityHistory(

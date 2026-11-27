@@ -9,10 +9,17 @@ import Foundation
 import HAModels
 
 final class MockStorageRepository: StorageRepository, @unchecked Sendable {
-    var items: [EntityStorageItem]
+    private let lock = NSLock()
+    private var storedItems: [EntityStorageItem]
+
+    /// The persist task of a HomeManager appends while a test or a read looks, so every access takes the lock.
+    var items: [EntityStorageItem] {
+        get { lock.withLock { storedItems } }
+        set { lock.withLock { storedItems = newValue } }
+    }
 
     init(items: [EntityStorageItem] = []) {
-        self.items = items
+        self.storedItems = items
     }
 
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? {
@@ -28,7 +35,7 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
     }
 
     func add(_ item: EntityStorageItem) async throws {
-        items.append(item)
+        lock.withLock { storedItems.append(item) }
     }
 
     func getHistory(

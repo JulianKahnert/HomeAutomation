@@ -289,10 +289,13 @@ public func configure(_ app: Application) async throws {
 
     // MARK: - register jobs
 
+    let gauge = EventLoopGauge()
+    app.eventLoopGauge = gauge
     let jobs: [any Job] = [
         ClockJob(location: location,
                  homeEventsContinuation: app.homeEventsContinuation),
-        HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
+        HomeEventProcessingJob(gauge: gauge,
+                               homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
                                homeManager: app.homeManager),
         DatabaseCleanupJob(entities: app.entityStorageDbRepository,
@@ -301,7 +304,8 @@ public func configure(_ app: Application) async throws {
         EntityRollupJob(entities: app.entityStorageDbRepository)
     ]
 
-    let scheduler = Scheduler(jobs: [OutdoorTemperatureJob(location: location, hours: weatherHours)])
+    let scheduler = Scheduler(jobs: [OutdoorTemperatureJob(location: location, hours: weatherHours),
+                                      LaneBacklogJob(automationService: automationService)])
     app.scheduler = scheduler
     Task.detached {
         await scheduler.run()

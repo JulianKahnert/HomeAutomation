@@ -29,6 +29,8 @@ func routes(_ app: Application) throws {
         let system = req.application.starActorSystem
         let homeManager = req.application.homeManager
         let scheduler = req.application.scheduler
+        let automationService = req.application.automationService
+        let gauge = req.application.eventLoopGauge
 
         // Race the health checks against a hard timeout so the Docker healthcheck always gets a
         // fast, definitive answer (503 peer-not-up / 504 timeout) instead of hanging.
@@ -47,7 +49,9 @@ func routes(_ app: Application) throws {
                 }
                 // Last success per scheduled job, so a dead source is visible (nil until first success).
                 let jobs = await scheduler?.lastSuccesses ?? [:]
-                let body = HealthDTO(jobs: jobs.mapValues { $0.formatted(.iso8601) })
+                let body = HealthDTO(jobs: jobs.mapValues { $0.formatted(.iso8601) },
+                                     loopAgeSeconds: await gauge?.age() ?? 0,
+                                     laneAgeSeconds: await automationService.laneAges())
                 let response = Response(status: .ok)
                 try response.content.encode(body, as: .json)
                 return response
@@ -116,7 +120,11 @@ func routes(_ app: Application) throws {
     try handler.registerHandlers(on: transport)
 }
 
-/// Body of `GET /health`: the last success of every scheduled job (ISO 8601).
+/// Body of `GET /health`: the last success of every scheduled job (ISO 8601) and the ages of the event loop and every lane.
 struct HealthDTO: Content {
     let jobs: [String: String]
+    /// How long the event loop has been on its current event.
+    let loopAgeSeconds: Double
+    /// Per automation: the age of the oldest event its lane has not finished checking; 0 when idle.
+    let laneAgeSeconds: [String: Double]
 }

@@ -9,7 +9,7 @@ import HAModels
 @testable import Server
 
 /// Runs are not recorded; the tests of the routes only read the deployed automations.
-private actor NoRuns: AutomationRunRepository {
+actor NoRuns: AutomationRunRepository {
     func add(_ run: AutomationRun) async throws {}
     func finish(_ id: UUID, outcome: AutomationRun.Outcome, endedAt: Date, errorDescription: String?) async throws {}
     func runs(for automationName: String, startDate: Date?, endDate: Date?, limit: Int) async throws -> [AutomationRun] { [] }

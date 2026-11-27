@@ -272,6 +272,9 @@ public func configure(_ app: Application) async throws {
                                         onFireplaceSwitch: { [continuation = app.homeEventsContinuation] fireplaceSwitch in
         continuation.yield(.fireplaceChanged(isOn: fireplaceSwitch.isOn))
     },
+                                        onReportedChange: { [continuation = app.homeEventsContinuation] item in
+        continuation.yield(.change(entity: item))
+    },
                                         outdoorTemperature: { [logger = app.logger] in
         // The same rows the OutdoorTemperatureJob writes for this location.
         do {

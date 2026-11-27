@@ -29,6 +29,8 @@ public final class HomeManager: HomeManagable {
     private let storageUpkeep: (any StorageUpkeep)?
     /// Tells the automations about a switch of the fireplace; the server yields `HomeEvent.fireplaceChanged`.
     private let onFireplaceSwitch: @Sendable (FireplaceSwitch) -> Void
+    /// Hands a changed, already checked server-owned state to the event stream (`report`).
+    private let onReportedChange: @Sendable (EntityStorageItem) -> Void
     /// The newest fireplace switch, loaded once from the database. It also holds a switch the database could
     /// not save, so an end of the fireplace stays an end and `FireplaceTimeout` does not repeat itself.
     private var fireplace: FireplaceSwitch??
@@ -73,6 +75,7 @@ public final class HomeManager: HomeManagable {
     ///   - fireplaceSwitches: Where the fireplace switches are stored; `nil` keeps them in memory only.
     ///   - storageUpkeep: What the database upkeep steps do; `nil` does nothing.
     ///   - onFireplaceSwitch: Called after each switch of the fireplace, to tell the automations.
+    ///   - onReportedChange: Called with each changed state set by `report`; the server yields `HomeEvent.change`.
     ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
     ///     than there are delays.
     ///   - outdoorTemperature: The latest stored outdoor temperature reading in °C, `nil` without one;
@@ -87,6 +90,7 @@ public final class HomeManager: HomeManagable {
                 fireplaceSwitches: (any FireplaceRepository)? = nil,
                 storageUpkeep: (any StorageUpkeep)? = nil,
                 onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
+                onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
                 retryTicks: AsyncStream<Void>? = nil,
                 persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
                 outdoorTemperature: @escaping @Sendable () async -> Double? = { nil }) {
@@ -102,6 +106,7 @@ public final class HomeManager: HomeManagable {
         self.fireplaceSwitches = fireplaceSwitches
         self.storageUpkeep = storageUpkeep
         self.onFireplaceSwitch = onFireplaceSwitch
+        self.onReportedChange = onReportedChange
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
         self.location = location
@@ -410,6 +415,27 @@ public final class HomeManager: HomeManagable {
             let duration = start.duration(to: .now)
             log.error("Failed to trigger scene '\(sceneName)' after \(duration)\n\(error)")
         }
+    }
+
+    @discardableResult
+    public func report(_ entityId: EntityId, value: Value, origin: Origin) async -> Bool {
+        guard entityId.isServerOwned else {
+            log.error("Refusing to report \(entityId): it is not a server-owned entity")
+            return false
+        }
+        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
+            log.error("Refusing to report \(entityId): the value \(value) does not fit its value kind")
+            return false
+        }
+        // No suspension point between the check, the state and the yield: the state holds before the event
+        // reaches the stream, and two reports of one entity cannot interleave.
+        guard await addEntityHistory(item) else { return false }
+        onReportedChange(currentStates[entityId] ?? item)
+        return true
+    }
+
+    public func states(of kind: ValueKind) async -> [EntityStorageItem] {
+        currentStates.values.filter { $0.entityId.characteristicType.valueKind == kind }
     }
 
     @discardableResult

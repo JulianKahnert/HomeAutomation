@@ -398,6 +398,7 @@ struct HomeManagerTests {
         let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let stored = InMemoryFireplaceRepository([FireplaceSwitch(timestamp: start, isOn: true)])
         let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored)
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
 
         #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
     }
@@ -407,6 +408,7 @@ struct HomeManagerTests {
         let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let stored = FailingFireplaceRepository(latest: FireplaceSwitch(timestamp: start, isOn: true))
         let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored)
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
 
         let off = await homeManager.switchFireplace(isOn: false, at: start.addingTimeInterval(7200))
 
@@ -519,10 +521,11 @@ struct HomeManagerTests {
         #expect(await probe.startedPerforms == 2)
     }
 
-    @Test("The current state comes from the last report, the stored state only for an entity not yet reported")
+    @Test("The current state comes from the last report, the stored state loaded at start for an entity not yet reported")
     func currentStateComesFromLastReport() async throws {
         let stored = EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: false)
         let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: MockStorageRepository(items: [stored]))
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
 
         #expect(try await homeManager.getCurrentEntity(with: switchId).isDeviceOn == false)
 

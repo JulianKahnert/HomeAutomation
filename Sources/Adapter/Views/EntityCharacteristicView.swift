@@ -142,16 +142,15 @@ struct EntityCharacteristicView: View {
     }
 }
 
-// #Preview {
-//    HStack {
-//        EntityCharacteristicView(
-//            item: EntityStorageItem(
-//                entityId: EntityId(placeId: "living-room", type: "light"),
-//                brightness: 75,
-//                isDeviceOn: true
-//            ),
-//            type: .brightness
-//        )
-//    }
-// }
+#Preview {
+    List {
+        HStack {
+            Text("Target")
+            EntityCharacteristicView(
+                item: EntityStorageItem(entityId: EntityId(placeId: "Bad", name: "Thermostat", characteristicsName: nil, characteristic: .targetTemperature),
+                                        targetTemperatureInC: 21),
+                type: .targetTemperature)
+        }
+    }
+}
 #endif

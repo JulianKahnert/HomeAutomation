@@ -14,8 +14,4 @@ extension EntityInfo {
         entityId.displayName
     }
 
-    /// Formatted characteristic display name using the CharacteristicsType extension
-    public var formattedCharacteristicDisplayName: String {
-        entityId.characteristicType.displayName
-    }
 }

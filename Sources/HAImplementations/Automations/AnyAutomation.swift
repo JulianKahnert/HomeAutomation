@@ -54,33 +54,6 @@ public enum AnyAutomation: Codable, Sendable {
         }
     }
 
-    public var automationTypes: [Automatable.Type] {
-        var tmp: [Automatable.Type] = [
-            CreateScene.self,
-            DatabaseCleanup.self,
-            EnergyLowPrice.self,
-            FireplaceReminder.self,
-            FireplaceTimeout.self,
-            HealthCheck.self,
-            MaintenanceAutomation.self,
-            MotionAtNight.self,
-            RestartSystem.self,
-            RoomHeating.self,
-            SetLightProperties.self,
-            Turn.self,
-            TurnOnForDuration.self,
-            WindowOpen.self,
-            WindowProjection.self,
-            UpsertScene.self,
-            TriggerScene.self
-        ]
-
-        #if canImport(WeatherKit)
-        tmp.append(GardenWatering.self)
-        #endif
-        return tmp
-    }
-
     public static func create(from automation: any Automatable) -> AnyAutomation {
         if let createScene = automation as? CreateScene {
             return .createScene(createScene)

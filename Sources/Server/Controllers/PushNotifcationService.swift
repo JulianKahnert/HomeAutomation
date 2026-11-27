@@ -11,12 +11,6 @@ import Foundation
 import HAModels
 import VaporAPNS
 
-/// Payload for `content-available` background pushes that tell the client
-/// to remove a previously delivered notification matched by `threadIdentifier`.
-private struct ClearNotificationPayload: Encodable, Sendable {
-    let clearNotificationId: String
-}
-
 actor PushNotifcationService: NotificationSender {
     private static let logger = Logger(label: "PushNotifcationService")
 
@@ -33,37 +27,6 @@ actor PushNotifcationService: NotificationSender {
 
     func sendNotification(title: String, message: String, id: String, category: String?) async throws {
         try await sendAlert(title: title, message: message, id: id, category: category)
-    }
-
-    func clearNotification(id: String) async throws {
-        let deviceTokens = try await DeviceToken
-            .query(on: database())
-            .filter(\.$tokenType == "pushNotification")
-            .all()
-
-        let payload = ClearNotificationPayload(clearNotificationId: id)
-        let notification = APNSBackgroundNotification(
-            expiration: .immediately,
-            topic: notificationTopic,
-            payload: payload
-        )
-
-        for deviceToken in deviceTokens {
-            do {
-                try await apnsClient.sendBackgroundNotification(notification, deviceToken: deviceToken.tokenString)
-            } catch {
-                Self.logger.warning(
-                    "Failed to send clear notification to \(deviceToken.deviceName): \(error.localizedDescription)"
-                )
-                do {
-                    try await DeviceToken.query(on: database())
-                        .filter(\.$tokenString == deviceToken.tokenString)
-                        .delete()
-                } catch {
-                    Self.logger.error("[clearNotification] Failed to delete invalid device token for \(deviceToken.deviceName): \(error)")
-                }
-            }
-        }
     }
 
     // MARK: - Private

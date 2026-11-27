@@ -5,7 +5,7 @@
 
 import Foundation
 
-/// The typed view of the one generic value. Nothing here is stored: every accessor reads ``EntityStorageItem/kind``
+/// The typed view of the one generic value. Nothing here is stored: every accessor reads ``EntityStorageItem/entityId``
 /// and ``EntityStorageItem/value`` and answers `nil` when the item carries another kind. A new value kind needs
 /// no accessor; automations that want one for it add a line here.
 public extension EntityStorageItem {
@@ -26,7 +26,7 @@ public extension EntityStorageItem {
 
     /// RGB color value
     var color: RGB? {
-        guard case .text(let text)? = value(of: .color) else { return nil }
+        guard case .text(let text)? = value(ifType: .color) else { return nil }
         let parts = text.split(separator: " ").compactMap { Float($0) }
         return parts.count == 3 ? RGB(red: parts[0], green: parts[1], blue: parts[2]) : nil
     }
@@ -78,19 +78,24 @@ public extension EntityStorageItem {
 
     /// The deadline of a window, a server-owned state
     var deadline: Deadline? {
-        guard case .text(let text)? = value(of: .deadline) else { return nil }
+        guard case .text(let text)? = value(ifType: .deadline) else { return nil }
         return Deadline(text: text)
     }
 }
 
 private extension EntityStorageItem {
+    /// The value when the entity of the item has the characteristic type `type`, `nil` otherwise.
+    func value(ifType type: CharacteristicsType) -> Value? {
+        entityId.characteristicType == type ? value : nil
+    }
+
     func bool(_ type: CharacteristicsType) -> Bool? {
-        guard case .bool(let bool)? = value(of: type) else { return nil }
+        guard case .bool(let bool)? = value(ifType: type) else { return nil }
         return bool
     }
 
     func number(_ type: CharacteristicsType) -> Double? {
-        guard case .number(let number)? = value(of: type) else { return nil }
+        guard case .number(let number)? = value(ifType: type) else { return nil }
         return number
     }
 
@@ -99,7 +104,7 @@ private extension EntityStorageItem {
     }
 }
 
-/// The typed creators for tests, fixtures and the adapter. The item keeps the first value that is set: an item
+/// The typed creators for tests, fixtures and the adapter. The item keeps the value of its entity's kind: an item
 /// carries one value, so a caller passes one.
 public extension EntityStorageItem {
     init(
@@ -154,7 +159,8 @@ public extension EntityStorageItem {
             (.energyPrice, energyPriceInEURPerKWh.map { .number($0) }),
             (.deadline, deadline.map { .text($0.text) })
         ]
-        let first = candidates.first { $0.1 != nil }
-        self.init(entityId: entityId, timestamp: timestamp, uncheckedKind: first?.0.valueKind, value: first?.1, origin: origin, lastReport: lastReport)
+        // Only the value of the entity's own kind counts: the kind of an item is the characteristic type of its entity.
+        let first = candidates.first { $0.0 == entityId.characteristicType && $0.1 != nil }
+        self.init(entityId: entityId, timestamp: timestamp, uncheckedValue: first?.1, origin: origin, lastReport: lastReport)
     }
 }

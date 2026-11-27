@@ -15,6 +15,8 @@ actor DeliveryQueue: Log {
     private var tail: Task<Void, Never>?
     /// When each push id was last sent, for rate limits of automations.
     private var pushDates: [String: Date] = [:]
+    /// How many deliveries were handed over so far; lets a test wait until one reached the queue.
+    private(set) var handedOver = 0
 
     init(sender: any NotificationSender) {
         self.sender = sender
@@ -22,6 +24,7 @@ actor DeliveryQueue: Log {
 
     /// Returns when this delivery was sent or failed; a failure is logged.
     func deliver(_ delivery: Delivery) async {
+        handedOver += 1
         let previous = tail
         let task = Task { [self] in
             await previous?.value
@@ -44,12 +47,6 @@ actor DeliveryQueue: Log {
                 pushDates[id] = Date()
             } catch {
                 log.warning("Failed to send notification", metadata: ["id": "\(id)", "error": "\(error)"])
-            }
-        case .clearPush(let id):
-            do {
-                try await sender.clearNotification(id: id)
-            } catch {
-                log.warning("Failed to clear notification", metadata: ["id": "\(id)", "error": "\(error)"])
             }
         case let .liveActivity(contentState, activityName, options):
             await sender.startOrUpdateLiveActivity(contentState: contentState, activityName: activityName, options: options)

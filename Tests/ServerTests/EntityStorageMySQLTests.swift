@@ -106,7 +106,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         let repository = app.entityStorageDbRepository
         for (index, sample) in EntityStorageMappingTests.samples.enumerated() {
             let id = EntityId(placeId: "Room", name: "Device\(index)", characteristicsName: "Name", characteristic: sample.0)
-            let item = try XCTUnwrap(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_000), kind: sample.0.valueKind, value: sample.1, origin: .job("valves")))
+            let item = try XCTUnwrap(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_000), value: sample.1, origin: .job("valves")))
             try await repository.add(item)
 
             let restored = try await repository.getCurrent(id)
@@ -202,7 +202,7 @@ final class EntityStorageMySQLTests: XCTestCase {
             entity = EntityDbItem(placeId: id.placeId, serviceName: id.name, characteristicType: id.characteristicType.rawValue, characteristicsName: id.characteristicsName)
             try await entity.save(on: app.db)
         }
-        let change = try EntityChangeDbItem(entityId: entity.requireID(), timestamp: Date(timeIntervalSince1970: seconds), value: value, origin: "homekit")
+        let change = try EntityChangeDbItem(entityId: entity.requireID(), timestamp: Date(timeIntervalSince1970: seconds), value: value, shape: ValueDescriptor.descriptor(for: id.characteristicType).shape, origin: "homekit")
         change.id = changeId
         try await change.save(on: app.db)
     }
@@ -230,7 +230,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         try await insertRaw(lux, minutes: 10, lux: 0)
 
         try await repository.rollUpHourly(type: .carbonDioxideSensorId,
-                                          validRange: StoragePolicy.policy(for: .carbonDioxideSensorId).validRange,
+                                          validRange: ValueDescriptor.descriptor(for: .carbonDioxideSensorId).storage.validRange,
                                           olderThan: hour.addingTimeInterval(2 * 3600))
 
         let aggregates = try await repository.hourlyAggregates(of: co2)

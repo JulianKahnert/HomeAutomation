@@ -132,10 +132,6 @@ struct JournalDbRepository: JournalStore {
         return commands
     }
 
-    func clearCommands() async throws {
-        try await entries(.command).delete()
-    }
-
     // MARK: - pushes
 
     func addPush(_ push: JournalPush) async throws {

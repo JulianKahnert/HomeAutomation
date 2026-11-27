@@ -10,14 +10,6 @@ import HAModels
 import SwiftUI
 
 extension EntityHistoryItem {
-    /// The colour of a colour value (the text "r g b" with components 0...1).
-    private var rgb: RGB? {
-        guard descriptor?.display == .color, case .text(let text) = value else { return nil }
-        let parts = text.split(separator: " ").compactMap { Float($0) }
-        guard parts.count == 3 else { return nil }
-        return RGB(red: parts[0], green: parts[1], blue: parts[2])
-    }
-
     /// Returns a SwiftUI Color from the colour value if available
     public var color: Color? {
         rgb.map { Color(red: Double($0.red), green: Double($0.green), blue: Double($0.blue)) }

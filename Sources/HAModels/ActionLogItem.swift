@@ -74,14 +74,4 @@ public struct ActionLogItem: Identifiable, Sendable, Codable, Equatable {
         self.planTargetInC = planTargetInC
     }
 
-    /// Human-readable description for display
-    public var displayName: String {
-        "\(actionName) - \(entityId)"
-    }
-
-    /// Searchable text combining all relevant fields
-    public var searchableText: String {
-        "\(actionName) \(entityId) \(detailDescription)"
-            .localizedLowercase
-    }
 }

@@ -32,8 +32,6 @@ private actor SlowSender: NotificationSender {
 
     func sendNotification(title: String, message: String, id: String, category: String?) async throws {}
 
-    nonisolated func clearNotification(id: String) async throws {}
-
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
                                                                        activityName: String,
                                                                        options: LiveActivityOptions) async {
@@ -73,7 +71,7 @@ struct WindowProjectionLaneTests {
     private func report(_ deadline: Deadline, _ name: String) async throws {
         let id = deadlineId(name)
         try await manager.report(id, value: .text(deadline.text))
-        let item = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id })
+        let item = try #require(await manager.states(of: .deadline).first { $0.entityId == id })
         await service.trigger(with: .change(entity: item))
     }
 

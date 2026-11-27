@@ -24,11 +24,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func lastReports() async -> [String: Date]
     /// When the entity last reported, a replay included; `nil` while unknown (after a restart until its first report).
     func lastReport(of entityId: EntityId) async -> Date?
-    func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem?
-    /// The last state of the entity the database holds, past the in-memory cache. After a restart the
-    /// adapter's resync refreshes the cache with a new timestamp; only the database still knows since
-    /// when the state really holds. `nil` when the database has none.
-    func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem?
     /// The changes of the entity the server holds in memory since `since` (the last 3 hours), newest first; a decision
     /// reads this, never the database. A longer history is ``getFullEntityHistory(with:limit:)``.
     func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem]
@@ -62,14 +57,13 @@ public protocol HomeManagable: EntityValidator, Sendable {
     ///   - entityId: A server-owned entity: `entityId.isServerOwned`.
     ///   - value: Must fit the shape of the entity's value kind.
     ///   - origin: `server` (default) or `app`.
-    /// - Returns: Whether the state changed. `false` too for a value that does not fit or an entity that is not server-owned (logged).
     /// - Returns: `true` when the state changed, `false` when the value was the one it already had.
     /// - Throws: ``ReportError`` for a report that is refused: an entity that is not server-owned, a value that does
     ///   not fit the kind. That is a programmer error of the caller, not an outcome.
     @discardableResult
     func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool
-    /// The current states of all entities of one value kind, in no particular order; from memory.
-    func states(of kind: ValueKind) async -> [EntityStorageItem]
+    /// The current states of all entities of one characteristic type, in no particular order; from memory.
+    func states(of type: CharacteristicsType) async -> [EntityStorageItem]
 
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async

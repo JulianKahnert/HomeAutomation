@@ -40,8 +40,6 @@ actor RecordingNotificationSender: NotificationSender {
         events.append(.notification(title: title, message: message, category: category))
     }
 
-    nonisolated func clearNotification(id: String) async throws {}
-
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
                                                                        activityName: String,
                                                                        options: LiveActivityOptions) async {

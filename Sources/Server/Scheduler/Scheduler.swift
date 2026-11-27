@@ -67,6 +67,13 @@ actor Scheduler: Log {
             }
             tick(plannedAt: next)
             next = next.addingTimeInterval(60)
+            // After a long stall (paused container, sleeping host, clock jump) the missed minutes would fire
+            // back to back with stale planned dates: skip them.
+            let now = clock.now
+            if now >= next.addingTimeInterval(60) {
+                log.warning("Scheduler fell behind, skipping the missed minutes", metadata: ["behindSeconds": "\(Int(now.timeIntervalSince(next)))"])
+                next = Self.nextMinute(after: now)
+            }
         }
     }
 

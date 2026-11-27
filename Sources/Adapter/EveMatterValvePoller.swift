@@ -23,8 +23,9 @@ private let log = Logger(label: "EveMatterValvePoller")
 /// The server decides when to read, detects changes and keeps the error book; this type only reads.
 actor EveMatterValvePoller {
     /// A Thread device that is asleep or unreachable may never answer. All reads of one thermostat together
-    /// stay within this limit.
-    static let readTimeout: Duration = .seconds(30)
+    /// stay within this limit. It stays below `StarActorSystem`'s remote call timeout (30 s), so a partial
+    /// answer (the valve without the offset) still reaches the server in time.
+    static let readTimeout: Duration = .seconds(20)
 
     private struct MatterNode: Hashable {
         let controllerID: String

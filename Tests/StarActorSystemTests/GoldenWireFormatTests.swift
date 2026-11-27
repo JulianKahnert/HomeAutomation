@@ -41,7 +41,8 @@ struct GoldenWireFormatTests {
         let item = EntityStorageItem(entityId: id, timestamp: date, temperatureInC: .init(value: 21.5, unit: .celsius), origin: .homekit)
         let json = try #require(String(bytes: try encoder.encode(item), encoding: .utf8))
         #expect(json == #"{"entityId":{"characteristicType":"temperatureSensor","name":"Sensor","placeId":"Bad OG"},"kind":"temperatureSensor","origin":"homekit","timestamp":1000,"value":{"number":{"_0":21.5}}}"#)
-        let text = EntityStorageItem(entityId: id, timestamp: date, color: RGB(red: 0.5, green: 0.25, blue: 1), origin: .homekit)
+        let colorId = EntityId(placeId: "Bad OG", name: "Lamp", characteristicsName: nil, characteristic: .color)
+        let text = EntityStorageItem(entityId: colorId, timestamp: date, color: RGB(red: 0.5, green: 0.25, blue: 1), origin: .homekit)
         #expect(String(bytes: try encoder.encode(text), encoding: .utf8)?.contains(#""value":{"text":{"_0":"0.5 0.25 1.0"}}"#) == true)
     }
 
@@ -50,17 +51,23 @@ struct GoldenWireFormatTests {
         for type in CharacteristicsType.allCases {
             let id = EntityId(placeId: "p", name: "e", characteristicsName: nil, characteristic: type)
             let value: Value
-            switch type.valueKind.descriptor?.shape {
+            switch ValueDescriptor.descriptor(for: type).shape {
             case .bool: value = .bool(true)
             case .text: value = .text("0.1 0.25 0.9")
             case .textWithNumber: value = .text("running 1800000000.0")
             default: value = type == .heatingMode ? .number(1) : .number(3)
             }
-            let item = try #require(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSinceReferenceDate: 5), kind: type.valueKind, value: value, origin: .homekit))
+            let item = try #require(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSinceReferenceDate: 5), value: value, origin: .homekit))
             let back = try JSONDecoder().decode(EntityStorageItem.self, from: try JSONEncoder().encode(item))
             #expect(back == item, "\(type)")
-            #expect(back.genericValue?.value == value, "\(type)")
+            #expect(back.value == value, "\(type)")
         }
+    }
+
+    @Test("A value kind that is not the kind of the entity fails to decode")
+    func kindOfAnotherEntityFails() {
+        let json = #"{"entityId":{"characteristicType":"temperatureSensor","name":"S","placeId":"p"},"kind":"switcher","origin":"homekit","timestamp":1,"value":{"bool":{"_0":true}}}"#
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(EntityStorageItem.self, from: Data(json.utf8)) }
     }
 
     @Test("An unknown value kind fails to decode")

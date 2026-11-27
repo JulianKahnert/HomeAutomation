@@ -32,9 +32,19 @@ actor HomeAutomationConfigService: Log, AutomationRepository {
         self.location = location
     }
 
+    /// The save that was handed over last; the next one waits for it, so an older snapshot never lands after a newer one.
+    private var tail: Task<Void, any Error>?
+
     func save(_ automations: [any Automatable]) async throws {
         let configDto = ConfigDTO(location: location, automations: automations.map(AnyAutomation.create(from:)))
-        try await persist(JSONEncoder().encode(configDto))
+        let data = try JSONEncoder().encode(configDto)
+        let previous = tail
+        let task = Task { [persist] in
+            _ = await previous?.result
+            try await persist(data)
+        }
+        tail = task
+        try await task.value
     }
 
     /// - Parameter database: Resolved per query, so saves are not tied to one event loop's pool.

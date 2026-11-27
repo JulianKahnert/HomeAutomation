@@ -12,7 +12,7 @@ import Logging
 import SQLKit
 import Vapor
 
-final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
+final class EntityStorageDbRepository: StorageRepository, Sendable {
     /// Resolved per query: a captured `app.db` is bound to one event loop and so to that loop's
     /// connection pool, which would funnel every query of this long-lived repository through it.
     let database: @Sendable () -> any Database
@@ -24,11 +24,6 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
 
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? {
         try await latestChanges(of: entityId, limit: 1).first
-    }
-
-    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? {
-        let items = try await latestChanges(of: entityId, limit: 2)
-        return items.count == 2 ? items.last : nil
     }
 
     /// The newest change per entity, with the tiebreak of `getCurrent`. An entity of an unknown
@@ -52,7 +47,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
                 .filter(\.$id ~~ chunk)
                 .with(\.$entity)
                 .all()
-            items += changes.compactMap { Self.mapDbItem($0) }
+            items += changes.compactMap { EntityStorageItem(entity: $0.entity, change: $0) }
         }
         return items
     }
@@ -68,7 +63,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
             .sort(\.$id, .descending)
             .limit(limit)
             .all()
-            .compactMap { Self.mapDbItem($0, entity: entity) }
+            .compactMap { EntityStorageItem(entity: entity, change: $0) }
     }
 
     private func findEntity(_ entityId: EntityId) async throws -> EntityDbItem? {
@@ -102,24 +97,24 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
     }
 
     func add(_ item: EntityStorageItem) async throws {
-        guard let value = item.value(of: item.entityId.characteristicType) else {
+        guard let value = item.value else {
             log.warning("Item without a value for its type is not stored", metadata: ["entityId": "\(item.entityId)"])
             return
         }
         let entity = try await entity(for: item.entityId)
         guard try await passesDeadBand(value, at: item.timestamp, of: entity) else { return }
-        try await EntityChangeDbItem(entityId: entity.requireID(), timestamp: item.timestamp, value: value, origin: item.origin.rawValue)
+        try await EntityChangeDbItem(entityId: entity.requireID(), timestamp: item.timestamp, value: value, shape: ValueDescriptor.descriptor(for: item.entityId.characteristicType).shape, origin: item.origin.rawValue)
             .save(on: database())
         if item.entityId.characteristicType.isHeatingRelated {
             log.debug("Stored heating entity item", metadata: ["entityId": "\(item.entityId)", "value": "\(value)"])
         }
     }
 
-    /// Whether the value moved out of its type's write dead band (`StoragePolicy`) around the last
+    /// Whether the value moved out of its type's write dead band (the descriptor's storage rule) around the last
     /// stored change. Types without a dead band cost no extra query.
     private func passesDeadBand(_ value: Value, at timestamp: Date, of entity: EntityDbItem) async throws -> Bool {
         guard let type = CharacteristicsType(rawValue: entity.characteristicType),
-              let deadBand = StoragePolicy.policy(for: type).deadBand,
+              let deadBand = ValueDescriptor.descriptor(for: type).storage.deadBand,
               case .number(let number) = value else {
             return true
         }
@@ -186,7 +181,7 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
             .sort(\.$timestamp, .descending)
             .limit(limit)
             .all()
-            .compactMap { Self.mapDbItem($0, entity: entity) }
+            .compactMap { EntityStorageItem(entity: entity, change: $0) }
     }
 
     func getAllEntityIds() async throws -> [EntityId] {
@@ -198,14 +193,6 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
             return EntityId(placeId: entity.placeId, name: entity.serviceName,
                             characteristicsName: entity.characteristicsName, characteristic: type)
         }
-    }
-
-    static func mapDbItem(_ change: EntityChangeDbItem) -> EntityStorageItem? {
-        mapDbItem(change, entity: change.entity)
-    }
-
-    static func mapDbItem(_ change: EntityChangeDbItem, entity: EntityDbItem) -> EntityStorageItem? {
-        EntityStorageItem(entity: entity, change: change)
     }
 }
 

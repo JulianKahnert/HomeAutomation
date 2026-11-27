@@ -6,6 +6,7 @@
 import Foundation
 import HAModels
 import Logging
+import Synchronization
 
 /// The facade over the journal table: commands and pushes are written off the caller's path (ADR-004).
 ///
@@ -20,19 +21,33 @@ public final class Journal: Sendable {
 
     private static let logger = Logger(label: "Journal")
 
+    /// A write, or the marker `flush` waits for; the marker is its own case so that a dropped one still resumes its caller.
+    private enum Item: Sendable {
+        case write(@Sendable () async throws -> Void)
+        case flush(CheckedContinuation<Void, Never>)
+    }
+
     private let store: any JournalStore
-    private let queue: AsyncStream<@Sendable () async throws -> Void>.Continuation
+    private let queue: AsyncStream<Item>.Continuation
+    /// Writes dropped because the queue was full, and how many were queued at all (for tests).
+    private let counters = Mutex((dropped: 0, enqueued: 0))
 
     public init(store: any JournalStore) {
         self.store = store
-        let (stream, queue) = AsyncStream<@Sendable () async throws -> Void>.makeStream(bufferingPolicy: .bufferingNewest(Self.queueLimit))
+        let (stream, queue) = AsyncStream<Item>.makeStream(bufferingPolicy: .bufferingNewest(Self.queueLimit))
         self.queue = queue
-        Task.detached(priority: .background) {
-            for await write in stream {
-                do {
-                    try await write()
-                } catch {
-                    Self.logger.error("Failed to write the journal", metadata: ["error": "\(error)"])
+        // Normal priority like the persist queue of the `HomeManager`: a background consumer is starved under load.
+        Task.detached {
+            for await item in stream {
+                switch item {
+                case .write(let write):
+                    do {
+                        try await write()
+                    } catch {
+                        Self.logger.error("Failed to write the journal", metadata: ["error": "\(error)"])
+                    }
+                case .flush(let continuation):
+                    continuation.resume()
                 }
             }
         }
@@ -83,14 +98,6 @@ public final class Journal: Sendable {
         }
     }
 
-    public func clearCommands() async {
-        do {
-            try await store.clearCommands()
-        } catch {
-            Self.logger.error("Failed to clear the commands of the journal", metadata: ["error": "\(error)"])
-        }
-    }
-
     /// Removes entries of every kind older than `date`; the cleanup calls this.
     public func deleteEntries(olderThan date: Date) async throws {
         try await store.deleteEntries(olderThan: date)
@@ -99,12 +106,36 @@ public final class Journal: Sendable {
     /// Returns once every write queued so far was tried.
     public func flush() async {
         await withCheckedContinuation { continuation in
-            enqueue { continuation.resume() }
+            enqueue(.flush(continuation))
         }
     }
 
+    /// How many items were queued so far, a dropped one included.
+    var enqueuedCount: Int { counters.withLock { $0.enqueued } }
+
     private func enqueue(_ write: @escaping @Sendable () async throws -> Void) {
-        queue.yield(write)
+        enqueue(.write(write))
+    }
+
+    private func enqueue(_ item: Item) {
+        counters.withLock { $0.enqueued += 1 }
+        switch queue.yield(item) {
+        case .dropped(let dropped):
+            // The oldest item made room. A dropped flush marker still resumes its caller, so `flush` cannot hang.
+            if case .flush(let continuation) = dropped { continuation.resume() }
+            let total = counters.withLock { counters in
+                counters.dropped += 1
+                return counters.dropped
+            }
+            if total == 1 || total.isMultiple(of: 500) {
+                Self.logger.warning("Journal queue full, dropped writes", metadata: ["dropped": "\(total)"])
+            }
+        case .terminated:
+            // Nothing will be written any more: the caller of a flush must not wait for it.
+            if case .flush(let continuation) = item { continuation.resume() }
+        default:
+            break
+        }
     }
 }
 
@@ -181,8 +212,6 @@ public actor InMemoryJournalStore: JournalStore {
         Dictionary(grouping: commandStore.filter { $0.reason != nil && $0.status == .executed }) { "\($0.entityId.placeId)/\($0.entityId.name)" }
             .compactMap { $0.value.max { $0.timestamp < $1.timestamp } }
     }
-
-    public func clearCommands() async throws { commandStore.removeAll() }
 
     public func addPush(_ push: JournalPush) async throws { pushStore.insert(push, at: 0) }
 

@@ -13,8 +13,6 @@ public enum Delivery: Sendable {
     /// An alert push tagged with a stable `id` (`apns-collapse-id` and thread identifier).
     /// - Parameter category: The notification category of the app, which gives the push its actions; `nil` for none.
     case push(title: String, message: String, id: String, category: String? = nil)
-    /// A silent push that lets the client remove the delivered notification with this `id`.
-    case clearPush(id: String)
     /// Starts the Live Activity or updates the running one.
     case liveActivity(contentState: any Encodable & Sendable, activityName: String, options: LiveActivityOptions)
     /// Ends every running Live Activity of this type.

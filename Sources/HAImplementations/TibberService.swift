@@ -17,8 +17,6 @@ public actor TibberService: Log {
         public let price: Double
     }
 
-    private static let tibberApi = "https://api.tibber.com/v1-beta/gql"
-
     private let tibber: TibberSwift
     private var priceCache: (Date, [TodayPrice])?
 

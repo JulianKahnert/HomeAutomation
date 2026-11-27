@@ -55,6 +55,21 @@ struct JournalTests {
         await homeManager.deliver(.push(title: "t", message: "m", id: "i"))
     }
 
+    @Test("A flush whose marker was dropped from a full queue still returns")
+    func flushReturnsWhenItsMarkerWasDropped() async {
+        let journal = Journal(store: StallingStore())
+
+        journal.recordPush(JournalPush(runId: nil, title: "t", message: "m", pushId: "i"))
+        let flushing = Task { await journal.flush() }
+        while journal.enqueuedCount < 2 { await Task.yield() }
+        // More writes than the queue holds push the oldest items out, the flush marker among them.
+        for _ in 0...Journal.queueLimit {
+            journal.recordPush(JournalPush(runId: nil, title: "t", message: "m", pushId: "i"))
+        }
+
+        await flushing.value
+    }
+
     @Test("A failing database fails no command and later writes still land")
     func failingDatabaseDoesNotFailCommands() async {
         let store = FlakyStore()
@@ -126,7 +141,6 @@ private actor StallingStore: JournalStore {
     func addCommand(_ command: ActionLogItem) async throws { try await stall() }
     func setCommandStatus(_ id: UUID, to status: ActionLogItem.Status) async throws { try await stall() }
     func commands(limit: Int?, runId: UUID?) async throws -> [ActionLogItem] { [] }
-    func clearCommands() async throws {}
     func addPush(_ push: JournalPush) async throws { try await stall() }
     func pushes(runId: UUID?) async throws -> [JournalPush] { [] }
     func deleteEntries(olderThan date: Date) async throws {}
@@ -145,7 +159,6 @@ private actor FlakyStore: JournalStore {
     func addCommand(_ command: ActionLogItem) async throws { throw StoreError() }
     func setCommandStatus(_ id: UUID, to status: ActionLogItem.Status) async throws { throw StoreError() }
     func commands(limit: Int?, runId: UUID?) async throws -> [ActionLogItem] { throw StoreError() }
-    func clearCommands() async throws { throw StoreError() }
     func addPush(_ push: JournalPush) async throws { pushes.append(push) }
     func pushes(runId: UUID?) async throws -> [JournalPush] { pushes }
     func deleteEntries(olderThan date: Date) async throws { throw StoreError() }

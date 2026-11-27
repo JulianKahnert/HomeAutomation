@@ -62,7 +62,8 @@ final class EntityChangeDbItem: Model, @unchecked Sendable {
 
     init() { }
 
-    init(entityId: UUID, timestamp: Date, value: Value, origin: String) {
+    /// - Parameter shape: The shape of the kind's descriptor; only `textWithNumber` (a deadline) splits its text.
+    init(entityId: UUID, timestamp: Date, value: Value, shape: ValueDescriptor.Shape = .text, origin: String) {
         self.$entity.id = entityId
         self.timestamp = timestamp
         self.origin = origin
@@ -73,7 +74,7 @@ final class EntityChangeDbItem: Model, @unchecked Sendable {
         case .number(let double): number = double
         case .text(let string):
             // A deadline keeps its case in the text and its end in the number, in one row.
-            if let deadline = Deadline(text: string) {
+            if shape == .textWithNumber, let deadline = Deadline(text: string) {
                 text = deadline.caseName
                 number = deadline.end?.timeIntervalSince1970
             } else {
@@ -107,7 +108,7 @@ extension EntityStorageItem {
         let origin = Origin(rawValue: change.origin)
         let shape = ValueDescriptor.descriptor(for: type).shape
         if let value = change.value(shape: shape),
-           let item = EntityStorageItem(entityId: entityId, timestamp: change.timestamp, kind: type.valueKind, value: value, origin: origin) {
+           let item = EntityStorageItem(entityId: entityId, timestamp: change.timestamp, value: value, origin: origin) {
             self = item
         } else {
             self = EntityStorageItem(entityId: entityId, timestamp: change.timestamp, origin: origin)

@@ -16,7 +16,7 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     /// When the entity last reported, a replay included. Only set on the newest item of a history, and only while the
     /// server holds it in memory; `nil` after a restart until the first report.
     public let lastReport: Date?
-    /// The value kind (`ValueKind.rawValue`) and the value. A kind this build does not know still arrives here, with
+    /// The value kind (the raw value of the `CharacteristicsType`) and the value. A kind this build does not know still arrives here, with
     /// its raw value. The typed accessors below derive from the pair.
     public let valueKind: String?
     public let value: Value?
@@ -61,10 +61,12 @@ extension EntityHistoryItem {
         number(type).flatMap { Int(exactly: $0) }
     }
 
-    private var colorComponents: [Float]? {
+    /// The colour of a colour value (the text "r g b" with components 0...1); `nil` for every other value.
+    public var rgb: RGB? {
         guard valueKind == CharacteristicsType.color.rawValue, case .text(let text)? = value else { return nil }
         let parts = text.split(separator: " ").compactMap { Float($0) }
-        return parts.count == 3 ? parts : nil
+        guard parts.count == 3 else { return nil }
+        return RGB(red: parts[0], green: parts[1], blue: parts[2])
     }
 
     public var motionDetected: Bool? { bool(.motionSensor) }
@@ -72,9 +74,6 @@ extension EntityHistoryItem {
     public var isDeviceOn: Bool? { bool(.switcher) }
     public var brightness: Int? { int(.brightness) }
     public var colorTemperature: Float? { number(.colorTemperature).map(Float.init) }
-    public var colorRed: Float? { colorComponents?[0] }
-    public var colorGreen: Float? { colorComponents?[1] }
-    public var colorBlue: Float? { colorComponents?[2] }
     public var isContactOpen: Bool? { bool(.contactSensor) }
     public var isDoorLocked: Bool? { bool(.lock) }
     public var stateOfCharge: Int? { int(.batterySensor) }
@@ -92,7 +91,7 @@ extension EntityHistoryItem {
 
     /// The descriptor of the value kind; `nil` for a kind this build does not know.
     public var descriptor: ValueDescriptor? {
-        valueKind.flatMap { ValueKind(rawValue: $0).descriptor }
+        valueKind.flatMap(CharacteristicsType.init(rawValue:)).map(ValueDescriptor.descriptor(for:))
     }
 
     /// The raw value as text, for a kind without a descriptor.
@@ -111,7 +110,7 @@ extension EntityHistoryItem {
 
     /// Human-readable description of the primary value
     public var valueDescription: String {
-        if let valueKind, ValueKind(rawValue: valueKind).descriptor == nil, let rawValueDescription {
+        if let valueKind, descriptor == nil, let rawValueDescription {
             return "\(valueKind): \(rawValueDescription)"
         }
         if valueKind == CharacteristicsType.deadline.rawValue, case .text(let text) = value, let deadline = Deadline(text: text) {
@@ -175,9 +174,8 @@ extension EntityHistoryItem {
             return "Mode \(heatingMode.name)"
         }
         // Color as hue
-        if let colorRed, let colorGreen, let colorBlue {
-            let hue = Double(RGB(red: colorRed, green: colorGreen, blue: colorBlue).hue)
-            return "\(String(format: "%.0f", hue))° hue"
+        if let rgb {
+            return "\(String(format: "%.0f", Double(rgb.hue)))° hue"
         }
         return "No data"
     }
@@ -203,9 +201,5 @@ public struct EntityHistoryResponse: Sendable, Codable, Equatable {
     public init(items: [EntityHistoryItem], nextCursor: Date?) {
         self.items = items
         self.nextCursor = nextCursor
-    }
-
-    public var hasMore: Bool {
-        nextCursor != nil
     }
 }

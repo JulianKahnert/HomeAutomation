@@ -35,7 +35,7 @@ actor NoisyEntityWarner: Log {
                 try await notificationSender.sendNotification(
                     title: "Noisy sensor: \(entity.serviceName)",
                     message: "\(entity.placeId) / \(entity.serviceName) (\(entity.characteristicType)) stored \(entity.rows) rows in 24 h, "
-                        + "more than \(StoragePolicy.noisyEntityRowsPerDay). Consider a write dead band in StoragePolicy.",
+                        + "more than \(StoragePolicy.noisyEntityRowsPerDay). Consider a write dead band in the value descriptor.",
                     id: "storage-noise-\(key)"
                 )
             } catch {

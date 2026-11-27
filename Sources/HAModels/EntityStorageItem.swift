@@ -15,11 +15,9 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// Timestamp when this state was recorded
     public var timestamp: Date
 
-    /// What kind of value the item carries; `nil` for an item without a value.
-    public let kind: ValueKind?
-
-    /// The one value of the item; its shape follows ``kind``. The typed accessors (`temperatureInC`, `isDeviceOn`, ...)
-    /// are derived from the pair, see `EntityStorageItem+TypedAccess.swift`.
+    /// The one value of the item; its shape follows the characteristic type of ``entityId``, the one table is
+    /// ``ValueDescriptor/descriptor(for:)``. The typed accessors (`temperatureInC`, `isDeviceOn`, ...)
+    /// are derived from it, see `EntityStorageItem+TypedAccess.swift`.
     public let value: Value?
 
     /// Where this change came from. It is no part of the value: two items that differ only in
@@ -41,12 +39,16 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         return string
     }
 
-    /// Creates an item from its kind and value as they are, without checking that they fit; the checked
-    /// way in is ``init(entityId:timestamp:kind:value:origin:)`` (failable).
-    init(entityId: EntityId, timestamp: Date, uncheckedKind kind: ValueKind?, value: Value?, origin: Origin, lastReport: Date? = nil) {
+    /// What kind of value the item carries, the characteristic type of its entity; `nil` for an item without a value.
+    public var kind: CharacteristicsType? {
+        value == nil ? nil : entityId.characteristicType
+    }
+
+    /// Creates an item from its value as it is, without checking that it fits; the checked way in is
+    /// ``init(entityId:timestamp:value:origin:)`` (failable).
+    init(entityId: EntityId, timestamp: Date, uncheckedValue value: Value?, origin: Origin, lastReport: Date? = nil) {
         self.entityId = entityId
         self.timestamp = timestamp
-        self.kind = kind
         self.value = value
         self.origin = origin
         self.lastReport = lastReport
@@ -54,7 +56,13 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
 
     /// Creates an item without a value, such as a report that only says the entity is alive.
     public init(entityId: EntityId, timestamp: Date = Date(), origin: Origin = .homekit, lastReport: Date? = nil) {
-        self.init(entityId: entityId, timestamp: timestamp, uncheckedKind: nil, value: nil, origin: origin, lastReport: lastReport)
+        self.init(entityId: entityId, timestamp: timestamp, uncheckedValue: nil, origin: origin, lastReport: lastReport)
+    }
+
+    /// Whether `other` carries the same information: same entity and value. Timestamp, origin and `lastReport`
+    /// are no part of the value, so every field added later stays out of this compare.
+    public func hasSameValue(as other: Self) -> Bool {
+        entityId == other.entityId && value == other.value
     }
 
     /// Retrieves a non-optional value for a given optional property key path

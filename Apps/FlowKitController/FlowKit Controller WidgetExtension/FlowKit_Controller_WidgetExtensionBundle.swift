@@ -13,7 +13,6 @@ import WidgetKit
 @main
 struct FlowKit_Controller_WidgetExtensionBundle: WidgetBundle {
     var body: some Widget {
-        FlowKit_Controller_WidgetExtension()
         #if os(iOS)
         WindowOpenPushConfiguration()
         #endif

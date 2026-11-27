@@ -274,8 +274,6 @@ public func configure(_ app: Application) async throws {
 
     let gauge = app.eventLoopGauge
     let jobs: [any Job] = [
-        ClockJob(location: location,
-                 homeEventSink: app.homeEventSink),
         HomeEventProcessingJob(gauge: gauge,
                                homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
@@ -288,7 +286,8 @@ public func configure(_ app: Application) async throws {
     let report: @Sendable (EntityId, Value, Origin) async throws -> Bool = { [homeManager] in
         try await homeManager.report($0, value: $1, origin: $2)
     }
-    var scheduledJobs: [any ScheduledJob] = [OutdoorTemperatureJob(location: location, hours: weatherHours, report: report),
+    var scheduledJobs: [any ScheduledJob] = [ClockJob(location: location, homeEventSink: app.homeEventSink),
+                                             OutdoorTemperatureJob(location: location, hours: weatherHours, report: report),
                                              LaneBacklogJob(automationService: automationService, gauge: gauge),
                                              valveJob]
     if let tibber = TibberService() {

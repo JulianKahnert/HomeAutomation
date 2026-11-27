@@ -175,13 +175,17 @@ struct EntityHistoryDetailView: View {
                     store.send(.timeRangeChanged(newValue))
                 }
 
-                if !store.chartData.isEmpty {
+                if hasChart {
                     chartView
                 } else if store.isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
-                } else {
+                } else if store.chartData.isEmpty {
                     Text("No history in this time range.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    // A text value (a window deadline) has history but nothing to plot.
+                    Text("This value has no chart.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -207,6 +211,11 @@ struct EntityHistoryDetailView: View {
             store.send(.onAppear)
         }
         .alert($store.scope(\.$alert, action: \.alert))
+    }
+
+    /// Whether any point of the history can be drawn: a state for the timeline, a number for the value chart.
+    private var hasChart: Bool {
+        store.chartData.contains { $0.stateValue != nil || $0.primaryValue != nil }
     }
 
     private var laneLabel: String {

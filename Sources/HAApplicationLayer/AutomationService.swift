@@ -8,6 +8,7 @@
 import Foundation
 import HAModels
 import Logging
+import Shared
 
 public actor AutomationService {
     private let log = Logger(label: "AutomationManager")
@@ -22,13 +23,12 @@ public actor AutomationService {
         /// When the event whose `shouldTrigger` is running entered the lane.
         var inFlight: Date?
         var worker: Task<Void, Never>?
-        var reported = false
+        var backlog = BacklogReporter()
 
         var isBusy: Bool { worker != nil }
 
         func age(now: Date) -> TimeInterval {
-            guard let oldest = inFlight ?? pending.first?.enqueuedAt else { return 0 }
-            return max(0, now.timeIntervalSince(oldest))
+            BacklogReporter.age(ofOldest: inFlight ?? pending.first?.enqueuedAt, now: now)
         }
     }
 
@@ -37,9 +37,11 @@ public actor AutomationService {
     /// stored config lacks them, and keep their active state like any other automation.
     private let builtIns: [any Automatable]
     private var runningTasks: [String: Task<Void, Never>] = [:]
-    /// Names whose current task was cancelled by `stopAutomation`, so its run ends as `stopped`
-    /// rather than `superseded`.
-    private var stopRequested: Set<String> = []
+    /// The token of each running task by automation name, to tell a stop of this very run from an older one.
+    private var runTokens: [String: UUID] = [:]
+    /// Tokens of the runs `stopAutomation` cancelled, so such a run ends as `stopped` rather than `superseded`.
+    /// Every run removes its own token when it ends, however it ends, so none goes stale.
+    private var stopRequested: Set<UUID> = []
 
     public init(using homeManager: HomeManagable,
                 runs: AutomationRunRepository,
@@ -110,21 +112,15 @@ public actor AutomationService {
     /// The lane is reported again only after it has drained.
     public func reportBacklogs(olderThan limit: TimeInterval, now: Date = Date()) {
         for (name, lane) in lanes {
-            let age = lane.age(now: now)
-            if age > limit {
-                guard !lane.reported else { continue }
-                lane.reported = true
-                log.critical("Automation lane is backed up", metadata: ["automation": "\(name)", "ageSeconds": "\(Int(age))", "waiting": "\(lane.pending.count)"])
-            } else if !lane.isBusy {
-                lane.reported = false
-            }
+            guard let age = lane.backlog.report(age: lane.age(now: now), olderThan: limit) else { continue }
+            log.critical("Automation lane is backed up", metadata: ["automation": "\(name)", "ageSeconds": "\(Int(age))", "waiting": "\(lane.pending.count)"])
         }
     }
 
     private func enqueue(_ event: HomeEvent, enqueuedAt: Date, into automation: any Automatable) {
         let lane = lanes[automation.name] ?? Lane()
         lanes[automation.name] = lane
-        if automation.collapsesChanges, case .change(let item) = event {
+        if automation.lanePolicy != .runEach, case .change(let item) = event {
             lane.pending.removeAll { entry in
                 if case .change(let waiting) = entry.event { return waiting.entityId == item.entityId }
                 return false
@@ -147,7 +143,6 @@ public actor AutomationService {
             }
             lane.inFlight = nil
         }
-        lane.reported = false
         lane.worker = nil
     }
 
@@ -157,13 +152,14 @@ public actor AutomationService {
                 return
             }
 
-            if !automation.supersedesRunningRun, !automation.runsEveryTrigger, self.isRunning(automation.name) {
+            if automation.lanePolicy == .skipWhileRunning, self.isRunning(automation.name) {
                 self.log.info("Automation is still running, not starting it again", metadata: ["automation": "\(automation.name)"])
                 return
             }
 
             self.log.info("Running automation", metadata: ["automation": "\(automation.name)"])
             let runId = automation.recordsRuns ? UUID() : nil
+            let token = UUID()
             let task = Task {
                 // Persisted alongside `execute`: the database must never delay the first command.
                 let recording = Task { await self.record(runId, of: automation, for: event) }
@@ -173,11 +169,13 @@ public actor AutomationService {
                             try await automation.execute(using: self.homeManager)
                         }
                     }
+                    _ = await self.consumeStopRequest(token)
                     await self.finish(await recording.value, outcome: .completed)
                 } catch is CancellationError {
-                    let stopped = await self.consumeStopRequest(for: automation.name)
+                    let stopped = await self.consumeStopRequest(token)
                     await self.finish(await recording.value, outcome: stopped ? .stopped : .superseded)
                 } catch {
+                    _ = await self.consumeStopRequest(token)
                     self.log.error("Automation failed", metadata: ["automation": "\(automation.name)", "error": "\(error)"])
                     await self.finish(await recording.value, outcome: .failed, error: String(describing: error))
                 }
@@ -187,8 +185,8 @@ public actor AutomationService {
                     currentTask?.cancel()
                 }
             }
-            self.set(task: task, with: automation.name)
-            if automation.runsEveryTrigger {
+            self.set(task: task, token: token, with: automation.name)
+            if automation.lanePolicy == .runEach {
                 await task.value
             }
         } catch {
@@ -207,8 +205,8 @@ public actor AutomationService {
 
     public func stopAutomation(with name: String) async {
         log.debug("Cancel automation", metadata: ["automation": "\(name)"])
-        guard let task = runningTasks[name], !task.isCancelled else { return }
-        stopRequested.insert(name)
+        guard let task = runningTasks[name], !task.isCancelled, let token = runTokens[name] else { return }
+        stopRequested.insert(token)
         task.cancel()
     }
 
@@ -216,17 +214,18 @@ public actor AutomationService {
         runningTasks[name].map { !$0.isCancelled } ?? false
     }
 
-    private func set(task: Task<Void, Never>, with id: String) {
+    private func set(task: Task<Void, Never>, token: UUID, with id: String) {
         if let runningTask = runningTasks[id],
            !runningTask.isCancelled {
             runningTask.cancel()
         }
 
         runningTasks[id] = task
+        runTokens[id] = token
     }
 
-    private func consumeStopRequest(for name: String) -> Bool {
-        stopRequested.remove(name) != nil
+    private func consumeStopRequest(_ token: UUID) -> Bool {
+        stopRequested.remove(token) != nil
     }
 
     /// - Returns: `runId` once the run is stored, `nil` when nothing was (or could be) recorded.

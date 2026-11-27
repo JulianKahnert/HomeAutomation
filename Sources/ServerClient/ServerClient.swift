@@ -183,11 +183,9 @@ public struct ServerClient {
     /// Switches the fireplace on or off through the general route `PUT /entities/state`; answers the state it will
     /// have. Asking for the state it already has changes nothing.
     public func setFireplace(isOn: Bool) async throws -> FireplaceState {
-        let id = Fireplace.stateId
-        let entityId = Components.Schemas.EntityId(placeId: id.placeId, name: id.name, characteristicsName: "", characteristicType: id.characteristicType.rawValue)
-        let answer = try await client.setEntityState(body: .json(.init(entityId: entityId, value: .case1(isOn)))).ok.body.json
-        guard case .case1(true) = answer.value else { return .off }
-        return FireplaceState(isOn: true, since: answer.timestamp)
+        let entityId = Components.Schemas.EntityId(Fireplace.stateId)
+        let answer = try await client.setEntityState(body: .json(.init(entityId: entityId, value: .init(.bool(isOn))))).ok.body.json
+        return FireplaceState(answer)
     }
 
     /// The time grid of a heating room (glossary: actual, plan target, Δ). Throws when the server answers
@@ -217,7 +215,37 @@ public struct ServerClient {
     }
 }
 
+extension Components.Schemas.EntityId {
+    /// The wire form of an entity id: no characteristics name is the empty string.
+    init(_ entityId: EntityId) {
+        self.init(placeId: entityId.placeId,
+                  name: entityId.name,
+                  characteristicsName: entityId.characteristicsName ?? "",
+                  characteristicType: entityId.characteristicType.rawValue)
+    }
+}
+
+extension Components.Schemas.Value {
+    init(_ value: Value) {
+        switch value {
+        case .bool(let bool): self = .case1(bool)
+        case .number(let number): self = .case2(number)
+        case .text(let text): self = .case3(text)
+        }
+    }
+}
+
 extension FireplaceState {
+    /// The state after `PUT /entities/state` for the fireplace: on since the answer's timestamp, off for every
+    /// other answer (also a value that is no boolean).
+    init(_ answer: Components.Schemas.EntityState) {
+        guard case .case1(true) = answer.value else {
+            self = .off
+            return
+        }
+        self.init(isOn: true, since: answer.timestamp)
+    }
+
     /// Takes the end the server named, so an app of another version shows when this server ends the fireplace.
     init(_ body: Components.Schemas.Fireplace) {
         self.init(isOn: body.isOn, since: body.since, endsAt: body.endsAt)
@@ -288,12 +316,12 @@ extension EntityHistoryItem {
                   origin: item.origin,
                   lastReport: item.lastReport,
                   valueKind: item.valueKind,
-                  value: item.value.flatMap(Value.init))
+                  value: item.value.map(Value.init))
     }
 }
 
 extension Value {
-    init?(_ payload: Components.Schemas.EntityHistoryItem.ValuePayload) {
+    init(_ payload: Components.Schemas.Value) {
         switch payload {
         case .case1(let bool): self = .bool(bool)
         case .case2(let number): self = .number(number)

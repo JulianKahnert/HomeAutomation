@@ -42,29 +42,28 @@ final class AuthenticationIntegrationTests: XCTestCase {
         app = nil
     }
 
-    // MARK: - Root Endpoint Tests
+    // MARK: - Config Endpoint Tests
 
-    func testRootEndpointRequiresAuthentication() async throws {
+    func testConfigEndpointRequiresAuthentication() async throws {
         // Test without token - should fail
-        try await app.test(.GET, "/", afterResponse: { res async in
+        try await app.test(.GET, "/config", afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
             XCTAssertTrue(res.body.string.contains("Invalid or missing authentication token"))
         })
     }
 
-    func testRootEndpointWithValidToken() async throws {
+    func testConfigEndpointWithValidToken() async throws {
         // Test with valid token - should succeed
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .ok)
-            XCTAssertEqual(res.body.string, "It works!")
         })
     }
 
-    func testRootEndpointWithInvalidToken() async throws {
+    func testConfigEndpointWithInvalidToken() async throws {
         // Test with wrong token - should fail
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer wrong-token")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
@@ -138,7 +137,6 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
     func testMultipleEndpointsAllProtected() async throws {
         let endpoints: [(HTTPMethod, String)] = [
-            (.GET, "/"),
             (.GET, "/config"),
             (.POST, "/config")
         ]
@@ -163,12 +161,13 @@ final class AuthenticationIntegrationTests: XCTestCase {
         testApp.authToken = "any-token"
         testApp.authDisabled = true
         testApp.starActorSystem = StarActorSystem(name: "server-tests")
+        testApp.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405), persist: { _ in })
+        testApp.automationService = try await makeAutomationService(automations: [])
         try routes(testApp)
 
         // Should work without token when auth is disabled
-        try await testApp.test(.GET, "/", afterResponse: { res async in
+        try await testApp.test(.GET, "/config", afterResponse: { res async in
             XCTAssertEqual(res.status, .ok)
-            XCTAssertEqual(res.body.string, "It works!")
         })
 
         try await testApp.asyncShutdown()
@@ -177,7 +176,7 @@ final class AuthenticationIntegrationTests: XCTestCase {
     // MARK: - Error Message Tests
 
     func testUnauthorizedErrorMessageIsClear() async throws {
-        try await app.test(.GET, "/", afterResponse: { res async in
+        try await app.test(.GET, "/config", afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
             let errorMessage = res.body.string
             XCTAssertTrue(
@@ -195,14 +194,14 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
     func testTokenIsCaseSensitive() async throws {
         // Test with wrong case - should fail
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer TEST-INTEGRATION-TOKEN-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
         })
 
         // Test with correct case - should succeed
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .ok)
@@ -213,21 +212,21 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
     func testTokenWithWhitespaceIsRejected() async throws {
         // Test with leading whitespace
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer  test-integration-token-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
         })
 
         // Test with trailing whitespace
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123 ")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
         })
 
         // Test exact token - should succeed
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .ok)

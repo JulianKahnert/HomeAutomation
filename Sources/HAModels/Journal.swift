@@ -45,8 +45,6 @@ public protocol JournalStore: AutomationRunRepository {
     func heatingCommands(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem]
     /// The newest executed radiator command of every radiator, whatever its characteristic; the server loads them at start.
     func lastHeatingCommands() async throws -> [ActionLogItem]
-    /// Removes every command entry.
-    func clearCommands() async throws
     func addPush(_ push: JournalPush) async throws
     /// Newest first.
     func pushes(runId: UUID?) async throws -> [JournalPush]

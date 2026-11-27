@@ -13,16 +13,8 @@ let package = Package(
             targets: ["Adapter", "HAModels", "HAImplementations", "HAApplicationLayer", "Shared", "StarActorSystem"]
         ),
         .library(
-            name: "HAShared",
-            targets: ["HAModels", "HAImplementations"]
-        ),
-        .library(
             name: "ControllerKit",
             targets: ["Controller"]
-        ),
-        .executable(
-            name: "home",
-            targets: ["HomeCLI"]
         ),
     ],
     dependencies: [
@@ -52,8 +44,7 @@ let package = Package(
         .package(url: "https://github.com/chrisaljoudi/swift-log-oslog.git", exact: "0.2.2"),
         .package(url: "https://github.com/juliankahnert/TibberSwift.git", branch: "fix/linux-foundation-networking"),
         // Capped at 7.x: vapor/apns 5.1.0 requires apnswift 7.0.1..<8.0.0.
-        .package(url: "https://github.com/swift-server-community/APNSwift", exact: "7.1.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2")
+        .package(url: "https://github.com/swift-server-community/APNSwift", exact: "7.1.0")
     ],
     targets: [
         .executableTarget(
@@ -144,13 +135,6 @@ let package = Package(
                 "ServerClient",
             ],
             path: "Sources/Controller"
-        ),
-        .executableTarget(
-            name: "HomeCLI",
-            dependencies: [
-                "Shared",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ]
         ),
         .testTarget(
             name: "SharedTests",

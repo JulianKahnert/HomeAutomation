@@ -41,10 +41,6 @@ struct SettingsFeature: Sendable {
         var serverURLString: String = ""
         var serverAuthToken: String = ""
 
-        // Push notification state
-        var isPushAuthorized: Bool = false
-        var deviceToken: Data?
-
         var path = StackState<SettingsPath.State>()
     }
 
@@ -52,7 +48,6 @@ struct SettingsFeature: Sendable {
 
     enum Action: Sendable, BindableAction {
         case onAppear
-        case setServerURL(URL)
         case editServerURL
         case saveServerURL
         case cancelEditServerURL
@@ -82,10 +77,6 @@ struct SettingsFeature: Sendable {
                     await send(.requestPushAuthorization)
                     await send(.refreshWindowStates)
                 }
-
-            case let .setServerURL(url):
-                state.$serverURL.withLock { $0 = url }
-                return .none
 
             case .editServerURL:
                 state.isEditingServerURL = true

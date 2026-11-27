@@ -22,7 +22,6 @@ private actor Repositories: StorageRepository {
     private func touch() { if blocked, Decision.isRunning { callsAfterStart += 1 } }
 
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? { touch(); return nil }
-    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? { touch(); return nil }
     func getAllCurrent() async throws -> [EntityStorageItem] { touch(); return [] }
     func add(_ item: EntityStorageItem) async throws {} // the background save of a change is no read
     func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] { touch(); return [] }

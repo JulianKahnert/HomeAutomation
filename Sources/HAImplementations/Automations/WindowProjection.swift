@@ -22,9 +22,7 @@ public struct WindowProjection: Automatable {
     public var isActive = true
     public let name: String
     public private(set) var triggerEntityIds = Set<EntityId>()
-    public var collapsesChanges: Bool { false }
-    public var supersedesRunningRun: Bool { false }
-    public var runsEveryTrigger: Bool { true }
+    public var lanePolicy: LanePolicy { .runEach }
 
     public init(_ name: String = WindowProjection.defaultName) {
         self.name = name
@@ -36,7 +34,7 @@ public struct WindowProjection: Automatable {
             return item.entityId.characteristicType == .deadline
         case .time(let date):
             guard Calendar.current.component(.minute, from: date) % Self.refreshMinutes == 0 else { return false }
-            return await hm.states(of: CharacteristicsType.deadline.valueKind).contains { $0.deadline?.end != nil }
+            return await hm.states(of: .deadline).contains { $0.deadline?.end != nil }
         case .sunrise, .sunset, .serverStarted, .configDeployed:
             return false
         }

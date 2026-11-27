@@ -43,15 +43,3 @@ public distributed actor HomeEventReceiver {
         return .change(entity: item)
     }
 }
-
-extension HomeEventReceiver {
-    public struct Event: Codable, Sendable {
-        public let type: String
-        public let payload: [String: String]
-
-        public init(type: String, payload: [String: String]) {
-            self.type = type
-            self.payload = payload
-        }
-    }
-}

@@ -208,23 +208,6 @@ paths:
                   - openCount
                   - overdueCount
 
-  /lights/set:
-    post:
-      summary: Set light properties
-      description: Set color and/or brightness of a light by placeId and name.
-      operationId: setLightProperties
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SetLightRequest"
-      responses:
-        "200":
-          description: Light properties were set successfully.
-        "400":
-          description: Bad request - invalid parameters.
-
   /entities/state:
     put:
       summary: Set the state of a server-owned entity
@@ -585,11 +568,7 @@ components:
         entityId:
           $ref: "#/components/schemas/EntityId"
         value:
-          description: The new value; its shape follows the value kind (boolean, number or text).
-          oneOf:
-            - type: boolean
-            - type: number
-            - type: string
+          $ref: "#/components/schemas/Value"
       required:
         - entityId
         - value
@@ -602,11 +581,7 @@ components:
         valueKind:
           type: string
         value:
-          description: The state after the request.
-          oneOf:
-            - type: boolean
-            - type: number
-            - type: string
+          $ref: "#/components/schemas/Value"
         changed:
           type: boolean
           description: False when the entity already had this value.
@@ -621,27 +596,6 @@ components:
         - value
         - changed
 
-    SetLightRequest:
-      type: object
-      properties:
-        placeId:
-          type: string
-          description: The place identifier (e.g. room name).
-        name:
-          type: string
-          description: The name of the light entity.
-        hexColor:
-          type: string
-          description: Hex color string (e.g. "#FF0000" or "FF0000").
-        brightness:
-          type: integer
-          minimum: 0
-          maximum: 100
-          description: Brightness level 0-100.
-      required:
-        - placeId
-        - name
-
     EntityHistory:
       type: object
       properties:
@@ -655,6 +609,13 @@ components:
         - entityId
         - items
 
+    Value:
+      description: A generic value, a boolean, a number or a text; its shape follows the value kind (colour is the text "r g b" with components 0...1).
+      oneOf:
+        - type: boolean
+        - type: number
+        - type: string
+
     EntityHistoryItem:
       type: object
       properties:
@@ -662,11 +623,7 @@ components:
           type: string
           description: The value kind of this point (the raw value of a characteristic type, e.g. `temperatureSensor`). A kind the app does not know is shown with its raw value.
         value:
-          description: The generic value of this point, a boolean, a number or a text; its shape follows the value kind (colour is the text "r g b" with components 0...1).
-          oneOf:
-            - type: boolean
-            - type: number
-            - type: string
+          $ref: "#/components/schemas/Value"
         timestamp:
           type: string
           format: date-time

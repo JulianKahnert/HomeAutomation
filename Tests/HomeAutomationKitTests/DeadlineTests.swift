@@ -19,12 +19,11 @@ struct DeadlineTests {
         #expect(Deadline(text: "soon 5") == nil)
     }
 
-    @Test func itemRoundTripsThroughTheGenericForm() throws {
+    @Test func aDeadlineIsAServerOwnedTextWithNumber() throws {
         let id = EntityId.serverOwned(name: "Küche/Fenster", characteristic: .deadline)
         let item = EntityStorageItem(entityId: id, timestamp: end, deadline: .running(until: end), origin: .server)
-        let generic = try #require(item.genericValue)
-        #expect(generic.kind == CharacteristicsType.deadline.valueKind)
-        #expect(generic.kind.descriptor?.shape == .textWithNumber)
-        #expect(EntityStorageItem(entityId: id, timestamp: end, kind: generic.kind, value: generic.value, origin: .server) == item)
+        #expect(item.kind == .deadline)
+        #expect(ValueDescriptor.descriptor(for: .deadline).shape == .textWithNumber)
+        #expect(item.deadline == .running(until: end))
     }
 }

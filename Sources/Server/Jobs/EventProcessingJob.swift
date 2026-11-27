@@ -19,7 +19,7 @@ final class EventLoopGauge: Sendable {
     private struct State {
         var waiting: [Date] = []
         var handling: Date?
-        var reported = false
+        var backlog = BacklogReporter()
     }
 
     private let state = Mutex(State())
@@ -51,19 +51,12 @@ final class EventLoopGauge: Sendable {
     func reportsBacklog(olderThan limit: TimeInterval, now: Date = Date()) -> TimeInterval? {
         state.withLock { state in
             let age = Self.age(of: state, now: now)
-            guard age > limit else {
-                if age == 0 { state.reported = false }
-                return nil
-            }
-            guard !state.reported else { return nil }
-            state.reported = true
-            return age
+            return state.backlog.report(age: age, olderThan: limit)
         }
     }
 
     private static func age(of state: State, now: Date) -> TimeInterval {
-        guard let oldest = state.handling ?? state.waiting.first else { return 0 }
-        return max(0, now.timeIntervalSince(oldest))
+        BacklogReporter.age(ofOldest: state.handling ?? state.waiting.first, now: now)
     }
 }
 

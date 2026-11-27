@@ -170,41 +170,6 @@ struct OpenAPIController: APIProtocol {
                                            staleDateIsoTimeStamp: contentState.staleDate?.ISO8601Format()))))
     }
 
-    // MARK: - /lights/set
-
-    func setLightProperties(_ input: Operations.SetLightProperties.Input) async throws -> Operations.SetLightProperties.Output {
-        guard case let .json(body) = input.body else {
-            throw Abort(.badRequest, reason: "Invalid JSON body")
-        }
-
-        // Set RGB color if hex provided
-        if let hexColor = body.hexColor {
-            let hex = hexColor.hasPrefix("#") ? String(hexColor.dropFirst()) : hexColor
-            guard hex.count == 6,
-                  let hexInt = UInt32(hex, radix: 16) else {
-                throw Abort(.badRequest, reason: "Invalid hex color: \(hexColor)")
-            }
-
-            let red = Float((hexInt >> 16) & 0xFF) / 255.0
-            let green = Float((hexInt >> 8) & 0xFF) / 255.0
-            let blue = Float(hexInt & 0xFF) / 255.0
-            let rgb = RGB(red: red, green: green, blue: blue)
-
-            let colorId = EntityId(placeId: body.placeId, name: body.name, characteristicsName: nil, characteristic: .color)
-            await request.application.homeManager.perform(.setRGB(colorId, rgb: rgb))
-        }
-
-        // Set brightness if provided
-        if let brightness = body.brightness {
-            let normalizedBrightness = Float(brightness) / 100.0
-
-            let brightnessId = EntityId(placeId: body.placeId, name: body.name, characteristicsName: nil, characteristic: .brightness)
-            await request.application.homeManager.perform(.setBrightness(brightnessId, normalizedBrightness))
-        }
-
-        return .ok
-    }
-
     // MARK: - /entities/state
 
     func setEntityState(_ input: Operations.SetEntityState.Input) async throws -> Operations.SetEntityState.Output {
@@ -215,13 +180,8 @@ struct OpenAPIController: APIProtocol {
                                 characteristicsName: characteristicsName, characteristic: type)
 
         // Only a server-owned entity of a kind the descriptor lets the app set; any other one stays unchanged.
-        guard entityId.isServerOwned, type.valueKind.descriptor?.isSettableFromApp == true else { return .forbidden }
-        let value: Value
-        switch body.value {
-        case .case1(let bool): value = .bool(bool)
-        case .case2(let number): value = .number(number)
-        case .case3(let text): value = .text(text)
-        }
+        guard entityId.isServerOwned, ValueDescriptor.descriptor(for: type).isSettableFromApp else { return .forbidden }
+        let value = Value(body.value)
         let homeManager = request.application.homeManager
         let changed: Bool
         do {
@@ -237,12 +197,12 @@ struct OpenAPIController: APIProtocol {
             request.logger.error("Failed to read the state that was just set", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
             throw Abort(.internalServerError)
         }
-        guard let state = item.genericValue?.value else {
+        guard let state = item.value else {
             request.logger.error("The state that was just set has no value", metadata: ["entityId": "\(entityId)"])
             throw Abort(.internalServerError)
         }
         return .ok(.init(body: .json(.init(entityId: .init(entityId),
-                                           valueKind: type.valueKind.rawValue,
+                                           valueKind: type.rawValue,
                                            value: .init(state),
                                            changed: changed,
                                            origin: item.origin.rawValue,
@@ -401,7 +361,7 @@ extension Components.Schemas.EntityHistoryItem {
     }
 }
 
-extension Components.Schemas.EntityState.ValuePayload {
+extension Components.Schemas.Value {
     init(_ value: Value) {
         switch value {
         case .bool(let bool): self = .case1(bool)
@@ -411,12 +371,12 @@ extension Components.Schemas.EntityState.ValuePayload {
     }
 }
 
-extension Components.Schemas.EntityHistoryItem.ValuePayload {
-    init(_ value: Value) {
-        switch value {
-        case .bool(let bool): self = .case1(bool)
-        case .number(let number): self = .case2(number)
-        case .text(let text): self = .case3(text)
+extension Value {
+    init(_ payload: Components.Schemas.Value) {
+        switch payload {
+        case .case1(let bool): self = .bool(bool)
+        case .case2(let number): self = .number(number)
+        case .case3(let text): self = .text(text)
         }
     }
 }

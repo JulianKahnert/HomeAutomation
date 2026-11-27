@@ -116,10 +116,6 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return Set(items)
     }
 
-    func getEntityStream() async -> AsyncStream<EntityStorageItem> {
-        return entityStream
-    }
-
     func findEntity(_ entity: EntityId) async throws {
     }
 
@@ -131,19 +127,6 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
             throw OptionalError.notFound
         }
         return item
-    }
-
-    func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem? {
-        let matching = storageItems.filter { $0.entityId == entityId }
-        return matching.count > 1 ? matching[matching.count - 2] : nil
-    }
-
-    /// What the database holds per entity, when it differs from the world in `storageItems` (the cache
-    /// after a restart carries the timestamp of the adapter's resync, the database the real one).
-    var storedItems: [EntityId: EntityStorageItem] = [:]
-
-    func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
-        storedItems[entityId] ?? storageItems.last(where: { $0.entityId == entityId })
     }
 
     /// The writes the server made to radiators: seeded by a test, and every action `perform` ran in a heating context.
@@ -218,16 +201,16 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     @discardableResult
     func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
         guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
-        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
+        guard let item = EntityStorageItem(entityId: entityId, value: value, origin: origin) else {
             throw ReportError.valueDoesNotFit(entityId)
         }
         return await addEntityHistory(item)
     }
 
-    func states(of kind: ValueKind) async -> [EntityStorageItem] {
+    func states(of type: CharacteristicsType) async -> [EntityStorageItem] {
         var latest: [EntityId: EntityStorageItem] = [:]
         for item in storageItems { latest[item.entityId] = item }
-        return latest.values.filter { $0.entityId.characteristicType.valueKind == kind }
+        return latest.values.filter { $0.entityId.characteristicType == type }
     }
 
     /// When each entity last reported, for a test that places a report in the past.

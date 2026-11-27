@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Shared
 
 /// What one value kind is: the shape of its value, unit, display and storage rule.
 ///
@@ -26,23 +27,21 @@ public struct ValueDescriptor: Sendable, Equatable {
 
     /// How a kind is written, kept and condensed (the rules behind `StoragePolicy`).
     public struct StorageRule: Sendable, Equatable {
-        /// Rules follow the kind of value, not the device.
-        public enum Class: Sendable, Equatable {
-            /// Measured quantities: temperature, humidity, lux, CO₂, battery level, lamp levels.
-            case analog
-            /// States and events: switch, contact, motion, lock, heating fields and mode.
-            case state
-            /// Enumerated levels such as HomeKit air quality.
-            case enumeration
-        }
-
         /// A new value is stored only when it moved by `absoluteChange` or the last one is older than `maxInterval`.
         public struct DeadBand: Sendable, Equatable {
             public let absoluteChange: Double
             public let maxInterval: Duration
+
+            /// Whether `value` at `timestamp` is worth storing after the last stored one.
+            public func shouldStore(_ value: Double, at timestamp: Date, lastStored: (value: Double, timestamp: Date)?) -> Bool {
+                guard let lastStored else { return true }
+                if timestamp.timeIntervalSince(lastStored.timestamp) >= maxInterval.timeInterval {
+                    return true
+                }
+                return abs(value - lastStored.value) >= absoluteChange
+            }
         }
 
-        public let storageClass: Class
         public let deadBand: DeadBand?
         /// Days a raw row is kept; `nil` keeps it forever.
         public let rawRetentionDays: Int?
@@ -51,8 +50,8 @@ public struct ValueDescriptor: Sendable, Equatable {
         /// Values outside are sensor errors and are left out of the rollup.
         public let validRange: ClosedRange<Double>?
 
-        static let state = StorageRule(storageClass: .state, deadBand: nil, rawRetentionDays: nil, hourlyRollup: false, validRange: nil)
-        static let analog = StorageRule(storageClass: .analog, deadBand: nil, rawRetentionDays: nil, hourlyRollup: false, validRange: nil)
+        /// Kept raw forever, no dead band, no rollup.
+        static let keepRaw = StorageRule(deadBand: nil, rawRetentionDays: nil, hourlyRollup: false, validRange: nil)
     }
 
     /// What a value of the right shape must also satisfy to fit the kind.
@@ -68,7 +67,6 @@ public struct ValueDescriptor: Sendable, Equatable {
         case deadlineText
     }
 
-    public let kind: ValueKind
     public let shape: Shape
     /// Unit symbol, `nil` for unitless kinds.
     public let unit: String?
@@ -116,7 +114,6 @@ public struct ValueDescriptor: Sendable, Equatable {
     }
 
     private static let lightStorage = StorageRule(
-        storageClass: .analog,
         deadBand: nil,
         rawRetentionDays: 90,
         hourlyRollup: true,
@@ -124,28 +121,18 @@ public struct ValueDescriptor: Sendable, Equatable {
     )
 
     private static let carbonDioxideStorage = StorageRule(
-        storageClass: .analog,
         deadBand: .init(absoluteChange: 25, maxInterval: .seconds(15 * 60)),
         rawRetentionDays: 90,
         hourlyRollup: true,
         validRange: 1...100_000
     )
 
-    private static let airQualityStorage = StorageRule(
-        storageClass: .enumeration,
-        deadBand: nil,
-        rawRetentionDays: nil,
-        hourlyRollup: false,
-        validRange: nil
-    )
-
     private static func bool(_ type: CharacteristicsType, _ trueLabel: String, _ falseLabel: String, isSettableFromApp: Bool = false) -> ValueDescriptor {
         ValueDescriptor(
-            kind: type.valueKind,
             shape: .bool,
             unit: nil,
             display: .boolean(trueLabel: trueLabel, falseLabel: falseLabel),
-            storage: .state,
+            storage: .keepRaw,
             constraint: .none,
             isSettableFromApp: isSettableFromApp
         )
@@ -155,12 +142,11 @@ public struct ValueDescriptor: Sendable, Equatable {
         _ type: CharacteristicsType,
         unit: String?,
         digits: Int = 0,
-        storage: StorageRule = .analog,
+        storage: StorageRule = .keepRaw,
         constraint: Constraint = .none,
         isSettableFromApp: Bool = false
     ) -> ValueDescriptor {
         ValueDescriptor(
-            kind: type.valueKind,
             shape: .number,
             unit: unit,
             display: .number(fractionDigits: digits),
@@ -172,11 +158,10 @@ public struct ValueDescriptor: Sendable, Equatable {
 
     private static func structured(_ type: CharacteristicsType, shape: Shape, display: Display, constraint: Constraint) -> ValueDescriptor {
         ValueDescriptor(
-            kind: type.valueKind,
             shape: shape,
             unit: nil,
             display: display,
-            storage: .state,
+            storage: .keepRaw,
             constraint: constraint,
             isSettableFromApp: false
         )
@@ -213,15 +198,15 @@ public struct ValueDescriptor: Sendable, Equatable {
         case .colorTemperature:
             return number(type, unit: nil, digits: 2)
         case .airQualitySensor:
-            return number(type, unit: nil, storage: airQualityStorage, constraint: .wholeNumber)
+            return number(type, unit: nil, storage: StorageRule.keepRaw, constraint: .wholeNumber)
         case .targetTemperature:
-            return number(type, unit: "°C", digits: 1, storage: .state, isSettableFromApp: true)
+            return number(type, unit: "°C", digits: 1, storage: .keepRaw, isSettableFromApp: true)
         case .heatingMode:
-            return number(type, unit: nil, storage: .state, constraint: .heatingMode, isSettableFromApp: true)
+            return number(type, unit: nil, storage: .keepRaw, constraint: .heatingMode, isSettableFromApp: true)
         case .valvePosition:
-            return number(type, unit: "%", storage: .state, constraint: .wholeNumber)
+            return number(type, unit: "%", storage: .keepRaw, constraint: .wholeNumber)
         case .temperatureCalibration:
-            return number(type, unit: "°C", digits: 1, storage: .state)
+            return number(type, unit: "°C", digits: 1, storage: .keepRaw)
         case .energyPrice:
             return number(type, unit: "€/kWh", digits: 3)
         case .deadline:

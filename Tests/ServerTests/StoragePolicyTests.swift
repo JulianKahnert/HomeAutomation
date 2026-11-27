@@ -15,62 +15,46 @@ struct StoragePolicyTests {
 
     // MARK: - rule table
 
+    private func rule(_ type: CharacteristicsType) -> ValueDescriptor.StorageRule {
+        ValueDescriptor.descriptor(for: type).storage
+    }
+
     @Test(arguments: [CharacteristicsType.temperatureSensor, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration, .heating, .valve,
                       .relativeHumiditySensor, .contactSensor, .batterySensor, .lock, .motionSensor, .switcher,
                       .brightness, .colorTemperature, .color, .airQualitySensor, .pmDensitySensor, .energyPrice])
     func keepsRawForeverWithoutRollupOrDeadBand(_ type: CharacteristicsType) {
-        let policy = StoragePolicy.policy(for: type)
-        #expect(policy.rawRetentionDays == nil)
-        #expect(policy.rollup == .none)
-        #expect(policy.deadBand == nil)
+        #expect(rule(type).rawRetentionDays == nil)
+        #expect(rule(type).hourlyRollup == false)
+        #expect(rule(type).deadBand == nil)
     }
 
     @Test(arguments: [CharacteristicsType.lightSensor, .carbonDioxideSensorId])
     func rollsUpLuxAndCO2HourlyAfter90Days(_ type: CharacteristicsType) {
-        let policy = StoragePolicy.policy(for: type)
-        #expect(policy.rawRetentionDays == 90)
-        #expect(policy.rollup == .hourly)
-        #expect(policy.kind == .analog)
+        #expect(rule(type).rawRetentionDays == 90)
+        #expect(rule(type).hourlyRollup)
     }
 
     @Test func co2HasDeadBandAndTreatsZeroAsError() throws {
-        let policy = StoragePolicy.policy(for: .carbonDioxideSensorId)
-        #expect(policy.deadBand == StoragePolicy.DeadBand(threshold: .absolute(25), maxInterval: .minutes(15)))
-        let range = try #require(policy.validRange)
+        let co2 = rule(.carbonDioxideSensorId)
+        #expect(co2.deadBand?.absoluteChange == 25)
+        #expect(co2.deadBand?.maxInterval == .minutes(15))
+        let range = try #require(co2.validRange)
         #expect(!range.contains(0))
         #expect(range.contains(420))
-        #expect(StoragePolicy.policy(for: .lightSensor).validRange?.contains(0) == true)
-    }
-
-    @Test func heatingFieldsAreStates() {
-        for type in [CharacteristicsType.targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration, .heating, .valve] {
-            #expect(StoragePolicy.policy(for: type).kind == .state)
-        }
-        #expect(StoragePolicy.policy(for: .airQualitySensor).kind == .enumeration)
+        #expect(rule(.lightSensor).validRange?.contains(0) == true)
     }
 
     @Test(arguments: CharacteristicsType.allCases)
-    func rollupAndDeadBandOnlyBelongToAnalogTypes(_ type: CharacteristicsType) {
-        let policy = StoragePolicy.policy(for: type)
-        if policy.rollup != .none || policy.deadBand != nil {
-            #expect(policy.kind == .analog)
+    func aRollupNeedsARetention(_ type: CharacteristicsType) {
+        if rule(type).hourlyRollup {
+            #expect(rule(type).rawRetentionDays != nil)
         }
-        if policy.rollup != .none {
-            #expect(policy.rawRetentionDays != nil)
-        }
-    }
-
-    @Test func unknownTypeIsKeptRawForever() {
-        #expect(StoragePolicy.policy(forRawType: "fineDustSensorV2") == StoragePolicy.unknown)
-        #expect(StoragePolicy.unknown.rawRetentionDays == nil)
-        #expect(StoragePolicy.unknown.rollup == .none)
-        #expect(StoragePolicy.policy(forRawType: "carbonDioxideSensorId") == StoragePolicy.policy(for: .carbonDioxideSensorId))
     }
 
     // MARK: - dead band
 
-    @Test func absoluteDeadBandStoresOnlyLargeChangesOrAfterMaxInterval() {
-        let band = StoragePolicy.DeadBand(threshold: .absolute(25), maxInterval: .minutes(15))
+    @Test func deadBandStoresOnlyLargeChangesOrAfterMaxInterval() throws {
+        let band = try #require(rule(.carbonDioxideSensorId).deadBand)
         let last = (value: 800.0, timestamp: now)
         #expect(band.shouldStore(800, at: now, lastStored: nil))
         #expect(!band.shouldStore(824, at: now.addingTimeInterval(60), lastStored: last))
@@ -80,14 +64,6 @@ struct StoragePolicyTests {
         #expect(!band.shouldStore(800, at: now.addingTimeInterval(14 * 60 + 59), lastStored: last))
         #expect(band.shouldStore(800, at: now.addingTimeInterval(15 * 60), lastStored: last))
         #expect(band.shouldStore(0, at: now.addingTimeInterval(1), lastStored: last))
-    }
-
-    @Test func relativeDeadBandScalesWithTheLastValue() {
-        let band = StoragePolicy.DeadBand(threshold: .relative(0.1), maxInterval: .hours(1))
-        #expect(!band.shouldStore(109, at: now, lastStored: (100, now)))
-        #expect(band.shouldStore(110, at: now, lastStored: (100, now)))
-        #expect(!band.shouldStore(1_090, at: now, lastStored: (1_000, now)))
-        #expect(band.shouldStore(90, at: now, lastStored: (100, now)))
     }
 
     // MARK: - cleanup and rollup selection
@@ -209,7 +185,6 @@ private actor RecordingNotificationSender: NotificationSender {
         messages.append(message)
     }
 
-    func clearNotification(id: String) async throws {}
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String, options: LiveActivityOptions) async {}
     func endAllLiveActivities(ofActivityType activityType: String) async {}
 }
@@ -226,7 +201,6 @@ private actor RecordingRunDeleter: JournalStore {
     func addCommand(_ command: ActionLogItem) async throws {}
     func setCommandStatus(_ id: UUID, to status: ActionLogItem.Status) async throws {}
     func commands(limit: Int?, runId: UUID?) async throws -> [ActionLogItem] { [] }
-    func clearCommands() async throws {}
     func addPush(_ push: JournalPush) async throws {}
     func pushes(runId: UUID?) async throws -> [JournalPush] { [] }
     func deleteEntries(olderThan date: Date) async throws {

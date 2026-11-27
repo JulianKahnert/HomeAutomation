@@ -24,8 +24,6 @@ enum EveMatterValve {
     /// Thermostat `LocalTemperatureCalibration` (int8, 0.1 °C), the Eve app's "Temperaturabweichung".
     /// The Thermostat's `LocalTemperature` already includes it.
     static let localTemperatureCalibrationAttributeID: UInt32 = 0x0010
-    /// Global `ClusterRevision` attribute; on the Thermostat cluster it tells which calibration range applies.
-    static let clusterRevisionAttributeID: UInt32 = 0xFFFD
     /// Matter Descriptor cluster and its `ServerList` attribute, the cluster IDs an endpoint serves.
     static let descriptorClusterID: UInt32 = 0x001D
     static let serverListAttributeID: UInt32 = 0x0001

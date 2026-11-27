@@ -73,7 +73,8 @@ struct ShouldTriggerMemoryTests {
                      contacts: [.window(window), .fireplace()],
                      configuration: HeatingConfiguration(standardPlan: HeatingPlan([]))),
          FireplaceReminder(roomSensor: roomSensor),
-         MotionAtNight("motion", motionSensors: [motion], lightSensor: motion, lights: [light], minBrightness: 0.1)]
+         MotionAtNight("motion", motionSensors: [motion], lightSensor: motion, lights: [light], minBrightness: 0.1),
+         DatabaseCleanup()]
     }
 
     @Test("No automation reaches a repository while deciding")

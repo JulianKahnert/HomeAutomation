@@ -238,28 +238,6 @@ struct OpenAPIController: APIProtocol {
         return .ok
     }
 
-    // MARK: - /entities
-
-    func getEntitiesWithHistory(_ input: Operations.GetEntitiesWithHistory.Input) async throws -> Operations.GetEntitiesWithHistory.Output {
-        // Get all unique entity IDs that have history
-        let entityIds = try await request.application.entityStorageDbRepository.getAllEntityIds()
-
-        // Map EntityIds to EntityInfo
-        let entityInfos = entityIds.map { entityId in
-            Components.Schemas.EntityInfo(
-                id: "\(entityId.placeId)_\(entityId.name)_\(entityId.characteristicType.rawValue)",
-                entityId: Components.Schemas.EntityId(
-                    placeId: entityId.placeId,
-                    name: entityId.name,
-                    characteristicsName: entityId.characteristicsName ?? "",
-                    characteristicType: entityId.characteristicType.rawValue
-                )
-            )
-        }
-
-        return .ok(.init(body: .json(entityInfos)))
-    }
-
     // MARK: - /entities/state
 
     func setEntityState(_ input: Operations.SetEntityState.Input) async throws -> Operations.SetEntityState.Output {

@@ -230,7 +230,7 @@ final class EntityStorageMySQLTests: XCTestCase {
         try await insertRaw(lux, minutes: 10, lux: 0)
 
         try await repository.rollUpHourly(type: .carbonDioxideSensorId,
-                                          validRange: StoragePolicy.policy(for: .carbonDioxideSensorId).validRange,
+                                          validRange: ValueDescriptor.descriptor(for: .carbonDioxideSensorId).storage.validRange,
                                           olderThan: hour.addingTimeInterval(2 * 3600))
 
         let aggregates = try await repository.hourlyAggregates(of: co2)

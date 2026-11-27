@@ -110,11 +110,11 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
         }
     }
 
-    /// Whether the value moved out of its type's write dead band (`StoragePolicy`) around the last
+    /// Whether the value moved out of its type's write dead band (the descriptor's storage rule) around the last
     /// stored change. Types without a dead band cost no extra query.
     private func passesDeadBand(_ value: Value, at timestamp: Date, of entity: EntityDbItem) async throws -> Bool {
         guard let type = CharacteristicsType(rawValue: entity.characteristicType),
-              let deadBand = StoragePolicy.policy(for: type).deadBand,
+              let deadBand = ValueDescriptor.descriptor(for: type).storage.deadBand,
               case .number(let number) = value else {
             return true
         }

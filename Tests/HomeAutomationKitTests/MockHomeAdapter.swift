@@ -228,7 +228,10 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return latest.values.filter { $0.entityId.characteristicType.valueKind == kind }
     }
 
-    func lastReport(of entityId: EntityId) async -> Date? { nil }
+    /// When each entity last reported, for a test that places a report in the past.
+    var lastReports: [EntityId: Date] = [:]
+
+    func lastReport(of entityId: EntityId) async -> Date? { lastReports[entityId] }
 
     func lastNotificationDate(id: String) async -> Date? {
         notificationDates[id]

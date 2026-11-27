@@ -130,8 +130,6 @@ struct HomeManagerTests {
     ///   in the tests that drive them.
     private func makeHomeManager(probe: AdapterProbe,
                                  storageRepo: any StorageRepository = MockStorageRepository(),
-                                 fireplaceSwitches: (any FireplaceRepository)? = nil,
-                                 onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
                                  onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
                                  retryTicks: AsyncStream<Void> = AsyncStream { _ in },
                                  persistRetryDelays: [Duration] = [.zero, .zero],
@@ -142,8 +140,6 @@ struct HomeManagerTests {
                                  notificationSender: MockNotificationSender(),
                                  location: Location(latitude: 0, longitude: 0),
                                  journal: journal,
-                                 fireplaceSwitches: fireplaceSwitches,
-                                 onFireplaceSwitch: onFireplaceSwitch,
                                  onReportedChange: onReportedChange,
                                  retryTicks: retryTicks,
                                  persistRetryDelays: persistRetryDelays)
@@ -521,45 +517,19 @@ struct HomeManagerTests {
 
     // MARK: - fireplace
 
-    @Test("A fireplace switch holds at once, is stored and tells the automations; a repeat changes nothing")
-    func fireplaceSwitch() async {
-        let stored = InMemoryFireplaceRepository()
-        let told = FireplaceLog()
-        let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored, onFireplaceSwitch: { told.append($0) })
-        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    @Test("A repeated 'on' from the app keeps the start, so the two hours do not restart; the end counts with origin server")
+    func fireplaceRepeatedOnKeepsStart() async throws {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
 
-        let on = await homeManager.switchFireplace(isOn: true, at: start)
-        let again = await homeManager.switchFireplace(isOn: true, at: start.addingTimeInterval(60))
+        #expect(await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app))
+        let since = try #require(await Fireplace.state(with: homeManager).since)
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app) == false)
 
-        #expect(on == FireplaceSwitch(timestamp: start, isOn: true))
-        #expect(again == nil)
-        #expect(await homeManager.lastFireplaceSwitch() == on)
-        #expect(await stored.all == [FireplaceSwitch(timestamp: start, isOn: true)])
-        #expect(told.all == [FireplaceSwitch(timestamp: start, isOn: true)])
-    }
-
-    @Test("After a restart the fireplace state comes from the database")
-    func fireplaceSurvivesRestart() async {
-        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
-        let stored = InMemoryFireplaceRepository([FireplaceSwitch(timestamp: start, isOn: true)])
-        let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored)
-        await homeManager.loadCurrentStates(timeout: .seconds(2))
-
-        #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
-    }
-
-    @Test("A switch the database could not save still holds, so the end of the fireplace is not repeated")
-    func fireplaceSwitchWithoutDatabase() async {
-        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
-        let stored = FailingFireplaceRepository(latest: FireplaceSwitch(timestamp: start, isOn: true))
-        let homeManager = await makeHomeManager(probe: AdapterProbe(), fireplaceSwitches: stored)
-        await homeManager.loadCurrentStates(timeout: .seconds(2))
-
-        let off = await homeManager.switchFireplace(isOn: false, at: start.addingTimeInterval(7200))
-
-        #expect(off?.isOn == false)
-        #expect(await homeManager.switchFireplace(isOn: false, at: start.addingTimeInterval(7260)) == nil)
+        #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: since))
+        #expect(await homeManager.report(Fireplace.stateId, value: .bool(false), origin: .server))
         #expect(await Fireplace.state(with: homeManager) == .off)
+        #expect(try await homeManager.getCurrentEntity(with: Fireplace.stateId).origin == .server)
     }
 
     // MARK: - entity history
@@ -983,22 +953,4 @@ private actor RecordingStorageRepository: StorageRepository {
         defer { concurrentCalls -= 1 }
         return await body()
     }
-}
-
-/// The fireplace switches the automations were told about.
-private final class FireplaceLog: @unchecked Sendable {
-    private let lock = NSLock()
-    private var switches: [FireplaceSwitch] = []
-
-    var all: [FireplaceSwitch] { lock.withLock { switches } }
-    func append(_ fireplaceSwitch: FireplaceSwitch) { lock.withLock { switches.append(fireplaceSwitch) } }
-}
-
-/// A database that answers the last switch but saves none.
-private struct FailingFireplaceRepository: FireplaceRepository {
-    let latest: FireplaceSwitch?
-
-    func add(_ fireplaceSwitch: FireplaceSwitch) async throws { throw StorageFailure() }
-    func latest() async throws -> FireplaceSwitch? { latest }
-    func switches(from startDate: Date, to endDate: Date) async throws -> [FireplaceSwitch] { [] }
 }

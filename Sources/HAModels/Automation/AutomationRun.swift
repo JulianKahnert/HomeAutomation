@@ -47,6 +47,7 @@ public struct AutomationTrigger: Codable, Sendable, Equatable {
         case sunset
         case serverStart
         case configDeploy
+        /// Only in stored runs from before the fireplace became an entity.
         case fireplace
     }
 
@@ -81,8 +82,6 @@ extension HomeEvent {
             return AutomationTrigger(kind: .serverStart, entityId: nil, summary: "Server started")
         case .configDeployed:
             return AutomationTrigger(kind: .configDeploy, entityId: nil, summary: "Configuration deployed")
-        case .fireplaceChanged(let isOn):
-            return AutomationTrigger(kind: .fireplace, entityId: nil, summary: isOn ? "Kamin an" : "Kamin aus")
         }
     }
 }

@@ -15,7 +15,7 @@ private enum Decision {
 }
 
 /// Every repository answers while the server starts and counts the reads a decision makes after it; it must make none.
-private actor Repositories: StorageRepository, FireplaceRepository {
+private actor Repositories: StorageRepository {
     private(set) var callsAfterStart = 0
     private var blocked = false
     func block() { blocked = true }
@@ -28,10 +28,6 @@ private actor Repositories: StorageRepository, FireplaceRepository {
     func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] { touch(); return [] }
 
     func getAllEntityIds() async throws -> [EntityId] { touch(); return [] }
-
-    func add(_ fireplaceSwitch: FireplaceSwitch) async throws { touch() }
-    func latest() async throws -> FireplaceSwitch? { touch(); return nil }
-    func switches(from startDate: Date, to endDate: Date) async throws -> [FireplaceSwitch] { touch(); return [] }
 }
 
 @Suite("shouldTrigger reads memory only")
@@ -50,7 +46,6 @@ struct ShouldTriggerMemoryTests {
                           notificationSender: MockNotificationSender(),
                           location: Location(latitude: 0, longitude: 0),
                           journal: journal,
-                          fireplaceSwitches: repositories,
                           retryTicks: AsyncStream { _ in })
     }
 
@@ -76,7 +71,7 @@ struct ShouldTriggerMemoryTests {
         let closed = EntityStorageItem(entityId: window.contactSensorId, isContactOpen: false)
         let moving = EntityStorageItem(entityId: motion.motionSensorId, motionDetected: true)
         let events: [HomeEvent] = [.change(entity: reading), .change(entity: closed), .change(entity: moving), .serverStarted,
-                                   .time(date: now), .fireplaceChanged(isOn: false), .fireplaceChanged(isOn: true), .sunset]
+                                   .time(date: now), .change(entity: EntityStorageItem(entityId: Fireplace.stateId, isDeviceOn: true)), .sunset]
         for event in events { await homeManager.addEntityHistory(event.item) }
         for automation in automations() {
             for event in events {

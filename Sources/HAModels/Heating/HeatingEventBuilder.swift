@@ -47,20 +47,20 @@ struct HeatingEventBuilder {
         var result: [HeatingEvent] = []
         var openedAt: Date?
         let items = (contactItems[contact.entityId] ?? []).sorted { $0.timestamp < $1.timestamp }
-        func close(at closedAt: Date?) {
+        func close(at closedAt: Date?, by origin: Origin? = nil) {
             guard let opened = openedAt else { return }
             openedAt = nil
-            if let event = intervalEvent(contact, from: opened, to: closedAt) { result.append(event) }
+            if let event = intervalEvent(contact, from: opened, to: closedAt, closedBy: origin) { result.append(event) }
         }
         for item in items {
             let isOpen = contact.source.isOpen(item)
-            if isOpen, openedAt == nil { openedAt = item.timestamp } else if !isOpen { close(at: item.timestamp) }
+            if isOpen, openedAt == nil { openedAt = item.timestamp } else if !isOpen { close(at: item.timestamp, by: item.origin) }
         }
         close(at: nil)
         return result
     }
 
-    private func intervalEvent(_ contact: HeatingRoomSources.Contact, from opened: Date, to closed: Date?) -> HeatingEvent? {
+    private func intervalEvent(_ contact: HeatingRoomSources.Contact, from opened: Date, to closed: Date?, closedBy origin: Origin?) -> HeatingEvent? {
         let last = closed ?? end
         switch contact.source {
         case .window:
@@ -74,7 +74,8 @@ struct HeatingEventBuilder {
             var reason = "Kamin an: die Heizkörper der Räume am Kamin sind aus."
             var title = "Kamin an"
             if let closed {
-                if closed.timeIntervalSince(opened) >= Fireplace.maxDuration - 60 {
+                // the history says who switched it off: the server's own end after the maximum duration, or the app
+                if origin == .server {
                     reason = "Der Kamin wurde nach \(Self.duration(closed.timeIntervalSince(opened))) per Zeitablauf ausgeschaltet; dazu kam die Benachrichtigung „Kamin aus“."
                     title = "Kamin aus (Zeitablauf)"
                 } else {

@@ -23,15 +23,9 @@ public final class HomeManager: HomeManagable {
     private let location: Location
     private let storageRepo: StorageRepository
     private let deliveries: DeliveryQueue
-    private let fireplaceSwitches: (any FireplaceRepository)?
     private let storageUpkeep: (any StorageUpkeep)?
-    /// Tells the automations about a switch of the fireplace; the server yields `HomeEvent.fireplaceChanged`.
-    private let onFireplaceSwitch: @Sendable (FireplaceSwitch) -> Void
     /// Hands a changed, already checked server-owned state to the event stream (`report`).
     private let onReportedChange: @Sendable (EntityStorageItem) -> Void
-    /// The newest fireplace switch, loaded once from the database. It also holds a switch the database could
-    /// not save, so an end of the fireplace stays an end and `FireplaceTimeout` does not repeat itself.
-    private var fireplace: FireplaceSwitch??
     /// The last command that reached each radiator, keyed by room and radiator name; loaded from the journal at
     /// start and kept current by `perform`, so a decision never reads the database.
     private var lastCommands: [String: HeatingWrite] = [:]
@@ -69,9 +63,7 @@ public final class HomeManager: HomeManagable {
     /// - Parameters:
     ///   - retryTicks: Cadence at which queued failed actions are retried. Pass a stream to drive the
     ///     retries deterministically; the default is a 5s timer.
-    ///   - fireplaceSwitches: Where the fireplace switches are stored; `nil` keeps them in memory only.
     ///   - storageUpkeep: What the database upkeep steps do; `nil` does nothing.
-    ///   - onFireplaceSwitch: Called after each switch of the fireplace, to tell the automations.
     ///   - onReportedChange: Called with each changed state set by `report`; the server yields `HomeEvent.change`.
     ///   - persistRetryDelays: Pauses between the attempts to save one entity state; one more attempt
     ///     than there are delays.
@@ -81,9 +73,7 @@ public final class HomeManager: HomeManagable {
                 location: Location,
                 journal: Journal = Journal(store: InMemoryJournalStore()),
                 commandCache: CommandCache = CommandCache(),
-                fireplaceSwitches: (any FireplaceRepository)? = nil,
                 storageUpkeep: (any StorageUpkeep)? = nil,
-                onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
                 onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
                 retryTicks: AsyncStream<Void>? = nil,
                 persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)]) {
@@ -91,9 +81,7 @@ public final class HomeManager: HomeManagable {
         self.deliveries = deliveries
         self.journal = journal
         self.commandCache = commandCache
-        self.fireplaceSwitches = fireplaceSwitches
         self.storageUpkeep = storageUpkeep
-        self.onFireplaceSwitch = onFireplaceSwitch
         self.onReportedChange = onReportedChange
         self.getAdapter = getAdapter
         self.storageRepo = storageRepo
@@ -191,20 +179,10 @@ public final class HomeManager: HomeManagable {
 
     private struct LoadTimeout: Error {}
 
-    /// Loads what the automations decide on and the database alone holds: the last command per radiator and the
-    /// fireplace state. A failed read leaves it empty and logs; the decision then runs without it.
+    /// Loads what the automations decide on and the database alone holds: the last command per radiator. A failed read leaves it empty and logs; the decision then runs without it.
     private func loadDecisionState() async {
         for write in await journal.lastHeatingWrites() where lastCommands[Self.key(of: write.entityId)] == nil {
             lastCommands[Self.key(of: write.entityId)] = write
-        }
-        if fireplace == nil, let fireplaceSwitches {
-            do {
-                // a switch made while the database was read wins over what it answered
-                let stored = try await fireplaceSwitches.latest()
-                if fireplace == nil { fireplace = .some(stored) }
-            } catch {
-                log.error("Failed to read the fireplace state", metadata: ["error": "\(error)"])
-            }
         }
     }
 
@@ -356,24 +334,6 @@ public final class HomeManager: HomeManagable {
 
     public func queuedRetry(of entityId: EntityId) async -> HomeManagableAction? {
         failedActions[entityId]?.action
-    }
-
-    public func lastFireplaceSwitch() async -> FireplaceSwitch? {
-        fireplace.flatMap { $0 }
-    }
-
-    public func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch? {
-        let current = await lastFireplaceSwitch()
-        guard (current?.isOn ?? false) != isOn else { return nil }
-        let new = FireplaceSwitch(timestamp: date, isOn: isOn)
-        fireplace = .some(new)
-        onFireplaceSwitch(new)
-        do {
-            try await fireplaceSwitches?.add(new)
-        } catch {
-            log.error("Failed to store the fireplace switch", metadata: ["isOn": "\(isOn)", "error": "\(error)"])
-        }
-        return new
     }
 
     public func trigger(scene sceneName: String) async {

@@ -145,7 +145,6 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateEntityHourlyAggregate())
     app.migrations.add(AddTemperatureCalibration())
     app.migrations.add(CreateHeatingWrite())
-    app.migrations.add(CreateFireplaceSwitch())
     app.migrations.add(AddOrigin())
     app.migrations.add(CreateJournal())
     app.migrations.add(CreateNarrowStorage())
@@ -266,13 +265,9 @@ public func configure(_ app: Application) async throws {
                                         notificationSender: notificationSender,
                                         location: app.homeAutomationConfigService.location,
                                         journal: journal,
-                                        fireplaceSwitches: app.fireplaceRepository,
                                         storageUpkeep: DatabaseStorageUpkeep(entities: app.entityStorageDbRepository,
                                                                              journal: journal,
                                                                              noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
-                                        onFireplaceSwitch: { [continuation = app.homeEventsContinuation] fireplaceSwitch in
-        continuation.yield(.fireplaceChanged(isOn: fireplaceSwitch.isOn))
-    },
                                         onReportedChange: { [continuation = app.homeEventsContinuation] item in
         continuation.yield(.change(entity: item))
     })

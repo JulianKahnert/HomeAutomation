@@ -14,7 +14,6 @@ import XCTVapor
 final class FireplaceEndpointTests: XCTestCase {
     var app: Application!
     private let token = "fireplace-test-token"
-    private var switches: FireplaceSwitches!
     private var events: EventLog!
 
     override func setUp() async throws {
@@ -25,15 +24,13 @@ final class FireplaceEndpointTests: XCTestCase {
         app.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405), persist: { _ in })
         app.automationService = try await makeAutomationService(automations: [])
         app.starActorSystem = StarActorSystem(name: "fireplace-tests")
-        switches = FireplaceSwitches()
         events = EventLog()
         // no adapter: the fireplace is the server's own state and needs none
         app.homeManager = await HomeManager(getAdapter: { nil },
                                             storageRepo: EmptyStorage(),
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 52.52, longitude: 13.405),
-                                            fireplaceSwitches: switches,
-                                            onFireplaceSwitch: { [events] in events?.append($0) })
+                                            onReportedChange: { [events] in events?.append($0) })
         try routes(app)
     }
 
@@ -48,10 +45,10 @@ final class FireplaceEndpointTests: XCTestCase {
         let endsAt: Date?
     }
 
-    private func request(_ method: HTTPMethod, token: String?, body: String? = nil) async throws -> (HTTPStatus, State?) {
+    private func request(_ method: HTTPMethod, _ path: String = "/heating/fireplace", token: String?, body: String? = nil) async throws -> (HTTPStatus, State?) {
         var status: HTTPStatus = .internalServerError
         var state: State?
-        try await app.test(method, "/heating/fireplace", beforeRequest: { req in
+        try await app.test(method, path, beforeRequest: { req in
             if let token { req.headers.add(name: .authorization, value: "Bearer \(token)") }
             if let body {
                 req.headers.contentType = .json
@@ -66,14 +63,21 @@ final class FireplaceEndpointTests: XCTestCase {
         return (status, state)
     }
 
+    /// The app's way to switch the fireplace: the general route.
+    @discardableResult
+    private func switchFireplace(_ isOn: Bool) async throws -> HTTPStatus {
+        let body = #"{"entityId":{"placeId":"server","name":"fireplace","characteristicType":"switcher"},"value":\#(isOn)}"#
+        return try await request(.PUT, "/entities/state", token: token, body: body).0
+    }
+
     func testGetRequiresAuthentication() async throws {
         let (status, _) = try await request(.GET, token: nil)
         XCTAssertEqual(status, .unauthorized)
     }
 
-    func testPutRequiresAuthentication() async throws {
-        let (status, _) = try await request(.PUT, token: "wrong", body: #"{"isOn":true}"#)
-        XCTAssertEqual(status, .unauthorized)
+    func testThePutRouteIsGone() async throws {
+        let (status, _) = try await request(.PUT, token: token, body: #"{"isOn":true}"#)
+        XCTAssertEqual(status, .notFound)
     }
 
     func testNeverSwitchedIsOff() async throws {
@@ -83,74 +87,51 @@ final class FireplaceEndpointTests: XCTestCase {
         XCTAssertNil(state?.since)
     }
 
-    func testStateSaysSinceAndEnd() async throws {
-        let start = Date(timeIntervalSinceNow: -3600)
-        try await switches.add(FireplaceSwitch(timestamp: start, isOn: true))
-        await (app.homeManager as? HomeManager)?.loadCurrentStates(timeout: .seconds(2))
+    func testSwitchOnHoldsAtOnceAndGetSaysSinceAndEnd() async throws {
+        let before = Date()
+        let putStatus = try await switchFireplace(true)
+        XCTAssertEqual(putStatus, .ok)
 
         let (status, state) = try await request(.GET, token: token)
-
         XCTAssertEqual(status, .ok)
         XCTAssertEqual(state?.isOn, true)
-        XCTAssertEqual(try XCTUnwrap(state?.since).timeIntervalSince1970, start.timeIntervalSince1970, accuracy: 1)
-        XCTAssertEqual(try XCTUnwrap(state?.endsAt).timeIntervalSince1970, start.addingTimeInterval(Fireplace.maxDuration).timeIntervalSince1970, accuracy: 1)
-    }
-
-    func testSwitchOnHoldsAtOnceIsStoredAndTellsTheAutomations() async throws {
-        let (status, state) = try await request(.PUT, token: token, body: #"{"isOn":true}"#)
-        XCTAssertEqual(status, .ok)
-        XCTAssertEqual(state?.isOn, true)
-        XCTAssertNotNil(state?.endsAt)
-
-        let (_, read) = try await request(.GET, token: token)
-        XCTAssertEqual(read?.isOn, true)
-        let stored = await switches.all
-        XCTAssertEqual(stored.map(\.isOn), [true])
-        XCTAssertEqual(events.all.map(\.isOn), [true])
+        let since = try XCTUnwrap(state?.since)
+        XCTAssertEqual(since.timeIntervalSince1970, before.timeIntervalSince1970, accuracy: 5)
+        XCTAssertEqual(try XCTUnwrap(state?.endsAt).timeIntervalSince1970, since.addingTimeInterval(Fireplace.maxDuration).timeIntervalSince1970, accuracy: 1)
+        // the rooms that follow the fireplace hear it as a change with origin app
+        XCTAssertEqual(events.all.map(\.origin), [.app])
+        XCTAssertEqual(events.all.first?.entityId, Fireplace.stateId)
     }
 
     func testSwitchOffHoldsAtOnce() async throws {
-        try await switches.add(FireplaceSwitch(timestamp: Date(timeIntervalSinceNow: -60), isOn: true))
-        await (app.homeManager as? HomeManager)?.loadCurrentStates(timeout: .seconds(2))
-
-        let (status, state) = try await request(.PUT, token: token, body: #"{"isOn":false}"#)
-        XCTAssertEqual(status, .ok)
-        XCTAssertEqual(state?.isOn, false)
+        try await switchFireplace(true)
+        try await switchFireplace(false)
 
         let (_, read) = try await request(.GET, token: token)
         XCTAssertEqual(read?.isOn, false)
-        XCTAssertEqual(events.all.map(\.isOn), [false])
+        XCTAssertEqual(events.all.compactMap(\.isDeviceOn), [true, false])
     }
 
     func testRepeatedOnKeepsTheStartAndTellsNobody() async throws {
-        let start = Date(timeIntervalSinceNow: -600)
-        try await switches.add(FireplaceSwitch(timestamp: start, isOn: true))
-        await (app.homeManager as? HomeManager)?.loadCurrentStates(timeout: .seconds(2))
+        try await switchFireplace(true)
+        let (_, first) = try await request(.GET, token: token)
+        try await Task.sleep(for: .milliseconds(1100))
 
-        let (_, state) = try await request(.PUT, token: token, body: #"{"isOn":true}"#)
+        try await switchFireplace(true)
 
-        XCTAssertEqual(try XCTUnwrap(state?.since).timeIntervalSince1970, start.timeIntervalSince1970, accuracy: 1)
-        let stored = await switches.all
-        XCTAssertEqual(stored.count, 1)
-        XCTAssertTrue(events.all.isEmpty)
+        let (_, second) = try await request(.GET, token: token)
+        XCTAssertEqual(second?.since, first?.since)
+        XCTAssertEqual(events.all.count, 1)
     }
 }
 
-private actor FireplaceSwitches: FireplaceRepository {
-    private(set) var all: [FireplaceSwitch] = []
-
-    func add(_ fireplaceSwitch: FireplaceSwitch) async throws { all.append(fireplaceSwitch) }
-    func latest() async throws -> FireplaceSwitch? { all.last }
-    func switches(from startDate: Date, to endDate: Date) async throws -> [FireplaceSwitch] { all }
-}
-
-/// The switches the automations were told about.
+/// The changes the automations were told about.
 private final class EventLog: @unchecked Sendable {
     private let lock = NSLock()
-    private var switches: [FireplaceSwitch] = []
+    private var items: [EntityStorageItem] = []
 
-    var all: [FireplaceSwitch] { lock.withLock { switches } }
-    func append(_ fireplaceSwitch: FireplaceSwitch) { lock.withLock { switches.append(fireplaceSwitch) } }
+    var all: [EntityStorageItem] { lock.withLock { items } }
+    func append(_ item: EntityStorageItem) { lock.withLock { items.append(item) } }
 }
 
 struct EmptyStorage: StorageRepository {

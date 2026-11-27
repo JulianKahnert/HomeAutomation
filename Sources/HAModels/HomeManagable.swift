@@ -38,11 +38,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite?
     /// The command queued to be sent again for `entityId` after it failed, `nil` when none waits.
     func queuedRetry(of entityId: EntityId) async -> HomeManagableAction?
-    /// The newest switch of the fireplace (glossary: fireplace mode), `nil` when it was never switched.
-    func lastFireplaceSwitch() async -> FireplaceSwitch?
-    /// Switches the fireplace and tells the automations (`HomeEvent.fireplaceChanged`). Returns the new switch,
-    /// `nil` when the fireplace already had that state.
-    func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
     /// Asks the adapter which thermostats it can read; throws while the adapter is not connected.
     func listThermostats() async throws -> [Thermostat]

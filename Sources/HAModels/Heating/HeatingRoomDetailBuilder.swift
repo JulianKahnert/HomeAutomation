@@ -74,7 +74,6 @@ public struct HeatingRoomSources: Sendable, Equatable {
 public struct HeatingRoomDetailBuilder: Sendable {
     private let storage: any StorageRepository
     private let writes: any HeatingCommandSource
-    private let fireplace: (any FireplaceRepository)?
     private let now: @Sendable () -> Date
     private let sensorFailureLimit: TimeInterval
     private let lastReport: @Sendable (EntityId) async -> Date?
@@ -85,21 +84,18 @@ public struct HeatingRoomDetailBuilder: Sendable {
     static let writeLookback: TimeInterval = 24 * 3_600
 
     /// - Parameters:
-    ///   - fireplace: The stored fireplace switches, the history of a room's fireplace contact; `nil` shows none.
     ///   - sensorFailureLimit: A reading older than this no longer counts: the grid shows a gap.
     ///     Rows are only stored when a value changed, so the limit counts from the later of the last change and the
     ///     last report: an unchanged value that still reports shows no gap, a silent sensor does.
     ///   - lastReport: When an entity last reported (memory of the server); `nil` when unknown, as after a restart.
     public init(storage: any StorageRepository,
                 writes: any HeatingCommandSource,
-                fireplace: (any FireplaceRepository)? = nil,
                 now: @escaping @Sendable () -> Date = { Date() },
                 sensorFailureLimit: TimeInterval = 6 * 3_600,
                 lastReport: @escaping @Sendable (EntityId) async -> Date? = { _ in nil },
                 calendar: Calendar = .current) {
         self.storage = storage
         self.writes = writes
-        self.fireplace = fireplace
         self.now = now
         self.sensorFailureLimit = sensorFailureLimit
         self.lastReport = lastReport
@@ -121,7 +117,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
         var targetItems: [String: [EntityStorageItem]] = [:]
         if includeEvents {
             for contact in room.contacts {
-                contactItems[contact.entityId] = try await contactHistory(contact, from: start, to: end)
+                contactItems[contact.entityId] = try await items(contact.entityId, from: start, to: end)
             }
             for radiator in room.radiators {
                 if let id = radiator.targetTemperatureId { targetItems[radiator.name] = try await items(id, from: start, to: end) }
@@ -172,14 +168,6 @@ public struct HeatingRoomDetailBuilder: Sendable {
     private func series(_ entityId: EntityId, from start: Date, to end: Date, value: (EntityStorageItem) -> Double?) async throws -> Series {
         let all = try await items(entityId, from: start, to: end)
         return Series(points: all.compactMap { item in value(item).map { (item.timestamp, $0) } }, lastReport: await lastReport(entityId))
-    }
-
-    /// The states of a contact in the range plus the one before it, oldest first. The fireplace comes from the
-    /// server's own switches, as items of `Fireplace.stateId` that say on or off.
-    private func contactHistory(_ contact: HeatingRoomSources.Contact, from start: Date, to end: Date) async throws -> [EntityStorageItem] {
-        guard contact.source == .fireplace else { return try await items(contact.entityId, from: start, to: end) }
-        let switches = try await fireplace?.switches(from: start, to: end.addingTimeInterval(1)) ?? []
-        return switches.map { EntityStorageItem(entityId: contact.entityId, timestamp: $0.timestamp, isDeviceOn: $0.isOn) }
     }
 
     /// The stored states of `entityId` in the range plus the one before it, oldest first.

@@ -58,7 +58,7 @@ public struct MotionAtNight: Automatable {
             guard sensorIds.contains(item.entityId) else { return false }
         case .serverStarted:
             break
-        case .time, .sunrise, .sunset, .configDeployed, .fireplaceChanged:
+        case .time, .sunrise, .sunset, .configDeployed:
             return false
         }
 

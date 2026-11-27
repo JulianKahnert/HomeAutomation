@@ -324,7 +324,6 @@ struct OpenAPIController: APIProtocol {
         let homeManager = request.application.homeManager
         return HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
                                  writes: Journal(store: request.application.journalRepository),
-                                 fireplace: request.application.fireplaceRepository,
                                  lastReport: { await homeManager.lastReport(of: $0) },
                                  calendar: HeatingOverviewBuilder.berlin)
     }
@@ -333,12 +332,6 @@ struct OpenAPIController: APIProtocol {
 
     func getFireplace(_ input: Operations.GetFireplace.Input) async throws -> Operations.GetFireplace.Output {
         let state = await Fireplace.state(with: request.application.homeManager)
-        return .ok(.init(body: .json(.init(state))))
-    }
-
-    func setFireplace(_ input: Operations.SetFireplace.Input) async throws -> Operations.SetFireplace.Output {
-        guard case .json(let body) = input.body else { throw Abort(.badRequest) }
-        let state = await Fireplace.set(isOn: body.isOn, with: request.application.homeManager)
         return .ok(.init(body: .json(.init(state))))
     }
 }

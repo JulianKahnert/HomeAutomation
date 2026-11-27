@@ -97,3 +97,40 @@ Something that happened in a room, in the room detail's `events` (`source`, titl
 
 **Pin** (Pin)
 The small SF Symbol above the room detail's chart for one event: `calendar` plan, `window.vertical.open` window, `flame` fireplace, `hand.raised` observed, `gearshape` system. At most two rows; a pin that finds both rows taken joins the last pin of the second row as a "+n" pin that lists all of them. Plan pins show up to 24 h only. Tapping or hovering shows the reason, as a popover on Mac and iPad and as an inline card on iPhone. Window and fireplace events with a duration also draw an area over the plot. There is no legend.
+
+## Server core
+
+Terms of the server core after the levers. Entries describe the target form; they are in force once the ticket that builds them is done.
+
+**Deadline** (Frist)
+A value kind with three cases: none, running until a moment, overdue. One stored row holds it: the number for the end, the text for the case.
+
+**Fensterschließzeit**
+The end of a window's deadline: the moment by which an open window has to be closed. Once it has passed, the deadline is overdue (überschritten).
+
+**Projection** (Projektion)
+An automation without own state and without waiting: it reads entities and hands a computed result over as a delivery. For a projection events are worked through in order, none is replaced or collapsed, so no alert is lost. The window projection computes the Live Activity content.
+
+**Delivery** (Zustellung)
+A push the server hands to the notification adapter, which executes deliveries in the order they were handed over and knows no feature. Automations reach it through one method at the `HomeManager`, not through `perform`.
+
+**Value kind** (Werttyp)
+The kind of value a state carries: Bool, number or text, with one descriptor per kind that names unit, display and storage rule. Not the storage policy's `StorageKind`, which only groups characteristic types by retention and rollup rules.
+
+**Origin** (Herkunft)
+Where a change came from: `homekit`, `server`, `app`, or the name of a polling job. Only `homekit` counts as a sign of life of HomeKit.
+
+**Report** (Meldung)
+Telling the `HomeManager` a new state: an adapter reports what a device says, the server reports what it owns itself. A report is checked and set at once, tells the caller whether it changed, and a repeat changes nothing. It is not a command; the command path stays reserved for devices (ADR-003).
+
+**Server-owned entity** (servereigene Entity)
+An entity no device stands behind: the server keeps its state itself and reports it with origin `server` or, when the app sets it, `app`. Examples: the fireplace, a window's deadline, the plan target of a room.
+
+**Polling job** (Abfrage-Job)
+A job of the scheduler with a cadence that polls a source (valves, weather, price), feeds the result into the event stream with the job's name as origin and logs an error once per disturbance.
+
+**Lane** (Spur)
+The queue of events one automation works through in order. A slow automation delays only its own lane. When several changes of the same entity wait in one lane only the newest stays; events without a state (button press, clock, sun, server start, deploy) are never collapsed.
+
+**Journal** (Journal)
+The one record of runs, commands and pushes, one table with an entry per kind. A command entry carries its reason (`plan`, `window`, `fireplace`, `system`).

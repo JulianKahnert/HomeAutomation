@@ -13,7 +13,7 @@ import Shared
 /// rollup all read it. Rules are fixed in code on purpose; there is no config and no DB table.
 struct StoragePolicy: Sendable, Equatable {
     /// Rules follow the kind of value, not the device.
-    enum ValueKind: Sendable, Equatable {
+    enum StorageKind: Sendable, Equatable {
         /// Measured quantities: temperature, humidity, lux, CO₂, battery level, lamp levels.
         case analog
         /// States and events: switch, contact, motion, lock, heating fields and mode.
@@ -74,7 +74,7 @@ struct StoragePolicy: Sendable, Equatable {
         }
     }
 
-    let kind: ValueKind
+    let kind: StorageKind
     let valueColumn: ValueColumn?
     let deadBand: DeadBand?
     /// Days a raw row is kept; `nil` keeps it forever.
@@ -89,7 +89,7 @@ struct StoragePolicy: Sendable, Equatable {
     /// mysql:9). So 500 rows a day are 500 × 365 × 370 B ≈ 68 MB per entity and year, kept forever.
     static let noisyEntityRowsPerDay = 500
 
-    static func state(_ kind: ValueKind = .state) -> StoragePolicy {
+    static func state(_ kind: StorageKind = .state) -> StoragePolicy {
         StoragePolicy(kind: kind, valueColumn: nil, deadBand: nil, rawRetentionDays: nil, rollup: .none, validRange: nil)
     }
 

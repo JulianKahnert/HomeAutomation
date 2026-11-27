@@ -49,55 +49,39 @@ extension HMCharacteristic: @retroactive Comparable {
             homeKitLogger.error("Characteristic is not readable", metadata: logMetadata)
             return nil
         }
+        let type = entityId.characteristicType
+        let context = HomeKitValueMapping.Context(
+            serviceType: service?.serviceType,
+            characteristicType: characteristicType,
+            isBoolFormat: metadata?.format == HMCharacteristicMetadataFormatBool,
+            minimumValue: metadata?.minimumValue?.doubleValue,
+            maximumValue: metadata?.maximumValue?.doubleValue
+        )
+        guard HomeKitValueMapping.needsRead(type, context: context) else {
+            return EntityStorageItem(entityId: entityId, timestamp: timestamp)
+        }
         do {
-            let motionDetected = try await hasMotion()
-            let illuminance = try await getIlluminance()
-            let isDeviceOn = try await isDeviceOn()
-            let brightness = try await getBrightness()
-            let colorTemperature = try await getColorTemperature()
-            let color = try await getColor()
-            let isContactOpen = try await isContactOpen()
-            let isDoorLocked = try await isDoorLocked()
-            let stateOfCharge = try await getStateOfCharge()
-            let isHeaterActive = try await getHeaterState()
-            let temperature = try await getTemperature()
-            let relativeHumidity = try await getRelativeHumidity()
-            let carbonDioxideLevel = try await getCarbonDioxideLevel()
-            let pmDensity = try await getPMDensity()
-            let airQuality = try await getAirQuality()
-            let valveOpen = try await getValveOpen()
-            let targetTemperature = try await getTargetTemperature()
-            let heatingMode = try await getHeatingMode()
-            let valvePositionPercent = try await getValvePositionPercent()
-
-            let item = EntityStorageItem(entityId: entityId,
-                                     timestamp: timestamp,
-                                     motionDetected: motionDetected,
-                                     illuminance: illuminance,
-                                     isDeviceOn: isDeviceOn,
-                                     brightness: brightness,
-                                     colorTemperature: colorTemperature,
-                                     color: color,
-                                     isContactOpen: isContactOpen,
-                                     isDoorLocked: isDoorLocked,
-                                     stateOfCharge: stateOfCharge,
-                                     isHeaterActive: isHeaterActive,
-                                     temperatureInC: temperature,
-                                     relativeHumidity: relativeHumidity,
-                                     carbonDioxideSensorId: carbonDioxideLevel,
-                                     pmDensity: pmDensity,
-                                     airQuality: airQuality,
-                                     valveOpen: valveOpen,
-                                     targetTemperatureInC: targetTemperature,
-                                     heatingMode: heatingMode,
-                                     valvePositionPercent: valvePositionPercent)
-            if entityId.characteristicType.isHeatingRelated {
+            try await readValue()
+            var context = context
+            if type == .color {
+                (context.saturation, context.brightness) = try await colorSiblingValues()
+            }
+            guard let mapped = HomeKitValueMapping.value(type, raw: value, context: context) else {
+                if type == .heatingMode || type == .valvePosition {
+                    homeKitLogger.warning("Unusable heating characteristic value, stored as nil", metadata: logMetadata.merging(["rawValue": "\(String(describing: value))"]) { _, new in new })
+                } else {
+                    assertionFailure("\(type) characteristic value is not valid - value: \(String(describing: value)), min: \(String(describing: metadata?.minimumValue)), max: \(String(describing: metadata?.maximumValue))")
+                }
+                return EntityStorageItem(entityId: entityId, timestamp: timestamp)
+            }
+            guard let item = EntityStorageItem(entityId: entityId, timestamp: timestamp, value: mapped) else {
+                assertionFailure("\(type) characteristic value does not fit its kind - value: \(mapped)")
+                return EntityStorageItem(entityId: entityId, timestamp: timestamp)
+            }
+            if type.isHeatingRelated {
                 homeKitLogger.debug("Read heating characteristic", metadata: logMetadata.merging([
-                    "entityType": "\(entityId.characteristicType)",
-                    "isHeaterActive": "\(isHeaterActive.map(String.init(describing:)) ?? "nil")",
-                    "targetTemperatureInC": "\(targetTemperature.map(String.init(describing:)) ?? "nil")",
-                    "heatingMode": "\(heatingMode?.name ?? "nil")",
-                    "valvePositionPercent": "\(valvePositionPercent.map(String.init(describing:)) ?? "nil")"
+                    "entityType": "\(type)",
+                    "value": "\(mapped)"
                 ]) { _, new in new })
             }
             return item
@@ -121,310 +105,20 @@ extension HMCharacteristic: @retroactive Comparable {
         ]
     }
 
-    private func hasMotion() async throws -> Bool? {
-        guard let service else { return nil }
-
-        if service.serviceType == HMServiceTypeOccupancySensor,
-           characteristicType == HMCharacteristicTypeOccupancyDetected {
-
-            try await readValue()
-
-            let motionDetected = (value as? Int64) == 1
-            return motionDetected
-
-        } else if service.serviceType == HMServiceTypeMotionSensor,
-                  characteristicType == HMCharacteristicTypeMotionDetected {
-
-            try await readValue()
-
-            let motionDetected = value as? Bool
-            return motionDetected
-        } else {
-            return nil
-        }
-    }
-
-    private func getIlluminance() async throws -> Measurement<UnitIlluminance>? {
-        guard let service,
-              service.serviceType == HMServiceTypeLightSensor,
-              characteristicType == HMCharacteristicTypeCurrentLightLevel else { return nil }
-
-        try await readValue()
-
-        guard let illuminance = value as? Double else {
-            assertionFailure("Illuminance characteristic value is not Double - value: \(String(describing: value))")
-            return nil
-        }
-        return .init(value: illuminance, unit: .lux)
-    }
-
-    private func isDeviceOn() async throws -> Bool? {
-        guard // let service,
-              // We don't specify the servicType, because there might be other/new services which could be turned off
-              // service.serviceType == HMServiceTypeLightbulb || service.serviceType == HMServiceTypeSwitch || service.serviceType == HMServiceTypeOutlet,
-              characteristicType == HMCharacteristicTypePowerState,
-              metadata?.format == HMCharacteristicMetadataFormatBool else { return nil }
-
-        try await readValue()
-
-        guard let value = value as? Bool else {
-            assertionFailure("PowerState characteristic value is not Bool - value: \(String(describing: value))")
-            return nil
-        }
-        return value
-    }
-
-    private func isContactOpen() async throws -> Bool? {
-        guard let service,
-              service.serviceType == HMServiceTypeContactSensor,
-              characteristicType == HMCharacteristicTypeContactState else { return nil }
-
-        try await readValue()
-
-        guard let value = value as? Int,
-              let contactState = HMCharacteristicValueContactState(rawValue: value) else {
-            assertionFailure("ContactState characteristic value is not valid - value: \(String(describing: value))")
-            return nil
-        }
-
-        return contactState != .detected
-    }
-
-    private func isDoorLocked() async throws -> Bool? {
-        guard let service,
-              service.serviceType == HMServiceTypeLockMechanism,
-              characteristicType == HMCharacteristicTypeTargetLockMechanismState else { return nil }
-
-        try await readValue()
-
-        guard let value = value as? Int,
-              let contactState = HMCharacteristicValueLockMechanismState(rawValue: value) else {
-            assertionFailure("LockMechanismState characteristic value is not valid - value: \(String(describing: value))")
-            return nil
-        }
-
-        return contactState == .secured
-    }
-
-    private func getStateOfCharge() async throws -> Int? {
-        guard let service,
-              service.serviceType == HMServiceTypeBattery,
-              characteristicType == HMCharacteristicTypeBatteryLevel else { return nil }
-
-        try await readValue()
-
-        guard let stateOfCharge = value as? Int64 else {
-            assertionFailure("BatteryLevel characteristic value is not Int64 - value: \(String(describing: value))")
-            return nil
-        }
-
-        return Int(stateOfCharge)
-    }
-
-    private func getHeaterState() async throws -> Bool? {
-        guard let service,
-              service.serviceType == HMServiceTypeHeaterCooler,
-              characteristicType == HMCharacteristicTypeActive else { return nil }
-
-        try await readValue()
-
-        guard let rawValue = value as? Int,
-              let state = HMCharacteristicValueActivationState(rawValue: rawValue) else {
-            assertionFailure("Active characteristic value is not valid - value: \(String(describing: value))")
-            return nil
-        }
-
-        return state == .active
-    }
-
-    private func getBrightness() async throws -> Int? {
-        guard characteristicType == HMCharacteristicTypeBrightness else { return nil }
-
-        try await readValue()
-
-        guard let brightness = value as? Int else {
-            assertionFailure("Brightness characteristic value is not Int - value: \(String(describing: value))")
-            return nil
-        }
-        return brightness
-    }
-
-    private func getColorTemperature() async throws -> Float? {
-        guard characteristicType == HMCharacteristicTypeColorTemperature else { return nil }
-
-        try await readValue()
-
-        // HomeKit returns color temperature in mired (micro-reciprocal degrees)
-        // Normalize to 0...1 (warm...cold) using the same logic as setColorTemperature
-        guard let mired = value as? Int,
-              let minimumValue = metadata?.minimumValue,
-              let maximumValue = metadata?.maximumValue else {
-            assertionFailure("ColorTemperature characteristic missing required data - value: \(String(describing: value)), min: \(String(describing: metadata?.minimumValue)), max: \(String(describing: metadata?.maximumValue))")
-            return nil
-        }
-
-        let min = Float(truncating: minimumValue)
-        let max = Float(truncating: maximumValue)
-        let range = max - min
-
-        guard range > 0 else {
-            assertionFailure("ColorTemperature characteristic has invalid range - min: \(min), max: \(max), range: \(range)")
-            return nil
-        }
-
-        // Invert because lower mired = colder light, but we want 0 = warm, 1 = cold
-        let normalized = 1 - (Float(mired) - min) / range
-        return normalized
-    }
-
-    private func getColor() async throws -> RGB? {
-        guard let service,
-              characteristicType == HMCharacteristicTypeHue else { return nil }
-
-        try await readValue()
-        guard let hue = value as? Float else {
-            assertionFailure("Hue characteristic value is not Float - value: \(String(describing: value))")
-            return nil
-        }
-
-        // Find saturation and brightness characteristics in the same service
-        var saturation: Float = 1.0
-        var brightness: Float = 1.0
-
-        for characteristic in service.characteristics {
+    /// The `Saturation` and `Brightness` values of the service, which a colour is made of together with the hue.
+    private func colorSiblingValues() async throws -> (saturation: Any?, brightness: Any?) {
+        var saturation: Any?
+        var brightness: Any?
+        for characteristic in service?.characteristics ?? [] {
             if characteristic.characteristicType == HMCharacteristicTypeSaturation {
                 try await characteristic.readValue()
-                saturation = (characteristic.value as? Float ?? 100.0) / 100.0
+                saturation = characteristic.value
             } else if characteristic.characteristicType == HMCharacteristicTypeBrightness {
                 try await characteristic.readValue()
-                brightness = (characteristic.value as? Float ?? 100.0) / 100.0
+                brightness = characteristic.value
             }
         }
-
-        // Convert HSV to RGB using the utility function
-        let normalizedHue = hue / 360.0  // Normalize 0-360° to 0-1
-        return rgb(h: normalizedHue, s: saturation, v: brightness)
-    }
-
-    private func getTemperature() async throws -> Measurement<UnitTemperature>? {
-        guard characteristicType == HMCharacteristicTypeCurrentTemperature else { return nil }
-
-        try await readValue()
-
-        guard let temperature = value as? Double else {
-            assertionFailure("Temperature characteristic value is not Float - value: \(String(describing: value))")
-            return nil
-        }
-        return .init(value: temperature, unit: .celsius)
-    }
-
-    private func getRelativeHumidity() async throws -> Double? {
-        guard characteristicType == HMCharacteristicTypeCurrentRelativeHumidity else { return nil }
-
-        try await readValue()
-
-        guard let humidity = value as? Double else {
-            assertionFailure("RelativeHumidity characteristic value is not Float - value: \(String(describing: value))")
-            return nil
-        }
-        return humidity
-    }
-
-    private func getCarbonDioxideLevel() async throws -> Int? {
-        guard characteristicType == HMCharacteristicTypeCarbonDioxideLevel else { return nil }
-
-        try await readValue()
-
-        guard let co2Level = value as? Float else {
-            assertionFailure("CarbonDioxideLevel characteristic value is not Float - value: \(String(describing: value))")
-            return nil
-        }
-        return Int(co2Level)
-    }
-
-    private func getPMDensity() async throws -> Double? {
-        guard characteristicType == HMCharacteristicTypePM2_5Density else { return nil }
-
-        try await readValue()
-
-        guard let density = value as? Float else {
-            assertionFailure("PMDensity characteristic value is not Float - value: \(String(describing: value))")
-            return nil
-        }
-        return Double(density)
-    }
-
-    private func getAirQuality() async throws -> Int? {
-        guard characteristicType == HMCharacteristicTypeAirQuality else { return nil }
-
-        try await readValue()
-
-        guard let quality = value as? Int else {
-            assertionFailure("AirQuality characteristic value is not Int - value: \(String(describing: value))")
-            return nil
-        }
-        return quality
-    }
-
-    private func getValveOpen() async throws -> Bool? {
-        guard let service,
-              service.serviceType == HMServiceTypeValve,
-              characteristicType == HMCharacteristicTypeActive else { return nil }
-
-        try await readValue()
-
-        guard let rawValue = value as? Int,
-              let state = HMCharacteristicValueActivationState(rawValue: rawValue) else {
-            assertionFailure("Active characteristic value is not valid - value: \(String(describing: value))")
-            return nil
-        }
-
-        return state == .active
-    }
-
-    /// Thermostat `TargetTemperature` or HeaterCooler `HeatingThresholdTemperature`.
-    private func getTargetTemperature() async throws -> Double? {
-        guard HeatingControlCharacteristic.characteristicsType(characteristicType: characteristicType,
-                                                               serviceType: service?.serviceType) == .targetTemperature else { return nil }
-
-        try await readValue()
-
-        guard let target = (value as? NSNumber)?.doubleValue else {
-            assertionFailure("Target temperature characteristic value is not a number - value: \(String(describing: value))")
-            return nil
-        }
-        return target
-    }
-
-    /// Thermostat `TargetHeatingCoolingState` or HeaterCooler `TargetHeaterCoolerState`.
-    private func getHeatingMode() async throws -> HeatingMode? {
-        guard HeatingControlCharacteristic.characteristicsType(characteristicType: characteristicType,
-                                                               serviceType: service?.serviceType) == .heatingMode else { return nil }
-
-        try await readValue()
-
-        guard let rawMode = (value as? NSNumber)?.intValue else {
-            assertionFailure("Target mode characteristic value is not a number - value: \(String(describing: value))")
-            return nil
-        }
-        guard let heatingMode = HeatingControlCharacteristic.heatingMode(rawValue: rawMode, characteristicType: characteristicType) else {
-            homeKitLogger.warning("Unknown target mode value, stored as nil", metadata: logMetadata.merging(["rawValue": "\(rawMode)"]) { _, new in new })
-            return nil
-        }
-        return heatingMode
-    }
-
-    /// Eve custom characteristic, matched by UUID because HomeKit reports it as "Custom".
-    private func getValvePositionPercent() async throws -> Int? {
-        guard EveCharacteristic.isValvePosition(characteristicType) else { return nil }
-
-        try await readValue()
-
-        guard let percent = (value as? NSNumber)?.intValue else {
-            homeKitLogger.warning("Eve valve position value is not a number - value: \(String(describing: value))")
-            return nil
-        }
-        return percent
+        return (saturation, brightness)
     }
 
     var entityId: EntityId? {

@@ -442,7 +442,7 @@ struct FireplaceSwitchTests {
     @Test("The fireplace is a server-owned switch the app may set")
     func entity() {
         #expect(Fireplace.stateId.isServerOwned)
-        #expect(AppSettableEntities.contains(Fireplace.stateId))
+        #expect(Fireplace.stateId.characteristicType.valueKind.descriptor?.isSettableFromApp == true)
     }
 
     @Test("On since its last change, no HomeKit command, the end derived from the start")

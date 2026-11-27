@@ -17,30 +17,8 @@ public extension EntityStorageItem {
     /// Creates an item from kind and value; `nil` when the kind is unknown or the value does not fit it: the wrong
     /// shape, a fraction for a whole-number kind, a heating mode that does not exist, a colour that is not "r g b" or a deadline that does not parse.
     init?(entityId: EntityId, timestamp: Date = Date(), kind: ValueKind, value: Value, origin: Origin = .homekit) {
-        guard let type = kind.characteristicsType, Self.fits(value, type) else { return nil }
+        guard let descriptor = kind.descriptor, descriptor.accepts(value) else { return nil }
         self.init(entityId: entityId, timestamp: timestamp, uncheckedKind: kind, value: value, origin: origin)
-    }
-
-    private static func fits(_ value: Value, _ type: CharacteristicsType) -> Bool {
-        switch (ValueDescriptor.descriptor(for: type).shape, value) {
-        case (.bool, .bool):
-            return true
-        case (.number, .number(let number)):
-            switch type {
-            case .brightness, .batterySensor, .carbonDioxideSensorId, .airQualitySensor, .valvePosition:
-                return Int(exactly: number) != nil
-            case .heatingMode:
-                return Int(exactly: number).flatMap(HeatingMode.init(rawValue:)) != nil
-            default:
-                return true
-            }
-        case (.text, .text(let text)):
-            return type != .color || text.split(separator: " ").compactMap { Float($0) }.count == 3
-        case (.textWithNumber, .text(let text)):
-            return Deadline(text: text) != nil
-        default:
-            return false
-        }
     }
 
     /// The value when the item carries the kind of `type`, `nil` otherwise.

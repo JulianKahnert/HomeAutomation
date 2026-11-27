@@ -31,7 +31,7 @@ public enum Fireplace {
     /// The fireplace ends this long after it was switched on.
     public static let maxDuration: TimeInterval = 2 * 3600
 
-    /// The fireplace entity: server-owned, a switch (on = burning). The app may set it (`AppSettableEntities`).
+    /// The fireplace entity: server-owned, a switch (on = burning). The app may set it: a switch is a kind the app may set (``ValueDescriptor/isSettableFromApp``).
     public static let stateId = EntityId.serverOwned(name: "fireplace", characteristic: .switcher)
 
     /// Category of the push "Kamin an?"; the app registers its action under this name.

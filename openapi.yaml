@@ -229,9 +229,9 @@ paths:
     put:
       summary: Set the state of a server-owned entity
       description: |
-        The one general route for the app to set a state the server owns (placeId `server`). Only entities
-        that are declared settable from the app are accepted; any other entity is refused and stays
-        unchanged. The state holds at once: the answer and every later read show it. Asking for the value the
+        The one general route for the app to set a state the server owns (placeId `server`). Whether the app may
+        set a state is decided per value kind: a switch, a heating mode and a target temperature may be set. Any
+        other kind, and any entity that is not server-owned, is refused and stays unchanged. The state holds at once: the answer and every later read show it. Asking for the value the
         entity already has changes nothing (`changed` is false). The change counts with origin `app`.
       operationId: setEntityState
       requestBody:
@@ -250,7 +250,7 @@ paths:
         "400":
           description: The value does not fit the value kind of the entity.
         "403":
-          description: The entity is not settable from the app.
+          description: The entity is not server-owned or its value kind is not settable from the app.
 
   /entities/history:
     get:

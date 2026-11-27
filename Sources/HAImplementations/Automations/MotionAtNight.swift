@@ -49,10 +49,16 @@ public struct MotionAtNight: Automatable {
         self.maxTemperature = maxTemperature
     }
 
+    /// A server start follows the same rule as a motion report, so motion that is still held
+    /// switches the light on again after a restart.
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
         let sensorIds = Set(motionSensors.map(\.motionSensorId)).union(windowContacts.map(\.contactSensorId))
-        guard case let HomeEvent.change(item) = event,
-              sensorIds.contains(item.entityId) else {
+        switch event {
+        case .change(let item):
+            guard sensorIds.contains(item.entityId) else { return false }
+        case .serverStarted:
+            break
+        case .time, .sunrise, .sunset, .configDeployed, .fireplaceChanged:
             return false
         }
 

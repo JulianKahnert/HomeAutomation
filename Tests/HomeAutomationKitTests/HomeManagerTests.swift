@@ -25,6 +25,8 @@ private actor AdapterProbe {
     private(set) var startedPerforms = 0
     private(set) var completedPerforms = 0
     private(set) var performedActions: [HomeManagableAction] = []
+    /// The entities the adapter was asked to find.
+    private(set) var foundEntities: [EntityId] = []
 
     private var failure: FakeAdapterError?
     private let performDuration: Duration?
@@ -52,6 +54,10 @@ private actor AdapterProbe {
         if let failure { throw failure }
 
         completedPerforms += 1
+    }
+
+    func find(_ entityId: EntityId) {
+        foundEntities.append(entityId)
     }
 
     func waitForStart() async {
@@ -84,7 +90,9 @@ private distributed actor FakeEntityAdapter: EntityAdapterable {
         []
     }
 
-    distributed func findEntity(_ entity: EntityId) async throws {}
+    distributed func findEntity(_ entity: EntityId) async throws {
+        await probe.find(entity)
+    }
 
     distributed func perform(_ action: HomeManagableAction) async throws {
         try await probe.perform(action)
@@ -451,6 +459,162 @@ struct HomeManagerTests {
         #expect(await storage.lookups == 2)
     }
 
+    @Test("A replay hours after the last change is no change and is not stored")
+    func lateReplayIsNotAChange() async {
+        let storage = RecordingStorageRepository()
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        let timestamp = Date().addingTimeInterval(-3 * 3600)
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: timestamp, isDeviceOn: true)))
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(), isDeviceOn: true)) == false)
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(), isDeviceOn: false)))
+        await storage.waitForAdds(2)
+
+        #expect(await storage.added.map(\.isDeviceOn) == [true, false])
+    }
+
+    @Test("A replay is a sign of life for HomeKit")
+    func replayCountsAsSignOfLife() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .accessDenied()))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        await homeManager.perform(.turnOff(switchId))
+        #expect(await homeManager.homeKitHealth() != .healthy)
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)) == false)
+
+        #expect(await homeManager.homeKitHealth() == .healthy)
+    }
+
+    @Test("A replay that contradicts the last command lets the command be sent again")
+    func replayIsCheckedAgainstLastCommand() async {
+        let probe = AdapterProbe()
+        let homeManager = await makeHomeManager(probe: probe)
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        await homeManager.perform(.turnOff(switchId))
+
+        // the light is still on: the command did not take
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)) == false)
+        await homeManager.perform(.turnOff(switchId))
+
+        #expect(await probe.startedPerforms == 2)
+    }
+
+    @Test("The current state comes from the last report, the stored state only for an entity not yet reported")
+    func currentStateComesFromLastReport() async throws {
+        let stored = EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: false)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: MockStorageRepository(items: [stored]))
+
+        #expect(try await homeManager.getCurrentEntity(with: switchId).isDeviceOn == false)
+
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+
+        #expect(try await homeManager.getCurrentEntity(with: switchId).isDeviceOn == true)
+    }
+
+    @Test("A replay keeps the current state with the timestamp of the last change")
+    func replayKeepsTimestampOfChange() async throws {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+        let changed = Date(timeIntervalSince1970: 1_000)
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: changed, isDeviceOn: true))
+
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(timeIntervalSince1970: 2_000), isDeviceOn: true))
+
+        #expect(try await homeManager.getCurrentEntity(with: switchId).timestamp == changed)
+    }
+
+    @Test("An entity reported since the start is found without asking the adapter")
+    func reportedEntityIsFoundWithoutTheAdapter() async throws {
+        let probe = AdapterProbe()
+        let homeManager = await makeHomeManager(probe: probe)
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+
+        try await homeManager.findEntity(switchId)
+
+        #expect(await probe.foundEntities.isEmpty)
+    }
+
+    @Test("An entity with only a stored state is looked up at the adapter, so one removed from HomeKit is noticed")
+    func storedEntityIsFoundAtTheAdapter() async throws {
+        let probe = AdapterProbe()
+        let stored = EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true)
+        let homeManager = await makeHomeManager(probe: probe, storageRepo: MockStorageRepository(items: [stored]))
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
+
+        try await homeManager.findEntity(switchId)
+
+        #expect(await probe.foundEntities == [switchId])
+    }
+
+    // MARK: - restart
+
+    @Test("After a restart a replay of a stored value is no change and is not stored again")
+    func replayAfterRestartIsNotAChange() async {
+        let storage = RecordingStorageRepository()
+        let lampId = EntityId(placeId: "room", name: "lamp", characteristicsName: nil, characteristic: .switcher)
+        let beforeRestart = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        await beforeRestart.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true))
+        await storage.waitForAdds(1)
+
+        let afterRestart = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        await afterRestart.loadCurrentStates(timeout: .seconds(2))
+
+        #expect(await afterRestart.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)) == false)
+        // a later change of another entity is stored after the replay would have been
+        await afterRestart.addEntityHistory(EntityStorageItem(entityId: lampId, isDeviceOn: true))
+        await storage.waitForAdds(2)
+        #expect(await storage.added.map(\.entityId) == [switchId, lampId])
+    }
+
+    @Test("After a restart a value that differs from the stored one is a change")
+    func changedValueAfterRestartIsAChange() async {
+        let stored = EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: MockStorageRepository(items: [stored]))
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: false)))
+    }
+
+    @Test("After a restart an entity without a stored state is a change on its first report")
+    func unknownEntityAfterRestartIsAChange() async {
+        let stored = EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: MockStorageRepository(items: [stored]))
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
+        let newLamp = EntityId(placeId: "room", name: "new lamp", characteristicsName: nil, characteristic: .switcher)
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: newLamp, isDeviceOn: true)))
+    }
+
+    @Test("When the load fails, the server starts with no remembered states")
+    func failedLoadStartsCold() async throws {
+        let storage = RecordingStorageRepository(load: .failing)
+        try await storage.add(EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true))
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        await homeManager.loadCurrentStates(timeout: .seconds(2))
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)))
+    }
+
+    @Test("When the load exceeds its time limit, the server starts with no remembered states, also once it answers late",
+          .timeLimit(.minutes(1)))
+    func slowLoadStartsCold() async throws {
+        let query = ManualSleeper()
+        let timer = ManualSleeper()
+        let storage = RecordingStorageRepository(load: .held(query))
+        try await storage.add(EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true))
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        let load = Task { await homeManager.loadCurrentStates(timeout: .seconds(10), sleep: { try await timer.sleep(for: $0) }) }
+        _ = await query.nextSleep()
+
+        #expect(await timer.nextSleep() == .seconds(10))
+        timer.wake()
+        // returns while the query still has not answered
+        await load.value
+        query.wake()
+        await storage.waitForLateLoadAnswer()
+
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true)))
+    }
+
     @Test("A burst of events is persisted one at a time and in order")
     func burstIsPersistedSerially() async {
         let storage = RecordingStorageRepository(addDuration: .milliseconds(2))
@@ -526,11 +690,23 @@ private actor RecordingStorageRepository: StorageRepository {
     private var concurrentCalls = 0
     private var failingAdds: Int
     private let addDuration: Duration?
+    private let load: Load
+
+    private var loadAnswered = false
+    private var loadAnswerWaiter: CheckedContinuation<Void, Never>?
+
+    /// How `getAllCurrent` answers.
+    enum Load {
+        case immediate, failing
+        /// Answers once the sleeper is woken, like a slow query that ignores cancellation.
+        case held(ManualSleeper)
+    }
 
     /// - Parameter failingAdds: Number of `add` calls that throw before the first one succeeds.
-    init(addDuration: Duration? = nil, failingAdds: Int = 0) {
+    init(addDuration: Duration? = nil, failingAdds: Int = 0, load: Load = .immediate) {
         self.addDuration = addDuration
         self.failingAdds = failingAdds
+        self.load = load
     }
 
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? {
@@ -540,6 +716,28 @@ private actor RecordingStorageRepository: StorageRepository {
 
     func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? {
         nil
+    }
+
+    func getAllCurrent() async throws -> [EntityStorageItem] {
+        switch load {
+        case .immediate:
+            break
+        case .failing:
+            throw StorageFailure()
+        case .held(let sleeper):
+            // an unstructured task does not inherit cancellation, like a database query that ignores it
+            _ = await Task { try await sleeper.sleep(for: .zero) }.result
+            loadAnswered = true
+            loadAnswerWaiter?.resume()
+            loadAnswerWaiter = nil
+        }
+        return Array(Dictionary(added.map { ($0.entityId, $0) }, uniquingKeysWith: { _, newer in newer }).values)
+    }
+
+    /// Waits until a held `getAllCurrent` answered.
+    func waitForLateLoadAnswer() async {
+        guard !loadAnswered else { return }
+        await withCheckedContinuation { loadAnswerWaiter = $0 }
     }
 
     func add(_ item: EntityStorageItem) async throws {

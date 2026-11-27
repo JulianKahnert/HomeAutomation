@@ -22,17 +22,22 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     private var traceMap: [String: Int] = [:]
     /// Every action `perform` ran, with the heating context it ran in.
     var performedActions: [(action: HomeManagableAction, heating: HeatingWriteContext.Context?)] = []
+    /// Every action `perform` ran, in order, for a test that waits for one; it has a single reader.
+    let performedActionStream: AsyncStream<HomeManagableAction>
+    private let performedActionContinuation: AsyncStream<HomeManagableAction>.Continuation
 
     init() {
         let (entityStream, entityStreamContinuation) = AsyncStream.makeStream(of: EntityStorageItem.self, bufferingPolicy: .unbounded)
         self.entityStream = entityStream
         self.entityStreamContinuation = entityStreamContinuation
+        (performedActionStream, performedActionContinuation) = AsyncStream.makeStream(of: HomeManagableAction.self)
     }
 
     func perform(_ action: HomeManagableAction) async {
 
         let item = storageItems.first(where: { $0.entityId == action.entityId })
         performedActions.append((action, HeatingWriteContext.current))
+        performedActionContinuation.yield(action)
         if let context = HeatingWriteContext.current, let write = HeatingWrite(action: action, context: context) {
             heatingWrites.append(write)
         }
@@ -221,11 +226,24 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         overdueWindowIds.append(entityId)
     }
 
+    /// The windows `setWindowOpenState` registered, überschritten as `markWindowOverdue` marked them.
     func getWindowContentState() async -> WindowContentState {
-        .empty
+        let windows = windowOpenStates.map { entityId, state in
+            WindowContentState.Window(id: state.id,
+                                      name: state.name,
+                                      room: state.room,
+                                      opened: state.opened,
+                                      closeBy: state.closeBy,
+                                      isOverdue: overdueWindowIds.contains(entityId))
+        }
+        return WindowContentState(sortedWindows: windows)
     }
 
+    /// The window state per window, as `setWindowOpenState` last set it; a cleared state is absent.
+    private(set) var windowOpenStates: [EntityId: WindowOpenState] = [:]
+
     func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
+        windowOpenStates[entityId] = state
     }
 
     func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {

@@ -177,6 +177,10 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return new
     }
 
+    func listThermostats() async throws -> [Thermostat] { [] }
+
+    func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem] { [] }
+
     func getAllEntitiesLive() async throws -> [EntityStorageItem] {
         return storageItems
     }

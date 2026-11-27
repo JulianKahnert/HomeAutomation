@@ -203,6 +203,14 @@ public final class HomeManager: HomeManagable {
         return entities
     }
 
+    public func listThermostats() async throws -> [Thermostat] {
+        try await getAdapter().get(with: log).listThermostats()
+    }
+
+    public func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem] {
+        try await getAdapter().get(with: log).readThermostat(thermostat)
+    }
+
     public func findEntity(_ entityId: EntityId) async throws {
         guard !reportedEntities.contains(entityId) else { return }
         return try await getAdapter().get(with: log).findEntity(entityId)

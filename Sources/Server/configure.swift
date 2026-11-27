@@ -301,7 +301,10 @@ public func configure(_ app: Application) async throws {
         EntityRollupJob(entities: app.entityStorageDbRepository)
     ]
 
-    let scheduler = Scheduler(jobs: [OutdoorTemperatureJob(location: location, hours: weatherHours)])
+    let valveJob = ValveJob(listThermostats: { try await homeManager.listThermostats() },
+                            readThermostat: { try await homeManager.readThermostat($0) },
+                            feed: { [continuation = app.homeEventsContinuation] in continuation.yield(.change(entity: $0)) })
+    let scheduler = Scheduler(jobs: [OutdoorTemperatureJob(location: location, hours: weatherHours), valveJob])
     app.scheduler = scheduler
     Task.detached {
         await scheduler.run()

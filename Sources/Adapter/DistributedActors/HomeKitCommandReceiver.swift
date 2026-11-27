@@ -60,4 +60,12 @@ public distributed actor HomeKitCommandReceiver {
             throw error
         }
     }
+
+    public distributed func listThermostats() async throws -> [Thermostat] {
+        try await adapter.listThermostats()
+    }
+
+    public distributed func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem] {
+        try await adapter.readThermostat(thermostat)
+    }
 }

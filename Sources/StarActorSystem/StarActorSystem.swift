@@ -24,7 +24,7 @@ public final class StarActorSystem: DistributedActorSystem, @unchecked Sendable 
     public typealias ResultHandler = StarResultHandler
 
     /// Current wire protocol version. Bump only for incompatible changes (additive-only rule).
-    static let protocolVersion = 1
+    static let protocolVersion = 2
 
     private let name: String
     private let remoteCallTimeout: Duration

@@ -57,6 +57,12 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         self.init(entityId: entityId, timestamp: timestamp, uncheckedKind: nil, value: nil, origin: origin, lastReport: lastReport)
     }
 
+    /// Whether `other` carries the same information: same entity and value. Timestamp, origin and `lastReport`
+    /// are no part of the value, so every field added later stays out of this compare.
+    public func hasSameValue(as other: Self) -> Bool {
+        entityId == other.entityId && kind == other.kind && value == other.value
+    }
+
     /// Retrieves a non-optional value for a given optional property key path
     /// - Parameter path: Key path to an optional property
     /// - Returns: The unwrapped value

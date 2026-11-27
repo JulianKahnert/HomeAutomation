@@ -38,25 +38,6 @@ enum Entrypoint {
             throw error
         }
 
-        #if DEBUG
-//        Task.detached {
-////            try! await Task.sleep(for: .seconds(2))
-////            app.homeEventsContinuation.yield(.sunrise)
-//            
-////            let light = EntityId(placeId: "Julians Arbeitszimmer", name: "Schrank", characteristicsName: nil, characteristic: .switcher)
-//            let light = EntityId(placeId: "Kaminzimmer", name: "LED Streifen", characteristicsName: nil, characteristic: .switcher)
-//            print("DEBUGGING \(Date()) light action start")
-////            await app.homeManager.perform(.turnOn(light))
-//            print("DEBUGGING \(Date()) light action end")
-//            
-////            let repo = app.entityStorageDbRepository
-////            let item = try! await repo.getPrevious(EntityId(placeId: "Kaminzimmer", name: "Eve Motion", characteristicsName: "Eve Motion", characteristic: .motionSensor))
-////            
-////            print(item)
-////            print(item)
-//        }
-        #endif
-
         try await app.execute()
         try await app.asyncShutdown()
     }

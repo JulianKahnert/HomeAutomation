@@ -136,7 +136,6 @@ private final class EventLog: @unchecked Sendable {
 
 struct EmptyStorage: StorageRepository {
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? { nil }
-    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? { nil }
     func getAllCurrent() async throws -> [EntityStorageItem] { [] }
     func add(_ item: EntityStorageItem) async throws {}
     func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] { [] }

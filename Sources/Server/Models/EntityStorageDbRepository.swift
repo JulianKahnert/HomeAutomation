@@ -26,11 +26,6 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
         try await latestChanges(of: entityId, limit: 1).first
     }
 
-    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? {
-        let items = try await latestChanges(of: entityId, limit: 2)
-        return items.count == 2 ? items.last : nil
-    }
-
     /// The newest change per entity, with the tiebreak of `getCurrent`. An entity of an unknown
     /// characteristic type is skipped.
     func getAllCurrent() async throws -> [EntityStorageItem] {

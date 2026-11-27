@@ -47,7 +47,10 @@ public final class HomeManager: HomeManagable {
     /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
     /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
     /// replaying both would be contradictory.
-    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?)] = [:]
+    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?, intent: UInt64)] = [:]
+    /// The number of the newest intent per entity. A command that finishes after a newer one for its entity
+    /// started is stale: it neither queues a retry nor becomes the last heating write.
+    private var newestIntent: [EntityId: UInt64] = [:]
     /// Changed entity states on their way to the database. One task drains it in order, so a burst
     /// of events (the adapter's full resync on every reconnect) uses one database connection at a
     /// time instead of one query per event at once.
@@ -100,38 +103,36 @@ public final class HomeManager: HomeManagable {
             }
         }
 
-//        Task {
-//            let adapter = await getAdapter()
-//            let entityStream = await adapter.getEntityStream()
-//            for await entityStorageItem in entityStream {
-//                self.log.info("Received storage item \(entityStorageItem)")
-//                await self.addEntityHistory(entityStorageItem)
-//                self.entityStreamContinuation.yield(entityStorageItem.entityId)
-//            }
-//        }
-
         let ticks = retryTicks ?? Self.timerRetryTicks()
-        Task.detached(priority: .low) {
+        // Weak: the loop must not keep the manager alive; it ends with the manager or with the ticks.
+        Task.detached(priority: .low) { [weak self] in
             for await _ in ticks {
+                guard let self else { return }
                 let queued = await self.popAllFailedActions()
-                for (action, attempt, runId, heating) in queued {
+                for (action, attempt, runId, heating, intent) in queued {
                     self.log.debug("Performing failed action again: \(action) [attempt \(attempt + 1)/\(Self.maxAttempts)]")
-                    await self.perform(action, attempt: attempt, runId: runId, heating: heating)
+                    await self.perform(action, attempt: attempt, runId: runId, heating: heating, intent: intent)
                 }
             }
         }
+    }
+
+    deinit {
+        // Ends the persist consumer, so a manager that is gone leaves no task behind.
+        persistQueue.finish()
     }
 
     /// Production retry cadence: a tick every 5s (the shared timer aligns its first tick to the next
     /// minute boundary).
     private static func timerRetryTicks() -> AsyncStream<Void> {
         let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        Task.detached(priority: .low) {
+        let timer = Task.detached(priority: .low) {
             for await _ in Timer.publish(every: .seconds(5)) {
                 continuation.yield(())
             }
             continuation.finish()
         }
+        continuation.onTermination = { _ in timer.cancel() }
         return stream
     }
 
@@ -226,10 +227,6 @@ public final class HomeManager: HomeManagable {
         currentStates[entityId]?.lastReport
     }
 
-    public func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem? {
-        return try await storageRepo.getPrevious(entityId).get(with: log)
-    }
-
     public func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
         lastCommands[Self.key(of: radiator)]
     }
@@ -259,12 +256,14 @@ public final class HomeManager: HomeManagable {
     public func perform(_ action: HomeManagableAction) async {
         // Round values to prevent excessive HomeKit updates
         let roundedAction = action.rounded()
-        await perform(roundedAction, attempt: 0, runId: AutomationRunContext.runId, heating: HeatingWriteContext.current)
+        let intent = (newestIntent[roundedAction.entityId] ?? 0) &+ 1
+        newestIntent[roundedAction.entityId] = intent
+        await perform(roundedAction, attempt: 0, runId: AutomationRunContext.runId, heating: HeatingWriteContext.current, intent: intent)
     }
 
     /// - Parameter runId: Passed explicitly because the retry loop runs detached, without the
     ///   `AutomationRunContext` task local of the original run; `heating` likewise for `HeatingWriteContext`.
-    private func perform(_ action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?) async {
+    private func perform(_ action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?, intent: UInt64) async {
         // Cancellation is honoured at command boundaries only: a superseded automation run must not
         // start further commands, but a command that already started always runs to completion (see
         // the shield below). Checked before logging so a skipped command produces no log entry.
@@ -275,6 +274,9 @@ public final class HomeManager: HomeManagable {
         // A new command supersedes the queued retry of its entity, also as a duplicate: the newest intent wins.
         if attempt == 0 {
             failedActions[action.entityId] = nil
+        } else if newestIntent[action.entityId] != intent {
+            log.debug("Dropping the retry of a superseded command: [\(action)]")
+            return
         }
 
         // Log action and check if it's a duplicate (cache hit)
@@ -313,7 +315,7 @@ public final class HomeManager: HomeManagable {
             // Only a command that reached the device may deduplicate its successors.
             await commandCache.markExecuted(action)
             liveness.recordCommandSuccess(at: Date())
-            if let heating, let write = HeatingWrite(action: action, context: heating) {
+            if newestIntent[action.entityId] == intent, let heating, let write = HeatingWrite(action: action, context: heating) {
                 lastCommands[Self.key(of: write.entityId)] = write
             }
         } catch {
@@ -327,8 +329,10 @@ public final class HomeManager: HomeManagable {
             log.error("(\(entityId)) Failed to perform action [\(action), attempt: \(attempt + 1)/\(Self.maxAttempts)]\n\(error)")
 
             let nextAttempt = attempt + 1
-            if nextAttempt < Self.maxAttempts {
-                failedActions[entityId] = (action, nextAttempt, runId, heating)
+            if newestIntent[entityId] != intent {
+                log.debug("Not retrying a command a newer one superseded: [\(action)]")
+            } else if nextAttempt < Self.maxAttempts {
+                failedActions[entityId] = (action, nextAttempt, runId, heating, intent)
             } else {
                 log.critical("Giving up on action", metadata: ["action": "\(action)", "attempts": "\(Self.maxAttempts)"])
             }
@@ -361,15 +365,21 @@ public final class HomeManager: HomeManagable {
 
     @discardableResult
     public func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
+        // Like `perform`: a run that was superseded must not change state any more. Checked on this actor, so it is
+        // atomic with the write: the lane cancels the old run before the new one starts.
+        try Task.checkCancellation()
         guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
         guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
             throw ReportError.valueDoesNotFit(entityId)
         }
-        // No suspension point between the check, the state and the yield: the state holds before the event
-        // reaches the stream, and two reports of one entity cannot interleave.
-        guard await addEntityHistory(item) else { return false }
-        onReportedChange(currentStates[entityId] ?? item)
-        return true
+        // No suspension point between the check, the state, the persist and the emit: the state holds before the
+        // event reaches the stream, and two reports of one entity cannot interleave.
+        let changed = record(item)
+        if let changed {
+            onReportedChange(changed)
+        }
+        await invalidateContradictedCommands(for: item)
+        return changed != nil
     }
 
     public func states(of kind: ValueKind) async -> [EntityStorageItem] {
@@ -378,6 +388,35 @@ public final class HomeManager: HomeManagable {
 
     @discardableResult
     public func addEntityHistory(_ item: EntityStorageItem) async -> Bool {
+        let changed = record(item) != nil
+        // A freshly observed state can reveal that the device drifted away from what the server last
+        // commanded — e.g. a scene activated outside the server (HomeKit only surfaces scenes as the
+        // per-characteristic changes they produce, which arrive here), or a manual change. Reset any
+        // cached command this state contradicts so the automation engine — which re-evaluates this
+        // same event right after — is allowed to re-issue it. A state that confirms the command (the
+        // command's own echo) is not contradicted, so deduplication is preserved and no command loop
+        // occurs. Done before this returns, so the cache is already reset before the automation runs.
+        //
+        // Invariant this relies on: no `.change`-triggered automation commands its own trigger
+        // entity. Today that holds (MotionAtNight triggers on motion/contact and commands lights,
+        // WindowOpen commands nothing). An automation that violated it would not get its command
+        // re-issued after the drift was healed, because the `changed` gate stops a
+        // value-identical replay from triggering the automation again.
+        await invalidateContradictedCommands(for: item)
+        return changed
+    }
+
+    private func invalidateContradictedCommands(for item: EntityStorageItem) async {
+        let invalidatedActions = await commandCache.invalidateContradictedCommands(for: item)
+        if !invalidatedActions.isEmpty {
+            log.info("Invalidated \(invalidatedActions.count) cached command(s) for \(item.entityId) due to state drift: \(invalidatedActions)")
+        }
+    }
+
+    /// Sets the state and queues it for the database, all in one synchronous section: no suspension point, so
+    /// reports of one entity apply, emit and persist in the order they arrive.
+    /// - Returns: The stored state when it is a change, `nil` for a value-identical replay.
+    private func record(_ item: EntityStorageItem) -> EntityStorageItem? {
         log.debug("Adding entity item to storage \(item.entityId)")
         // Every report from HomeKit counts, a value-identical replay too: it proves HomeKit still delivers.
         // A change of another origin (server, polling job) proves nothing about HomeKit.
@@ -388,50 +427,17 @@ public final class HomeManager: HomeManagable {
         let reportedAt = Date()
         lastReportBySource[item.origin] = reportedAt
 
-        // `EntityStorageItem` is Equatable including its timestamp, so align it before comparing —
-        // only the values decide whether this is new information. An unknown entity counts as a
+        // Only the values decide whether this is new information. An unknown entity counts as a
         // change so nothing is ever swallowed on the first sighting.
-        let didChange: Bool
-        if var knownItem = currentStates[item.entityId] {
-            knownItem.timestamp = item.timestamp
-            knownItem.origin = item.origin
-            knownItem.lastReport = item.lastReport
-            didChange = knownItem != item
-        } else {
-            didChange = true
-        }
-
-        // A replay keeps the known state, so its timestamp stays the time of the last change.
-        if didChange {
-            var state = item
-            state.lastReport = reportedAt
-            currentStates[item.entityId] = state
-            remember(reading: item)
-        } else {
+        guard currentStates[item.entityId]?.hasSameValue(as: item) != true else {
+            // A replay keeps the known state, so its timestamp stays the time of the last change.
             currentStates[item.entityId]?.lastReport = reportedAt
+            return nil
         }
-
-        // A freshly observed state can reveal that the device drifted away from what the server last
-        // commanded — e.g. a scene activated outside the server (HomeKit only surfaces scenes as the
-        // per-characteristic changes they produce, which arrive here), or a manual change. Reset any
-        // cached command this state contradicts so the automation engine — which re-evaluates this
-        // same event right after — is allowed to re-issue it. A state that confirms the command (the
-        // command's own echo) is not contradicted, so deduplication is preserved and no command loop
-        // occurs. Done synchronously here so the cache is already reset before the automation runs.
-        //
-        // Invariant this relies on: no `.change`-triggered automation commands its own trigger
-        // entity. Today that holds (MotionAtNight triggers on motion/contact and commands lights,
-        // WindowOpen commands nothing). An automation that violated it would not get its command
-        // re-issued after the drift was healed, because the `didChange` gate above stops a
-        // value-identical replay from triggering the automation again.
-        let invalidatedActions = await commandCache.invalidateContradictedCommands(for: item)
-        if !invalidatedActions.isEmpty {
-            log.info("Invalidated \(invalidatedActions.count) cached command(s) for \(item.entityId) due to state drift: \(invalidatedActions)")
-        }
-
-        // A value-identical replay is already queued or stored: `currentStates` only holds states loaded
-        // from the database or sent through this queue.
-        guard didChange else { return false }
+        var state = item
+        state.lastReport = reportedAt
+        currentStates[item.entityId] = state
+        remember(reading: item)
 
         // Persist item in the background to avoid blocking automation execution
         switch persistQueue.yield(item) {
@@ -446,8 +452,7 @@ public final class HomeManager: HomeManagable {
         default:
             break
         }
-
-        return didChange
+        return state
     }
 
     /// Retries inside the serial queue instead of forgetting the current state: a forgotten state would make
@@ -473,11 +478,8 @@ public final class HomeManager: HomeManagable {
     nonisolated private static func persistOnce(_ item: EntityStorageItem, in storageRepo: StorageRepository) async throws {
         // Skip a state the database already holds: it keeps a retry from saving a state twice, and covers
         // a start whose load of the stored states failed, so the adapter's resync counted as changes.
-        if var currentItem = try await storageRepo.getCurrent(item.entityId) {
-            // we want to exclude the timestamp from the equality comparison, so change the timestamp temporarily
-            currentItem.timestamp = item.timestamp
-            currentItem.origin = item.origin
-            guard item != currentItem else { return }
+        if let currentItem = try await storageRepo.getCurrent(item.entityId), currentItem.hasSameValue(as: item) {
+            return
         }
         try await storageRepo.add(item)
     }
@@ -493,15 +495,6 @@ public final class HomeManager: HomeManagable {
         readings.removeAll { $0.timestamp < cutoff }
         if readings.count > Self.readingLimit { readings.removeLast(readings.count - Self.readingLimit) }
         recentReadings[item.entityId] = readings
-    }
-
-    public func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
-        do {
-            return try await storageRepo.getCurrent(entityId)
-        } catch {
-            log.error("Failed to read the stored entity", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
-            return nil
-        }
     }
 
     public func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] {
@@ -545,7 +538,7 @@ public final class HomeManager: HomeManagable {
         try await storageUpkeep?.perform(step, now: now)
     }
 
-    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?)] {
+    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?, intent: UInt64)] {
         let queued = Array(failedActions.values)
         failedActions.removeAll()
         return queued

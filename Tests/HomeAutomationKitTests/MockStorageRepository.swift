@@ -26,10 +26,6 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
         return items.last { $0.entityId == entityId }
     }
 
-    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? {
-        return nil
-    }
-
     func getAllCurrent() async throws -> [EntityStorageItem] {
         Array(Dictionary(items.map { ($0.entityId, $0) }, uniquingKeysWith: { _, newer in newer }).values)
     }

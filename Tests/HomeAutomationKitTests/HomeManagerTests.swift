@@ -47,6 +47,11 @@ private actor AdapterProbe {
         startedPerforms += 1
         performedActions.append(action)
 
+        if holdsFailingTurnOn, case .turnOn = action {
+            await withCheckedContinuation { heldTurnOn = $0 }
+            throw FakeAdapterError.unreachable
+        }
+
         if let performDuration {
             // Deliberately not `try?`: if cancellation reached the shielded command, the sleep
             // throws and the command is recorded as not completed.
@@ -74,6 +79,25 @@ private actor AdapterProbe {
 
     func find(_ entityId: EntityId) {
         foundEntities.append(entityId)
+    }
+
+    /// A held `turnOn` waits for `releaseHeldTurnOn()` and then fails; every other action succeeds at once.
+    private var holdsFailingTurnOn = false
+    private var heldTurnOn: CheckedContinuation<Void, Never>?
+
+    func holdAndFailTurnOn() {
+        holdsFailingTurnOn = true
+    }
+
+    func waitForHeldTurnOn() async {
+        while heldTurnOn == nil {
+            await Task.yield()
+        }
+    }
+
+    func releaseHeldTurnOn() {
+        heldTurnOn?.resume()
+        heldTurnOn = nil
     }
 
     func waitForStart() async {
@@ -227,6 +251,41 @@ struct HomeManagerTests {
         #expect(events.first?.origin == .server)
         #expect(events.first?.isDeviceOn == true)
         #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == true)
+    }
+
+    @Test("Two reports of one entity at once emit their own states in order")
+    func concurrentReportsEmitTheirOwnState() async throws {
+        let seen = Mutex<[Bool?]>([])
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), onReportedChange: { item in seen.withLock { $0.append(item.isDeviceOn) } })
+        let id = holidayId
+
+        // Both tasks queue on the manager at once; the first suspends at the command cache, the second runs then.
+        let on = Task { try await homeManager.report(id, value: .bool(true)) }
+        let off = Task { try await homeManager.report(id, value: .bool(false)) }
+        _ = try await (on.value, off.value)
+
+        // Whichever report ran first, each event carries the state its own report set, and the last one is the state that holds.
+        let events = seen.withLock { $0 }
+        #expect(events.count == 2)
+        #expect(Set(events) == [true, false])
+        #expect(try await homeManager.getCurrentEntity(with: id).isDeviceOn == events.last)
+    }
+
+    @Test("A report of a cancelled run changes nothing")
+    func cancelledReportChangesNothing() async throws {
+        let seen = Mutex<Int>(0)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), onReportedChange: { _ in seen.withLock { $0 += 1 } })
+        let id = holidayId
+
+        // A superseded run is cancelled while it is still on its way to the report.
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await homeManager.report(id, value: .bool(true))
+        }
+
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(seen.withLock { $0 } == 0)
+        #expect(await homeManager.states(of: ValueKind(.switcher)).isEmpty)
     }
 
     @Test("A report carries its origin and is no sign of life for HomeKit")
@@ -420,6 +479,21 @@ struct HomeManagerTests {
         await failing.flush()
         #expect(await failing.writes(placeId: "Kitchen", startDate: nil, endDate: nil).isEmpty)
         #expect(await failingManager.lastHeatingWrite(of: radiator) == nil)
+    }
+
+    @Test("A slow command that fails does not queue a retry over a newer command of its entity")
+    func slowFailureDoesNotOverrideANewerIntent() async {
+        let probe = AdapterProbe()
+        await probe.holdAndFailTurnOn()
+        let homeManager = await makeHomeManager(probe: probe)
+
+        let slowTurnOn = Task { await homeManager.perform(.turnOn(switchId)) }
+        await probe.waitForHeldTurnOn()
+        await homeManager.perform(.turnOff(switchId))
+        await probe.releaseHeldTurnOn()
+        await slowTurnOn.value
+
+        #expect(await homeManager.queuedRetry(of: switchId) == nil)
     }
 
     @Test("Every command writes one server log line with entity, action, reason and run, a cache hit included")
@@ -978,10 +1052,6 @@ private actor RecordingStorageRepository: StorageRepository {
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? {
         lookups += 1
         return await track { added.last { $0.entityId == entityId } }
-    }
-
-    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? {
-        nil
     }
 
     func getAllCurrent() async throws -> [EntityStorageItem] {

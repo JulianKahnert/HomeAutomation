@@ -24,11 +24,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func lastReports() async -> [String: Date]
     /// When the entity last reported, a replay included; `nil` while unknown (after a restart until its first report).
     func lastReport(of entityId: EntityId) async -> Date?
-    func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem?
-    /// The last state of the entity the database holds, past the in-memory cache. After a restart the
-    /// adapter's resync refreshes the cache with a new timestamp; only the database still knows since
-    /// when the state really holds. `nil` when the database has none.
-    func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem?
     /// The changes of the entity the server holds in memory since `since` (the last 3 hours), newest first; a decision
     /// reads this, never the database. A longer history is ``getFullEntityHistory(with:limit:)``.
     func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem]

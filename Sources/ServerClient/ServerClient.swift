@@ -349,6 +349,8 @@ extension EntityHistoryItem {
                   targetTemperatureInC: item.targetTemperatureInC,
                   heatingMode: item.heatingMode.flatMap { HeatingMode(name: $0.rawValue) },
                   valvePositionPercent: item.valvePositionPercent,
-                  temperatureCalibrationInC: item.temperatureCalibrationInC)
+                  temperatureCalibrationInC: item.temperatureCalibrationInC,
+                  origin: item.origin,
+                  lastReport: item.lastReport)
     }
 }

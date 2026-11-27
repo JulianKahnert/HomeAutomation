@@ -505,6 +505,45 @@ struct HomeManagerTests {
         #expect(await homeManager.homeKitHealth() != .healthy)
     }
 
+    @Test("A replay refreshes the last report time and leaves the time of the last change")
+    func replayRefreshesLastReport() async throws {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+        let changed = Date(timeIntervalSinceNow: -3_600)
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: changed, isDeviceOn: true))
+        let first = try #require(await homeManager.lastReport(of: switchId))
+
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(), isDeviceOn: true)) == false)
+
+        let state = try await homeManager.getCurrentEntity(with: switchId)
+        #expect(state.timestamp == changed)
+        #expect(try #require(state.lastReport) > first)
+    }
+
+    @Test("After a restart the last report time is unknown until the first report")
+    func lastReportUnknownAfterRestart() async throws {
+        let storage = MockStorageRepository(items: [EntityStorageItem(entityId: switchId, timestamp: Date(timeIntervalSinceNow: -60), isDeviceOn: true)])
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
+        await homeManager.loadCurrentStates(timeout: .seconds(5))
+
+        #expect(try await homeManager.getCurrentEntity(with: switchId).isDeviceOn == true)
+        #expect(await homeManager.lastReport(of: switchId) == nil)
+        #expect(await homeManager.lastReports().isEmpty)
+
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        #expect(await homeManager.lastReport(of: switchId) != nil)
+    }
+
+    @Test("The last report is kept per reporting source")
+    func lastReportPerSource() async {
+        let homeManager = await makeHomeManager(probe: AdapterProbe())
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
+        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true, origin: .job("valves")))
+
+        let reports = await homeManager.lastReports()
+        #expect(Set(reports.keys) == ["homekit", "valves"])
+    }
+
     @Test("A replay is dropped whatever its origin", arguments: [Origin.homekit, Origin.server, Origin.job("valves")])
     func replayIsDroppedWhateverItsOrigin(origin: Origin) async {
         let homeManager = await makeHomeManager(probe: AdapterProbe())

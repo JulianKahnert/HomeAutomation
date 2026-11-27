@@ -788,6 +788,10 @@ components:
         origin:
           type: string
           description: Where the change came from, `homekit`, `server` or the name of a polling job. Absent for an item that is no single change, such as an hourly aggregate.
+        lastReport:
+          type: string
+          format: date-time
+          description: When the entity last reported, a replay included, next to `timestamp`, the time of the last change. Only on the newest item of a history and only while the server holds it in memory; absent after a restart until the first report.
       required:
         - timestamp
 

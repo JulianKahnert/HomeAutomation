@@ -69,6 +69,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
     private let fireplace: (any FireplaceRepository)?
     private let now: @Sendable () -> Date
     private let sensorFailureLimit: TimeInterval
+    private let lastReport: @Sendable (EntityId) async -> Date?
     private let calendar: Calendar
 
     /// The writes the events look at reach back at most this far before the range: an open window or a burning
@@ -78,18 +79,22 @@ public struct HeatingRoomDetailBuilder: Sendable {
     /// - Parameters:
     ///   - fireplace: The stored fireplace switches, the history of a room's fireplace contact; `nil` shows none.
     ///   - sensorFailureLimit: A reading older than this no longer counts: the grid shows a gap.
-    ///     Rows are only stored when a value changed, so this is the only way to see a silent sensor.
+    ///     Rows are only stored when a value changed, so the limit counts from the later of the last change and the
+    ///     last report: an unchanged value that still reports shows no gap, a silent sensor does.
+    ///   - lastReport: When an entity last reported (memory of the server); `nil` when unknown, as after a restart.
     public init(storage: any StorageRepository,
                 writes: any HeatingWriteRepository,
                 fireplace: (any FireplaceRepository)? = nil,
                 now: @escaping @Sendable () -> Date = { Date() },
                 sensorFailureLimit: TimeInterval = 6 * 3_600,
+                lastReport: @escaping @Sendable (EntityId) async -> Date? = { _ in nil },
                 calendar: Calendar = .current) {
         self.storage = storage
         self.writes = writes
         self.fireplace = fireplace
         self.now = now
         self.sensorFailureLimit = sensorFailureLimit
+        self.lastReport = lastReport
         self.calendar = calendar
     }
 
@@ -161,7 +166,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
     /// because seven days of a temperature exceed one page.
     private func series(_ entityId: EntityId, from start: Date, to end: Date, value: (EntityStorageItem) -> Double?) async throws -> Series {
         let all = try await items(entityId, from: start, to: end)
-        return Series(points: all.compactMap { item in value(item).map { (item.timestamp, $0) } })
+        return Series(points: all.compactMap { item in value(item).map { (item.timestamp, $0) } }, lastReport: await lastReport(entityId))
     }
 
     /// The states of a contact in the range plus the one before it, oldest first. The fireplace comes from the
@@ -192,6 +197,8 @@ public struct HeatingRoomDetailBuilder: Sendable {
 
 private struct Series {
     let points: [(date: Date, value: Double)]
+    /// When the entity last reported; keeps the last point alive while the value is unchanged.
+    var lastReport: Date?
 
     var isEmpty: Bool { points.isEmpty }
 
@@ -204,7 +211,11 @@ private struct Series {
         }
         guard low > 0 else { return nil }
         let point = points[low - 1]
-        if let limit, date.timeIntervalSince(point.date) > limit { return nil }
+        if let limit {
+            let isLast = low == points.count
+            let alive = isLast ? max(point.date, lastReport ?? point.date) : point.date
+            if date.timeIntervalSince(alive) > limit { return nil }
+        }
         return point.value
     }
 }

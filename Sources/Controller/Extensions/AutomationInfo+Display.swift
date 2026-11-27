@@ -10,6 +10,7 @@ extension AutomationInfo {
     /// Label, symbol and trigger configuration per automation type; keys match the server's type names.
     private static let typeDisplay: [String: (label: String, systemImage: String, trigger: String)] = [
         "CreateScene": ("Scene", "sparkles", "Manual"),
+        "DatabaseCleanup": ("System", "externaldrive.badge.checkmark", "Hourly"),
         "EnergyLowPrice": ("Energy Price", "bolt", "Electricity price"),
         "FireplaceTimeout": ("Fireplace", "flame", "Every minute"),
         "GardenWatering": ("Garden", "drop", "Schedule"),

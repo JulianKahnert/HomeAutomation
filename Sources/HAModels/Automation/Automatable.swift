@@ -42,12 +42,18 @@ public protocol Automatable: Sendable, Codable {
     /// that trigger every minute, which would flood the run history.
     var recordsRuns: Bool { get }
 
+    /// Whether a new trigger cancels this automation's run that is still going (the newest intent wins).
+    /// Off for work that must finish, such as the database upkeep.
+    var supersedesRunningRun: Bool { get }
+
     /// Extra detail appended to the generic trigger summary, e.g. the sensor value that decided it.
     func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String?
 }
 
 public extension Automatable {
     var recordsRuns: Bool { true }
+
+    var supersedesRunningRun: Bool { true }
 
     func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String? { nil }
 

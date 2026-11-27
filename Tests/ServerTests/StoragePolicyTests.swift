@@ -108,15 +108,15 @@ struct StoragePolicyTests {
         #expect(exact.timeIntervalSince(co2.before) < 3600)
     }
 
-    @Test func cleanupJobDeletesOnlyRunsAndRollupJobCondensesLuxAndCO2() async {
+    @Test func cleanupStepDeletesOnlyRunsAndRollupStepCondensesLuxAndCO2() async throws {
         let store = RecordingRetentionStore()
         let runs = RecordingRunDeleter()
-        let job = DatabaseCleanupJob(entities: store,
-                                     automationRuns: runs,
-                                     noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender()))
+        let upkeep = DatabaseStorageUpkeep(entities: store,
+                                           automationRuns: runs,
+                                           noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender()))
 
-        await job.performCleanup(now: now)
-        await EntityRollupJob(entities: store).rollUpOnce(now: now)
+        try await upkeep.perform(.cleanup, now: now)
+        try await upkeep.perform(.rollup, now: now)
 
         #expect(await store.deletedTypes.isEmpty)
         #expect(Set(await store.rolledUpTypes) == [.lightSensor, .carbonDioxideSensorId])

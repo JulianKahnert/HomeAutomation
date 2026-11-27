@@ -12,7 +12,7 @@ import Logging
 import Shared
 
 /// Once a day: deletes raw entity rows past their type's retention in ``StoragePolicy``, old
-/// automation runs, and warns about entities that store too many rows.
+/// journal entries (runs, commands, pushes), and warns about entities that store too many rows.
 ///
 /// Heating writes are deliberately kept for good as well: the rows are small and SQL queries over the long
 /// term are the point of recording them.
@@ -20,11 +20,11 @@ import Shared
 /// `weatherHours` are deliberately not touched here or by any other job: they are kept
 /// indefinitely for now.
 struct DatabaseCleanupJob: Job, Log {
-    private static let runRetentionDays = 30
+    private static let journalRetentionDays = 30
     private static let cleanupInterval: Duration = .hours(24) // Run once per day
 
     let entities: any EntityRetentionStore
-    let automationRuns: any AutomationRunRepository
+    let journal: Journal
     let noisyEntityWarner: NoisyEntityWarner
 
     func run() async {
@@ -45,7 +45,7 @@ struct DatabaseCleanupJob: Job, Log {
                 log.info("Deleting \(type.rawValue) entries before \(cutoff)")
                 try await entities.deleteEntries(ofType: type, olderThan: cutoff)
             }
-            try await automationRuns.deleteRuns(olderThan: now.addingTimeInterval(-1 * Duration.days(Self.runRetentionDays).timeInterval))
+            try await journal.deleteEntries(olderThan: now.addingTimeInterval(-1 * Duration.days(Self.journalRetentionDays).timeInterval))
             log.info("Database cleanup completed successfully")
         } catch {
             log.error("Database cleanup failed: \(error)")

@@ -17,7 +17,8 @@ public final class HomeManager: HomeManagable {
 
     private let log = Logger(label: "HomeManager")
     private let windowManager: WindowManager
-    private let actionLogManager: ActionLogManager
+    private let commandCache: CommandCache
+    private let journal: Journal
 
     private let getAdapter: () async -> (any EntityAdapterable)?
     private let location: Location
@@ -75,7 +76,8 @@ public final class HomeManager: HomeManagable {
                 storageRepo: StorageRepository,
                 notificationSender: NotificationSender,
                 location: Location,
-                actionLogManager: ActionLogManager,
+                journal: Journal = Journal(store: InMemoryJournalStore()),
+                commandCache: CommandCache = CommandCache(),
                 heatingWrites: (any HeatingWriteRepository)? = nil,
                 fireplaceSwitches: (any FireplaceRepository)? = nil,
                 onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
@@ -84,8 +86,12 @@ public final class HomeManager: HomeManagable {
                 outdoorTemperature: @escaping @Sendable () async -> Double? = { nil }) {
         let deliveries = DeliveryQueue(sender: notificationSender)
         self.deliveries = deliveries
-        self.windowManager = WindowManager(deliver: { await deliveries.deliver($0) }, outdoorTemperature: outdoorTemperature)
-        self.actionLogManager = actionLogManager
+        self.windowManager = WindowManager(deliver: { delivery in
+            Self.record(delivery, in: journal)
+            await deliveries.deliver(delivery)
+        }, outdoorTemperature: outdoorTemperature)
+        self.journal = journal
+        self.commandCache = commandCache
         self.heatingWrites = heatingWrites
         self.fireplaceSwitches = fireplaceSwitches
         self.onFireplaceSwitch = onFireplaceSwitch
@@ -279,7 +285,13 @@ public final class HomeManager: HomeManagable {
         }
 
         // Log action and check if it's a duplicate (cache hit)
-        let hasCacheHit = await actionLogManager.log(action: action, runId: runId, heating: heating)
+        let hasCacheHit = await commandCache.isDuplicate(action)
+        let entry = ActionLogItem(action: action,
+                                  hasCacheHit: hasCacheHit,
+                                  runId: runId,
+                                  reason: heating?.reason,
+                                  planTargetInC: heating?.planTargetInC)
+        journal.recordCommand(entry)
 
         if hasCacheHit {
             log.info("Skipping duplicate command: [\(action)]")
@@ -300,14 +312,14 @@ public final class HomeManager: HomeManagable {
             try await command.value
 
             // Only a command that reached the device may deduplicate its successors.
-            await actionLogManager.markExecuted(action)
+            await commandCache.markExecuted(action)
             liveness.recordCommandSuccess(at: Date())
             if let heating, let write = HeatingWrite(action: action, context: heating) {
                 await record(write)
             }
         } catch {
             liveness.recordCommandFailure(error, at: Date())
-            await actionLogManager.markFailed(action)
+            journal.markCommandFailed(entry.id)
             let entityId = action.entityId
 
             if let entity = try? await getCurrentEntity(with: entityId) {
@@ -418,7 +430,7 @@ public final class HomeManager: HomeManagable {
         // WindowOpen commands nothing). An automation that violated it would not get its command
         // re-issued after the drift was healed, because the `didChange` gate above stops a
         // value-identical replay from triggering the automation again.
-        let invalidatedActions = await actionLogManager.invalidateContradictedCommands(for: item)
+        let invalidatedActions = await commandCache.invalidateContradictedCommands(for: item)
         if !invalidatedActions.isEmpty {
             log.info("Invalidated \(invalidatedActions.count) cached command(s) for \(item.entityId) due to state drift: \(invalidatedActions)")
         }
@@ -506,7 +518,14 @@ public final class HomeManager: HomeManagable {
         await deliveries.lastPushDate(id: id)
     }
 
+    /// Every alert push is one journal entry, linked to the run that sent it.
+    nonisolated private static func record(_ delivery: Delivery, in journal: Journal) {
+        guard case let .push(title, message, id, _) = delivery else { return }
+        journal.recordPush(JournalPush(runId: AutomationRunContext.runId, title: title, message: message, pushId: id))
+    }
+
     public func deliver(_ delivery: Delivery) async {
+        Self.record(delivery, in: journal)
         await deliveries.deliver(delivery)
     }
 
@@ -523,11 +542,11 @@ public final class HomeManager: HomeManagable {
     }
 
     public func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {
-        await actionLogManager.getActions(limit: limit, runId: runId)
+        await journal.commands(limit: limit, runId: runId)
     }
 
     public func clearActionLog() async {
-        await actionLogManager.clear()
+        await journal.clearCommands()
     }
 
     public func homeKitHealth() async -> HomeKitHealth {

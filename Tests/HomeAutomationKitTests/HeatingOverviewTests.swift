@@ -31,7 +31,7 @@ struct HeatingOverviewTests {
     }
 
     private func overview(_ rooms: [HeatingRoomSources], items: [EntityStorageItem], writes: [HeatingWrite]) async throws -> HeatingOverview {
-        let detail = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: InMemoryHeatingWriteRepository(writes), now: { now })
+        let detail = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items + writes.compactMap { $0.planTargetItem() }), writes: InMemoryHeatingCommands(writes), now: { now })
         return try await HeatingOverviewBuilder(detail: detail).overview(for: rooms)
     }
 
@@ -123,8 +123,9 @@ struct HeatingOverviewTests {
     }
 
     private func heatmap(now: Date, sensor: EntityId, items: [EntityStorageItem], plan target: Double = 21) async throws -> [HeatingHeatmapCell] {
-        let detail = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items),
-                                              writes: InMemoryHeatingWriteRepository([HeatingWrite(timestamp: now.addingTimeInterval(-8 * 86_400), entityId: id("Bad", "Thermo", .heating), reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: target, planTargetInC: target)]),
+        let old = HeatingWrite(timestamp: now.addingTimeInterval(-8 * 86_400), entityId: id("Bad", "Thermo", .heating), reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: target, planTargetInC: target)
+        let detail = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items + [old.planTargetItem()].compactMap { $0 }),
+                                              writes: InMemoryHeatingCommands([old]),
                                               now: { now }, calendar: berlin)
         let result = try await HeatingOverviewBuilder(detail: detail, calendar: berlin).overview(for: [room("Bad", sensor: sensor)])
         return result.heatmap

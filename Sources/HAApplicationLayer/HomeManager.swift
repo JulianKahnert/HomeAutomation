@@ -24,7 +24,6 @@ public final class HomeManager: HomeManagable {
     private let location: Location
     private let storageRepo: StorageRepository
     private let deliveries: DeliveryQueue
-    private let heatingWrites: (any HeatingWriteRepository)?
     private let fireplaceSwitches: (any FireplaceRepository)?
     private let storageUpkeep: (any StorageUpkeep)?
     /// Tells the automations about a switch of the fireplace; the server yields `HomeEvent.fireplaceChanged`.
@@ -34,8 +33,8 @@ public final class HomeManager: HomeManagable {
     /// The newest fireplace switch, loaded once from the database. It also holds a switch the database could
     /// not save, so an end of the fireplace stays an end and `FireplaceTimeout` does not repeat itself.
     private var fireplace: FireplaceSwitch??
-    /// The last command that reached each radiator, keyed by room and radiator name; loaded from the database at
-    /// start and kept current by `record`, so a decision never reads the database.
+    /// The last command that reached each radiator, keyed by room and radiator name; loaded from the journal at
+    /// start and kept current by `perform`, so a decision never reads the database.
     private var lastCommands: [String: HeatingWrite] = [:]
     /// The changes of every entity of the last `readingRetention`, newest first; what a decision compares
     /// (the rise `FireplaceReminder` looks for). Fills from the changes since the start.
@@ -71,7 +70,6 @@ public final class HomeManager: HomeManagable {
     /// - Parameters:
     ///   - retryTicks: Cadence at which queued failed actions are retried. Pass a stream to drive the
     ///     retries deterministically; the default is a 5s timer.
-    ///   - heatingWrites: Where the writes to radiators are recorded with their reason; `nil` records none.
     ///   - fireplaceSwitches: Where the fireplace switches are stored; `nil` keeps them in memory only.
     ///   - storageUpkeep: What the database upkeep steps do; `nil` does nothing.
     ///   - onFireplaceSwitch: Called after each switch of the fireplace, to tell the automations.
@@ -86,7 +84,6 @@ public final class HomeManager: HomeManagable {
                 location: Location,
                 journal: Journal = Journal(store: InMemoryJournalStore()),
                 commandCache: CommandCache = CommandCache(),
-                heatingWrites: (any HeatingWriteRepository)? = nil,
                 fireplaceSwitches: (any FireplaceRepository)? = nil,
                 storageUpkeep: (any StorageUpkeep)? = nil,
                 onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
@@ -102,7 +99,6 @@ public final class HomeManager: HomeManagable {
         }, outdoorTemperature: outdoorTemperature)
         self.journal = journal
         self.commandCache = commandCache
-        self.heatingWrites = heatingWrites
         self.fireplaceSwitches = fireplaceSwitches
         self.storageUpkeep = storageUpkeep
         self.onFireplaceSwitch = onFireplaceSwitch
@@ -206,14 +202,8 @@ public final class HomeManager: HomeManagable {
     /// Loads what the automations decide on and the database alone holds: the last command per radiator and the
     /// fireplace state. A failed read leaves it empty and logs; the decision then runs without it.
     private func loadDecisionState() async {
-        if let heatingWrites {
-            do {
-                for write in try await heatingWrites.lastWrites() where lastCommands[Self.key(of: write.entityId)] == nil {
-                    lastCommands[Self.key(of: write.entityId)] = write
-                }
-            } catch {
-                log.error("Failed to load the last heating commands", metadata: ["error": "\(error)"])
-            }
+        for write in await journal.lastHeatingWrites() where lastCommands[Self.key(of: write.entityId)] == nil {
+            lastCommands[Self.key(of: write.entityId)] = write
         }
         if fireplace == nil, let fireplaceSwitches {
             do {
@@ -345,7 +335,7 @@ public final class HomeManager: HomeManagable {
             await commandCache.markExecuted(action)
             liveness.recordCommandSuccess(at: Date())
             if let heating, let write = HeatingWrite(action: action, context: heating) {
-                await record(write)
+                lastCommands[Self.key(of: write.entityId)] = write
             }
         } catch {
             liveness.recordCommandFailure(error, at: Date())
@@ -386,17 +376,6 @@ public final class HomeManager: HomeManagable {
             log.error("Failed to store the fireplace switch", metadata: ["isOn": "\(isOn)", "error": "\(error)"])
         }
         return new
-    }
-
-    /// Persists a radiator write; a failing database must not fail the command.
-    public func record(_ write: HeatingWrite) async {
-        if write.sentToDevice { lastCommands[Self.key(of: write.entityId)] = write }
-        guard let heatingWrites else { return }
-        do {
-            try await heatingWrites.add(write)
-        } catch {
-            log.error("Failed to record heating write", metadata: ["action": "\(write.actionName)", "radiator": "\(write.entityId.name)", "error": "\(error)"])
-        }
     }
 
     public func trigger(scene sceneName: String) async {

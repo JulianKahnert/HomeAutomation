@@ -42,8 +42,8 @@ public enum HeatingWriteContext {
     }
 }
 
-/// One write of the server to a radiator, persisted so the plan history and the events of the Heizung
-/// tab can be built from what the server actually wrote.
+/// One command of the server that reached a radiator, read from the journal's command rows so the events of the
+/// Heizung tab can be built from what the server actually wrote.
 public struct HeatingWrite: Identifiable, Sendable, Codable, Equatable {
     public let id: UUID
     public let timestamp: Date
@@ -58,9 +58,6 @@ public struct HeatingWrite: Identifiable, Sendable, Codable, Equatable {
     public let targetTemperatureInC: Double?
     /// The plan target at the time of the write; `nil` for writes that do not follow the plan.
     public let planTargetInC: Double?
-    /// `false` for a plan target the server only recorded because the room was off at the switch point:
-    /// nothing was sent to the radiator, so it is no state of the radiator.
-    public let sentToDevice: Bool
 
     public var placeId: String { entityId.placeId }
 
@@ -71,8 +68,7 @@ public struct HeatingWrite: Identifiable, Sendable, Codable, Equatable {
                 actionName: String,
                 isActive: Bool? = nil,
                 targetTemperatureInC: Double? = nil,
-                planTargetInC: Double? = nil,
-                sentToDevice: Bool = true) {
+                planTargetInC: Double? = nil) {
         self.id = id
         self.timestamp = timestamp
         self.entityId = entityId
@@ -81,7 +77,6 @@ public struct HeatingWrite: Identifiable, Sendable, Codable, Equatable {
         self.isActive = isActive
         self.targetTemperatureInC = targetTemperatureInC
         self.planTargetInC = planTargetInC
-        self.sentToDevice = sentToDevice
     }
 
     /// The record of `action`, or `nil` when `action` is not a radiator write.
@@ -95,18 +90,26 @@ public struct HeatingWrite: Identifiable, Sendable, Codable, Equatable {
             return nil
         }
     }
+
+    /// The write a journal command row stands for, or `nil` when it is no executed radiator command with a reason.
+    public init?(command: ActionLogItem) {
+        guard command.status == .executed, let reason = command.reason, let value = command.value else { return nil }
+        switch command.actionName {
+        case "setHeating":
+            self.init(id: command.id, timestamp: command.timestamp, entityId: command.entityId, reason: reason, actionName: command.actionName,
+                      isActive: value != 0, planTargetInC: command.planTargetInC)
+        case "setTargetTemperature":
+            self.init(id: command.id, timestamp: command.timestamp, entityId: command.entityId, reason: reason, actionName: command.actionName,
+                      targetTemperatureInC: value, planTargetInC: command.planTargetInC)
+        default:
+            return nil
+        }
+    }
 }
 
-/// Persistence of `HeatingWrite`s; implemented by the server's database.
-public protocol HeatingWriteRepository: Sendable {
-    func add(_ write: HeatingWrite) async throws
-    /// The writes to the radiators of room `placeId` in `startDate ..< endDate` (open ends allowed),
+/// Where the room detail reads the radiator commands of a room: the journal's command rows.
+public protocol HeatingCommandSource: Sendable {
+    /// The commands that reached the radiators of room `placeId` in `startDate ..< endDate` (open ends allowed),
     /// oldest first.
-    func writes(placeId: String, startDate: Date?, endDate: Date?) async throws -> [HeatingWrite]
-    /// The newest write of room `placeId` that carries a plan target and lies before `date`.
-    func lastPlanWrite(placeId: String, before date: Date) async throws -> HeatingWrite?
-    /// The newest write that reached the radiator `radiatorName` of room `placeId`, whatever its characteristic.
-    func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite?
-    /// The newest write that reached each radiator, one per radiator; the server loads them once at start.
-    func lastWrites() async throws -> [HeatingWrite]
+    func writes(placeId: String, startDate: Date?, endDate: Date?) async -> [HeatingWrite]
 }

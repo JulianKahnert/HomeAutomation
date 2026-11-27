@@ -15,15 +15,9 @@ private enum Decision {
 }
 
 /// Every repository answers while the server starts and counts the reads a decision makes after it; it must make none.
-private actor Repositories: StorageRepository, HeatingWriteRepository, FireplaceRepository {
+private actor Repositories: StorageRepository, FireplaceRepository {
     private(set) var callsAfterStart = 0
     private var blocked = false
-    private let radiatorWrite: HeatingWrite?
-
-    init(radiatorWrite: HeatingWrite? = nil) {
-        self.radiatorWrite = radiatorWrite
-    }
-
     func block() { blocked = true }
     private func touch() { if blocked, Decision.isRunning { callsAfterStart += 1 } }
 
@@ -34,12 +28,6 @@ private actor Repositories: StorageRepository, HeatingWriteRepository, Fireplace
     func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] { touch(); return [] }
 
     func getAllEntityIds() async throws -> [EntityId] { touch(); return [] }
-
-    func add(_ write: HeatingWrite) async throws { touch() }
-    func writes(placeId: String, startDate: Date?, endDate: Date?) async throws -> [HeatingWrite] { touch(); return [] }
-    func lastPlanWrite(placeId: String, before date: Date) async throws -> HeatingWrite? { touch(); return nil }
-    func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite? { touch(); return nil }
-    func lastWrites() async throws -> [HeatingWrite] { touch(); return radiatorWrite.map { [$0] } ?? [] }
 
     func add(_ fireplaceSwitch: FireplaceSwitch) async throws { touch() }
     func latest() async throws -> FireplaceSwitch? { touch(); return nil }
@@ -56,12 +44,12 @@ struct ShouldTriggerMemoryTests {
     private let roomSensor = EntityId(placeId: "Keller", name: "Raumsensor", characteristicsName: nil, characteristic: .temperatureSensor)
     private let now = Date()
 
-    private func makeHomeManager(_ repositories: Repositories) async -> HomeManager {
+    private func makeHomeManager(_ repositories: Repositories, journal: Journal = Journal(store: InMemoryJournalStore())) async -> HomeManager {
         await HomeManager(getAdapter: { nil },
                           storageRepo: repositories,
                           notificationSender: MockNotificationSender(),
                           location: Location(latitude: 0, longitude: 0),
-                          heatingWrites: repositories,
+                          journal: journal,
                           fireplaceSwitches: repositories,
                           retryTicks: AsyncStream { _ in })
     }
@@ -117,19 +105,22 @@ struct ShouldTriggerMemoryTests {
         #expect(await repositories.callsAfterStart == 0)
     }
 
-    @Test("The last command per radiator is loaded at start and follows the commands since")
+    @Test("The last command per radiator is loaded from the journal at start")
     func lastCommandPerRadiator() async throws {
-        let earlier = HeatingWrite(timestamp: now.addingTimeInterval(-600), entityId: radiator.heatingId, reason: .window, actionName: "setHeating", isActive: false)
-        let repositories = Repositories(radiatorWrite: earlier)
-        let homeManager = await makeHomeManager(repositories)
+        let store = InMemoryJournalStore()
+        let earlier = ActionLogItem(timestamp: now.addingTimeInterval(-600), action: .setHeating(radiator.heatingId, active: false), hasCacheHit: false, reason: .window)
+        let older = ActionLogItem(timestamp: now.addingTimeInterval(-1_200), action: .setHeating(radiator.heatingId, active: true), hasCacheHit: false, reason: .plan)
+        try await store.addCommand(older)
+        try await store.addCommand(earlier)
+        let repositories = Repositories()
+        let homeManager = await makeHomeManager(repositories, journal: Journal(store: store))
         await homeManager.loadCurrentStates(timeout: .seconds(2))
         await repositories.block()
 
-        #expect(await homeManager.lastHeatingWrite(of: radiator.heatingId) == earlier)
-
-        let later = HeatingWrite(timestamp: now, entityId: radiator.heatingId, reason: .plan, actionName: "setHeating", isActive: true)
-        await homeManager.record(later)
-        #expect(await homeManager.lastHeatingWrite(of: radiator.heatingId) == later)
+        let loaded = try #require(await homeManager.lastHeatingWrite(of: radiator.heatingId))
+        #expect(loaded.id == earlier.id)
+        #expect(loaded.isActive == false)
+        #expect(loaded.reason == .window)
     }
 
     @Test("The readings of the window survive a restart")

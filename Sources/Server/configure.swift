@@ -150,6 +150,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateJournal())
     app.migrations.add(CreateNarrowStorage())
     app.migrations.add(DropEntityItems())
+    app.migrations.add(MoveHeatingWritesToJournal())
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -265,7 +266,6 @@ public func configure(_ app: Application) async throws {
                                         notificationSender: notificationSender,
                                         location: app.homeAutomationConfigService.location,
                                         journal: journal,
-                                        heatingWrites: app.heatingWriteRepository,
                                         fireplaceSwitches: app.fireplaceRepository,
                                         storageUpkeep: DatabaseStorageUpkeep(entities: app.entityStorageDbRepository,
                                                                              journal: journal,

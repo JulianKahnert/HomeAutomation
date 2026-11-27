@@ -18,7 +18,7 @@ import HAModels
 /// | `detail` | trigger summary | action description | push message |
 /// | `entity*` | trigger entity | commanded entity | |
 /// | `triggerKind`, `outcome`, `endedAt`, `errorDescription` | yes | | |
-/// | `status`, `hasCacheHit`, `reason`, `planTargetInC` | | yes | |
+/// | `status`, `hasCacheHit`, `reason`, `planTargetInC`, `commandValue` | | yes | |
 /// | `pushId` | | | yes |
 final class JournalDbItem: Model, @unchecked Sendable {
     static let schema = "journal"
@@ -77,6 +77,9 @@ final class JournalDbItem: Model, @unchecked Sendable {
     @OptionalField(key: "planTargetInC")
     var planTargetInC: Double?
 
+    @OptionalField(key: "commandValue")
+    var commandValue: Double?
+
     @OptionalField(key: "pushId")
     var pushId: String?
 
@@ -108,6 +111,7 @@ final class JournalDbItem: Model, @unchecked Sendable {
         hasCacheHit = command.hasCacheHit
         reason = command.reason?.rawValue
         planTargetInC = command.planTargetInC
+        commandValue = command.value
     }
 
     init(_ push: JournalPush) {
@@ -162,7 +166,8 @@ final class JournalDbItem: Model, @unchecked Sendable {
                              runId: runId,
                              status: status.flatMap(ActionLogItem.Status.init(rawValue:)),
                              reason: reason.flatMap(HeatingWriteReason.init(rawValue:)),
-                             planTargetInC: planTargetInC)
+                             planTargetInC: planTargetInC,
+                             value: commandValue)
     }
 
     func toPush() throws -> JournalPush {

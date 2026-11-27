@@ -130,7 +130,6 @@ struct HomeManagerTests {
     ///   in the tests that drive them.
     private func makeHomeManager(probe: AdapterProbe,
                                  storageRepo: any StorageRepository = MockStorageRepository(),
-                                 heatingWrites: (any HeatingWriteRepository)? = nil,
                                  fireplaceSwitches: (any FireplaceRepository)? = nil,
                                  onFireplaceSwitch: @escaping @Sendable (FireplaceSwitch) -> Void = { _ in },
                                  onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
@@ -143,7 +142,6 @@ struct HomeManagerTests {
                                  notificationSender: MockNotificationSender(),
                                  location: Location(latitude: 0, longitude: 0),
                                  journal: journal,
-                                 heatingWrites: heatingWrites,
                                  fireplaceSwitches: fireplaceSwitches,
                                  onFireplaceSwitch: onFireplaceSwitch,
                                  onReportedChange: onReportedChange,
@@ -331,11 +329,10 @@ struct HomeManagerTests {
 
     private let radiator = EntityId(placeId: "Kitchen", name: "Radiator", characteristicsName: nil, characteristic: .targetTemperature)
 
-    @Test("A radiator write with a reason lands in the action log and the heating write record")
+    @Test("A radiator write with a reason lands in the journal with its value and is the last command of the radiator")
     func heatingWriteIsRecorded() async throws {
-        let writes = InMemoryHeatingWriteRepository()
         let journal = Journal(store: InMemoryJournalStore())
-        let homeManager = await makeHomeManager(probe: AdapterProbe(), heatingWrites: writes, journal: journal)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), journal: journal)
 
         await HeatingWriteContext.withReason(.plan, planTargetInC: 21) {
             await homeManager.perform(.setTargetTemperature(radiator, celsius: 21.2))
@@ -345,40 +342,45 @@ struct HomeManagerTests {
         let logged = try #require(await journal.commands(limit: nil, runId: nil).first)
         #expect(logged.reason == .plan)
         #expect(logged.planTargetInC == 21)
-        let recorded = try #require(await writes.all.first)
+        let recorded = try #require(await journal.writes(placeId: "Kitchen", startDate: nil, endDate: nil).first)
         #expect(recorded.reason == .plan)
         #expect(recorded.targetTemperatureInC == 21.0)
         #expect(recorded.planTargetInC == 21)
+        #expect(await homeManager.lastHeatingWrite(of: radiator)?.targetTemperatureInC == 21.0)
+        #expect(await journal.lastHeatingWrites().map(\.targetTemperatureInC) == [21.0])
     }
 
     @Test("A command without a reason, a duplicate and a failed write are not recorded")
     func onlyExecutedWritesWithReasonAreRecorded() async {
-        let writes = InMemoryHeatingWriteRepository()
-        let homeManager = await makeHomeManager(probe: AdapterProbe(), heatingWrites: writes)
+        let journal = Journal(store: InMemoryJournalStore())
+        let homeManager = await makeHomeManager(probe: AdapterProbe(), journal: journal)
 
         await homeManager.perform(.setTargetTemperature(radiator, celsius: 20))
-        #expect(await writes.all.isEmpty)
+        await journal.flush()
+        #expect(await journal.writes(placeId: "Kitchen", startDate: nil, endDate: nil).isEmpty)
 
         await HeatingWriteContext.withReason(.system) {
             await homeManager.perform(.setHeating(radiator, active: true))
             await homeManager.perform(.setHeating(radiator, active: true))
         }
-        #expect(await writes.all.count == 1)
+        await journal.flush()
+        #expect(await journal.writes(placeId: "Kitchen", startDate: nil, endDate: nil).count == 1)
 
-        let failing = InMemoryHeatingWriteRepository()
-        let failingManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), heatingWrites: failing)
+        let failing = Journal(store: InMemoryJournalStore())
+        let failingManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), journal: failing)
         await HeatingWriteContext.withReason(.system) {
             await failingManager.perform(.setHeating(radiator, active: true))
         }
-        #expect(await failing.all.isEmpty)
+        await failing.flush()
+        #expect(await failing.writes(placeId: "Kitchen", startDate: nil, endDate: nil).isEmpty)
+        #expect(await failingManager.lastHeatingWrite(of: radiator) == nil)
     }
 
     @Test("A retried radiator write keeps its reason")
     func retryKeepsHeatingReason() async {
         let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
-        let writes = InMemoryHeatingWriteRepository()
         let journal = Journal(store: InMemoryJournalStore())
-        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), heatingWrites: writes, retryTicks: ticks, journal: journal)
+        let homeManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), retryTicks: ticks, journal: journal)
 
         await HeatingWriteContext.withReason(.plan, planTargetInC: 19) {
             await homeManager.perform(.setTargetTemperature(radiator, celsius: 19))
@@ -490,7 +492,7 @@ struct HomeManagerTests {
     func queuedOffIsReplacedByTheClosing() async throws {
         let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
         let probe = AdapterProbe(failure: .unreachable)
-        let homeManager = await makeHomeManager(probe: probe, heatingWrites: InMemoryHeatingWriteRepository(), retryTicks: ticks)
+        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks)
         let thermo = Radiator(query: .init(placeId: "Kitchen", name: "Thermo"))
         let window = WindowContactSensor(query: .init(placeId: "Kitchen", name: "Window"))
         let plan = HeatingPlan([.init(weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday], switchPoints: [SwitchPoint(hour: 6, targetInC: 21)])])

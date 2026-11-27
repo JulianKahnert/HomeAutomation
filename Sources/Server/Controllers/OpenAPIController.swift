@@ -7,6 +7,7 @@
 
 import Dependencies
 import Fluent
+import HAApplicationLayer
 import HAImplementations
 import HAModels
 import OpenAPIRuntime
@@ -327,7 +328,7 @@ struct OpenAPIController: APIProtocol {
     private func heatingDetailBuilder() -> HeatingRoomDetailBuilder {
         let homeManager = request.application.homeManager
         return HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
-                                 writes: request.application.heatingWriteRepository,
+                                 writes: Journal(store: request.application.journalRepository),
                                  fireplace: request.application.fireplaceRepository,
                                  lastReport: { await homeManager.lastReport(of: $0) },
                                  calendar: HeatingOverviewBuilder.berlin)

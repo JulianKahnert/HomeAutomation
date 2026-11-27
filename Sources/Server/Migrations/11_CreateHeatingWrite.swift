@@ -7,14 +7,15 @@ import Fluent
 import SQLKit
 import Vapor
 
-/// The persisted record of the server's writes to radiators: reason, written value and plan target.
+/// Dropped again by `MoveHeatingWritesToJournal`. The persisted record of the server's writes to radiators: reason, written value and plan target.
 /// A few rows per room and day, kept for good: the index serves the lookup of a radiator's last write on
 /// every contact change and the range queries of the room detail (key ≈ 2 × 1020 + 8 bytes, within InnoDB's 3072).
 struct CreateHeatingWrite: AsyncMigration {
+    static let table = "heatingWrites"
     static let indexName = "idx_heatingWrites_place_name_timestamp"
 
     func prepare(on database: Database) async throws {
-        try await database.schema(HeatingWriteDbItem.schema)
+        try await database.schema(Self.table)
             .id()
             .field("timestamp", .datetime, .required)
             .field("placeId", .string, .required)
@@ -32,7 +33,7 @@ struct CreateHeatingWrite: AsyncMigration {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
         try await sql.create(index: Self.indexName)
-            .on(HeatingWriteDbItem.schema)
+            .on(Self.table)
             .column("placeId")
             .column("name")
             .column("timestamp")
@@ -40,6 +41,6 @@ struct CreateHeatingWrite: AsyncMigration {
     }
 
     func revert(on database: Database) async throws {
-        try await database.schema(HeatingWriteDbItem.schema).delete()
+        try await database.schema(Self.table).delete()
     }
 }

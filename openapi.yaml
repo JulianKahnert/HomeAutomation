@@ -710,6 +710,15 @@ components:
     EntityHistoryItem:
       type: object
       properties:
+        valueKind:
+          type: string
+          description: The value kind of this point (the raw value of a characteristic type, e.g. `temperatureSensor`). A kind the app does not know is shown with its raw value.
+        value:
+          description: The generic value of this point, a boolean, a number or a text; its shape follows the value kind (colour is the text "r g b" with components 0...1).
+          oneOf:
+            - type: boolean
+            - type: number
+            - type: string
         timestamp:
           type: string
           format: date-time

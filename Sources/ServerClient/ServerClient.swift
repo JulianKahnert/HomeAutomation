@@ -351,6 +351,18 @@ extension EntityHistoryItem {
                   valvePositionPercent: item.valvePositionPercent,
                   temperatureCalibrationInC: item.temperatureCalibrationInC,
                   origin: item.origin,
-                  lastReport: item.lastReport)
+                  lastReport: item.lastReport,
+                  valueKind: item.valueKind,
+                  value: item.value.flatMap(Value.init))
+    }
+}
+
+extension Value {
+    init?(_ payload: Components.Schemas.EntityHistoryItem.ValuePayload) {
+        switch payload {
+        case .case1(let bool): self = .bool(bool)
+        case .case2(let number): self = .number(number)
+        case .case3(let text): self = .text(text)
+        }
     }
 }

@@ -133,8 +133,14 @@ final class EntityStorageMySQLTests: XCTestCase {
         let temperature = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .temperatureSensor)
         let valve = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: "Thermostat", characteristic: .valvePosition)
         let lamp = EntityId(placeId: "Hall", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
-        for (index, id) in [temperature, temperature, valve, lamp].enumerated() {
-            try await repository.add(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: Double(index)), isDeviceOn: true))
+        let items = [
+            EntityStorageItem(entityId: temperature, timestamp: Date(timeIntervalSince1970: 0), temperatureInC: Measurement(value: 20, unit: .celsius)),
+            EntityStorageItem(entityId: temperature, timestamp: Date(timeIntervalSince1970: 1), temperatureInC: Measurement(value: 22, unit: .celsius)),
+            EntityStorageItem(entityId: valve, timestamp: Date(timeIntervalSince1970: 2), valvePositionPercent: 40),
+            EntityStorageItem(entityId: lamp, timestamp: Date(timeIntervalSince1970: 3), isDeviceOn: true)
+        ]
+        for item in items {
+            try await repository.add(item)
         }
 
         let ids = try await repository.getAllEntityIds()

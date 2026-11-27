@@ -270,12 +270,6 @@ public func configure(_ app: Application) async throws {
                                                                              noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
                                         onReportedChange: { [continuation = app.homeEventsContinuation] item in
         continuation.yield(.change(entity: item))
-    },
-                                        outdoorTemperature: { [app] in
-        // The state the OutdoorTemperatureJob reports.
-        await app.homeManager.states(of: CharacteristicsType.temperatureSensor.valueKind)
-            .first { $0.entityId == OutdoorTemperatureJob.entityId }?
-            .temperatureInC?.value
     })
     app.homeManager = homeManager
     // Before the event processing job starts and before `.serverStarted`, which reads current states.
@@ -285,7 +279,7 @@ public func configure(_ app: Application) async throws {
     let automationService = try AutomationService(using: homeManager,
                                                   runs: app.journalRepository,
                                                   automations: loadedConfig.automations,
-                                                  builtIns: [DatabaseCleanup()],
+                                                  builtIns: [DatabaseCleanup(), WindowProjection()],
                                                   repository: app.homeAutomationConfigService)
     app.automationService = automationService
 

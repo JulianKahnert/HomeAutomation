@@ -199,7 +199,6 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     }
 
     private(set) var sentNotificationTitles: [String] = []
-    private(set) var overdueWindowIds: [EntityId] = []
 
     /// The notifications `deliver` was asked to send.
     private(set) var sentNotifications: [(title: String, message: String, id: String, category: String?)] = []
@@ -237,30 +236,6 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem] {
         storageItems.filter { $0.entityId == entityId && $0.timestamp >= since }.sorted { $0.timestamp > $1.timestamp }
-    }
-
-    func markWindowOverdue(entityId: EntityId) async {
-        overdueWindowIds.append(entityId)
-    }
-
-    /// The windows `setWindowOpenState` registered, überschritten as `markWindowOverdue` marked them.
-    func getWindowContentState() async -> WindowContentState {
-        let windows = windowOpenStates.map { entityId, state in
-            WindowContentState.Window(id: state.id,
-                                      name: state.name,
-                                      room: state.room,
-                                      opened: state.opened,
-                                      closeBy: state.closeBy,
-                                      isOverdue: overdueWindowIds.contains(entityId))
-        }
-        return WindowContentState(sortedWindows: windows)
-    }
-
-    /// The window state per window, as `setWindowOpenState` last set it; a cleared state is absent.
-    private(set) var windowOpenStates: [EntityId: WindowOpenState] = [:]
-
-    func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
-        windowOpenStates[entityId] = state
     }
 
     func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws {

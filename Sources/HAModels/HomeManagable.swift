@@ -70,11 +70,6 @@ public protocol HomeManagable: EntityValidator, Sendable {
     /// Hands a push or Live Activity update over to the notification adapter. Deliveries leave in the order
     /// they were handed over, also when one send is slow; a failed send is logged, not thrown.
     func deliver(_ delivery: Delivery) async
-    /// Marks an offenes Fenster überschritten once its Fensterschließzeit has passed; the Live Activity alerts once.
-    func markWindowOverdue(entityId: EntityId) async
-    /// The window Live Activity's content state, as the server last built it.
-    func getWindowContentState() async -> WindowContentState
-    func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async
     /// Whether HomeKit works end to end; shared by `/health` and the `HealthCheck` automation.
     func homeKitHealth() async -> HomeKitHealth
     /// Runs one step of the database upkeep (cleanup, rollup). A no-op where the host has no database upkeep.

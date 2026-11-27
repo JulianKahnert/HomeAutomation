@@ -357,14 +357,10 @@ public final class HomeManager: HomeManagable {
     }
 
     @discardableResult
-    public func report(_ entityId: EntityId, value: Value, origin: Origin) async -> Bool {
-        guard entityId.isServerOwned else {
-            log.error("Refusing to report \(entityId): it is not a server-owned entity")
-            return false
-        }
+    public func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
+        guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
         guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
-            log.error("Refusing to report \(entityId): the value \(value) does not fit its value kind")
-            return false
+            throw ReportError.valueDoesNotFit(entityId)
         }
         // No suspension point between the check, the state and the yield: the state holds before the event
         // reaches the stream, and two reports of one entity cannot interleave.

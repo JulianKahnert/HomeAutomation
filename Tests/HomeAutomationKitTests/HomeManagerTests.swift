@@ -154,13 +154,13 @@ struct HomeManagerTests {
     func reportTellsWhetherItChanged() async throws {
         let homeManager = await makeHomeManager(probe: AdapterProbe())
 
-        #expect(await homeManager.report(holidayId, value: .bool(true)))
+        #expect(try await homeManager.report(holidayId, value: .bool(true)))
         let first = try await homeManager.getCurrentEntity(with: holidayId)
         try await Task.sleep(for: .milliseconds(20))
 
-        #expect(await homeManager.report(holidayId, value: .bool(true)) == false)
+        #expect(try await homeManager.report(holidayId, value: .bool(true)) == false)
         #expect(try await homeManager.getCurrentEntity(with: holidayId).timestamp == first.timestamp)
-        #expect(await homeManager.report(holidayId, value: .bool(false)))
+        #expect(try await homeManager.report(holidayId, value: .bool(false)))
         #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == false)
     }
 
@@ -169,8 +169,8 @@ struct HomeManagerTests {
         let seen = Mutex<[EntityStorageItem]>([])
         let homeManager = await makeHomeManager(probe: AdapterProbe(), onReportedChange: { item in seen.withLock { $0.append(item) } })
 
-        await homeManager.report(holidayId, value: .bool(true))
-        await homeManager.report(holidayId, value: .bool(true))
+        try await homeManager.report(holidayId, value: .bool(true))
+        try await homeManager.report(holidayId, value: .bool(true))
 
         let events = seen.withLock { $0 }
         #expect(events.count == 1)
@@ -186,7 +186,7 @@ struct HomeManagerTests {
         await homeManager.perform(.turnOff(switchId))
         #expect(await homeManager.homeKitHealth() != .healthy)
 
-        await homeManager.report(holidayId, value: .bool(true), origin: .app)
+        try await homeManager.report(holidayId, value: .bool(true), origin: .app)
 
         #expect(try await homeManager.getCurrentEntity(with: holidayId).origin == .app)
         #expect(await homeManager.homeKitHealth() != .healthy)
@@ -197,14 +197,14 @@ struct HomeManagerTests {
     func reportSurvivesARestart() async throws {
         let storage = RecordingStorageRepository()
         let beforeRestart = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
-        await beforeRestart.report(priceId, value: .number(0.31))
+        try await beforeRestart.report(priceId, value: .number(0.31))
         await storage.waitForAdds(1)
 
         let afterRestart = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
         await afterRestart.loadCurrentStates(timeout: .seconds(2))
 
         #expect(try await afterRestart.getCurrentEntity(with: priceId).temperatureInC?.value == 0.31)
-        #expect(await afterRestart.report(priceId, value: .number(0.31)) == false)
+        #expect(try await afterRestart.report(priceId, value: .number(0.31)) == false)
         #expect(await storage.added.count == 1)
     }
 
@@ -213,19 +213,19 @@ struct HomeManagerTests {
         let storage = RecordingStorageRepository(failingAdds: 100)
         let homeManager = await makeHomeManager(probe: AdapterProbe(), storageRepo: storage)
 
-        #expect(await homeManager.report(holidayId, value: .bool(true)))
+        #expect(try await homeManager.report(holidayId, value: .bool(true)))
 
         #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == true)
-        #expect(await homeManager.report(holidayId, value: .bool(true)) == false)
+        #expect(try await homeManager.report(holidayId, value: .bool(true)) == false)
     }
 
     @Test("The facade reads all states of one value kind")
-    func statesOfOneKind() async {
+    func statesOfOneKind() async throws {
         let homeManager = await makeHomeManager(probe: AdapterProbe())
         let guestsId = EntityId.serverOwned(name: "guests", characteristic: .switcher)
-        await homeManager.report(holidayId, value: .bool(true))
-        await homeManager.report(guestsId, value: .bool(false))
-        await homeManager.report(priceId, value: .number(0.3))
+        try await homeManager.report(holidayId, value: .bool(true))
+        try await homeManager.report(guestsId, value: .bool(false))
+        try await homeManager.report(priceId, value: .number(0.3))
         await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
 
         let switches = await homeManager.states(of: ValueKind(.switcher)).map(\.entityId)
@@ -234,12 +234,12 @@ struct HomeManagerTests {
         #expect(await homeManager.states(of: ValueKind(.temperatureSensor)).map(\.entityId) == [priceId])
     }
 
-    @Test("A report is refused for an entity that is not server-owned or a value that does not fit")
-    func reportRefusesWhatDoesNotFit() async {
+    @Test("A refused report throws: an entity that is not server-owned, a value that does not fit")
+    func reportRefusesWhatDoesNotFit() async throws {
         let homeManager = await makeHomeManager(probe: AdapterProbe())
 
-        #expect(await homeManager.report(switchId, value: .bool(true)) == false)
-        #expect(await homeManager.report(holidayId, value: .number(1)) == false)
+        await #expect(throws: ReportError.notServerOwned(switchId)) { try await homeManager.report(switchId, value: .bool(true)) }
+        await #expect(throws: ReportError.valueDoesNotFit(holidayId)) { try await homeManager.report(holidayId, value: .number(1)) }
         #expect(await homeManager.states(of: ValueKind(.switcher)).isEmpty)
     }
 
@@ -521,14 +521,14 @@ struct HomeManagerTests {
     func fireplaceRepeatedOnKeepsStart() async throws {
         let homeManager = await makeHomeManager(probe: AdapterProbe())
 
-        #expect(await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app))
-        let since = try #require(await Fireplace.state(with: homeManager).since)
+        #expect(try await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app))
+        let since = try #require(try await Fireplace.state(with: homeManager).since)
         try await Task.sleep(for: .milliseconds(20))
-        #expect(await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app) == false)
+        #expect(try await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app) == false)
 
-        #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: since))
-        #expect(await homeManager.report(Fireplace.stateId, value: .bool(false), origin: .server))
-        #expect(await Fireplace.state(with: homeManager) == .off)
+        #expect(try await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: since))
+        #expect(try await homeManager.report(Fireplace.stateId, value: .bool(false), origin: .server))
+        #expect(try await Fireplace.state(with: homeManager) == .off)
         #expect(try await homeManager.getCurrentEntity(with: Fireplace.stateId).origin == .server)
     }
 

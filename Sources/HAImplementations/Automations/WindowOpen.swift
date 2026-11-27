@@ -59,7 +59,7 @@ public struct WindowOpen: Automatable {
         // Clear window state when window closes early
         guard isWindowOpen else {
             log.debug("Skipping 'WindowOpen' automation, window is closed")
-            await reportDeadline(.none, using: hm)
+            try await reportDeadline(.none, using: hm)
             return
         }
 
@@ -73,7 +73,7 @@ public struct WindowOpen: Automatable {
             closeBy = opened.addingTimeInterval(notificationWait.timeInterval)
         }
 
-        await reportDeadline(.running(until: closeBy), using: hm)
+        try await reportDeadline(.running(until: closeBy), using: hm)
 
         let remaining = closeBy.timeIntervalSince(now)
         if remaining > 0 {
@@ -83,7 +83,7 @@ public struct WindowOpen: Automatable {
 
         // The window projection shows the window überschritten and alerts the resident.
         log.debug("Fensterschließzeit reached, reporting the window überschritten")
-        await reportDeadline(.overdue(since: closeBy), using: hm)
+        try await reportDeadline(.overdue(since: closeBy), using: hm)
     }
 
     /// The server-owned entity that holds this window's deadline, one per window.
@@ -94,7 +94,7 @@ public struct WindowOpen: Automatable {
 
     /// Reports the deadline of this window unless it already holds it. An overdue deadline is never taken back
     /// to running for the same end, so a replay after a restart changes nothing and sends nothing.
-    private func reportDeadline(_ deadline: Deadline, using hm: HomeManagable) async {
+    private func reportDeadline(_ deadline: Deadline, using hm: HomeManagable) async throws {
         // The stored deadline went through its text form, which can move the end by a fraction of a microsecond;
         // compare in that form so the same end counts as the same deadline.
         let deadline = Deadline(text: deadline.text) ?? deadline
@@ -102,7 +102,7 @@ public struct WindowOpen: Automatable {
             .first { $0.entityId == deadlineId }?.deadline
         guard current != deadline else { return }
         if case .running(let until) = deadline, current == .overdue(since: until) { return }
-        await hm.report(deadlineId, value: .text(deadline.text))
+        try await hm.report(deadlineId, value: .text(deadline.text))
     }
 
     /// The deadline this window holds, `nil` when none is stored or it is `none`.

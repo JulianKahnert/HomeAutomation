@@ -49,16 +49,16 @@ struct EnergyLowPriceTests {
     }
 
     @Test("a price known as state but never reported in this process is not current")
-    func priceFromBeforeTheRestartIsNotCurrent() async {
-        await homeManager.report(.electricityPrice, value: .number(0.2), origin: .job("EnergyPriceJob"))
+    func priceFromBeforeTheRestartIsNotCurrent() async throws {
+        try await homeManager.report(.electricityPrice, value: .number(0.2), origin: .job("EnergyPriceJob"))
         homeManager.lastReports[.electricityPrice] = nil
 
         #expect(await automation.currentPrice(using: homeManager, now: now) == nil)
     }
 
     @Test("a price report older than the price job's cadence allows is not current, a fresh one is")
-    func stalePriceIsNotCurrent() async {
-        await homeManager.report(.electricityPrice, value: .number(0.2), origin: .job("EnergyPriceJob"))
+    func stalePriceIsNotCurrent() async throws {
+        try await homeManager.report(.electricityPrice, value: .number(0.2), origin: .job("EnergyPriceJob"))
 
         homeManager.lastReports[.electricityPrice] = now.addingTimeInterval(-EnergyLowPrice.maximumPriceAge - 1)
         #expect(await automation.currentPrice(using: homeManager, now: now) == nil)

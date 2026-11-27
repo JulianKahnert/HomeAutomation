@@ -217,8 +217,11 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     /// Server-owned states reported by an automation under test, with the origin they were reported with.
     @discardableResult
-    func report(_ entityId: EntityId, value: Value, origin: Origin) async -> Bool {
-        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else { return false }
+    func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
+        guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
+        guard let item = EntityStorageItem(entityId: entityId, kind: entityId.characteristicType.valueKind, value: value, origin: origin) else {
+            throw ReportError.valueDoesNotFit(entityId)
+        }
         return await addEntityHistory(item)
     }
 

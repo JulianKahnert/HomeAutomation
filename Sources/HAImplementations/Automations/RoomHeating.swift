@@ -115,7 +115,7 @@ public struct RoomHeating: Automatable {
         let isSwitchPoint = effectivePlan.switchPoint(at: now) != nil
         if let target = effectivePlan.planTarget(at: now) {
             // an unchanged target is no change: the history keeps only the switch points that moved it
-            await hm.report(HeatingRoomSources.planTargetId(placeId: placeId), value: .number(target))
+            try await hm.report(HeatingRoomSources.planTargetId(placeId: placeId), value: .number(target))
         }
         let off = try await switchOff(from: now, sleep: sleep, using: hm)
         // A radiator whose contact closed within its delay never went off: it follows the plan like the others.

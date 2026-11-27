@@ -22,10 +22,10 @@ struct EnergyPriceJob: ScheduledJob, Log {
     /// The price in EUR per kWh that is valid at the given date, `nil` without one.
     let currentPrice: @Sendable (Date) async throws -> Double?
     /// Reports a value of a server-owned entity (`HomeManagable.report`).
-    let report: @Sendable (EntityId, Value, Origin) async -> Bool
+    let report: @Sendable (EntityId, Value, Origin) async throws -> Bool
 
     func run(plannedAt: Date) async throws {
         guard let price = try await currentPrice(plannedAt) else { throw NoPriceError() }
-        _ = await report(Self.entityId, .number(price), .job(name))
+        _ = try await report(Self.entityId, .number(price), .job(name))
     }
 }

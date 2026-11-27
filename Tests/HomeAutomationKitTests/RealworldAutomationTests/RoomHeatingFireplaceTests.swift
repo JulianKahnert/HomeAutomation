@@ -154,7 +154,7 @@ struct RoomHeatingFireplaceTests {
         setFireplace(on: true, at: noon.addingTimeInterval(-3600))
         homeManager.health = .degraded(reason: "homed dropped the adapter")
 
-        #expect(await Fireplace.state(with: homeManager).isOn)
+        #expect(try await Fireplace.state(with: homeManager).isOn)
         #expect(try await room().shouldTrigger(with: .serverStarted, using: homeManager))
     }
 
@@ -409,8 +409,8 @@ struct FireplaceTimeoutTests {
     func endsAt() async throws {
         setFireplace(on: true, at: start)
 
-        #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
-        #expect(await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(maxDuration))
+        #expect(try await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
+        #expect(try await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(maxDuration))
     }
 
     @Test("Another event does not trigger it")
@@ -446,24 +446,24 @@ struct FireplaceSwitchTests {
     }
 
     @Test("On since its last change, no HomeKit command, the end derived from the start")
-    func on() async {
+    func on() async throws {
         homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: start, isOn: true))
 
-        #expect(await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
-        #expect(await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(Fireplace.maxDuration))
+        #expect(try await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
+        #expect(try await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(Fireplace.maxDuration))
         #expect(homeManager.performedActions.isEmpty)
     }
 
     @Test("Switched off ends it at once")
-    func off() async {
+    func off() async throws {
         homeManager.fireplaceSwitches += [FireplaceSwitch(timestamp: start, isOn: true), FireplaceSwitch(timestamp: start.addingTimeInterval(60), isOn: false)]
 
-        #expect(await Fireplace.state(with: homeManager) == .off)
+        #expect(try await Fireplace.state(with: homeManager) == .off)
     }
 
     @Test("A fireplace never switched is off")
-    func neverSwitched() async {
-        #expect(await Fireplace.state(with: homeManager) == .off)
+    func neverSwitched() async throws {
+        #expect(try await Fireplace.state(with: homeManager) == .off)
     }
 
     @Test("The end the server names wins over the one derived from the start")

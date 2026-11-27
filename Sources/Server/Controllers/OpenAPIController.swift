@@ -223,9 +223,24 @@ struct OpenAPIController: APIProtocol {
         case .case3(let text): value = .text(text)
         }
         let homeManager = request.application.homeManager
-        let changed = await homeManager.report(entityId, value: value, origin: .app)
-        guard let item = try? await homeManager.getCurrentEntity(with: entityId),
-              let state = item.genericValue?.value else { return .badRequest }
+        let changed: Bool
+        do {
+            changed = try await homeManager.report(entityId, value: value, origin: .app)
+        } catch ReportError.valueDoesNotFit {
+            return .badRequest
+        }
+        // The report just set it: a state that cannot be read back is a failure of the server, not of the request.
+        let item: EntityStorageItem
+        do {
+            item = try await homeManager.getCurrentEntity(with: entityId)
+        } catch {
+            request.logger.error("Failed to read the state that was just set", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
+            throw Abort(.internalServerError)
+        }
+        guard let state = item.genericValue?.value else {
+            request.logger.error("The state that was just set has no value", metadata: ["entityId": "\(entityId)"])
+            throw Abort(.internalServerError)
+        }
         return .ok(.init(body: .json(.init(entityId: .init(entityId),
                                            valueKind: type.valueKind.rawValue,
                                            value: .init(state),
@@ -266,8 +281,7 @@ struct OpenAPIController: APIProtocol {
         var schemaItems = historyItems.map(Components.Schemas.EntityHistoryItem.init)
 
         // The last report lives in memory next to the current state: it belongs to the newest change only.
-        if cursor == nil, !schemaItems.isEmpty,
-           let current = try? await request.application.homeManager.getCurrentEntity(with: entityId),
+        if cursor == nil, !schemaItems.isEmpty, let current = await currentState(of: entityId),
            let lastReport = current.lastReport,
            abs(current.timestamp.timeIntervalSince(schemaItems[0].timestamp)) < 1 {
             schemaItems[0].lastReport = lastReport
@@ -282,6 +296,18 @@ struct OpenAPIController: APIProtocol {
         )
 
         return .ok(.init(body: .json(response)))
+    }
+
+    /// The current state the server holds; `nil` for an entity it never held. Any other failure is logged.
+    private func currentState(of entityId: EntityId) async -> EntityStorageItem? {
+        do {
+            return try await request.application.homeManager.getCurrentEntity(with: entityId)
+        } catch OptionalError.notFound {
+            return nil
+        } catch {
+            request.logger.error("Failed to read the current state", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
+            return nil
+        }
     }
 
     func getRoomHistory(_ input: Operations.GetRoomHistory.Input) async throws -> Operations.GetRoomHistory.Output {
@@ -331,7 +357,7 @@ struct OpenAPIController: APIProtocol {
     // MARK: - /heating/fireplace
 
     func getFireplace(_ input: Operations.GetFireplace.Input) async throws -> Operations.GetFireplace.Output {
-        let state = await Fireplace.state(with: request.application.homeManager)
+        let state = try await Fireplace.state(with: request.application.homeManager)
         return .ok(.init(body: .json(.init(state))))
     }
 }

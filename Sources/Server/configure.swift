@@ -285,8 +285,8 @@ public func configure(_ app: Application) async throws {
     let valveJob = ValveJob(listThermostats: { try await homeManager.listThermostats() },
                             readThermostat: { try await homeManager.readThermostat($0) },
                             feed: { [sink = app.homeEventSink] in sink.yield(.change(entity: $0)) })
-    let report: @Sendable (EntityId, Value, Origin) async -> Bool = { [homeManager] in
-        await homeManager.report($0, value: $1, origin: $2)
+    let report: @Sendable (EntityId, Value, Origin) async throws -> Bool = { [homeManager] in
+        try await homeManager.report($0, value: $1, origin: $2)
     }
     var scheduledJobs: [any ScheduledJob] = [OutdoorTemperatureJob(location: location, hours: weatherHours, report: report),
                                              LaneBacklogJob(automationService: automationService, gauge: gauge),

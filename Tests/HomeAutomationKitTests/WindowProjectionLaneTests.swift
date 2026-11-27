@@ -72,7 +72,7 @@ struct WindowProjectionLaneTests {
     /// Reports the deadline and hands the change to the service, like the event loop does.
     private func report(_ deadline: Deadline, _ name: String) async throws {
         let id = deadlineId(name)
-        await manager.report(id, value: .text(deadline.text))
+        try await manager.report(id, value: .text(deadline.text))
         let item = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id })
         await service.trigger(with: .change(entity: item))
     }

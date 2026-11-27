@@ -38,7 +38,7 @@ struct WindowProjectionTests {
     @discardableResult
     private func report(_ deadline: Deadline, _ name: String, in room: String) async throws -> EntityStorageItem {
         let id = Self.deadlineId(name, in: room)
-        await manager.report(id, value: .text(deadline.text))
+        try await manager.report(id, value: .text(deadline.text))
         let item = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id })
         try await AutomationRunContext.$event.withValue(.change(entity: item)) {
             try await projection.execute(using: manager)
@@ -211,9 +211,9 @@ struct WindowProjectionTests {
         try await open("Tür", in: "Flur", minutesAfterStart: 1)
         let id = Self.deadlineId("Tür", in: "Flur")
         let end = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id }?.deadline?.end)
-        await manager.report(id, value: .text(Deadline.overdue(since: end).text))
+        try await manager.report(id, value: .text(Deadline.overdue(since: end).text))
         let overdue = try #require(await manager.states(of: CharacteristicsType.deadline.valueKind).first { $0.entityId == id })
-        await manager.report(id, value: .text(Deadline.none.text))
+        try await manager.report(id, value: .text(Deadline.none.text))
 
         try await AutomationRunContext.$event.withValue(.change(entity: overdue)) {
             try await projection.execute(using: manager)
@@ -292,7 +292,7 @@ struct WindowProjectionTests {
         try await open("Fenster", in: "Küche", minutesAfterStart: 0)
         #expect(try #require(await sender.contentStates.last).outdoorTemperature == nil)
 
-        await manager.report(.outdoorTemperature, value: .number(7.5))
+        try await manager.report(.outdoorTemperature, value: .number(7.5))
         try await open("Tür", in: "Flur", minutesAfterStart: 1)
         #expect(try #require(await sender.contentStates.last).outdoorTemperature == 7.5)
     }
@@ -321,7 +321,7 @@ struct WindowProjectionTests {
     @Test("the quiet refresh sends priority 5 without an alert and with the current outdoor temperature")
     func quietRefreshIsLowPriority() async throws {
         try await open("Fenster", in: "Küche", minutesAfterStart: 0)
-        await manager.report(.outdoorTemperature, value: .number(5.5))
+        try await manager.report(.outdoorTemperature, value: .number(5.5))
 
         try await AutomationRunContext.$event.withValue(Self.clockTick(minute: 15)) {
             try await projection.execute(using: manager)

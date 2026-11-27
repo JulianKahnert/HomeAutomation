@@ -193,9 +193,10 @@ final class EntityStorageMySQLTests: XCTestCase {
     /// Writes a change row directly, past the repository's dead band.
     private func insertChange(_ id: EntityId, at seconds: Double, _ value: Value, changeId: UUID? = nil) async throws {
         let entity: EntityDbItem
-        if let existing = try await EntityDbItem.query(on: app.db)
+        let entityQuery = EntityDbItem.query(on: app.db)
             .filter(\.$placeId == id.placeId).filter(\.$serviceName == id.name)
-            .filter(\.$characteristicType == id.characteristicType.rawValue).first() {
+            .filter(\.$characteristicType == id.characteristicType.rawValue)
+        if let existing = try await entityQuery.first() {
             entity = existing
         } else {
             entity = EntityDbItem(placeId: id.placeId, serviceName: id.name, characteristicType: id.characteristicType.rawValue, characteristicsName: id.characteristicsName)

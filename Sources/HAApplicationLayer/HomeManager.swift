@@ -330,7 +330,7 @@ public final class HomeManager: HomeManagable {
             if nextAttempt < Self.maxAttempts {
                 failedActions[entityId] = (action, nextAttempt, runId, heating)
             } else {
-                log.critical("Giving up on action [\(action)] after \(Self.maxAttempts) attempts")
+                log.critical("Giving up on action", metadata: ["action": "\(action)", "attempts": "\(Self.maxAttempts)"])
             }
         }
     }

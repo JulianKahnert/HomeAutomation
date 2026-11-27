@@ -470,7 +470,8 @@ struct HomeManagerTests {
     func failingCommandIsDroppedAfterThreeAttempts() async {
         let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
         let probe = AdapterProbe(failure: .unreachable)
-        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks)
+        let handler = RecordingLogHandler()
+        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks, logger: Logger(label: "test", factory: { _ in handler }))
 
         await homeManager.perform(.turnOn(switchId))
         #expect(await probe.startedPerforms == 1)
@@ -479,9 +480,10 @@ struct HomeManagerTests {
         for _ in 0..<5 {
             tickContinuation.yield(())
         }
-        await probe.waitForPerforms(3)
-
-        try? await Task.sleep(for: .milliseconds(200))
+        // giving up is the last thing the third attempt does; later ticks find nothing queued
+        await eventually("the command is given up") {
+            handler.recorded.contains { $0.message == "Giving up on action" }
+        }
         #expect(await probe.startedPerforms == 3)
     }
 
@@ -551,14 +553,18 @@ struct HomeManagerTests {
         let probe = AdapterProbe(failure: .unreachable)
         let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks)
 
+        let brightnessId = EntityId(placeId: "room", name: "light", characteristicsName: nil, characteristic: .brightness)
+
         await homeManager.perform(.turnOff(switchId))   // fails and is queued
+        await homeManager.perform(.setBrightness(brightnessId, 0.4))   // fails and is queued, another entity
         await probe.setFailure(nil)
-        await homeManager.perform(.turnOn(switchId))    // reaches the device
+        await homeManager.perform(.turnOn(switchId))    // reaches the device, drops the queued off
 
+        // one tick replays everything queued; the brightness retry shows the tick was handled
         tickContinuation.yield(())
-        try? await Task.sleep(for: .milliseconds(200))
+        await probe.waitForPerforms(4)
 
-        #expect(await probe.performedActions == [.turnOff(switchId), .turnOn(switchId)])
+        #expect(await probe.performedActions == [.turnOff(switchId), .setBrightness(brightnessId, 0.4), .turnOn(switchId), .setBrightness(brightnessId, 0.4)])
     }
 
     @Test("An off that failed and waits for its retry is replaced when the window closes, so the room does not go off after the closing")

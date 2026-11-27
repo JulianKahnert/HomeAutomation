@@ -77,7 +77,7 @@ actor EveMatterValvePoller {
                                               deadline: deadline,
                                               parse: Self.unsignedInteger)
         // The offset is a bonus: a missing answer must not hide the valve position.
-        let rawCalibration: Int?
+        let rawCalibration: Int64?
         do {
             rawCalibration = try await read(device,
                                             EveMatterValve.thermostatClusterID,

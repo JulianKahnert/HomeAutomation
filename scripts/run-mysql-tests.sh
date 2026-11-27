@@ -24,7 +24,7 @@ if [[ -n "$ref" ]]; then
     git -C "$repo_root" fetch --quiet origin
     git -C "$repo_root" checkout --quiet "$ref"
 fi
-echo "Testing $(git -C "$repo_root" rev-parse --short HEAD) ($(git -C "$repo_root" branch --show-current))"
+echo "Testing $(git -C "$repo_root" rev-parse --short HEAD) ($(git -C "$repo_root" branch --show-current))" | tee "$repo_root/mysql-tests.log"
 
 cleanup
 
@@ -47,7 +47,7 @@ if [[ "$(uname)" == "Darwin" ]] && command -v swift >/dev/null 2>&1; then
         "$mysql_image" >/dev/null
     wait_for_mysql
     (cd "$repo_root" && HA_TEST_MYSQL_PORT="$host_port" swift test --filter EntityStorageMySQLTests) \
-        2>&1 | tee "$repo_root/mysql-tests.log"
+        2>&1 | tee -a "$repo_root/mysql-tests.log"
 else
     echo "This script needs a Mac with a Swift toolchain: the package also holds app targets (SwiftUI, TCA) that do not build on Linux." >&2
     exit 1

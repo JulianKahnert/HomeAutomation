@@ -29,16 +29,18 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
     /// The newest change per entity, with the tiebreak of `getCurrent`. An entity of an unknown
     /// characteristic type is skipped.
     func getAllCurrent() async throws -> [EntityStorageItem] {
+        // One backward dive into `idx_entityChanges_entity_timestamp` per directory entry (the index carries the
+        // primary key), instead of a window over the whole table.
         let rows = try await sqlDatabase().raw("""
-            SELECT \(ident: "id") FROM (
-                SELECT c.\(ident: "id"), ROW_NUMBER() OVER (PARTITION BY c.\(ident: "entityId")
-                                                          ORDER BY c.\(ident: "timestamp") DESC, c.\(ident: "id") DESC) AS \(ident: "rowNumber")
-                FROM \(ident: EntityChangeDbItem.schema) c
-            ) newest
-            WHERE \(ident: "rowNumber") = 1
+            SELECT newest.\(ident: "id") AS \(ident: "id")
+            FROM \(ident: EntityDbItem.schema) e,
+            LATERAL (SELECT c.\(ident: "id") FROM \(ident: EntityChangeDbItem.schema) c
+                     WHERE c.\(ident: "entityId") = e.\(ident: "id")
+                     ORDER BY c.\(ident: "timestamp") DESC, c.\(ident: "id") DESC
+                     LIMIT 1) AS newest
             """)
             .all()
-        let ids = try rows.map { try $0.decode(column: "id", as: UUID.self) }
+        let ids = try rows.map { try $0.decode(column: "id", as: Int.self) }
         guard !ids.isEmpty else { return [] }
         var items: [EntityStorageItem] = []
         // Chunked, so a large directory does not build one huge IN list.
@@ -176,8 +178,11 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
         if let cursor {
             query = query.filter(\.$timestamp < cursor)
         }
+        // The id breaks ties of equal timestamps (the index carries it, so no filesort). A page boundary on a tied
+        // timestamp can still skip rows: the cursor is a timestamp only.
         return try await query
             .sort(\.$timestamp, .descending)
+            .sort(\.$id, .descending)
             .limit(limit)
             .all()
             .compactMap { EntityStorageItem(entity: entity, change: $0) }
@@ -196,59 +201,98 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
 }
 
 extension EntityStorageDbRepository: EntityRetentionStore {
-    func deleteEntries(ofType type: CharacteristicsType, olderThan date: Date) async throws {
-        try await sqlDatabase().raw("""
-            DELETE FROM \(ident: EntityChangeDbItem.schema)
-            WHERE \(ident: "timestamp") < \(bind: date)
-              AND \(ident: "entityId") IN (SELECT \(ident: "id") FROM \(ident: EntityDbItem.schema) WHERE \(ident: "characteristicType") = \(bind: type.rawValue))
-            """)
-            .run()
+    static let deleteBatchSize = 10_000
+    /// A rollup transaction covers at most this long a span of one entity.
+    static let rollupSpan: TimeInterval = 86_400
+
+    private func entityKeys(ofType type: CharacteristicsType) async throws -> [UUID] {
+        try await EntityDbItem.query(on: database())
+            .filter(\.$characteristicType == type.rawValue)
+            .all()
+            .map { try $0.requireID() }
     }
 
+    /// Deletes per entity and in batches, each an exact range on `(entityId, timestamp)`, so a statement locks only
+    /// its batch and a large backlog does not become one transaction.
+    func deleteEntries(ofType type: CharacteristicsType, olderThan date: Date) async throws {
+        let sql = try sqlDatabase()
+        for entityKey in try await entityKeys(ofType: type) {
+            while true {
+                try await sql.raw("""
+                    DELETE FROM \(ident: EntityChangeDbItem.schema)
+                    WHERE \(ident: "entityId") = \(bind: entityKey) AND \(ident: "timestamp") < \(bind: date)
+                    ORDER BY \(ident: "timestamp") LIMIT \(literal: Self.deleteBatchSize)
+                    """)
+                    .run()
+                let left = try await sql.raw("""
+                    SELECT 1 AS \(ident: "found") FROM \(ident: EntityChangeDbItem.schema)
+                    WHERE \(ident: "entityId") = \(bind: entityKey) AND \(ident: "timestamp") < \(bind: date) LIMIT 1
+                    """)
+                    .first()
+                if left == nil { break }
+            }
+        }
+    }
+
+    /// Rolls the raw rows older than `date` up into hourly rows, one entity and at most a day per transaction, so a
+    /// failed run resumes where it stopped and the first run over years of history is not one transaction.
     func rollUpHourly(type: CharacteristicsType, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
         let range = validRange ?? -Double.greatestFiniteMagnitude...Double.greatestFiniteMagnitude
-        try await database().transaction { database in
-            guard let sql = database as? SQLDatabase else {
-                throw Abort(.internalServerError, reason: "Database does not support SQL queries")
+        for entityKey in try await entityKeys(ofType: type) {
+            while let oldest = try await EntityChangeDbItem.query(on: database())
+                .filter(\.$entity.$id == entityKey)
+                .filter(\.$timestamp < date)
+                .sort(\.$timestamp, .ascending)
+                .first()?.timestamp {
+                let from = Date(timeIntervalSince1970: (oldest.timeIntervalSince1970 / 3600).rounded(.down) * 3600)
+                let to = min(from.addingTimeInterval(Self.rollupSpan), date)
+                try await database().transaction { database in
+                    try await Self.rollUp(entityKey, from: from, to: to, range: range, on: database)
+                }
             }
-            // An hour that already has a row (a late raw row) is merged; the update order matters
-            // because MySQL assigns left to right, so the mean reads the old count. `maxValue` is a
-            // reserved word, hence the backticks.
-            try await sql.raw("""
-                INSERT INTO \(ident: EntityHourlyAggregate.schema)
-                    (entityId, hourStart, `minValue`, `meanValue`, `maxValue`, `lastValue`, `valueCount`)
-                SELECT * FROM (
-                    SELECT entityId, hourStart,
-                           MIN(v) AS minV, AVG(v) AS meanV, MAX(v) AS maxV, MAX(CASE WHEN rn = 1 THEN v END) AS lastV, COUNT(*) AS countV
-                    FROM (
-                        SELECT c.\(ident: "entityId") AS entityId,
-                               TIMESTAMP(DATE_FORMAT(c.\(ident: "timestamp"), '%Y-%m-%d %H:00:00')) AS hourStart,
-                               c.\(ident: "number") AS v,
-                               ROW_NUMBER() OVER (PARTITION BY c.\(ident: "entityId"), DATE_FORMAT(c.\(ident: "timestamp"), '%Y-%m-%d %H')
-                                                  ORDER BY c.\(ident: "timestamp") DESC) AS rn
-                        FROM \(ident: EntityChangeDbItem.schema) c
-                        JOIN \(ident: EntityDbItem.schema) e ON e.\(ident: "id") = c.\(ident: "entityId")
-                        WHERE e.\(ident: "characteristicType") = \(bind: type.rawValue)
-                          AND c.\(ident: "timestamp") < \(bind: date)
-                          AND c.\(ident: "number") BETWEEN \(bind: range.lowerBound) AND \(bind: range.upperBound)
-                    ) raw
-                    GROUP BY entityId, hourStart
-                ) AS hourly
-                ON DUPLICATE KEY UPDATE
-                    `minValue` = LEAST(`minValue`, hourly.minV),
-                    `maxValue` = GREATEST(`maxValue`, hourly.maxV),
-                    `meanValue` = (`meanValue` * `valueCount` + hourly.meanV * hourly.countV) / (`valueCount` + hourly.countV),
-                    `lastValue` = hourly.lastV,
-                    `valueCount` = `valueCount` + hourly.countV
-                """)
-                .run()
-            try await sql.raw("""
-                DELETE FROM \(ident: EntityChangeDbItem.schema)
-                WHERE \(ident: "timestamp") < \(bind: date)
-                  AND \(ident: "entityId") IN (SELECT \(ident: "id") FROM \(ident: EntityDbItem.schema) WHERE \(ident: "characteristicType") = \(bind: type.rawValue))
-                """)
-                .run()
         }
+    }
+
+    private static func rollUp(_ entityKey: UUID, from: Date, to: Date, range: ClosedRange<Double>, on database: any Database) async throws {
+        guard let sql = database as? SQLDatabase else {
+            throw Abort(.internalServerError, reason: "Database does not support SQL queries")
+        }
+        // An hour that already has a row (a late raw row) is merged; the update order matters
+        // because MySQL assigns left to right, so the mean reads the old count. `maxValue` is a
+        // reserved word, hence the backticks.
+        try await sql.raw("""
+            INSERT INTO \(ident: EntityHourlyAggregate.schema)
+                (entityId, hourStart, `minValue`, `meanValue`, `maxValue`, `lastValue`, `valueCount`)
+            SELECT * FROM (
+                SELECT entityId, hourStart,
+                       MIN(v) AS minV, AVG(v) AS meanV, MAX(v) AS maxV, MAX(CASE WHEN rn = 1 THEN v END) AS lastV, COUNT(*) AS countV
+                FROM (
+                    SELECT c.\(ident: "entityId") AS entityId,
+                           TIMESTAMP(DATE_FORMAT(c.\(ident: "timestamp"), '%Y-%m-%d %H:00:00')) AS hourStart,
+                           c.\(ident: "number") AS v,
+                           ROW_NUMBER() OVER (PARTITION BY DATE_FORMAT(c.\(ident: "timestamp"), '%Y-%m-%d %H')
+                                              ORDER BY c.\(ident: "timestamp") DESC, c.\(ident: "id") DESC) AS rn
+                    FROM \(ident: EntityChangeDbItem.schema) c
+                    WHERE c.\(ident: "entityId") = \(bind: entityKey)
+                      AND c.\(ident: "timestamp") >= \(bind: from) AND c.\(ident: "timestamp") < \(bind: to)
+                      AND c.\(ident: "number") BETWEEN \(bind: range.lowerBound) AND \(bind: range.upperBound)
+                ) raw
+                GROUP BY entityId, hourStart
+            ) AS hourly
+            ON DUPLICATE KEY UPDATE
+                `minValue` = LEAST(`minValue`, hourly.minV),
+                `maxValue` = GREATEST(`maxValue`, hourly.maxV),
+                `meanValue` = (`meanValue` * `valueCount` + hourly.meanV * hourly.countV) / (`valueCount` + hourly.countV),
+                `lastValue` = hourly.lastV,
+                `valueCount` = `valueCount` + hourly.countV
+            """)
+            .run()
+        try await sql.raw("""
+            DELETE FROM \(ident: EntityChangeDbItem.schema)
+            WHERE \(ident: "entityId") = \(bind: entityKey)
+              AND \(ident: "timestamp") >= \(bind: from) AND \(ident: "timestamp") < \(bind: to)
+            """)
+            .run()
     }
 
     func entitiesWithRowCount(above limit: Int, since date: Date) async throws -> [EntityRowCount] {

@@ -45,7 +45,8 @@ struct AutomationsFeature: Sendable {
             let sorted = automations.sorted { ($0.isRunning ? 0 : 1, $0.name) < ($1.isRunning ? 0 : 1, $1.name) }
             switch grouping {
             case .status:
-                return [("Active", sorted.filter(\.isActive)), ("Inactive", sorted.filter { !$0.isActive })]
+                return [(String(localized: "Active", bundle: .module), sorted.filter(\.isActive)),
+                        (String(localized: "Inactive", bundle: .module), sorted.filter { !$0.isActive })]
                     .filter { !$0.1.isEmpty }
             case .type:
                 return Dictionary(grouping: sorted, by: \.typeLabel)
@@ -110,7 +111,7 @@ struct AutomationsFeature: Sendable {
 
             case let .automationsResponse(.failure(error)):
                 state.isLoading = false
-                state.alert = Self.errorAlert("Failed to load automations: \(error.localizedDescription)")
+                state.alert = Self.errorAlert(String(localized: "Failed to load automations: \(error.localizedDescription)", bundle: .module))
                 return .none
 
             case let .setActive(name, isActive):
@@ -139,7 +140,7 @@ struct AutomationsFeature: Sendable {
 
             case let .setActiveResponse(name, .failure(error)):
                 state.$automations.withLock { $0[id: name]?.isActive.toggle() }
-                state.alert = Self.errorAlert("Failed to change \(name): \(error.localizedDescription)")
+                state.alert = Self.errorAlert(String(localized: "Failed to change \(name): \(error.localizedDescription)", bundle: .module))
                 return .none
 
             case let .groupingChanged(grouping):
@@ -168,10 +169,10 @@ struct AutomationsFeature: Sendable {
 
     private static func errorAlert(_ message: String) -> AlertState<Action.Alert> {
         AlertState {
-            TextState("Error")
+            TextState(String(localized: "Error", bundle: .module))
         } actions: {
             ButtonState(action: .dismissError) {
-                TextState("OK")
+                TextState(String(localized: "OK", bundle: .module))
             }
         } message: {
             TextState(message)
@@ -193,16 +194,16 @@ struct AutomationsView: View {
                     }
                 }
             }
-            .navigationTitle("Automations")
+            .navigationTitle(String(localized: "Automations", bundle: .module))
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        Picker("Group By", selection: Binding(get: { store.grouping }, set: { store.send(.groupingChanged($0)) })) {
-                            Text("Active / Inactive").tag(AutomationsFeature.Grouping.status)
-                            Text("By Type").tag(AutomationsFeature.Grouping.type)
+                        Picker(String(localized: "Group By", bundle: .module), selection: Binding(get: { store.grouping }, set: { store.send(.groupingChanged($0)) })) {
+                            Text("Active / Inactive", bundle: .module).tag(AutomationsFeature.Grouping.status)
+                            Text("By Type", bundle: .module).tag(AutomationsFeature.Grouping.type)
                         }
                     } label: {
-                        Label("Group By", systemImage: "rectangle.3.group")
+                        Label(String(localized: "Group By", bundle: .module), systemImage: "rectangle.3.group")
                     }
                 }
             }
@@ -216,11 +217,11 @@ struct AutomationsView: View {
                 if store.isLoading && store.automations.isEmpty {
                     ProgressView()
                 } else if store.automations.isEmpty {
-                    ContentUnavailableView(
-                        "No Automations",
-                        systemImage: "lamp.floor",
-                        description: Text("Pull to refresh")
-                    )
+                    ContentUnavailableView {
+                        Label(String(localized: "No Automations", bundle: .module), systemImage: "lamp.floor")
+                    } description: {
+                        Text("Pull to refresh", bundle: .module)
+                    }
                 }
             }
             .alert($store.scope(\.$alert, action: \.alert))
@@ -250,7 +251,7 @@ struct AutomationsView: View {
                 Text(automation.name)
                 Group {
                     if automation.isRunning {
-                        Text("\(Text("Running").foregroundStyle(.green)) · \(automation.subtitle)")
+                        Text("\(Text("Running", bundle: .module).foregroundStyle(.green)) · \(automation.subtitle)", bundle: .module)
                     } else {
                         Text(automation.subtitle)
                     }

@@ -28,7 +28,7 @@ public final class AppDelegate: NSObject {
 
 #if os(iOS)
 extension AppDelegate: UNUserNotificationCenterDelegate {
-    /// The action "Heizkörper ausschalten" of the push "Kamin an?": switches the fireplace on through the
+    /// The action "Turn off radiators" of the push "Kamin an?": switches the fireplace on through the
     /// server. It does not open the app; the call finishes before the system suspends it again.
     public nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         guard let isOn = FireplaceNotification.requestedState(forAction: response.actionIdentifier) else { return }

@@ -9,12 +9,12 @@
 import HAModels
 import SwiftUI
 
-/// The offenen Fenster as a compact list (design 1c): a header, at most `rowBudget` rows and a
-/// "+X weitere" line. Used on the Lock Screen, in StandBy and on the Mac.
+/// The open windows as a compact list (design 1c): a header, at most `rowBudget` rows and a
+/// "+X more" line. Used on the Lock Screen, in StandBy and on the Mac.
 public struct WindowOpenLiveActivityView: View {
     let presentation: WindowActivityPresentation
 
-    /// - Parameter isStale: The activity context's stale state; shows the first window not yet überschritten as "überschritten?".
+    /// - Parameter isStale: The activity context's stale state; shows the first window not yet overdue as "overdue?".
     public init(contentState: WindowAttributes.ContentState,
                 rowBudget: Int = WindowActivityPresentation.lockScreenRowBudget,
                 isStale: Bool = false) {
@@ -44,7 +44,7 @@ public struct WindowOpenLiveActivityView: View {
     }
 }
 
-/// The rows and the "+X weitere" line of a ``WindowActivityPresentation``, without a header.
+/// The rows and the "+X more" line of a ``WindowActivityPresentation``, without a header.
 /// Shared by the Lock Screen and the bottom region of the expanded Dynamic Island.
 public struct WindowActivityList: View {
     let presentation: WindowActivityPresentation
@@ -67,8 +67,8 @@ public struct WindowActivityList: View {
     }
 }
 
-/// The most urgent offene Fenster in the Watch Smart Stack (`.small` activity family, 162 × 69 pt):
-/// Raum and countdown, its bar, and the ``WindowActivityPresentation/watchCaption``.
+/// The most urgent open window in the Watch Smart Stack (`.small` activity family, 162 × 69 pt):
+/// room and countdown, its bar, and the ``WindowActivityPresentation/watchCaption``.
 public struct WindowOpenWatchActivityView: View {
     let presentation: WindowActivityPresentation
 
@@ -111,13 +111,13 @@ public struct WindowOpenWatchActivityView: View {
     }
 }
 
-/// One offenes Fenster: Raum over window name, a progress bar towards the Fensterschließzeit,
+/// One open window: room over window name, a progress bar towards the closing time,
 /// and the countdown or the red overtime.
 public struct WindowActivityRow: View {
     let window: WindowContentState.Window
     let isPossiblyOverdue: Bool
 
-    /// - Parameter isPossiblyOverdue: Shows "überschritten?" instead of the window name, for a stale activity.
+    /// - Parameter isPossiblyOverdue: Shows "overdue?" instead of the window name, for a stale activity.
     public init(window: WindowContentState.Window, isPossiblyOverdue: Bool = false) {
         self.window = window
         self.isPossiblyOverdue = isPossiblyOverdue
@@ -128,7 +128,7 @@ public struct WindowActivityRow: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text(window.room).font(.subheadline.weight(.semibold))
                 if isPossiblyOverdue {
-                    Text("überschritten?").font(.caption2).foregroundStyle(.red)
+                    Text("overdue?", bundle: .module).font(.caption2).foregroundStyle(.red)
                 } else {
                     Text(window.name).font(.caption2).foregroundStyle(.secondary)
                 }
@@ -139,7 +139,7 @@ public struct WindowActivityRow: View {
             // The time column is right-aligned and has slack, so the bar can sit close to it.
             HStack(spacing: 2) {
                 if window.isOverdue {
-                    // Full and red once the server marked the window überschritten.
+                    // Full and red once the server marked the window overdue.
                     ProgressView(value: 1)
                         .tint(.red)
                 } else {
@@ -160,7 +160,7 @@ public struct WindowActivityRow: View {
     }
 }
 
-/// The countdown to the Fensterschließzeit, or "+m:ss" in red once the server marked the window überschritten.
+/// The countdown to the closing time, or "+m:ss" in red once the server marked the window overdue.
 public struct WindowActivityTimeLabel: View {
     let window: WindowContentState.Window
 
@@ -192,23 +192,23 @@ public struct WindowActivityTimeLabel: View {
     WindowOpenLiveActivityView(contentState: .sample(overdueCount: 0), isStale: true)
 }
 
-#Preview("Überschritten, 21 Min") {
+#Preview("Overdue, 21 min") {
     WindowOpenLiveActivityView(contentState: .overdueSample(overdueBy: 21 * 60 + 34))
         .background(.black)
 }
 
-#Preview("Überschritten, 21 Min, gesperrt") {
+#Preview("Overdue, 21 min, locked") {
     WindowOpenLiveActivityView(contentState: .overdueSample(overdueBy: 21 * 60 + 34))
         .background(.black)
         .environment(\.isLuminanceReduced, true)
 }
 
-#Preview("Überschritten, über 1 Std") {
+#Preview("Overdue, over 1 h") {
     WindowOpenLiveActivityView(contentState: .overdueSample(overdueBy: 71 * 60 + 34))
         .background(.black)
 }
 
-#Preview("Überschritten, 2 Fenster, 21 Min") {
+#Preview("Overdue, 2 windows, 21 min") {
     WindowOpenLiveActivityView(contentState: .sample(overdueCount: 2))
         .background(.black)
         .environment(\.isLuminanceReduced, true)

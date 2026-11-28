@@ -31,27 +31,27 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Host", text: $host)
-                TextField("Port", value: $port, format: .number.grouping(.never))
-                Toggle("Use TLS (wss://)", isOn: $useTLS)
+                TextField(String(localized: "Host", bundle: .module), text: $host)
+                TextField(String(localized: "Port", bundle: .module), value: $port, format: .number.grouping(.never))
+                Toggle(String(localized: "Use TLS (wss://)", bundle: .module), isOn: $useTLS)
             } header: {
-                Text("Home Automation Server")
+                Text("Home Automation Server", bundle: .module)
             } footer: {
-                Text("Websocket endpoint: \(newServerAddress.description)\nWithout TLS the auth token and all HomeKit traffic cross the network unencrypted.")
+                Text("Websocket endpoint: \(newServerAddress.description)\nWithout TLS the auth token and all HomeKit traffic cross the network unencrypted.", bundle: .module)
             }
             Section {
-                SecureField("Auth Token", text: $token)
+                SecureField(String(localized: "Auth Token", bundle: .module), text: $token)
             } header: {
-                Text("Authentication")
+                Text("Authentication", bundle: .module)
             } footer: {
-                Text("Bearer token used when connecting to the server. Stored in the keychain. Leave empty if authentication is disabled.")
+                Text("Bearer token used when connecting to the server. Stored in the keychain. Leave empty if authentication is disabled.", bundle: .module)
             }
             Section {
-                Toggle("Debug Logs", isOn: $isDebugLoggingEnabled)
+                Toggle(String(localized: "Debug Logs", bundle: .module), isOn: $isDebugLoggingEnabled)
             } header: {
-                Text("Logging")
+                Text("Logging", bundle: .module)
             } footer: {
-                Text("Writes debug logs, e.g. every thermostat value. Takes effect after restarting the app. The environment variable \(DebugLogging.key) overrides this setting.")
+                Text("Writes debug logs, e.g. every thermostat value. Takes effect after restarting the app. The environment variable \(DebugLogging.key) overrides this setting.", bundle: .module)
             }
         }
         .onAppear {
@@ -61,10 +61,10 @@ struct SettingsView: View {
             token = credentials?.authToken ?? ""
             isDebugLoggingEnabled = storedDebugLogging
         }
-        .navigationTitle("Settings")
+        .navigationTitle(String(localized: "Settings", bundle: .module))
         .toolbar {
             ToolbarItem {
-                Button("Save") {
+                Button(String(localized: "Save", bundle: .module)) {
                     serverAddress = newServerAddress
                     credentials?.update(authToken: token)
                     storedDebugLogging = isDebugLoggingEnabled

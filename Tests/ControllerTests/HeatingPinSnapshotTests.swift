@@ -49,7 +49,7 @@ struct HeatingPinSnapshotTests {
             .frame(width: device.size.width, height: device.size.height)
             .background(Color(white: scheme == .dark ? 0.08 : 0.96))
             .environment(\.colorScheme, scheme)
-            .environment(\.locale, Locale(identifier: "de_DE"))
+            .environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
     }
 
@@ -101,7 +101,7 @@ struct HeatingPinSnapshotTests {
                 .frame(width: 260)
                 .background(Color(white: scheme == .dark ? 0.16 : 1))
                 .environment(\.colorScheme, scheme)
-                .environment(\.locale, Locale(identifier: "de_DE"))
+                .environment(\.locale, Locale(identifier: "en_US"))
                 .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
             record(view, size: CGSize(width: 260, height: 260), scheme: scheme, name: "mac", test: "pins-popover")
         }

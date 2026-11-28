@@ -26,18 +26,18 @@ struct TimelineChart: View {
         let minimumDuration = domain.upperBound.timeIntervalSince(domain.lowerBound) / 250
         Chart {
             ForEach(nights, id: \.start) { night in
-                RectangleMark(xStart: .value("Start", night.start), xEnd: .value("End", night.end))
+                RectangleMark(xStart: .value(ChartLabel.start, night.start), xEnd: .value(ChartLabel.end, night.end))
                     .foregroundStyle(ChartPalette.night)
             }
             ForEach(lanes) { lane in
                 ForEach(lane.intervals, id: \.start) { interval in
                     RectangleMark(
-                        xStart: .value("Start", interval.start),
-                        xEnd: .value("End", max(interval.end, interval.start.addingTimeInterval(minimumDuration))),
-                        y: .value("Lane", lane.label),
+                        xStart: .value(ChartLabel.start, interval.start),
+                        xEnd: .value(ChartLabel.end, max(interval.end, interval.start.addingTimeInterval(minimumDuration))),
+                        y: .value(ChartLabel.lane, lane.label),
                         height: .fixed(12)
                     )
-                    .foregroundStyle(by: .value("Kind", lane.kind ?? lane.label))
+                    .foregroundStyle(by: .value(ChartLabel.kind, lane.kind ?? lane.label))
                     .clipShape(.rect(cornerRadius: 3))
                 }
             }

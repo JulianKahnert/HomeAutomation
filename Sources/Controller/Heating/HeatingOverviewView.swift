@@ -11,6 +11,7 @@ import SwiftUI
 
 /// The bars of all rooms. Selecting a room is reported through `onSelect`.
 struct HeatingOverviewView: View {
+    @Environment(\.locale) private var locale
     let rooms: [HeatingOverviewRoom]
     let selectedPlaceId: String?
     /// The fireplace burns: the rooms that follow it show the flame and a soft orange area.
@@ -40,9 +41,9 @@ struct HeatingOverviewView: View {
         HeatingSection {
             chart.frame(height: 200)
         } header: {
-            Text("Räume")
+            Text("Rooms", bundle: .module)
         } footer: {
-            Text("Abweichung vom Plan, kälteste zuerst. Grau: innerhalb ±\(HeatingFormat.kelvinAmount(HeatingComfort.band)).")
+            Text("Deviation from plan, coldest first. Grey: within ±\(HeatingFormat.kelvinAmount(HeatingComfort.band, locale: locale)).", bundle: .module)
         }
     }
 
@@ -51,25 +52,25 @@ struct HeatingOverviewView: View {
             // The fireplace burns: a soft warm column behind the bars of the rooms that follow it.
             if fireplaceOn {
                 ForEach(rooms.filter(\.followsFireplace)) { room in
-                    RectangleMark(x: .value("Raum", room.placeId), yStart: .value("Δ", -(limit + 0.5)), yEnd: .value("Δ", limit + 0.5), width: .ratio(0.9))
+                    RectangleMark(x: .value(ChartLabel.room, room.placeId), yStart: .value(ChartLabel.delta, -(limit + 0.5)), yEnd: .value(ChartLabel.delta, limit + 0.5), width: .ratio(0.9))
                         .foregroundStyle(Color.orange.opacity(0.14))
                         .clipShape(.rect(cornerRadius: 8))
                 }
             }
-            RectangleMark(yStart: .value("Δ", -HeatingComfort.band), yEnd: .value("Δ", HeatingComfort.band))
+            RectangleMark(yStart: .value(ChartLabel.delta, -HeatingComfort.band), yEnd: .value(ChartLabel.delta, HeatingComfort.band))
                 .foregroundStyle(Color.gray.opacity(0.1))
-            RuleMark(y: .value("Δ", 0))
+            RuleMark(y: .value(ChartLabel.delta, 0))
                 .foregroundStyle(Color.secondary.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1))
             ForEach(rooms) { room in
                 if let delta = room.delta {
                     let extent = HeatingChartData.barExtent(forDelta: delta)
-                    BarMark(x: .value("Raum", room.placeId), yStart: .value("Δ", extent.lowerBound), yEnd: .value("Δ", extent.upperBound), width: .ratio(0.55))
+                    BarMark(x: .value(ChartLabel.room, room.placeId), yStart: .value(ChartLabel.delta, extent.lowerBound), yEnd: .value(ChartLabel.delta, extent.upperBound), width: .ratio(0.55))
                         .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
                         .clipShape(.rect(cornerRadius: 6))
                 } else {
                     // Keeps the category on the axis; the hatched box is drawn in the overlay.
-                    BarMark(x: .value("Raum", room.placeId), yStart: .value("Δ", -0.6), yEnd: .value("Δ", 0.6), width: .ratio(0.55))
+                    BarMark(x: .value(ChartLabel.room, room.placeId), yStart: .value(ChartLabel.delta, -0.6), yEnd: .value(ChartLabel.delta, 0.6), width: .ratio(0.55))
                         .foregroundStyle(Color.clear)
                 }
             }
@@ -182,6 +183,7 @@ struct HeatingOverviewView: View {
 
 /// Health-style info bubble: no border, numbers only for the hovered or dragged room.
 struct HeatingInfoBubble: View {
+    @Environment(\.locale) private var locale
     @Environment(\.colorScheme) private var scheme
     let room: HeatingOverviewRoom
 
@@ -189,13 +191,13 @@ struct HeatingInfoBubble: View {
         VStack(alignment: .leading, spacing: 1) {
             Text(room.name).font(.caption).foregroundStyle(.secondary)
             if let delta = room.delta {
-                Text(HeatingFormat.kelvin(delta))
+                Text(HeatingFormat.kelvin(delta, locale: locale))
                     .font(.title3.weight(.semibold).monospacedDigit())
                     .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
             } else {
-                Text("kein Ist-Wert").font(.title3.weight(.semibold))
+                Text("No value available", bundle: .module).font(.title3.weight(.semibold))
             }
-            Text("Ist \(room.ist.map(HeatingFormat.degrees) ?? "–") · Plan \(room.sollPlan.map(HeatingFormat.degrees) ?? "–")")
+            Text("Actual \(room.ist.map { HeatingFormat.degrees($0, locale: locale) } ?? "–") · Plan \(room.sollPlan.map { HeatingFormat.degrees($0, locale: locale) } ?? "–")", bundle: .module)
                 .font(.caption.monospacedDigit())
             Label(sourceText, systemImage: sourceSymbol)
                 .font(.caption2)
@@ -210,8 +212,8 @@ struct HeatingInfoBubble: View {
 
     private var sourceText: String {
         switch room.istSource {
-        case .roomSensor(let name): return "Raumsensor \(name)"
-        case .thermostats(let names): return names.count == 1 ? "Thermostat" : "Mittel von \(names.count) Thermostaten"
+        case .roomSensor(let name): return String(localized: "Room sensor \(name)", bundle: .module)
+        case .thermostats(let names): return names.count == 1 ? String(localized: "Thermostat", bundle: .module) : String(localized: "Average of \(names.count) thermostats", bundle: .module)
         }
     }
 
@@ -225,14 +227,14 @@ struct HeatingInfoBubble: View {
 
 // MARK: - Previews
 
-#Preview("Übersicht") {
+#Preview("Overview") {
     let rooms = HeatingFeature.sorted(HeatingPreviewData.overviewRooms)
     HeatingOverviewView(rooms: rooms, selectedPlaceId: nil) { _ in }
         .padding(16)
         .frame(width: 402)
 }
 
-#Preview("Info-Blase") {
+#Preview("Info bubble") {
     if let room = HeatingPreviewData.overviewRooms.first {
         HeatingInfoBubble(room: room).padding(16)
     }

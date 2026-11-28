@@ -17,6 +17,8 @@
 		A3DEADC42EDC67F200AC511A /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEADC32EDC67F200AC511A /* ControllerKit */; };
 		A3DEADC62EDC67F200AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEADC52EDC67F200AC511A /* HomeAutomationKit */; };
 		A3DEADC82EDC67F900AC511A /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEADC72EDC67F900AC511A /* ControllerKit */; };
+		A3D1C0110000000000000000 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A3D1C0010000000000000000 /* InfoPlist.xcstrings */; };
+		A3D1C0120000000000000000 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A3D1C0020000000000000000 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -54,6 +56,8 @@
 		A3BA515D2D798A69002DD924 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		A3BF51EF2D6FB82B0034254A /* FlowKit Controller-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "FlowKit Controller-Info.plist"; sourceTree = "<group>"; };
 		A3ECEDB12D6A841D00E56665 /* FlowKit Controller.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "FlowKit Controller.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A3D1C0010000000000000000 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
+		A3D1C0020000000000000000 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -128,6 +132,8 @@
 		A3ECEDA82D6A841D00E56665 = {
 			isa = PBXGroup;
 			children = (
+				A3D1C0010000000000000000 /* InfoPlist.xcstrings */,
+				A3D1C0020000000000000000 /* Localizable.xcstrings */,
 				A3BF51EF2D6FB82B0034254A /* FlowKit Controller-Info.plist */,
 				A3B8A08E2D6A8468009314DA /* Assets.xcassets */,
 				A3F1C0032E9A1B0000C0FFEE /* AppIcon.icon */,
@@ -223,6 +229,7 @@
 			knownRegions = (
 				en,
 				Base,
+				de,
 			);
 			mainGroup = A3ECEDA82D6A841D00E56665;
 			minimizedProjectReferenceProxies = 1;
@@ -252,6 +259,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A3D1C0110000000000000000 /* InfoPlist.xcstrings in Resources */,
+				A3D1C0120000000000000000 /* Localizable.xcstrings in Resources */,
 				A3B8A0962D6A8468009314DA /* Preview Assets.xcassets in Resources */,
 				A3B8A0972D6A8468009314DA /* Assets.xcassets in Resources */,
 				A3F1C0042E9A1B0000C0FFEE /* AppIcon.icon in Resources */,

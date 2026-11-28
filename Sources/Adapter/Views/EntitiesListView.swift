@@ -31,7 +31,7 @@ struct EntitiesListView: View {
         }
         .toolbar {
             ToolbarItem {
-                Button("Preferences", systemImage: "gear") {
+                Button(String(localized: "Preferences", bundle: .module), systemImage: "gear") {
                     showSettings.toggle()
                 }
             }

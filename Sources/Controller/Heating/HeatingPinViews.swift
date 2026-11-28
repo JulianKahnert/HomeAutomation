@@ -26,11 +26,11 @@ extension HeatingEventSource {
 
     var label: String {
         switch self {
-        case .plan: return "Plan"
-        case .window: return "Fenster"
-        case .fireplace: return "Kamin"
-        case .observed: return "Von Hand"
-        case .system: return "System"
+        case .plan: return String(localized: "Plan", bundle: .module)
+        case .window: return String(localized: "Window", bundle: .module)
+        case .fireplace: return String(localized: "Fireplace", bundle: .module)
+        case .observed: return String(localized: "By hand", bundle: .module)
+        case .system: return String(localized: "System", bundle: .module)
         }
     }
 }
@@ -51,7 +51,7 @@ struct HeatingPinBadge: View {
         .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
         .frame(minWidth: 18, minHeight: 18)
         .background(isSelected ? HeatingPalette.softFill : .clear, in: .capsule)
-        .accessibilityLabel(slot.badge.map { "\($0) Ereignisse" } ?? slot.events[0].source.label)
+        .accessibilityLabel(slot.badge.map { String(localized: "\($0) events", bundle: .module) } ?? slot.events[0].source.label)
     }
 }
 
@@ -61,6 +61,7 @@ struct HeatingPinCard: View {
     var inPopover = false
 
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.locale) private var locale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -87,8 +88,8 @@ struct HeatingPinCard: View {
     }
 
     private func header(_ event: HeatingEvent) -> String {
-        var text = "\(event.source.label) · \(HeatingFormat.time(event.start, includingDay: true))"
-        if let end = event.end { text += " – \(HeatingFormat.time(end, includingDay: false))" } else if event.hasDuration { text += " – jetzt" }
+        var text = "\(event.source.label) · \(HeatingFormat.time(event.start, includingDay: true, locale: locale))"
+        if let end = event.end { text += " – \(HeatingFormat.time(end, includingDay: false, locale: locale))" } else if event.hasDuration { text = String(localized: "\(text) – until now", bundle: .module) }
         return text
     }
 }
@@ -105,6 +106,6 @@ struct HeatingPinCard: View {
     .padding(16)
 }
 
-#Preview("Pin-Karte") {
+#Preview("Pin card") {
     HeatingPinCard(events: Array(HeatingPreviewData.kitchenEvents.prefix(2))).padding(16).frame(width: 402)
 }

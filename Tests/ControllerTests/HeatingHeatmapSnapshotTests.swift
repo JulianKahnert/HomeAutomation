@@ -32,7 +32,7 @@ struct HeatingHeatmapSnapshotTests {
                     .frame(width: size.width, height: size.height, alignment: .top)
                     .background(Color(white: scheme == .dark ? 0.08 : 0.96))
                     .environment(\.colorScheme, scheme)
-                    .environment(\.locale, Locale(identifier: "de_DE"))
+                    .environment(\.locale, Locale(identifier: "en_US"))
                 let host = NSHostingView(rootView: view)
                 host.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
                 assertSnapshot(of: host, as: .image(size: size, scale: 2), named: "\(device.name)-\(scheme == .dark ? "dark" : "light")", testName: test)

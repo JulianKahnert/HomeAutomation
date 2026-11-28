@@ -28,7 +28,7 @@ public struct WindowIslandExpandedLeading: View {
     }
 }
 
-/// Expanded, trailing: a warning symbol with the number of überschrittenen Fenster, if any,
+/// Expanded, trailing: a warning symbol with the number of overdue windows, if any,
 /// and the outdoor temperature, if there is a reading.
 public struct WindowIslandExpandedTrailing: View {
     let presentation: WindowActivityPresentation
@@ -75,7 +75,7 @@ public struct WindowIslandExpandedBottom: View {
 }
 
 /// Compact leading and minimal: the window symbol with the number of offenen Fenster,
-/// red once any window is überschritten.
+/// red once any window is overdue.
 public struct WindowIslandCountBadge: View {
     let openCount: Int
     let tint: Color
@@ -93,7 +93,7 @@ public struct WindowIslandCountBadge: View {
     }
 }
 
-/// Compact trailing: the countdown or the overtime of the first window, red once any window is überschritten.
+/// Compact trailing: the countdown or the overtime of the first window, red once any window is overdue.
 public struct WindowIslandCompactTrailing: View {
     let presentation: WindowActivityPresentation
 

@@ -61,9 +61,9 @@ struct EntityHistoryDetailFeature: Sendable {
 
         var displayName: String {
             switch self {
-            case .hour: return "Last Hour"
-            case .day: return "Last 24 Hours"
-            case .week: return "Last 7 Days"
+            case .hour: return String(localized: "Last Hour", bundle: .module)
+            case .day: return String(localized: "Last 24 Hours", bundle: .module)
+            case .week: return String(localized: "Last 7 Days", bundle: .module)
             }
         }
     }
@@ -119,13 +119,13 @@ struct EntityHistoryDetailFeature: Sendable {
             case let .historyResponse(.failure(error)):
                 state.isLoading = false
                 state.alert = AlertState {
-                    TextState("Error")
+                    TextState(String(localized: "Error", bundle: .module))
                 } actions: {
                     ButtonState(action: .dismissError) {
-                        TextState("OK")
+                        TextState(String(localized: "OK", bundle: .module))
                     }
                 } message: {
-                    TextState("Failed to load history: \(error.localizedDescription)")
+                    TextState(String(localized: "Failed to load history: \(error.localizedDescription)", bundle: .module))
                 }
                 return .none
 
@@ -184,7 +184,7 @@ struct EntityHistoryDetailView: View {
     var body: some View {
         List {
             Section {
-                Picker("Time Range", selection: $store.timeRange) {
+                Picker(String(localized: "Time Range", bundle: .module), selection: $store.timeRange) {
                     ForEach(EntityHistoryDetailFeature.TimeRange.allCases, id: \.self) { range in
                         Text(range.displayName).tag(range)
                     }
@@ -197,23 +197,23 @@ struct EntityHistoryDetailView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 } else if store.historyItems.isEmpty {
-                    Text("No history in this time range.")
+                    Text("No history in this time range.", bundle: .module)
                         .foregroundStyle(.secondary)
                 } else {
                     // A text value (a window deadline) has history but nothing to plot.
-                    Text("This value has no chart.")
+                    Text("This value has no chart.", bundle: .module)
                         .foregroundStyle(.secondary)
                 }
             }
 
             if store.timeRange == .week {
-                Section("Per Day") {
+                Section(String(localized: "Per Day", bundle: .module)) {
                     dailyChart
                 }
             }
 
             if !store.historyItems.isEmpty {
-                Section("History") {
+                Section(String(localized: "History", bundle: .module)) {
                     ForEach(store.historyItems) { item in
                         historyRow(item)
                     }
@@ -229,9 +229,9 @@ struct EntityHistoryDetailView: View {
 
     private var laneLabel: String {
         switch store.entity.entityId.characteristicType {
-        case .contactSensor: "Open"
-        case .motionSensor: "Motion"
-        default: "On"
+        case .contactSensor: String(localized: "Open", bundle: .module)
+        case .motionSensor: String(localized: "Motion", bundle: .module)
+        default: String(localized: "Switched on", bundle: .module)
         }
     }
 
@@ -284,7 +284,7 @@ struct EntityHistoryDetailView: View {
                 color: ChartPalette.color(for: type).opacity(0.6),
                 unit: type == .lightSensor ? "lx" : "ppm",
                 points: stats.map { ($0.day, $0.mean) },
-                barLabel: "Daily Max"
+                barLabel: String(localized: "Daily Max", bundle: .module)
             )
         }
     }
@@ -300,7 +300,7 @@ struct EntityHistoryDetailView: View {
                         .frame(width: 24, height: 24)
                         .overlay(Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 1))
                 }
-                Text(item.valueDescription)
+                Text(item.localizedValueDescription())
             }
         }
     }

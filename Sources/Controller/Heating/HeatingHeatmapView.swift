@@ -24,6 +24,7 @@ struct HeatingHeatmapView: View {
     }
 
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.locale) private var locale
 
     init(rooms: [HeatingOverviewRoom], cells: [HeatingHeatmapCell], selectedPlaceId: String?, selection: Selection? = nil) {
         self.rooms = rooms
@@ -46,7 +47,7 @@ struct HeatingHeatmapView: View {
                 GridRow {
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                     ForEach(days, id: \.self) { day in
-                        Text(Self.weekday(day))
+                        Text(Self.weekday(day, locale: locale))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -72,7 +73,7 @@ struct HeatingHeatmapView: View {
             .frame(maxWidth: .infinity)
         } header: {
             HStack(alignment: .firstTextBaseline) {
-                Text("Woche")
+                Text("Week", bundle: .module)
                 Spacer()
                 // Reserves its line so the section does not jump when a value appears.
                 Text(selectionText ?? " ")
@@ -81,7 +82,7 @@ struct HeatingHeatmapView: View {
                     .lineLimit(1)
             }
         } footer: {
-            Text("Abweichung vom Plan je sechs Stunden. Schraffiert: kein Ist-Wert.")
+            Text("Deviation from plan per six hours. Hatched: no actual value.", bundle: .module)
         }
     }
 
@@ -106,7 +107,7 @@ struct HeatingHeatmapView: View {
         #if os(macOS)
         .onHover { if $0 { selection = Selection(placeId: placeId, day: day, segment: segment) } }
         #endif
-        .accessibilityLabel(Self.accessibilityLabel(room.shortName, day, segment, value))
+        .accessibilityLabel(Self.accessibilityLabel(room.shortName, day, segment, value, locale: locale))
     }
 
     /// Grey inside the comfort band, blue or orange beyond it; the stronger the deviation, the deeper the tint.
@@ -121,19 +122,19 @@ struct HeatingHeatmapView: View {
     private var selectionText: String? {
         guard let selection, let room = rooms.first(where: { $0.placeId == selection.placeId }) else { return nil }
         let value = cell(selection.placeId, selection.day, selection.segment)?.delta
-        return Self.accessibilityLabel(room.shortName, selection.day, selection.segment, value)
+        return Self.accessibilityLabel(room.shortName, selection.day, selection.segment, value, locale: locale)
     }
 
-    private static func accessibilityLabel(_ name: String, _ day: Date, _ segment: Int, _ value: Double?) -> String {
-        "\(name) · \(weekday(day)) \(segmentTitles[segment]) Uhr · \(value.map(HeatingFormat.kelvin) ?? "keine Daten")"
+    private static func accessibilityLabel(_ name: String, _ day: Date, _ segment: Int, _ value: Double?, locale: Locale) -> String {
+        String(localized: "\(name) · \(weekday(day, locale: locale)) \(segmentTitles[segment]) · \(value.map { HeatingFormat.kelvin($0, locale: locale) } ?? String(localized: "no data", bundle: .module))", bundle: .module)
     }
 
-    private static func weekday(_ day: Date) -> String {
-        HeatingFormat.weekday(day, calendar: HeatingOverviewBuilder.berlin)
+    private static func weekday(_ day: Date, locale: Locale) -> String {
+        HeatingFormat.weekday(day, calendar: HeatingOverviewBuilder.berlin, locale: locale)
     }
 }
 
-#Preview("Wochen-Heatmap") {
+#Preview("Week heatmap") {
     HeatingHeatmapView(rooms: HeatingFeature.sorted(HeatingPreviewData.overviewRooms), cells: HeatingPreviewData.heatmap, selectedPlaceId: nil)
         .padding(16)
         .frame(width: 402)

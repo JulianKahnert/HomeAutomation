@@ -48,36 +48,36 @@ struct RunDetailView<EntityDestination>: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Automation", value: store.run.automationName)
+                LabeledContent(String(localized: "Automation", bundle: .module), value: store.run.automationName)
                 if let entityId = store.run.trigger.entityId {
                     NavigationLink(state: entityDestination(entityId)) {
-                        LabeledContent("Trigger", value: store.run.trigger.summary)
+                        LabeledContent(String(localized: "Trigger", bundle: .module), value: store.run.trigger.summary)
                     }
                 } else {
-                    LabeledContent("Trigger", value: store.run.trigger.summary)
+                    LabeledContent(String(localized: "Trigger", bundle: .module), value: store.run.trigger.summary)
                 }
-                LabeledContent("Start", value: store.run.startedAt.formatted(date: .abbreviated, time: .standard))
+                LabeledContent(String(localized: "Start", bundle: .module), value: store.run.startedAt.formatted(date: .abbreviated, time: .standard))
                 if let endedAt = store.run.endedAt {
-                    LabeledContent("Duration", value: Duration.seconds(endedAt.timeIntervalSince(store.run.startedAt))
+                    LabeledContent(String(localized: "Duration", bundle: .module), value: Duration.seconds(endedAt.timeIntervalSince(store.run.startedAt))
                         .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated)))
                 }
-                LabeledContent("Outcome") {
+                LabeledContent(String(localized: "Outcome", bundle: .module)) {
                     StatusLabel(outcome: store.run.outcome)
                 }
                 if let errorDescription = store.run.errorDescription {
-                    LabeledContent("Error") {
+                    LabeledContent(String(localized: "Error", bundle: .module)) {
                         Text(errorDescription).foregroundStyle(.red)
                     }
                 }
             }
 
             Section {
-                Button("Open Automation") {
+                Button(String(localized: "Open Automation", bundle: .module)) {
                     store.send(.openAutomationButtonTapped)
                 }
             }
         }
-        .navigationTitle("Run")
+        .navigationTitle(String(localized: "Run", bundle: .module))
     }
 }
 

@@ -15,7 +15,7 @@ struct AutomationInfoDisplayTests {
         let motion = AutomationInfo(name: "a", isActive: true, isRunning: false, type: "MotionAtNight")
         #expect(motion.typeLabel == "Motion")
         #expect(motion.systemImage == "figure.walk")
-        #expect(motion.triggerDescription == "Motion sensor")
+        #expect(motion.triggerDescription == "Motion Sensor")
 
         let unknown = AutomationInfo(name: "b", isActive: true, isRunning: false, type: "Something")
         #expect(unknown.typeLabel == "Other")
@@ -29,7 +29,7 @@ struct AutomationInfoDisplayTests {
     @Test("subtitle shows the trigger configuration until the first run, then the last run")
     func subtitleFollowsLastRun() {
         var info = AutomationInfo(name: "a", isActive: true, isRunning: false, type: "MotionAtNight")
-        #expect(info.subtitle == "Motion sensor")
+        #expect(info.subtitle == "Motion Sensor")
 
         info.lastRun = AutomationRun(
             automationName: "a",

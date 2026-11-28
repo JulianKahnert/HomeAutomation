@@ -37,7 +37,7 @@ struct WindowActivityPresentationTests {
                                                       rowBudget: 3)
 
         #expect(presentation.rows.map(\.room) == ["Küche", "Bad", "Büro"])
-        #expect(presentation.more?.text == "+5 weitere: Flur, Schlafzimmer, Wohnzimmer, Kinderzimmer, Keller")
+        #expect(presentation.more?.text == "+5 more: Flur, Schlafzimmer, Wohnzimmer, Kinderzimmer, Keller")
         #expect(presentation.more?.isOverdue == false)
     }
 
@@ -48,7 +48,7 @@ struct WindowActivityPresentationTests {
                                                                                overdueCount: 2),
                                                       rowBudget: 3)
 
-        #expect(presentation.header == "8 offen · 2 überschritten")
+        #expect(presentation.header == "8 open · 2 overdue")
     }
 
     @Test("all windows fit: no +X weitere line")
@@ -65,7 +65,7 @@ struct WindowActivityPresentationTests {
         let windows = ["Küche", "Bad", "Bad", "Bad", "Flur"].map { Self.window($0) }
         let presentation = WindowActivityPresentation(contentState: Self.state(windows), rowBudget: 2)
 
-        #expect(presentation.more?.text == "+3 weitere: Bad, Flur")
+        #expect(presentation.more?.text == "+3 more: Bad, Flur")
     }
 
     @Test("windows cut off by the server's cap count in +X weitere and end the room list with …")
@@ -73,7 +73,7 @@ struct WindowActivityPresentationTests {
         let windows = ["Küche", "Bad", "Büro", "Flur"].map { Self.window($0) }
         let presentation = WindowActivityPresentation(contentState: Self.state(windows, openCount: 23), rowBudget: 3)
 
-        #expect(presentation.more?.text == "+20 weitere: Flur, …")
+        #expect(presentation.more?.text == "+20 more: Flur, …")
     }
 
     @Test("+X weitere turns red only when a hidden window is überschritten")
@@ -116,7 +116,7 @@ struct WindowActivityPresentationTests {
                                                       rowBudget: WindowActivityPresentation.expandedRowBudget)
 
         #expect(presentation.rows.map(\.room) == ["Küche", "Bad"])
-        #expect(presentation.more?.text == "+6 weitere: Büro, Flur, Schlafzimmer, Wohnzimmer, Kinderzimmer, Keller")
+        #expect(presentation.more?.text == "+6 more: Büro, Flur, Schlafzimmer, Wohnzimmer, Kinderzimmer, Keller")
     }
 
     @Test("the expanded leading region says how many windows are offen, beyond the server's cap too")
@@ -124,7 +124,7 @@ struct WindowActivityPresentationTests {
         let presentation = WindowActivityPresentation(contentState: Self.state([Self.window("Küche")], openCount: 23),
                                                       rowBudget: WindowActivityPresentation.expandedRowBudget)
 
-        #expect(presentation.openSummary == "23 offen")
+        #expect(presentation.openSummary == "23 open")
     }
 
     @Test("the expanded trailing region counts überschrittene Fenster and stays empty without one")
@@ -164,7 +164,7 @@ struct WindowActivityPresentationTests {
                                                       rowBudget: WindowActivityPresentation.watchRowBudget)
 
         #expect(presentation.rows.map(\.room) == ["Küche"])
-        #expect(presentation.watchCaption?.text == "+7 weitere offen")
+        #expect(presentation.watchCaption?.text == "+7 more open")
         #expect(presentation.watchCaption?.isOverdue == false)
     }
 
@@ -173,7 +173,7 @@ struct WindowActivityPresentationTests {
         let capped = Self.state([Self.window("Küche"), Self.window("Bad", overdue: true)], openCount: 23, overdueCount: 1)
         let presentation = WindowActivityPresentation(contentState: capped, rowBudget: WindowActivityPresentation.watchRowBudget)
 
-        #expect(presentation.watchCaption?.text == "+22 weitere offen")
+        #expect(presentation.watchCaption?.text == "+22 more open")
         #expect(presentation.watchCaption?.isOverdue == true)
     }
 
@@ -203,7 +203,7 @@ struct WindowActivityPresentationTests {
         let state = Self.state([Self.window("Küche"), Self.window("Bad")])
         let presentation = WindowActivityPresentation(contentState: state, rowBudget: WindowActivityPresentation.watchRowBudget, isStale: true)
 
-        #expect(presentation.watchCaption == WindowActivityPresentation.Caption(text: "überschritten?", isOverdue: true))
+        #expect(presentation.watchCaption == WindowActivityPresentation.Caption(text: "overdue?", isOverdue: true))
     }
 
     @Test("a stale activity on the Watch turns +X weitere offen red when the possibly überschritten window is hidden")
@@ -211,7 +211,7 @@ struct WindowActivityPresentationTests {
         let state = Self.state([Self.window("Küche", overdue: true), Self.window("Bad")])
         let presentation = WindowActivityPresentation(contentState: state, rowBudget: WindowActivityPresentation.watchRowBudget, isStale: true)
 
-        #expect(presentation.watchCaption == WindowActivityPresentation.Caption(text: "+1 weitere offen", isOverdue: true))
+        #expect(presentation.watchCaption == WindowActivityPresentation.Caption(text: "+1 more open", isOverdue: true))
     }
 
     // MARK: outdoor temperature

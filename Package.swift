@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "HomeAutomationKit",
+    defaultLocalization: "en",
     platforms: [.macOS(.v15), .iOS(.v18), .macCatalyst(.v18)],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -89,7 +90,8 @@ let package = Package(
                 "HAModels",
                 "Shared",
                 "StarActorSystem",
-            ]
+            ],
+            resources: [.process("Localizable.xcstrings")]
         ),
         .target(
             name: "HAModels",
@@ -134,7 +136,8 @@ let package = Package(
                 "Shared",
                 "ServerClient",
             ],
-            path: "Sources/Controller"
+            path: "Sources/Controller",
+            resources: [.process("Localizable.xcstrings")]
         ),
         .testTarget(
             name: "SharedTests",

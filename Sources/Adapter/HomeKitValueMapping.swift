@@ -20,6 +20,7 @@ enum HomeKitValueMapping {
     static let lockMechanismService = "00000045-0000-1000-8000-0026BB765291"
     static let batteryService = "00000096-0000-1000-8000-0026BB765291"
     static let heaterCoolerService = "000000BC-0000-1000-8000-0026BB765291"
+    static let valveService = "000000D0-0000-1000-8000-0026BB765291"
     // Characteristics
     static let occupancyDetectedCharacteristic = "00000071-0000-1000-8000-0026BB765291"
     static let motionDetectedCharacteristic = "00000022-0000-1000-8000-0026BB765291"
@@ -39,10 +40,6 @@ enum HomeKitValueMapping {
 
     /// Whether HomeKit has to be asked for the value of `type` on this characteristic at all: the service and
     /// format checks that come before the read. `false` leaves the item without a value, as before.
-    ///
-    /// `.valve` never reads: the entity comes from the `In Use` characteristic of a Valve service, while the
-    /// former getter looked for `Active` on that service, which has no entity. The valve state reaches the
-    /// server another way (see `ValveJob`); this keeps what the adapter always did.
     static func needsRead(_ type: CharacteristicsType, context: Context) -> Bool {
         let service = context.serviceType
         switch type {
@@ -61,10 +58,12 @@ enum HomeKitValueMapping {
             return service == batteryService
         case .heating:
             return service == heaterCoolerService
+        case .valve:
+            return service == valveService
         case .brightness, .colorTemperature, .color, .temperatureSensor, .relativeHumiditySensor, .carbonDioxideSensorId,
              .pmDensitySensor, .airQualitySensor, .targetTemperature, .heatingMode, .valvePosition:
             return true
-        case .valve, .temperatureCalibration, .energyPrice, .deadline:
+        case .temperatureCalibration, .energyPrice, .deadline:
             return false
         }
     }
@@ -113,7 +112,11 @@ enum HomeKitValueMapping {
             return .number(Double(mode.rawValue))
         case .valvePosition:
             return (raw as? NSNumber).map { .number(Double($0.intValue)) }
-        case .valve, .temperatureCalibration, .energyPrice, .deadline:
+        case .valve:
+            // HMCharacteristicValueInUseState of the `In Use` characteristic: 0 not in use, 1 in use (the valve is open)
+            guard let state = raw as? Int, (0...1).contains(state) else { return nil }
+            return .bool(state == 1)
+        case .temperatureCalibration, .energyPrice, .deadline:
             return nil
         }
     }

@@ -22,7 +22,11 @@ Key lengths: a key over 3 × VARCHAR(255) utf8mb4 (3060 bytes) plus a DATETIME(6
 
 ## Moving data from the old schema
 
-The old tables `entityItems` (wide, one column per characteristic), `automationRuns`, `heatingWrites` and `fireplaceSwitches` are not part of the schema.
+The old tables `entityItems` (wide, one column per characteristic), `automationRuns`, `heatingWrites` and `fireplaceSwitches` are not part of the schema. `scripts/migrate-old-database/migrate.sh [--check] <dump.sql.gz> <db-container>` moves their data from a dump of the old database (as `backup.sh` in the config repo writes it) into a new database the server has created: it loads the old tables as `legacy_*`, runs `migrate.sql` in one transaction and drops them again. `--check` prints the report and rolls back. Every row keeps its old id, so a second run adds nothing. `scripts/migrate-old-database/test/test.sh` tests it against two throwaway MySQL containers.
 
-- Old `entityItems` rows become `entities` plus `entityChanges` rows (`number` or `text` per characteristic).
-- Old `automationRuns` rows become `journal` rows with kind `run`: id and runId are the old id, timestamp is startedAt, title is automationName, detail is the trigger summary, entityPlaceId and entityName are the trigger's place and name, entityCharacteristicsName and entityCharacteristicType are the trigger's, plus triggerKind, outcome, endedAt and errorDescription.
+- Old `entityItems` rows become `entities` plus `entityChanges` rows: the value is the column of the row's type (`number`, a color as the text "red green blue"); origin `homekit`, `ValveJob` for valve position and temperature offset. Rows of a type the new schema lacks, or without a value of their type, are left out and counted in the report. An entity gets its newest name.
+- Old `entityHourlyAggregates` rows (keyed by place, service and type) point to the entity id.
+- Old `fireplaceSwitches` rows become changes of the server-owned switch `server/fireplace` with origin `app`.
+- Old `heatingWrites`: the plan target becomes changes of the server-owned `server/<room>/targetTemperature` with origin `server` (one per value change, not one per radiator); a write that reached the radiator (`sentToDevice`) becomes a `journal` row with kind `command`, its reason and value.
+- Old `automationRuns` rows become `journal` rows with kind `run`: id and runId are the old id, timestamp is startedAt, title is automationName, detail is the trigger summary, entityPlaceId and entityName are the trigger's place and name, entityCharacteristicsName and entityCharacteristicType are the trigger's, plus triggerKind, outcome (`running` becomes `interrupted`), endedAt and errorDescription.
+- `deviceToken` and `weatherHours` are copied as they are; `config` is not (deploy the config again).

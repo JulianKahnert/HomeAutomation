@@ -4,7 +4,9 @@
 //
 //  Snapshots of the Heizung room detail: 24 h, 7 d, room without data and server not reachable,
 //  light and dark, at iPhone (402 pt) and Mac (1120 pt) width. The dates come from
-//  HeatingPreviewData (fixed "now"), the locale is de_DE and the time zone Europe/Berlin.
+//  HeatingPreviewData (fixed "now"), the locale is en_US (the
+//  English source text renders the same on every machine; a German locale in the environment is
+//  honoured on the CI runner but not in a local test process) and the time zone Europe/Berlin.
 //
 //  Re-record: delete the images in __Snapshots__/HeatingDetailSnapshotTests or run
 //  `SNAPSHOT_TESTING_RECORD=all swift test --filter HeatingDetailSnapshotTests`.
@@ -51,7 +53,7 @@ struct HeatingDetailSnapshotTests {
             .frame(width: device.size.width, height: device.size.height)
             .background(Color(white: scheme == .dark ? 0.08 : 0.96))
             .environment(\.colorScheme, scheme)
-            .environment(\.locale, Locale(identifier: "de_DE"))
+            .environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
     }
 
@@ -98,7 +100,7 @@ struct HeatingDetailSnapshotTests {
                 .frame(width: 402, height: 600)
                 .background(Color(white: scheme == .dark ? 0.08 : 0.96))
                 .environment(\.colorScheme, scheme)
-                .environment(\.locale, Locale(identifier: "de_DE"))
+                .environment(\.locale, Locale(identifier: "en_US"))
                 .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
             let hosting = NSHostingView(rootView: view)
             hosting.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
@@ -117,7 +119,7 @@ struct HeatingDetailSnapshotTests {
                 .frame(width: 402, height: 600)
                 .background(Color(white: scheme == .dark ? 0.08 : 0.96))
                 .environment(\.colorScheme, scheme)
-                .environment(\.locale, Locale(identifier: "de_DE"))
+                .environment(\.locale, Locale(identifier: "en_US"))
                 .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
             let hosting = NSHostingView(rootView: view)
             hosting.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
@@ -134,7 +136,7 @@ struct HeatingDetailSnapshotTests {
             func height(_ crosshair: Date?) -> CGFloat {
                 let view = HeatingRoomDetailView(detail: detail, range: .constant(range), crosshair: crosshair)
                     .frame(width: 370)
-                    .environment(\.locale, Locale(identifier: "de_DE"))
+                    .environment(\.locale, Locale(identifier: "en_US"))
                     .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
                 return NSHostingView(rootView: view).fittingSize.height
             }

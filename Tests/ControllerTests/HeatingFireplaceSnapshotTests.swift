@@ -67,7 +67,7 @@ struct HeatingFireplaceSnapshotTests {
                 .frame(width: device.size.width, height: device.size.height, alignment: .top)
                 .background(Color(white: scheme == .dark ? 0.08 : 0.96))
                 .environment(\.colorScheme, scheme)
-                .environment(\.locale, Locale(identifier: "de_DE"))
+                .environment(\.locale, Locale(identifier: "en_US"))
                 .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
                 let view = NSHostingView(rootView: content)
                 view.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)

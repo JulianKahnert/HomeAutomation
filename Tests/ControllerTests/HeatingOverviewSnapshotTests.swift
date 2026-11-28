@@ -37,7 +37,7 @@ struct HeatingOverviewSnapshotTests {
             .frame(width: size.width, height: size.height)
             .background(Color(white: scheme == .dark ? 0.08 : 0.96))
             .environment(\.colorScheme, scheme)
-            .environment(\.locale, Locale(identifier: "de_DE"))
+            .environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.timeZone, TimeZone(identifier: "Europe/Berlin")!)
         let view = NSHostingView(rootView: styled)
         view.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)

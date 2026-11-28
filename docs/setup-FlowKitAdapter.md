@@ -54,6 +54,14 @@ Open the settings screen (gear icon) in the app and enter host, port and the ser
 * The token is stored in the keychain. Installs that still have it in `UserDefaults` from older versions are migrated automatically on first launch and the plaintext copy is deleted.
 * Enable **Use TLS (wss://)** whenever the adapter does not share a trusted network with the server (e.g. when connecting through the Cloudflare tunnel). Without TLS the token and all HomeKit traffic cross the network unencrypted.
 
+## Reading values actively
+
+The adapter subscribes to HomeKit notifications only for the types that matter (`CharacteristicsType.isSubscribed`), because too many subscriptions make HomeKit drop notifications, contact sensors first. Battery level, temperature and humidity (`isPolled`) are additionally read actively: on every full resync (start, reconnect) and every three hours (`CharacteristicsType.pollInterval`). The values go to the server as normal reports; the server stores a value only when it changed (the battery by at least one percentage point), see `ValueDescriptor.StorageRule`.
+
+## HomeKit inventory
+
+The server asks the adapter for a list of everything HomeKit has (`homeKitInventory()`: homes, rooms, accessories, services and characteristics, with one read of each readable value, also for what the adapter does not map). It does so after each adapter connect (the first one after its start included) and once a day. The server keeps it in the table `homekitInventory`, see `docs/database-schema.md` for the columns and example queries.
+
 ## Setup on iOS/iPadOS
 
 Start the app and keep it in foreground.

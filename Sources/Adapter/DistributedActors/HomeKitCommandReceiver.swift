@@ -34,6 +34,14 @@ public distributed actor HomeKitCommandReceiver {
         return entities
     }
 
+    public distributed func homeKitInventory() async -> HomeKitInventory {
+        log.info("homeKitInventory() — received remote call")
+        let start = ContinuousClock.now
+        let inventory = await adapter.homeKitInventory()
+        log.info("homeKitInventory() — returning \(inventory.summary) in \(start.duration(to: .now))")
+        return inventory
+    }
+
     public distributed func perform(_ action: HomeManagableAction) async throws {
         do {
             try await adapter.perform(action)

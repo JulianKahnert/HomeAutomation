@@ -129,6 +129,12 @@ An entity no device stands behind: the server keeps its state itself and reports
 **Polling job** (Abfrage-Job)
 A job of the scheduler with a cadence that polls a source (valves, weather, price), feeds the result into the event stream with the job's name as origin and logs an error once per disturbance.
 
+**Polled characteristic** (aktiv gelesene Eigenschaft)
+A HomeKit characteristic the adapter reads itself instead of waiting for a notification: battery level, temperature and humidity. It is read on every full resync and every three hours and sent as a normal report with origin `homekit`. The battery is not subscribed, because more subscriptions make HomeKit drop notifications.
+
+**HomeKit inventory** (HomeKit-Bestand)
+The list of everything HomeKit has, one row per characteristic, mapped to our model or not, in the table `homekitInventory`. The server pulls it from the adapter after each connect and once a day; it is the query surface for "what does HomeKit have that our automations do not use". Not the same as the entities, which are only the mapped characteristics that reported.
+
 **Lane** (Spur)
 The queue of events one automation works through in order. A slow automation delays only its own lane. When several changes of the same entity wait in one lane only the newest stays; events without a state (button press, clock, sun, server start, deploy) are never collapsed.
 

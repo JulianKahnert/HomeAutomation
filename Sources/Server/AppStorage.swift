@@ -20,6 +20,10 @@ private let homeEvents = AsyncStream.makeStream(of: HomeInput.self)
          EntityStorageDbRepository(database: { self.db })
      }
 
+     var homekitInventoryRepository: HomekitInventoryDbRepository {
+         HomekitInventoryDbRepository(database: { self.db })
+     }
+
      var journalRepository: JournalDbRepository {
          JournalDbRepository(database: { self.db })
      }

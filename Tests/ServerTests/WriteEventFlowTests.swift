@@ -218,7 +218,9 @@ final class WriteEventFlowTests: XCTestCase {
         let gate = Signal()
         let port = app.commandPort
         let task = Task {
-            await gate.wait()
+            // Not `wait()`: its timeout race ends at once in a cancelled task and would fail the test
+            // whenever the task starts before the gate opens.
+            await gate.waitIgnoringCancellation()
             try await port.stopAutomation(name: "probe")
         }
         task.cancel()
@@ -296,6 +298,11 @@ actor Signal {
         } catch {
             XCTFail("A signal was not opened within \(timeout)", file: file, line: line)
         }
+    }
+
+    /// Returns once opened, even when the calling task is cancelled meanwhile.
+    func waitIgnoringCancellation() async {
+        await park()
     }
 
     private func park() async {

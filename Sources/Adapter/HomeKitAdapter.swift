@@ -15,6 +15,9 @@ public protocol HomeKitAdapterable: Sendable {
 
     func listThermostats() async throws -> [Thermostat]
     func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem]
+
+    /// Everything HomeKit knows, see `HomeKitInventory`. Values are best-effort and bounded in time.
+    func homeKitInventory() async -> HomeKitInventory
 }
 
 #if canImport(HomeKit)
@@ -41,6 +44,10 @@ public final class HomeKitAdapter: HomeKitAdapterable {
     public func pushFullState() async {
         log.info("pushFullState() — re-yielding full entity state after (re)connect")
         await homeKitHomeManager.updateEntitiesNow()
+    }
+
+    public func homeKitInventory() async -> HomeKitInventory {
+        await homeKitHomeManager.inventory()
     }
 
     public func getAllEntitiesLive() async -> [EntityStorageItem] {

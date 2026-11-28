@@ -36,6 +36,7 @@ struct HeatingFeatureTests {
             HeatingFeature()
         } withDependencies: {
             $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getFireplace = { .off }
             $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: rooms) }
             $0.serverClient.getHeatingRoom = { placeId, range in
                 requests.append("\(placeId) \(range.rawValue)")
@@ -77,6 +78,7 @@ struct HeatingFeatureTests {
             HeatingFeature()
         } withDependencies: {
             $0.date = .constant(moment)
+            $0.serverClient.getFireplace = { .off }
             $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: [Self.room("Bad", ist: 20)]) }
         }
         store.exhaustivity = .off
@@ -142,6 +144,7 @@ struct HeatingFeatureTests {
             HeatingFeature()
         } withDependencies: {
             $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getFireplace = { .off }
             $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: rooms.value) }
             $0.serverClient.getHeatingRoom = { placeId, range in Self.detail(placeId, range) }
         }
@@ -180,6 +183,7 @@ struct HeatingFeatureTests {
             HeatingFeature()
         } withDependencies: {
             $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getFireplace = { .off }
             $0.serverClient.getHeatingOverview = { throw Failure() }
         }
         store.exhaustivity = .off
@@ -196,6 +200,7 @@ struct HeatingFeatureTests {
             HeatingFeature()
         } withDependencies: {
             $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getFireplace = { .off }
             $0.serverClient.getHeatingOverview = {
                 calls.withValue { $0 += 1 }
                 guard calls.value == 1 else { throw Failure() }
@@ -217,6 +222,7 @@ struct HeatingFeatureTests {
             HeatingFeature()
         } withDependencies: {
             $0.date = .constant(Date(timeIntervalSince1970: 1_800_000_000))
+            $0.serverClient.getFireplace = { .off }
             $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: [Self.room("Bad", ist: 20)]) }
             $0.serverClient.getHeatingRoom = { _, _ in throw Failure() }
         }

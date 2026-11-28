@@ -14,21 +14,6 @@ import Testing
 @Suite("ServerClient Dependency Tests")
 struct ServerClientDependencyTests {
 
-    @Test("Test value returns empty arrays")
-    func testTestValue() async throws {
-        try await withDependencies {
-            $0.serverClient = .testValue
-        } operation: {
-            @Dependency(\.serverClient) var client
-
-            let automations = try await client.getAutomations()
-            #expect(automations.isEmpty)
-
-            let windowStates = try await client.getWindowContentState()
-            #expect(windowStates.windows.isEmpty)
-        }
-    }
-
     @Test("Preview value returns mock data")
     func testPreviewValue() async throws {
         try await withDependencies {

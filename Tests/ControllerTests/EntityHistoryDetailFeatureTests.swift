@@ -47,6 +47,8 @@ struct EntityHistoryDetailFeatureTests {
     func timeRangeReloads() async {
         let store = TestStore(initialState: EntityHistoryDetailFeature.State(entity: entity)) {
             EntityHistoryDetailFeature()
+        } withDependencies: {
+            $0.serverClient.getEntityHistory = { _, _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) }
         }
 
         await store.send(.timeRangeChanged(.week)) {

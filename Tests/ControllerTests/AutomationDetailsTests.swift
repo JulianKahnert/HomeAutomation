@@ -95,6 +95,8 @@ struct AutomationDetailsTests {
             AutomationDetails()
         } withDependencies: {
             $0.date.now = now
+            $0.serverClient.stop = { _ in }
+            $0.serverClient.getRuns = { _, _, _, _ in [] }
         }
 
         await store.send(.stopAutomation) {

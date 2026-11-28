@@ -58,6 +58,10 @@ Open the settings screen (gear icon) in the app and enter host, port and the ser
 
 The adapter subscribes to HomeKit notifications only for the types that matter (`CharacteristicsType.isSubscribed`), because too many subscriptions make HomeKit drop notifications, contact sensors first. Battery level, temperature and humidity (`isPolled`) are additionally read actively: on every full resync (start, reconnect) and every three hours (`CharacteristicsType.pollInterval`). The values go to the server as normal reports; the server stores a value only when it changed (the battery by at least one percentage point), see `ValueDescriptor.StorageRule`.
 
+## HomeKit inventory
+
+After each connect to the server, and when an accessory is added, removed or renamed, the adapter sends the server a list of everything HomeKit has (one row per characteristic, with one read of its value), also what it does not map. The server keeps it in the table `homekitInventory`, see `docs/database-schema.md` for the columns and example queries.
+
 ## Setup on iOS/iPadOS
 
 Start the app and keep it in foreground.

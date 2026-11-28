@@ -49,7 +49,7 @@ struct GoldenThunkIDTests {
         ])
     }
 
-    /// Freezes the wire `target` strings of the 7 production receiver methods.
+    /// Freezes the wire `target` strings of the 8 production receiver methods.
     ///
     /// FROZEN CONTRACT: the module name `Adapter` (and the actor/method names +
     /// parameter types, including argument types from module `HAModels`) are
@@ -78,6 +78,7 @@ struct GoldenThunkIDTests {
 
         // adapter → server
         try await eventProxy.process(event: .change(entity: EntityStorageItem(entityId: entityId)))
+        try await eventProxy.process(inventory: [])
         // server → adapter
         _ = try await commandProxy.getAllEntitiesLive()
         try await commandProxy.perform(.turnOn(entityId))
@@ -90,7 +91,8 @@ struct GoldenThunkIDTests {
         let serverTargets = try targets(sentOver: serverConnection)
 
         #expect(adapterTargets == [
-            "$s7Adapter17HomeEventReceiverC7process5eventy8HAModels0bC0O_tYaKFTE"
+            "$s7Adapter17HomeEventReceiverC7process5eventy8HAModels0bC0O_tYaKFTE",
+            "$s7Adapter17HomeEventReceiverC7process9inventoryySay8HAModels0B16KitInventoryItemVG_tYaKFTE"
         ])
         #expect(serverTargets == [
             "$s7Adapter22HomeKitCommandReceiverC18getAllEntitiesLiveSay8HAModels17EntityStorageItemVGyYaKFTE",

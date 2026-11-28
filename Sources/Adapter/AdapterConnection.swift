@@ -86,10 +86,18 @@ public final class AdapterConnection {
         // the very first connect) so the server never misses events that
         // happened while the link was down. Unbounded buffering — no completed
         // handshake can ever be missed.
-        observationTasks.append(Task { [system, homeKitAdapter] in
+        observationTasks.append(Task { [system, homeKitAdapter, eventReceiver] in
             for await _ in system.makeHandshakeCompletedStream() {
                 Self.log.info("handshake completed — pushing full state")
                 await homeKitAdapter.pushFullState()
+                await Self.sendInventory(of: homeKitAdapter, to: eventReceiver)
+            }
+        })
+
+        // The homes changed (accessory added, removed or renamed): send a fresh inventory.
+        observationTasks.append(Task { [homeKitAdapter, eventReceiver] in
+            for await _ in homeKitAdapter.inventoryRequests {
+                await Self.sendInventory(of: homeKitAdapter, to: eventReceiver)
             }
         })
 
@@ -106,6 +114,16 @@ public final class AdapterConnection {
                 }
             }
         })
+    }
+
+    /// Sends the HomeKit inventory to the server; a failure (e.g. no link) is only logged, the next trigger sends it again.
+    private static func sendInventory(of adapter: HomeKitAdapter, to receiver: HomeEventReceiver) async {
+        let inventory = await adapter.inventory()
+        do {
+            try await receiver.process(inventory: inventory)
+        } catch {
+            log.error("Failed to send the HomeKit inventory: \(error)")
+        }
     }
 
     public func stop() {

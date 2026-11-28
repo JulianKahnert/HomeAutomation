@@ -128,6 +128,41 @@ extension HMCharacteristic: @retroactive Comparable {
         entityCharacteristicType?.isSubscribed ?? false
     }
 
+    /// Our type for this characteristic, or `nil`; unlike `entityCharacteristicType` quiet about unmapped ones.
+    var mappedCharacteristicType: CharacteristicsType? {
+        HomeKitCharacteristic(characteristicType: characteristicType)?
+            .toCharacteristicsType(serviceType: service?.serviceType, isBoolFormat: metadata?.format == HMCharacteristicMetadataFormatBool)
+    }
+
+    /// The characteristic as one row of the HomeKit inventory, with one read of its value when it is readable.
+    /// A failed read leaves the value out; the characteristic is listed anyway.
+    func inventoryItem(inHome homeName: String) async -> HomeKitInventoryItem? {
+        guard let service, let accessory = service.accessory else { return nil }
+        var text: String?
+        if isReadable {
+            do {
+                try await readValue()
+                text = value.map { "\($0)" }
+            } catch {
+                homeKitLogger.debug("Inventory value not read", metadata: logMetadata.merging(["error": "\(error)"]) { _, new in new })
+            }
+        }
+        return HomeKitInventoryItem(homeName: homeName,
+                                    roomName: accessory.room?.name ?? "",
+                                    accessoryName: accessory.name,
+                                    manufacturer: accessory.manufacturer,
+                                    model: accessory.model,
+                                    serviceType: service.serviceType,
+                                    serviceName: service.name,
+                                    characteristicType: characteristicType,
+                                    characteristicDescription: localizedDescription,
+                                    mappedType: mappedCharacteristicType,
+                                    isReadable: isReadable,
+                                    isNotifiable: isNotifiable,
+                                    isWritable: properties.contains(HMCharacteristicPropertyWritable),
+                                    value: text)
+    }
+
     /// Whether a resync yields this characteristic's value to the server: it is subscribed or polled.
     var shouldReport: Bool {
         entityCharacteristicType?.isReported ?? false

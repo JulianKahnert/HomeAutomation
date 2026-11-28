@@ -52,6 +52,12 @@ extension HomeKitAdapter {
         private let eveMatterValvePoller = EveMatterValvePoller()
         #endif
 
+        /// One element per request for a fresh inventory snapshot (the homes changed), already debounced.
+        let inventoryRequests: AsyncStream<Void>
+        private let inventoryRequestsContinuation: AsyncStream<Void>.Continuation
+        /// Homes change in bursts (a new accessory brings services and names one by one); the snapshot reads every value.
+        private var inventoryDebouncer: AsyncDebouncer!
+
         /// Reads battery level, temperature and humidity every `CharacteristicsType.pollInterval`, see `startPolling()`.
         private var pollTask: Task<Void, Never>?
 
@@ -59,8 +65,12 @@ extension HomeKitAdapter {
             self.entityStream = entityStream
             self.entityStreamContinuation = entityStreamContinuation
 
+            (inventoryRequests, inventoryRequestsContinuation) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
             manager = HMHomeManager()
             super.init()
+            inventoryDebouncer = AsyncDebouncer(delay: .seconds(30), maxDelay: .seconds(120)) { [weak self] in
+                self?.inventoryRequestsContinuation.yield()
+            }
             entityUpdateDebouncer = AsyncDebouncer(delay: .seconds(5)) { [weak self] in
                 await self?.updateEntities()
             }
@@ -74,6 +84,31 @@ extension HomeKitAdapter {
 
         deinit {
             pollTask?.cancel()
+        }
+
+        /// Asks for a fresh inventory snapshot after the debounce delay.
+        func scheduleInventoryUpdate() {
+            Task { await inventoryDebouncer.schedule() }
+        }
+
+        /// Everything HomeKit knows, one row per characteristic: mapped or not, skipped by the mapping or not.
+        func inventory() async -> [HomeKitInventoryItem] {
+            let homes = await homesPublisher.get()
+            var characteristics: [(homeName: String, characteristic: HMCharacteristic)] = []
+            for home in homes {
+                for characteristic in home.accessories.flatMap(\.services).flatMap(\.characteristics) {
+                    characteristics.append((home.name, characteristic))
+                }
+            }
+            let items = await withTaskGroup(of: HomeKitInventoryItem?.self) { group in
+                for (homeName, characteristic) in characteristics {
+                    group.addTask(priority: .low) {
+                        await characteristic.inventoryItem(inHome: homeName)
+                    }
+                }
+                return await group.reduce(into: [HomeKitInventoryItem]()) { $0.append($1) }
+            }
+            return items.sorted { ($0.roomName, $0.accessoryName, $0.serviceName, $0.characteristicType) < ($1.roomName, $1.accessoryName, $1.serviceName, $1.characteristicType) }
         }
 
         func getHomes() async -> [HMHome] {
@@ -321,6 +356,7 @@ extension HomeKitAdapter.HomeKitHomeManager: HMHomeManagerDelegate {
         log.info("homeManager.homeManagerDidUpdateHomes")
         // also the first callback of the manager created by a reset, whose registrations start empty
         update(homes: manager.homes, resubscribeReason: "homeManagerDidUpdateHomes", releasesRetiredManager: true)
+        scheduleInventoryUpdate()
     }
     func homeManager(_ manager: HMHomeManager, didUpdate status: HMHomeManagerAuthorizationStatus) {
         log.info("homeManager.didUpdate \(status.rawValue)")
@@ -332,11 +368,13 @@ extension HomeKitAdapter.HomeKitHomeManager: HMHomeManagerDelegate {
 extension HomeKitAdapter.HomeKitHomeManager: HMHomeDelegate {
     func home(_ home: HMHome, didAdd accessory: HMAccessory) {
         log.info("home:didAdd accessory \(accessory.name)")
+        scheduleInventoryUpdate()
         update(homes: manager.homes)
     }
 
     func home(_ home: HMHome, didRemove accessory: HMAccessory) {
         log.info("home:didRemove accessory \(accessory.name)")
+        scheduleInventoryUpdate()
         update(homes: manager.homes)
     }
 
@@ -354,6 +392,7 @@ extension HomeKitAdapter.HomeKitHomeManager: HMHomeDelegate {
 extension HomeKitAdapter.HomeKitHomeManager: HMAccessoryDelegate {
     func accessoryDidUpdateName(_ accessory: HMAccessory) {
         log.info("accessory:accessoryDidUpdateName(HMAccessory) \(accessory.name)")
+        scheduleInventoryUpdate()
         update(homes: manager.homes)
 
     }
@@ -364,10 +403,12 @@ extension HomeKitAdapter.HomeKitHomeManager: HMAccessoryDelegate {
     }
     func accessoryDidUpdateServices(_ accessory: HMAccessory) {
         log.info("accessory:accessoryDidUpdateServices(HMAccessory) \(accessory.name)")
+        scheduleInventoryUpdate()
         update(homes: manager.homes)
     }
     func accessory(_ accessory: HMAccessory, didUpdateNameFor: HMService) {
         log.info("accessory:accessory(HMAccessory, didUpdateNameFor: HMService) \(accessory.name)")
+        scheduleInventoryUpdate()
         update(homes: manager.homes)
     }
     func accessory(_ accessory: HMAccessory, service: HMService, didUpdateValueFor characteristic: HMCharacteristic) {

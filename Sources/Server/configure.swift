@@ -224,7 +224,9 @@ public func configure(_ app: Application) async throws {
     let actorSystem = StarActorSystem(name: "server", logger: app.logger)
     app.starActorSystem = actorSystem
     let eventReceiver = actorSystem.makeActor(id: .homeEventReceiver) {
-        HomeEventReceiver(emit: { [sink = app.homeEventSink] in sink.yield($0) }, actorSystem: actorSystem)
+        HomeEventReceiver(emit: { [sink = app.homeEventSink] in sink.yield($0) },
+                          storeInventory: { [repository = app.homekitInventoryRepository] in try await repository.replace(with: $0, syncedAt: Date()) },
+                          actorSystem: actorSystem)
     }
     app.homeEventReceiver = eventReceiver
 

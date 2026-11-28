@@ -10,7 +10,7 @@ CREATE TABLE weatherHours (locationKey VARCHAR(64) NOT NULL, hour DATETIME(6) NO
     shortwaveRadiationWm2 DOUBLE, directRadiationWm2 DOUBLE, diffuseRadiationWm2 DOUBLE, directNormalIrradianceWm2 DOUBLE,
     sunshineDurationS DOUBLE, isDay BOOL, PRIMARY KEY (locationKey, hour)) COLLATE utf8mb4_0900_bin;
 CREATE TABLE entities (id VARBINARY(16) PRIMARY KEY, placeId VARCHAR(255) NOT NULL, serviceName VARCHAR(255) NOT NULL,
-    characteristicType VARCHAR(255) NOT NULL, characteristicsName VARCHAR(255),
+    characteristicType VARCHAR(255) NOT NULL, characteristicsName VARCHAR(255), lastReport DATETIME(6),
     UNIQUE KEY (placeId, serviceName, characteristicType)) COLLATE utf8mb4_0900_bin;
 CREATE TABLE entityHourlyAggregates (entityId VARBINARY(16) NOT NULL, hourStart DATETIME(6) NOT NULL, minValue DOUBLE NOT NULL,
     meanValue DOUBLE NOT NULL, `maxValue` DOUBLE NOT NULL, lastValue DOUBLE NOT NULL, valueCount BIGINT NOT NULL,
@@ -27,10 +27,18 @@ CREATE TABLE journal (id VARBINARY(16) PRIMARY KEY, kind VARCHAR(16) NOT NULL, t
     INDEX idx_journal_kind_timestamp (kind, timestamp), INDEX idx_journal_runId (runId),
     INDEX idx_journal_kind_title_timestamp (kind, title, timestamp),
     INDEX idx_journal_kind_place_timestamp (kind, entityPlaceId, timestamp)) COLLATE utf8mb4_0900_bin;
+CREATE TABLE homekitInventory (id BIGINT AUTO_INCREMENT PRIMARY KEY, homeName VARCHAR(255) NOT NULL,
+    roomName VARCHAR(255) NOT NULL, accessoryName VARCHAR(255) NOT NULL, accessoryCategory VARCHAR(255) NOT NULL,
+    isReachable BOOL NOT NULL, manufacturer VARCHAR(255), model VARCHAR(255), serviceType VARCHAR(64) NOT NULL,
+    serviceTypeDescription VARCHAR(255) NOT NULL, serviceName VARCHAR(255) NOT NULL, isPrimaryService BOOL NOT NULL,
+    characteristicType VARCHAR(64) NOT NULL, characteristicDescription VARCHAR(255) NOT NULL, mappedType VARCHAR(32),
+    isReadable BOOL NOT NULL, isNotifiable BOOL NOT NULL, isWritable BOOL NOT NULL, value VARCHAR(255),
+    syncedAt DATETIME(6) NOT NULL,
+    INDEX idx_homekitInventory_mappedType_room_accessory (mappedType, roomName, accessoryName)) COLLATE utf8mb4_0900_bin;
 CREATE TABLE _fluent_migrations (id VARBINARY(16) PRIMARY KEY, name VARCHAR(255) NOT NULL, batch BIGINT NOT NULL,
     created_at DATETIME(6), updated_at DATETIME(6));
 
 -- The new server already ran a little before the migration: it knows the kitchen lamp and stored one change.
-INSERT INTO entities VALUES (UNHEX('aa000000000000000000000000000001'), 'Kueche', 'Lampe', 'switcher', NULL);
+INSERT INTO entities VALUES (UNHEX('aa000000000000000000000000000001'), 'Kueche', 'Lampe', 'switcher', NULL, NULL);
 INSERT INTO entityChanges (entityId, timestamp, number, text, origin)
     VALUES (UNHEX('aa000000000000000000000000000001'), '2026-11-28 08:00:00', 0, NULL, 'homekit');

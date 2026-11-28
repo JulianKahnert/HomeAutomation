@@ -111,7 +111,10 @@ final class EntityStorageMySQLTests: XCTestCase {
 
             let restored = try await repository.getCurrent(id)
 
-            XCTAssertEqual(restored, item, "\(sample.0)")
+            // the current state also carries the time of its last report, which is the change's own time here
+            var expected = item
+            expected.lastReport = item.timestamp
+            XCTAssertEqual(restored, expected, "\(sample.0)")
         }
     }
 
@@ -536,9 +539,15 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     /// The tabular `EXPLAIN` of a statement as one text (every row's `select_type`, `key` and `Extra`); the tests below
     /// assert that an index is used, so a later schema edit cannot silently drop one.
+    /// MySQLNIO asserts ("Statement not closed") on `EXPLAIN DELETE`, so a DELETE is explained as the SELECT that finds its
+    /// rows: the optimizer picks the same index.
+    private static func explainable(_ statement: String) -> String {
+        statement.hasPrefix("DELETE FROM") ? "SELECT * FROM" + statement.dropFirst("DELETE FROM".count) : statement
+    }
+
     private func plan(_ statement: String) async throws -> String {
         let sql = try XCTUnwrap(app.db as? SQLDatabase)
-        let rows = try await sql.raw(SQLQueryString("EXPLAIN " + statement)).all()
+        let rows = try await sql.raw(SQLQueryString("EXPLAIN " + Self.explainable(statement))).all()
         XCTAssertFalse(rows.isEmpty, "EXPLAIN returned no rows for \(statement)")
         return try rows.map { row in
             let key = try row.decode(column: "key", as: String?.self) ?? "-"

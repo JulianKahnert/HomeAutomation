@@ -219,16 +219,26 @@ public final class HomeManager: HomeManagable {
                 let history = try await storageRepo.getHistory(for: item.entityId, startDate: cutoff, endDate: nil, cursor: nil, limit: Self.readingLimit)
                 // changes reported while the load ran are newer and already in front
                 let known = Set((recentReadings[item.entityId] ?? []).map { Self.microseconds($0.timestamp) })
-                recentReadings[item.entityId, default: []] += history.filter { !known.contains(Self.microseconds($0.timestamp)) }
+                recentReadings[item.entityId, default: []] += history.filter { !Self.isKnown($0.timestamp, in: known) }
             } catch {
                 log.error("Failed to load the recent readings", metadata: ["entityId": "\(item.entityId)", "error": "\(error)"])
             }
         }
     }
 
-    /// A timestamp at the precision of the database (`DATETIME(6)`): a change read back from it equals the one held in memory.
+    /// A timestamp at the precision of the database (`DATETIME(6)`). The MySQL driver cuts the sub-microsecond digits
+    /// off on write (it does not round), so this cuts them off too; the date read back can then still be one
+    /// microsecond lower through floating point, which `isKnown` tolerates.
     nonisolated private static func microseconds(_ date: Date) -> Int64 {
-        Int64((date.timeIntervalSince1970 * 1_000_000).rounded())
+        let seconds = date.timeIntervalSince1970
+        let whole = seconds.rounded(.towardZero)
+        return Int64(whole) * 1_000_000 + Int64((seconds - whole) * 1_000_000)
+    }
+
+    /// Whether `date` is one of the `known` timestamps, up to the one microsecond of the round trip through the database.
+    nonisolated private static func isKnown(_ date: Date, in known: Set<Int64>) -> Bool {
+        let value = microseconds(date)
+        return known.contains(value) || known.contains(value - 1) || known.contains(value + 1)
     }
 
     nonisolated private static func key(of radiator: EntityId) -> String {
@@ -565,7 +575,7 @@ public final class HomeManager: HomeManagable {
             log.error("Failed to read the entity history", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
         }
         let known = Set(recent.map { Self.microseconds($0.timestamp) })
-        let merged = recent + stored.filter { !known.contains(Self.microseconds($0.timestamp)) }
+        let merged = recent + stored.filter { !Self.isKnown($0.timestamp, in: known) }
         return Array(merged.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 

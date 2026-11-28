@@ -15,6 +15,8 @@
 		A3DEAD552EDB93FE00AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3CA7DAD2D63BDD90019691F /* HomeAutomationKit */; };
 		A3DEAD562EDB93FE00AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3EC945C2D63E8870009361C /* HomeAutomationKit */; };
 		A3DEAD572EDB93FE00AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3F9BC7C2D6F99A9002298ED /* HomeAutomationKit */; };
+		A3D1A0110000000000000000 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A3D1A0010000000000000000 /* InfoPlist.xcstrings */; };
+		A3D1A0120000000000000000 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A3D1A0020000000000000000 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +27,8 @@
 		A3BC6BA32D6916E3001BE1D5 /* FlowKitAdapterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowKitAdapterApp.swift; sourceTree = "<group>"; };
 		A3BC6BA42D6916E3001BE1D5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A3BC6BA52D6916E3001BE1D5 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		A3D1A0010000000000000000 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
+		A3D1A0020000000000000000 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +49,8 @@
 		A326E8142C06528B00486F8E = {
 			isa = PBXGroup;
 			children = (
+				A3D1A0010000000000000000 /* InfoPlist.xcstrings */,
+				A3D1A0020000000000000000 /* Localizable.xcstrings */,
 				A3BC6B902D6916E3001BE1D5 /* Assets.xcassets */,
 				A3F1C0012E9A1B0000C0FFEE /* AppIcon.icon */,
 				A3BC6BA22D6916E3001BE1D5 /* FlowKitAdapter.entitlements */,
@@ -119,6 +125,7 @@
 			knownRegions = (
 				en,
 				Base,
+				de,
 			);
 			mainGroup = A326E8142C06528B00486F8E;
 			packageReferences = (
@@ -138,6 +145,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A3D1A0110000000000000000 /* InfoPlist.xcstrings in Resources */,
+				A3D1A0120000000000000000 /* Localizable.xcstrings in Resources */,
 				A3BC6BAC2D6916E3001BE1D5 /* Preview Assets.xcassets in Resources */,
 				A3BC6BAD2D6916E3001BE1D5 /* Assets.xcassets in Resources */,
 				A3F1C0022E9A1B0000C0FFEE /* AppIcon.icon in Resources */,

@@ -101,8 +101,8 @@ struct OpenAPIController: APIProtocol {
         request.logger.info("Adding/updating push device token: \(token.tokenType.rawValue)")
 
         switch token.tokenType {
-        case .pushNotification, .liveActivityStart:
-            assert(token.activityType == nil, "For pushNotification and liveActivityStart, activityType should be nil")
+        case .pushNotification:
+            assert(token.activityType == nil, "For pushNotification, activityType should be nil")
 
             // upsert: update existing token or create new one
             let existingQuery = DeviceToken
@@ -117,9 +117,33 @@ struct OpenAPIController: APIProtocol {
                 let newPushDevice = DeviceToken(deviceName: token.deviceName,
                                                 tokenString: token.tokenString,
                                                 tokenType: token.tokenType.rawValue,
-                                                activityType: token.activityType)
+                                                activityType: nil)
                 try await newPushDevice.save(on: request.db)
                 request.logger.info("Created new \(token.tokenType.rawValue) token for \(token.deviceName)")
+            }
+            return .ok
+
+        case .liveActivityStart:
+            // One push-to-start token per device and activity type; an app that names no type registers the window's.
+            let activityType = token.activityType ?? WindowContentState.activityTypeName
+            let existing = try await DeviceToken
+                .query(on: request.db)
+                .filter(\.$deviceName == token.deviceName)
+                .filter(\.$tokenType == token.tokenType.rawValue)
+                .all()
+                .first { $0.startActivityType == activityType }
+            if let existing {
+                existing.tokenString = token.tokenString
+                existing.activityType = activityType
+                try await existing.save(on: request.db)
+                request.logger.info("Updated existing liveActivityStart token for \(token.deviceName) (activity: \(activityType))")
+            } else {
+                let newPushDevice = DeviceToken(deviceName: token.deviceName,
+                                                tokenString: token.tokenString,
+                                                tokenType: token.tokenType.rawValue,
+                                                activityType: activityType)
+                try await newPushDevice.save(on: request.db)
+                request.logger.info("Created new liveActivityStart token for \(token.deviceName) (activity: \(activityType))")
             }
             return .ok
 
@@ -296,11 +320,34 @@ struct OpenAPIController: APIProtocol {
         let state = try await Fireplace.state(from: request.application.storageReader)
         return .ok(.init(body: .json(.init(state))))
     }
+
+    /// The answer to "Ist der Kamin noch an?": "Nein" switches the fireplace off, "Ja" sets the next question
+    /// `Fireplace.maxDuration` ahead. Both go through the core with origin `app`; `FireplaceTimeout` hears the change
+    /// and ends the question's Live Activity on every device.
+    func answerFireplaceQuestion(_ input: Operations.AnswerFireplaceQuestion.Input) async throws -> Operations.AnswerFireplaceQuestion.Output {
+        guard case .json(let body) = input.body else { throw Abort(.badRequest) }
+        let commandPort = request.application.commandPort
+        guard body.stillOn else {
+            _ = try await commandPort.setState(Fireplace.stateId, value: .bool(false))
+            return .ok(.init(body: .json(.init(FireplaceState.off))))
+        }
+
+        // The reads come from the database, which may lag the core by the persist delay; a fireplace switched on
+        // a moment ago therefore reads off here and "Ja" has nothing to extend.
+        let storage = request.application.storageReader
+        let fireplace = try await storage.getCurrent(Fireplace.stateId)
+        guard Fireplace.state(of: fireplace).isOn else {
+            return .ok(.init(body: .json(.init(FireplaceState.off))))
+        }
+        let next = Deadline.running(until: Date().addingTimeInterval(Fireplace.maxDuration))
+        let change = try await commandPort.setState(Fireplace.questionId, value: .text(next.text))
+        return .ok(.init(body: .json(.init(Fireplace.state(of: fireplace, question: change.item)))))
+    }
 }
 
 extension Components.Schemas.Fireplace {
     init(_ state: FireplaceState) {
-        self.init(isOn: state.isOn, since: state.since, endsAt: state.endsAt)
+        self.init(isOn: state.isOn, since: state.since, asksAt: state.asksAt, isAsking: state.isAsking, endsAt: state.endsAt)
     }
 }
 

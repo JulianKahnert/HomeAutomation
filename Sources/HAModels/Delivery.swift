@@ -15,6 +15,6 @@ public enum Delivery: Sendable {
     case push(title: String, message: String, id: String, category: String? = nil)
     /// Starts the Live Activity or updates the running one.
     case liveActivity(contentState: any Encodable & Sendable, activityName: String, options: LiveActivityOptions)
-    /// Ends every running Live Activity of this type.
-    case endLiveActivities(activityType: String)
+    /// Ends every running Live Activity of this type with `finalContentState`, which must decode as that type's content state.
+    case endLiveActivities(activityType: String, finalContentState: any Encodable & Sendable)
 }

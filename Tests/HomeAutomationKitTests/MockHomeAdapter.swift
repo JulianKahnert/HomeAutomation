@@ -179,11 +179,22 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     /// The notifications `deliver` was asked to send.
     private(set) var sentNotifications: [(title: String, message: String, id: String, category: String?)] = []
 
+    /// The Live Activity starts and updates `deliver` was asked to send.
+    private(set) var sentLiveActivities: [(contentState: any Encodable & Sendable, activityName: String, options: LiveActivityOptions)] = []
+    /// The activity types `deliver` was asked to end.
+    private(set) var endedLiveActivities: [String] = []
+
     func deliver(_ delivery: Delivery) async {
-        guard case let .push(title, message, id, category) = delivery else { return }
-        sentNotificationTitles.append(title)
-        sentNotifications.append((title, message, id, category))
-        notificationDates[id] = Date()
+        switch delivery {
+        case let .push(title, message, id, category):
+            sentNotificationTitles.append(title)
+            sentNotifications.append((title, message, id, category))
+            notificationDates[id] = Date()
+        case let .liveActivity(contentState, activityName, options):
+            sentLiveActivities.append((contentState, activityName, options))
+        case .endLiveActivities(let activityType, _):
+            endedLiveActivities.append(activityType)
+        }
     }
 
     /// When a notification with this id was last sent; a test sets it to place a push in the past.

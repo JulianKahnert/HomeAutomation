@@ -415,7 +415,7 @@ paths:
       summary: Get the state of the fireplace
       description: |
         The fireplace mode is a server-owned switch entity (`server/fireplace`), no HomeKit switch stands behind it. It is switched with `PUT /entities/state`.
-        `since` is when it went on, `endsAt` when the server switches it off (the fireplace's maximum duration, two hours, after `since`).
+        `since` is when it went on. At `asksAt` (two hours after `since`, or after the last answer "Ja") the server asks "Ist der Kamin noch an?" with a Live Activity on every device; `isAsking` is true while that question is open. Without an answer the server switches the fireplace off at `endsAt`, 30 minutes after it asked.
       operationId: getFireplace
       responses:
         "200":
@@ -424,6 +424,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Fireplace"
+
+  /heating/fireplace/answer:
+    post:
+      summary: Answer the fireplace question
+      description: |
+        The answer to "Ist der Kamin noch an?" from the Live Activity. `stillOn` false switches the fireplace off (like `PUT /entities/state`); true sets the next question two hours ahead and changes nothing while the fireplace is off. Either answer ends the question's Live Activity on every device. The change counts with origin `app`.
+      operationId: answerFireplaceQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FireplaceAnswer"
+      responses:
+        "200":
+          description: The state of the fireplace after the answer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fireplace"
+        "503":
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first.
 
 components:
   schemas:
@@ -515,7 +537,7 @@ components:
           description: The type of the push notification.
         activityType:
           type: string
-          description: Type of the activity (e.g., WindowAttributes) - only available for tokens of type "liveActivityUpdate".
+          description: Type of the activity (e.g., WindowAttributes, FireplaceAttributes) for tokens of type "liveActivityUpdate" and "liveActivityStart". A "liveActivityStart" token without it is the window's (apps before the fireplace question).
       required:
         - deviceName
         - tokenString
@@ -724,10 +746,24 @@ components:
           type: string
           format: date-time
           description: When the fireplace went on; missing while it is off.
+        asksAt:
+          type: string
+          format: date-time
+          description: When the server asks (or asked, while `isAsking`) whether the fireplace still burns; missing while it is off. Clients show this value instead of computing it.
+        isAsking:
+          type: boolean
+          description: Whether the question "Ist der Kamin noch an?" is open; missing counts as false.
         endsAt:
           type: string
           format: date-time
-          description: When the server switches it off; missing while it is off. Clients show this value instead of computing it.
+          description: When the server switches it off if nobody answers the question; missing while it is off. Clients show this value instead of computing it.
+    FireplaceAnswer:
+      type: object
+      required: [stillOn]
+      properties:
+        stillOn:
+          type: boolean
+          description: The answer to "Ist der Kamin noch an?".
     HeatingOverview:
       type: object
       required: [rooms, heatmap]

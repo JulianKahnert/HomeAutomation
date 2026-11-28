@@ -214,7 +214,7 @@ struct HeatingView: View {
     private var layout: HeatingLayout { .regular }
     #endif
 
-    /// The clock of the subtitle "endet in 2 h"; ticks only while the fireplace burns, so the charts are not
+    /// The clock of the subtitle "Rückfrage in 2 h"; ticks only while the fireplace burns, so the charts are not
     /// rebuilt every minute.
     @State private var now = Date()
 

@@ -47,7 +47,7 @@ actor RecordingNotificationSender: NotificationSender {
         events.append(.liveActivity(Update(contentState: state, options: options)))
     }
 
-    func endAllLiveActivities(ofActivityType activityType: String) async {
+    func endAllLiveActivities<ContentState: Encodable & Sendable>(ofActivityType activityType: String, finalContentState: ContentState) async {
         events.append(.end(activityType: activityType))
     }
 }

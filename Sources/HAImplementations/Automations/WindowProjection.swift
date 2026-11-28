@@ -30,10 +30,11 @@ public struct WindowProjection: Automatable {
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
         switch event {
         case .change(let item):
-            return item.entityId.characteristicType == .deadline
+            // Only window deadlines: the fireplace question is a deadline too, but no window.
+            return WindowContentState.window(of: item.entityId) != nil
         case .time(let date):
             guard Calendar.current.component(.minute, from: date) % Self.refreshMinutes == 0 else { return false }
-            return await hm.states(of: .deadline).contains { $0.deadline?.end != nil }
+            return await hm.states(of: .deadline).contains { $0.deadline?.end != nil && WindowContentState.window(of: $0.entityId) != nil }
         case .sunrise, .sunset, .serverStarted, .configDeployed:
             return false
         }
@@ -43,7 +44,7 @@ public struct WindowProjection: Automatable {
         let contentState = await hm.getWindowContentState()
         guard !contentState.windows.isEmpty else {
             log.debug("No open window left, ending the Live Activity")
-            await hm.deliver(.endLiveActivities(activityType: WindowContentState.activityTypeName))
+            await hm.deliver(.endLiveActivities(activityType: WindowContentState.activityTypeName, finalContentState: WindowContentState.empty))
             return
         }
 

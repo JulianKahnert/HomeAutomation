@@ -37,10 +37,13 @@ struct LiveActivityDependency: Sendable {
 
     /// Observe push-to-start token updates.
     /// Runs in the caller's structured concurrency context — cancellation propagates automatically.
-    var pushToStartTokenUpdates: @Sendable (_ onToken: @Sendable (PushToken) async -> Void) async -> Void
+    var pushToStartTokenUpdates: @Sendable (_ onToken: @escaping @Sendable (PushToken) async -> Void) async -> Void
 
     /// Check if Live Activities are currently running
     var hasActiveActivities: @Sendable () async -> Bool = { false }
+
+    /// Ends the fireplace question on this device at once; the server ends it on the other devices.
+    var endFireplaceQuestion: @Sendable () async -> Void
 }
 
 // MARK: - Dependency Key Implementation
@@ -58,7 +61,8 @@ extension LiveActivityDependency: TestDependencyKey {
             await onToken(mockToken)
         },
         pushToStartTokenUpdates: { _ in },
-        hasActiveActivities: { true }
+        hasActiveActivities: { true },
+        endFireplaceQuestion: { }
     )
 }
 
@@ -113,51 +117,75 @@ extension LiveActivityDependency: DependencyKey {
                 // Runs directly in the caller's structured concurrency context.
                 // cancelInFlight: true on the TCA effect cancels this entire tree.
                 await withDiscardingTaskGroup { group in
-                    for await activity in Activity<WindowAttributes>.activityUpdates {
-                        let totalActive = Activity<WindowAttributes>.activities.count
-                        logger.info("activityUpdates emitted activity: id=\(activity.id), totalActive=\(totalActive)")
-
-                        if totalActive > 1 {
-                            let allActivities = Activity<WindowAttributes>.activities
-                            for oldActivity in allActivities where oldActivity.id != activity.id {
-                                logger.info("Ending stale Live Activity: id=\(oldActivity.id)")
-                                await oldActivity.end(nil, dismissalPolicy: .immediate)
-                            }
-                        }
-
-                        group.addTask {
-                            for await tokenData in activity.pushTokenUpdates {
-                                let tokenString = tokenData.hexadecimalString
-                                logger.info("pushTokenUpdates emitted for activity \(activity.id): token=\(String(tokenString.prefix(8)))...")
-                                let token = await PushToken(
-                                    deviceName: PushToken.currentDeviceName,
-                                    tokenString: tokenString,
-                                    type: .liveActivityUpdate(activityName: WindowContentState.activityTypeName)
-                                )
-                                await onToken(token)
-                            }
-                        }
-                    }
+                    group.addTask { await observeUpdateTokens(of: WindowAttributes.self, activityName: WindowContentState.activityTypeName, onToken: onToken) }
+                    group.addTask { await observeUpdateTokens(of: FireplaceAttributes.self, activityName: FireplaceContentState.activityTypeName, onToken: onToken) }
                 }
             },
             pushToStartTokenUpdates: { onToken in
-                // Runs directly in the caller's structured concurrency context.
-                for await pushTokenData in Activity<WindowAttributes>.pushToStartTokenUpdates {
-                    let tokenString = pushTokenData.hexadecimalString
-                    logger.info("pushToStartTokenUpdates emitted: token=\(String(tokenString.prefix(8)))...")
-                    let token = await PushToken(deviceName: PushToken.currentDeviceName,
-                                                tokenString: tokenString,
-                                                type: .liveActivityStart)
-                    await onToken(token)
+                // Runs directly in the caller's structured concurrency context. Each activity type has its own token.
+                await withDiscardingTaskGroup { group in
+                    group.addTask {
+                        for await pushTokenData in Activity<WindowAttributes>.pushToStartTokenUpdates {
+                            await onToken(await startToken(pushTokenData, activityName: WindowContentState.activityTypeName))
+                        }
+                    }
+                    group.addTask {
+                        for await pushTokenData in Activity<FireplaceAttributes>.pushToStartTokenUpdates {
+                            await onToken(await startToken(pushTokenData, activityName: FireplaceContentState.activityTypeName))
+                        }
+                    }
                 }
             },
             hasActiveActivities: {
                 let count = Activity<WindowAttributes>.activities.count
                 logger.debug("hasActiveActivities: \(count) active")
                 return count > 0
+            },
+            endFireplaceQuestion: {
+                for activity in Activity<FireplaceAttributes>.activities {
+                    logger.info("Ending fireplace question", metadata: ["activityId": "\(activity.id)"])
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
             }
         )
     }()
+}
+
+/// Registers the update token of every activity of `Attributes`, the ones the server starts by push included.
+/// A newer activity ends the older ones of the same type, so one per type stays.
+private func observeUpdateTokens<Attributes: ActivityAttributes>(of type: Attributes.Type,
+                                                                activityName: String,
+                                                                onToken: @escaping @Sendable (PushToken) async -> Void) async {
+    await withDiscardingTaskGroup { group in
+        for await activity in Activity<Attributes>.activityUpdates {
+            let totalActive = Activity<Attributes>.activities.count
+            logger.info("activityUpdates emitted activity: type=\(activityName), id=\(activity.id), totalActive=\(totalActive)")
+
+            if totalActive > 1 {
+                for oldActivity in Activity<Attributes>.activities where oldActivity.id != activity.id {
+                    logger.info("Ending stale Live Activity: id=\(oldActivity.id)")
+                    await oldActivity.end(nil, dismissalPolicy: .immediate)
+                }
+            }
+
+            group.addTask {
+                for await tokenData in activity.pushTokenUpdates {
+                    let tokenString = tokenData.hexadecimalString
+                    logger.info("pushTokenUpdates emitted for activity \(activity.id): token=\(String(tokenString.prefix(8)))...")
+                    let token = await PushToken(deviceName: PushToken.currentDeviceName,
+                                                tokenString: tokenString,
+                                                type: .liveActivityUpdate(activityName: activityName))
+                    await onToken(token)
+                }
+            }
+        }
+    }
+}
+
+private func startToken(_ data: Data, activityName: String) async -> PushToken {
+    let tokenString = data.hexadecimalString
+    logger.info("pushToStartTokenUpdates emitted: type=\(activityName), token=\(String(tokenString.prefix(8)))...")
+    return await PushToken(deviceName: PushToken.currentDeviceName, tokenString: tokenString, type: .liveActivityStart(activityName: activityName))
 }
 #else
 extension LiveActivityDependency: DependencyKey {
@@ -168,7 +196,8 @@ extension LiveActivityDependency: DependencyKey {
         stopActivity: { },
         pushTokenUpdates: { _ in },
         pushToStartTokenUpdates: { _ in },
-        hasActiveActivities: { false }
+        hasActiveActivities: { false },
+        endFireplaceQuestion: { }
     )
 }
 #endif

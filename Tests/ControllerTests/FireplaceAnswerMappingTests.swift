@@ -30,6 +30,23 @@ struct FireplaceAnswerMappingTests {
         #expect(FireplaceState(answer(.case3("on"))) == .off)
     }
 
+    @Test func theServerNamesTheQuestionAndTheEnd() {
+        let body = Components.Schemas.Fireplace(isOn: true,
+                                                since: since,
+                                                asksAt: since.addingTimeInterval(60),
+                                                isAsking: true,
+                                                endsAt: since.addingTimeInterval(120))
+        let state = FireplaceState(body)
+
+        #expect(state.asksAt == since.addingTimeInterval(60))
+        #expect(state.isAsking)
+        #expect(state.endsAt == since.addingTimeInterval(120))
+    }
+
+    @Test func aServerWithoutTheQuestionIsNotAsking() {
+        #expect(!FireplaceState(Components.Schemas.Fireplace(isOn: true, since: since)).isAsking)
+    }
+
     @Test func theRequestNamesTheEntityWithAnEmptyCharacteristicsName() {
         let id = Components.Schemas.EntityId(Fireplace.stateId)
 

@@ -13,5 +13,5 @@ final class MockNotificationSender: NotificationSender, @unchecked Sendable {
 
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String, options: LiveActivityOptions) async {}
 
-    func endAllLiveActivities(ofActivityType activityType: String) async {}
+    func endAllLiveActivities<ContentState: Encodable & Sendable>(ofActivityType activityType: String, finalContentState: ContentState) async {}
 }

@@ -5,6 +5,7 @@
 //  Created by Julian Kahnert on 22.02.25.
 //
 
+import AppIntents
 import Controller
 import Shared
 import SwiftUI
@@ -34,4 +35,10 @@ struct FlowKitControllerApp: App {
             RootView()
         }
     }
+}
+
+/// The intents of the Controller module (the answers of the fireplace question) for the app's metadata: a Live
+/// Activity intent runs in the app's process.
+struct FlowKitControllerAppIntents: AppIntentsPackage {
+    static var includedPackages: [any AppIntentsPackage.Type] { [ControllerAppIntents.self] }
 }

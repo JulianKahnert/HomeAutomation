@@ -68,6 +68,9 @@ struct ServerClientDependency: Sendable {
     /// Switches the fireplace on or off; answers the state it will have
     var setFireplace: @Sendable (_ isOn: Bool) async throws -> FireplaceState
 
+    /// Answers "Ist der Kamin noch an?"; answers the state it will have
+    var answerFireplaceQuestion: @Sendable (_ stillOn: Bool) async throws -> FireplaceState
+
     /// The server's location, used for sunrise and sunset
     var getLocation: @Sendable () async throws -> Location
 }
@@ -179,6 +182,7 @@ extension ServerClientDependency: TestDependencyKey {
         },
         getFireplace: { .off },
         setFireplace: { isOn in isOn ? FireplaceState(isOn: true, since: Date()) : .off },
+        answerFireplaceQuestion: { stillOn in stillOn ? FireplaceState(isOn: true, since: Date()) : .off },
         getLocation: { Location(latitude: 52.5, longitude: 13.4) }
     )
 
@@ -262,6 +266,9 @@ extension ServerClientDependency: DependencyKey {
         },
         setFireplace: { isOn in
             try await client.setFireplace(isOn: isOn)
+        },
+        answerFireplaceQuestion: { stillOn in
+            try await client.answerFireplaceQuestion(stillOn: stillOn)
         },
         getLocation: {
             try await client.getLocation()

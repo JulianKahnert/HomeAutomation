@@ -60,8 +60,8 @@ actor DeliveryQueue: Log {
             }
         case let .liveActivity(contentState, activityName, options):
             await sender.startOrUpdateLiveActivity(contentState: contentState, activityName: activityName, options: options)
-        case .endLiveActivities(let activityType):
-            await sender.endAllLiveActivities(ofActivityType: activityType)
+        case let .endLiveActivities(activityType, finalContentState):
+            await sender.endAllLiveActivities(ofActivityType: activityType, finalContentState: finalContentState)
         }
     }
 }

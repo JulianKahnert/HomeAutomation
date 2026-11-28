@@ -7,6 +7,8 @@
 
 // swiftlint:disable type_name
 
+import AppIntents
+import Controller
 import SwiftUI
 import WidgetKit
 
@@ -14,5 +16,11 @@ import WidgetKit
 struct FlowKit_Controller_WidgetExtensionBundle: WidgetBundle {
     var body: some Widget {
         WindowOpenPushConfiguration()
+        FireplaceQuestionConfiguration()
     }
+}
+
+/// The intents of the Controller module (the answers of the fireplace question) for this extension's metadata.
+struct WidgetExtensionAppIntents: AppIntentsPackage {
+    static var includedPackages: [any AppIntentsPackage.Type] { [ControllerAppIntents.self] }
 }

@@ -113,8 +113,6 @@ actor PushNotifcationService: NotificationSender {
             let deviceMap = Dictionary(grouping: deviceTokens, by: { $0.deviceName })
             Self.logger.info("Processing \(deviceMap.count) device(s) with \(deviceTokens.count) token(s)")
             for tokens in deviceMap.values {
-                assert(tokens.count <= 2, "Found device with more than 2 tokens")
-
                 var usedToken: DeviceToken?
                 do {
                     if let updateToken = tokens.first(where: {
@@ -137,7 +135,8 @@ actor PushNotifcationService: NotificationSender {
                         Self.logger.debug("Received send live activity response: \(response)")
 
                     } else if let startToken = tokens.first(where: {
-                        $0.tokenType == "liveActivityStart"
+                        // A push-to-start token belongs to one activity type; a token of an app that did not name it is the window's.
+                        $0.tokenType == "liveActivityStart" && $0.startActivityType == activityName
                     }) {
                         Self.logger.info("Starting LiveActivity (on: \(startToken.deviceName)) with attributesType '\(activityName)': \(contentState)")
                         // alert with non-empty title/body is required for push-to-start Live Activities
@@ -219,19 +218,21 @@ actor PushNotifcationService: NotificationSender {
         }
     }
 
-    func endAllLiveActivities(ofActivityType activityType: String) async {
+    func endAllLiveActivities<ContentState: Encodable & Sendable>(ofActivityType activityType: String,
+                                                                  finalContentState: ContentState) async {
         do {
+            // Only the update tokens: the push-to-start tokens carry the activity type as well and must stay.
             let deviceTokens = try await DeviceToken
                 .query(on: database())
+                .filter(\.$tokenType == "liveActivityUpdate")
                 .filter(\.$activityType == activityType)
                 .all()
 
-            let contentState = WindowContentState.empty
-            let notification = APNSLiveActivityNotification<WindowContentState>(
+            let notification = APNSLiveActivityNotification<ContentState>(
                 expiration: .immediately,
                 priority: .immediately,
                 appID: notificationTopic,
-                contentState: contentState,
+                contentState: finalContentState,
                 event: .end,
                 timestamp: Int(Date().timeIntervalSince1970),
                 dismissalDate: .immediately)
@@ -276,6 +277,7 @@ actor PushNotifcationService: NotificationSender {
         do {
             try await DeviceToken
                 .query(on: database())
+                .filter(\.$tokenType == "liveActivityUpdate")
                 .filter(\.$activityType == activityType)
                 .delete()
         } catch {

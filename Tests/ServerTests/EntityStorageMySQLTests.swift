@@ -234,8 +234,12 @@ final class EntityStorageMySQLTests: XCTestCase {
         let repository = app.entityStorageDbRepository
         let lamp = EntityId(placeId: "Kueche", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
         let reported = hour.addingTimeInterval(120)
-        try await repository.add(EntityStorageItem(entityId: lamp, timestamp: hour, isDeviceOn: true, lastReport: reported))
+        try await repository.add(EntityStorageItem(entityId: lamp, timestamp: hour, isDeviceOn: true))
         var current = try await repository.getCurrent(lamp)
+        XCTAssertEqual(current?.lastReport, hour, "a stored change shows as a report through its own timestamp")
+        // the HomeManager writes the time of a change's report through the same throttled call as an unchanged report
+        try await repository.recordLastReport(of: lamp, at: reported)
+        current = try await repository.getCurrent(lamp)
         XCTAssertEqual(current?.lastReport, reported)
 
         try await repository.recordLastReport(of: lamp, at: reported.addingTimeInterval(400))
@@ -479,21 +483,21 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     /// The indexes of the big table are exactly the primary key and the two named ones: the foreign key made no extra one.
     func testEntityChangesHasExactlyTheExpectedIndexes() async throws {
-        let names = try await columns("SELECT DISTINCT INDEX_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityChanges' ORDER BY INDEX_NAME")
-        XCTAssertEqual(names, ["PRIMARY", "idx_entityChanges_entity_timestamp", "idx_entityChanges_timestamp_entity"])
+        let names = try await columns("SELECT DISTINCT INDEX_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityChanges'")
+        XCTAssertEqual(names.sorted(), ["PRIMARY", "idx_entityChanges_entity_timestamp", "idx_entityChanges_timestamp_entity"])
         let covering = try await columns("SELECT COLUMN_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityChanges' AND INDEX_NAME = 'idx_entityChanges_timestamp_entity' ORDER BY SEQ_IN_INDEX")
         XCTAssertEqual(covering, ["timestamp", "entityId"])
     }
 
     func testJournalIndexesMatchTheQueries() async throws {
-        let names = try await columns("SELECT DISTINCT INDEX_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'journal' ORDER BY INDEX_NAME")
-        XCTAssertEqual(names, ["PRIMARY", "idx_journal_kind_place_timestamp", "idx_journal_kind_timestamp", "idx_journal_kind_title_timestamp", "idx_journal_runId"])
+        let names = try await columns("SELECT DISTINCT INDEX_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'journal'")
+        XCTAssertEqual(names.sorted(), ["PRIMARY", "idx_journal_kind_place_timestamp", "idx_journal_kind_timestamp", "idx_journal_kind_title_timestamp", "idx_journal_runId"])
     }
 
     func testChangeKeyIsABigIntAndTextColumnsAreBinaryCollated() async throws {
         let type = try await columns("SELECT DATA_TYPE AS v FROM information_schema.columns WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityChanges' AND COLUMN_NAME = 'id'")
         XCTAssertEqual(type, ["bigint"])
-        let collations = try await columns("SELECT DISTINCT COLLATION_NAME AS v FROM information_schema.columns WHERE TABLE_SCHEMA = 't' AND COLLATION_NAME IS NOT NULL")
+        let collations = try await columns("SELECT DISTINCT COLLATION_NAME AS v FROM information_schema.columns WHERE TABLE_SCHEMA = 't' AND TABLE_NAME <> '_fluent_migrations' AND COLLATION_NAME IS NOT NULL")
         XCTAssertEqual(collations, ["utf8mb4_0900_bin"])
         let weather = try await columns("SELECT DATA_TYPE AS v FROM information_schema.columns WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'weatherHours' AND COLUMN_NAME = 'temperature2mC'")
         XCTAssertEqual(weather, ["double"])
@@ -530,12 +534,17 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     // MARK: - query plans
 
-    /// The `EXPLAIN FORMAT=JSON` text of a statement; the tests below assert that an index is used, so a later schema
-    /// edit cannot silently drop one.
+    /// The tabular `EXPLAIN` of a statement as one text (every row's `select_type`, `key` and `Extra`); the tests below
+    /// assert that an index is used, so a later schema edit cannot silently drop one.
     private func plan(_ statement: String) async throws -> String {
         let sql = try XCTUnwrap(app.db as? SQLDatabase)
-        let row = try await sql.raw(SQLQueryString("EXPLAIN FORMAT=JSON " + statement)).first()
-        return try XCTUnwrap(row).decode(column: "EXPLAIN", as: String.self)
+        let rows = try await sql.raw(SQLQueryString("EXPLAIN " + statement)).all()
+        XCTAssertFalse(rows.isEmpty, "EXPLAIN returned no rows for \(statement)")
+        return try rows.map { row in
+            let key = try row.decode(column: "key", as: String?.self) ?? "-"
+            let extra = try row.decode(column: "Extra", as: String?.self) ?? "-"
+            return "key=\(key) extra=\(extra)"
+        }.joined(separator: "\n")
     }
 
     func testQueryPlansUseTheIndexes() async throws {

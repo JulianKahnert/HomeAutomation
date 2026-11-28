@@ -8,7 +8,7 @@
 import Foundation
 import Shared
 
-open class MotionSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
+open class MotionSensorDevice: Codable, @unchecked Sendable, Log {
 
     public let motionSensorId: EntityId
     public let lightSensorId: EntityId?
@@ -31,17 +31,4 @@ open class MotionSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
         return try item.illuminance.get(with: log)
     }
 
-    public func validate(with hm: any EntityValidator) async throws {
-        try await hm.findEntity(motionSensorId)
-        if let lightSensorId {
-            try await hm.findEntity(lightSensorId)
-        }
-        if let batterySensorId {
-            do {
-                try await hm.findEntity(batterySensorId)
-            } catch {
-                log.warning("Failed to get battery sensor for \(batterySensorId)")
-            }
-        }
-    }
 }

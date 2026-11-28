@@ -231,6 +231,15 @@ public func configure(_ app: Application) async throws {
     // Resolve the adapter proxy once; HomeManager only gets it while the connection is up.
     let adapterProxy = try HomeKitCommandReceiver.resolve(id: .homeKitCommandReceiver, using: actorSystem)
 
+    // The HomeKit inventory is pulled from the adapter after each connect and once a day.
+    let inventorySync = HomekitInventorySync(fetch: { [adapterProxy] in
+        actorSystem.isConnected ? try await adapterProxy.homeKitInventory() : nil
+    }, store: { [repository = app.homekitInventoryRepository] inventory, syncedAt in
+        try await repository.replace(with: inventory, syncedAt: syncedAt)
+    })
+    let inventoryTask = Task { await inventorySync.run(handshakes: actorSystem.makeHandshakeCompletedStream()) }
+    app.lifecycle.use(CancelOnShutdown(task: inventoryTask))
+
     // MARK: - home automation setup
 
     let loadedConfig = await HomeAutomationConfigService.load(from: { app.db })
@@ -250,7 +259,7 @@ public func configure(_ app: Application) async throws {
     },
                                         storageRepo: app.entityStorageDbRepository,
                                         notificationSender: notificationSender,
-                                        location: app.homeAutomationConfigService.location,
+                                        location: location,
                                         journal: journal,
                                         storageUpkeep: DatabaseStorageUpkeep(entities: app.entityStorageDbRepository,
                                                                              journal: journal,
@@ -263,12 +272,24 @@ public func configure(_ app: Application) async throws {
     await homeManager.loadCurrentStates(timeout: .seconds(10))
     // Runs still marked `running` belong to a previous server process that died mid-run.
     try await app.journalRepository.markRunningAsInterrupted()
+    let builtIns: [any Automatable] = [DatabaseCleanup(), WindowProjection()]
     let automationService = try AutomationService(using: homeManager,
                                                   runs: app.journalRepository,
                                                   automations: loadedConfig.automations,
-                                                  builtIns: [DatabaseCleanup(), WindowProjection()],
+                                                  builtIns: builtIns,
                                                   repository: app.homeAutomationConfigService)
     app.automationService = automationService
+    // The read side (`GET /config`, `/config/automations`) shows the stored row: store the built-ins once when it lacks
+    // them, so the app sees and can deactivate them before the first deploy. Not after a failed load, which would
+    // overwrite a config that is only unreadable for now.
+    let storedNames = Set(loadedConfig.automations.map(\.name))
+    if loadedConfig.isReadable, !builtIns.allSatisfy({ storedNames.contains($0.name) }) {
+        do {
+            try await automationService.save()
+        } catch {
+            app.logger.error("Failed to store the built-in automations: \(error)")
+        }
+    }
 
     // MARK: - register jobs
 

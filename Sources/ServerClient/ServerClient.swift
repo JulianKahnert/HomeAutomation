@@ -80,17 +80,29 @@ public struct ServerClient {
 
     public func activate(automation name: String) async throws {
         let response = try await client.activateAutomation(path: .init(name: name))
-        _ = try response.ok
+        switch response {
+        case .ok: return
+        case .serviceUnavailable: throw ServerClientError.busy
+        case .undocumented(let status, _): throw ServerClientError(undocumentedStatus: status)
+        }
     }
 
     public func deactivate(automation name: String) async throws {
         let response = try await client.deactivateAutomation(path: .init(name: name))
-        _ = try response.ok
+        switch response {
+        case .ok: return
+        case .serviceUnavailable: throw ServerClientError.busy
+        case .undocumented(let status, _): throw ServerClientError(undocumentedStatus: status)
+        }
     }
 
     public func stop(automation name: String) async throws {
         let response = try await client.stopAutomation(path: .init(name: name))
-        _ = try response.ok
+        switch response {
+        case .ok: return
+        case .serviceUnavailable: throw ServerClientError.busy
+        case .undocumented(let status, _): throw ServerClientError(undocumentedStatus: status)
+        }
     }
 
     public func register(token: PushToken) async throws {
@@ -184,8 +196,10 @@ public struct ServerClient {
     /// have. Asking for the state it already has changes nothing.
     public func setFireplace(isOn: Bool) async throws -> FireplaceState {
         let entityId = Components.Schemas.EntityId(Fireplace.stateId)
-        let answer = try await client.setEntityState(body: .json(.init(entityId: entityId, value: .init(.bool(isOn))))).ok.body.json
-        return FireplaceState(answer)
+        let response = try await client.setEntityState(body: .json(.init(entityId: entityId, value: .init(.bool(isOn)))))
+        if case .serviceUnavailable = response { throw ServerClientError.busy }
+        if case .undocumented(let status, _) = response { throw ServerClientError(undocumentedStatus: status) }
+        return FireplaceState(try response.ok.body.json)
     }
 
     /// The time grid of a heating room (glossary: actual, plan target, Δ). Throws when the server answers

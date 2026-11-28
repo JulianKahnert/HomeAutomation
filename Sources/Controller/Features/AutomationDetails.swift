@@ -8,6 +8,7 @@
 import ComposableArchitecture
 import Foundation
 import HAModels
+import ServerClient
 import Sharing
 import SwiftUI
 
@@ -33,22 +34,36 @@ struct AutomationDetails: Sendable {
     }
 
     enum Action: Sendable {
+        case automationsResponse(Result<[AutomationInfo], Error>)
         case historiesResponse(Result<[EntityHistory], Error>)
         case locationResponse(Result<Location, Error>)
         case runsResponse(Result<[AutomationRun], Error>)
         case task
         case stopAutomation
         case updateIsActive(Bool)
-        case isActiveOperationResponse(Result<Bool, Error>)
+        case isActiveOperationResponse(requested: Bool, Result<Void, Error>)
         case stopOperationResponse(Result<Void, Error>)
     }
 
+    @Dependency(\.continuousClock) var clock
     @Dependency(\.date.now) var now
     @Dependency(\.serverClient) var serverClient
+
+    private enum CancelID { case reload }
 
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case let .automationsResponse(.success(automations)):
+                if let reloaded = automations.first(where: { $0.name == state.automation.name }) {
+                    state.$automation.withLock { $0 = reloaded }
+                }
+                return .none
+
+            case .automationsResponse(.failure):
+                // The next visit shows what the server has; nothing to tell the user about a courtesy reload.
+                return .none
+
             case let .historiesResponse(.success(histories)):
                 state.histories = histories
                 return .none
@@ -70,15 +85,8 @@ struct AutomationDetails: Sendable {
                 return .none
 
             case .task:
-                state.end = now
-                return .merge(
-                    state.automation.recordsRuns ? .run { [name = state.automation.name, start = state.start] send in
-                        await send(.runsResponse(Result {
-                            try await serverClient.getRuns(name, start, nil, nil)
-                        }))
-                    } : .none,
-                    state.isMotionAtNight ? loadDebugChart(state) : .none
-                )
+                return load(&state)
+
             case .stopAutomation:
                 state.error = nil
                 state.isLoading = true
@@ -93,38 +101,71 @@ struct AutomationDetails: Sendable {
                 state.isLoading = true
                 return .run { [name = state.automation.name] send in
                     await send(.isActiveOperationResponse(
+                        requested: isActive,
                         Result {
                             if isActive {
                                 try await serverClient.activate(name)
                             } else {
                                 try await serverClient.deactivate(name)
                             }
-                            return isActive
                         }
                     ))
                 }
 
-            case .isActiveOperationResponse(.success(let isActive)):
-                state.$automation.withLock { $0.isActive = isActive }
+            case let .isActiveOperationResponse(requested, .success):
+                state.$automation.withLock { $0.isActive = requested }
                 state.isLoading = false
                 return .none
 
-            case let .isActiveOperationResponse(.failure(error)):
+            case let .isActiveOperationResponse(requested, .failure(error)) where error as? ServerClientError == .busy:
+                // Queued, not refused: keep what the user asked for.
                 state.isLoading = false
-                state.error = "Failed to load automations: \(error.localizedDescription)"
+                state.$automation.withLock { $0.isActive = requested }
+                return reloadLater()
+
+            case let .isActiveOperationResponse(_, .failure(error)):
+                state.isLoading = false
+                state.error = "Failed to change \(state.automation.name): \(error.localizedDescription)"
                 return .none
 
             case .stopOperationResponse(.success):
                 state.isLoading = false
                 state.$automation.withLock { $0.isRunning = false }
-                return .send(.task)
+                return load(&state)
+
+            case let .stopOperationResponse(.failure(error)) where error as? ServerClientError == .busy:
+                // Queued, not refused: the reload shows whether the automation has stopped.
+                state.isLoading = false
+                return reloadLater()
 
             case let .stopOperationResponse(.failure(error)):
                 state.isLoading = false
-                state.error = "Failed to load automations: \(error.localizedDescription)"
+                state.error = "Failed to stop \(state.automation.name): \(error.localizedDescription)"
                 return .none
             }
         }
+    }
+
+    /// The runs and, for `MotionAtNight`, the debug chart of the last 24 hours.
+    private func load(_ state: inout State) -> Effect<Action> {
+        state.end = now
+        return .merge(
+            state.automation.recordsRuns ? .run { [name = state.automation.name, start = state.start] send in
+                await send(.runsResponse(Result {
+                    try await serverClient.getRuns(name, start, nil, nil)
+                }))
+            } : .none,
+            state.isMotionAtNight ? loadDebugChart(state) : .none
+        )
+    }
+
+    /// Asks the server for the automation again after a short delay, e.g. when it queued a change.
+    private func reloadLater() -> Effect<Action> {
+        .run { send in
+            try await clock.sleep(for: .seconds(5))
+            await send(.automationsResponse(Result { try await serverClient.getAutomations() }))
+        }
+        .cancellable(id: CancelID.reload, cancelInFlight: true)
     }
 
     /// One room-history request per room the automation's devices are in.

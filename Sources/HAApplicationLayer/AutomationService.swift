@@ -60,7 +60,7 @@ public actor AutomationService {
 
     /// Stores the current automations. The snapshot is taken and the tail is set in the same synchronous section,
     /// so the saves leave in the order the changes were made, however the callers' tasks are scheduled.
-    private func save(location: Location? = nil) async throws {
+    private func startSave(location: Location? = nil) -> Task<Void, any Error> {
         let snapshot = automations
         let previous = saveTail
         let task = Task { [repository] in
@@ -68,12 +68,18 @@ public actor AutomationService {
             try await repository.save(snapshot, location: location)
         }
         saveTail = task
-        try await task.value
+        return task
     }
 
     /// Replaces the deployed automations and stores them, with the config's location in the same snapshot.
     /// An automation that was deployed before keeps its active state.
     public func deploy(_ newAutomations: [any Automatable], location: Location? = nil) async throws {
+        try await startDeploy(newAutomations, location: location).value
+    }
+
+    /// Like ``deploy(_:location:)``, but returns as soon as the automations are swapped in memory. The returned task
+    /// ends with the save; the saves of earlier changes go first. The event loop uses it so that a slow database never holds it.
+    public func startDeploy(_ newAutomations: [any Automatable], location: Location? = nil) -> Task<Void, any Error> {
         let previous = automations
         automations = Self.adding(builtIns, to: newAutomations).map { automation in
             var automation = automation
@@ -82,7 +88,7 @@ public actor AutomationService {
             }
             return automation
         }
-        try await save(location: location)
+        return startSave(location: location)
     }
 
     private static func adding(_ builtIns: [any Automatable], to automations: [any Automatable]) -> [any Automatable] {
@@ -90,6 +96,12 @@ public actor AutomationService {
     }
 
     public func setAutomationActive(with name: String, to value: Bool) async throws {
+        try await startSettingActive(with: name, to: value).value
+    }
+
+    /// Like ``setAutomationActive(with:to:)``, but returns as soon as the state is set in memory; the returned task ends
+    /// with the save.
+    public func startSettingActive(with name: String, to value: Bool) -> Task<Void, any Error> {
         automations = automations.map { automation in
             var automation = automation
             if automation.name == name {
@@ -97,7 +109,12 @@ public actor AutomationService {
             }
             return automation
         }
-        try await save()
+        return startSave()
+    }
+
+    /// Stores the current automations (and the location, when given) and waits for it.
+    public func save(location: Location? = nil) async throws {
+        try await startSave(location: location).value
     }
 
     /// Hands the event to the lane of every active automation and returns without waiting for any `shouldTrigger`.
@@ -204,13 +221,6 @@ public actor AutomationService {
         } catch {
             self.log.error("Automation shouldTrigger failed", metadata: ["automation": "\(automation.name)", "error": "\(error)"])
         }
-    }
-
-    public func getActiveAutomationNames() async -> Set<String> {
-        let keys = Array(runningTasks.keys)
-
-        log.debug("Found currently active automations", metadata: ["automations": "\(keys)"])
-        return Set(keys)
     }
 
     public func stopAutomation(with name: String) async {

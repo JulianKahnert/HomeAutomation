@@ -40,6 +40,8 @@ paths:
       responses:
         "200":
           description: The automation was activated.
+        "503":
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /config/automations/{name}/deactivate:
     post:
@@ -56,6 +58,8 @@ paths:
       responses:
         "200":
           description: The automation was deactivated.
+        "503":
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /config/automations/{name}/stop:
     post:
@@ -72,6 +76,8 @@ paths:
       responses:
         "200":
           description: The currently running automation was stopped or the automation is not running.
+        "503":
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /config/automations/{name}/runs:
     get:
@@ -214,7 +220,7 @@ paths:
       description: |
         The one general route for the app to set a state the server owns (placeId `server`). Whether the app may
         set a state is decided per value kind: a switch, a heating mode and a target temperature may be set. Any
-        other kind, and any entity that is not server-owned, is refused and stays unchanged. The state holds at once: the answer and every later read show it. Asking for the value the
+        other kind, and any entity that is not server-owned, is refused and stays unchanged. The answer holds the new state; reads (which come from the database) follow it within the persist delay. Asking for the value the
         entity already has changes nothing (`changed` is false). The change counts with origin `app`.
       operationId: setEntityState
       requestBody:
@@ -234,6 +240,8 @@ paths:
           description: The value does not fit the value kind of the entity.
         "403":
           description: The entity is not server-owned or its value kind is not settable from the app.
+        "503":
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /entities/history:
     get:
@@ -430,7 +438,7 @@ components:
           description: Indicates if the automation is active.
         isRunning:
           type: boolean
-          description: Indicates if the automation is currently running.
+          description: Whether the newest recorded run of the automation has not ended yet. Always false for an automation that does not record runs (`recordsRuns` false).
         type:
           type: string
           description: Type name of the automation, e.g. MotionAtNight.
@@ -634,7 +642,7 @@ components:
         lastReport:
           type: string
           format: date-time
-          description: When the entity last reported, a replay included, next to `timestamp`, the time of the last change. Only on the newest item of a history and only while the server holds it in memory; absent after a restart until the first report.
+          description: When the entity last reported, a replay included, next to `timestamp`, the time of the last change. Only on the newest item of a history. Stored per entity, written at most every five minutes, so it can lag by that much; a stored change counts as a report through its own timestamp. Absent until the entity has reported once after the column exists.
       required:
         - timestamp
 

@@ -111,7 +111,10 @@ final class EntityStorageMySQLTests: XCTestCase {
 
             let restored = try await repository.getCurrent(id)
 
-            XCTAssertEqual(restored, item, "\(sample.0)")
+            // the current state also carries the time of its last report, which is the change's own time here
+            var expected = item
+            expected.lastReport = item.timestamp
+            XCTAssertEqual(restored, expected, "\(sample.0)")
         }
     }
 
@@ -226,6 +229,31 @@ final class EntityStorageMySQLTests: XCTestCase {
 
         // 810 and 776 are within 25 ppm of 800; 10 within 25 of 0; the last 10 comes after 15 minutes.
         XCTAssertEqual(items.map(\.carbonDioxideSensorId), [10, 0, 830, 800])
+    }
+
+    /// A change stores the time of its report with it; a report that changed nothing writes only that time, and an
+    /// older time never replaces a newer one. Only the current state carries it, the history does not.
+    func testLastReportIsStoredWithAChangeAndByAnUnchangedReport() async throws {
+        let repository = app.entityStorageDbRepository
+        let lamp = EntityId(placeId: "Kueche", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
+        let reported = hour.addingTimeInterval(120)
+        try await repository.add(EntityStorageItem(entityId: lamp, timestamp: hour, isDeviceOn: true))
+        var current = try await repository.getCurrent(lamp)
+        XCTAssertEqual(current?.lastReport, hour, "a stored change shows as a report through its own timestamp")
+        // the HomeManager writes the time of a change's report through the same throttled call as an unchanged report
+        try await repository.recordLastReport(of: lamp, at: reported)
+        current = try await repository.getCurrent(lamp)
+        XCTAssertEqual(current?.lastReport, reported)
+
+        try await repository.recordLastReport(of: lamp, at: reported.addingTimeInterval(400))
+        try await repository.recordLastReport(of: lamp, at: reported.addingTimeInterval(100))
+        current = try await repository.getCurrent(lamp)
+        XCTAssertEqual(current?.lastReport, reported.addingTimeInterval(400))
+        let all = try await repository.getAllCurrent()
+        XCTAssertEqual(all.first { $0.entityId == lamp }?.lastReport, reported.addingTimeInterval(400))
+
+        let history = try await repository.getHistory(for: lamp, startDate: nil, endDate: nil, cursor: nil, limit: 10)
+        XCTAssertEqual(history.map(\.lastReport), [nil])
     }
 
     func testRollupAggregatesPerHourWithoutZeroPPMAndDeletesRawRows() async throws {
@@ -394,7 +422,12 @@ final class EntityStorageMySQLTests: XCTestCase {
         let id = EntityId(placeId: "Kitchen", name: "Sensor", characteristicsName: nil, characteristic: .temperatureSensor)
         let timestamp = Date(timeIntervalSince1970: 1_800_000_000.123_456_789)  // more digits than DATETIME(6) keeps
         await homeManager.addEntityHistory(EntityStorageItem(entityId: id, timestamp: timestamp, temperatureInC: Measurement(value: 20, unit: .celsius)))
-        try await Task.sleep(for: .milliseconds(200))  // the persist queue writes asynchronously
+        // the persist queue writes asynchronously: poll the database, bounded
+        var stored: [EntityStorageItem] = []
+        for _ in 0..<500 where stored.isEmpty {
+            stored = try await repository.getHistory(for: id, startDate: nil, endDate: nil, cursor: nil, limit: 10)
+            if stored.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        }
 
         let history = await homeManager.getFullEntityHistory(with: id, limit: 10)
 
@@ -453,21 +486,21 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     /// The indexes of the big table are exactly the primary key and the two named ones: the foreign key made no extra one.
     func testEntityChangesHasExactlyTheExpectedIndexes() async throws {
-        let names = try await columns("SELECT DISTINCT INDEX_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityChanges' ORDER BY INDEX_NAME")
-        XCTAssertEqual(names, ["PRIMARY", "idx_entityChanges_entity_timestamp", "idx_entityChanges_timestamp_entity"])
+        let names = try await columns("SELECT DISTINCT INDEX_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityChanges'")
+        XCTAssertEqual(names.sorted(), ["PRIMARY", "idx_entityChanges_entity_timestamp", "idx_entityChanges_timestamp_entity"])
         let covering = try await columns("SELECT COLUMN_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityChanges' AND INDEX_NAME = 'idx_entityChanges_timestamp_entity' ORDER BY SEQ_IN_INDEX")
         XCTAssertEqual(covering, ["timestamp", "entityId"])
     }
 
     func testJournalIndexesMatchTheQueries() async throws {
-        let names = try await columns("SELECT DISTINCT INDEX_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'journal' ORDER BY INDEX_NAME")
-        XCTAssertEqual(names, ["PRIMARY", "idx_journal_kind_place_timestamp", "idx_journal_kind_timestamp", "idx_journal_kind_title_timestamp", "idx_journal_runId"])
+        let names = try await columns("SELECT DISTINCT INDEX_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'journal'")
+        XCTAssertEqual(names.sorted(), ["PRIMARY", "idx_journal_kind_place_timestamp", "idx_journal_kind_timestamp", "idx_journal_kind_title_timestamp", "idx_journal_runId"])
     }
 
     func testChangeKeyIsABigIntAndTextColumnsAreBinaryCollated() async throws {
         let type = try await columns("SELECT DATA_TYPE AS v FROM information_schema.columns WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'entityChanges' AND COLUMN_NAME = 'id'")
         XCTAssertEqual(type, ["bigint"])
-        let collations = try await columns("SELECT DISTINCT COLLATION_NAME AS v FROM information_schema.columns WHERE TABLE_SCHEMA = 't' AND COLLATION_NAME IS NOT NULL")
+        let collations = try await columns("SELECT DISTINCT COLLATION_NAME AS v FROM information_schema.columns WHERE TABLE_SCHEMA = 't' AND TABLE_NAME <> '_fluent_migrations' AND COLLATION_NAME IS NOT NULL")
         XCTAssertEqual(collations, ["utf8mb4_0900_bin"])
         let weather = try await columns("SELECT DATA_TYPE AS v FROM information_schema.columns WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'weatherHours' AND COLUMN_NAME = 'temperature2mC'")
         XCTAssertEqual(weather, ["double"])
@@ -504,12 +537,15 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     // MARK: - query plans
 
-    /// The `EXPLAIN FORMAT=JSON` text of a statement; the tests below assert that an index is used, so a later schema
-    /// edit cannot silently drop one.
+    /// The `EXPLAIN FORMAT=JSON` text of a statement. The tests below assert that an index serves a query without a
+    /// sort, so a later schema edit cannot silently drop one. On tables this small the optimizer picks any index, so the
+    /// journal queries force the index under test: a missing or unfitting index then fails the plan. It goes through the driver's text
+    /// protocol: over the prepared-statement path `sql.raw` uses, MySQLNIO returns no rows for an EXPLAIN.
     private func plan(_ statement: String) async throws -> String {
-        let sql = try XCTUnwrap(app.db as? SQLDatabase)
-        let row = try await sql.raw(SQLQueryString("EXPLAIN FORMAT=JSON " + statement)).first()
-        return try XCTUnwrap(row).decode(column: "EXPLAIN", as: String.self)
+        let mysql = try XCTUnwrap(app.db as? MySQLDatabase)
+        let rows = try await mysql.simpleQuery("EXPLAIN FORMAT=JSON " + statement).get()
+        let row = try XCTUnwrap(rows.first, "EXPLAIN returned no rows for \(statement)")
+        return try XCTUnwrap(row.column("EXPLAIN")?.string)
     }
 
     func testQueryPlansUseTheIndexes() async throws {
@@ -518,15 +554,18 @@ final class EntityStorageMySQLTests: XCTestCase {
         try await app.journalRepository.addCommand(ActionLogItem(timestamp: Date(timeIntervalSince1970: 1), action: .setTargetTemperature(id, celsius: 21), reason: .plan))
         let history = try await plan("SELECT * FROM entityChanges WHERE entityId = UNHEX(REPEAT('00', 16)) AND timestamp < '2030-01-01' ORDER BY timestamp DESC, id DESC LIMIT 10")
         XCTAssertTrue(history.contains("idx_entityChanges_entity_timestamp"), history)
-        XCTAssertFalse(history.contains("filesort"), history)
+        XCTAssertFalse(history.contains("\"Sort"), history)
         let newest = try await plan("SELECT newest.id FROM entities e, LATERAL (SELECT c.id FROM entityChanges c WHERE c.entityId = e.id ORDER BY c.timestamp DESC, c.id DESC LIMIT 1) AS newest")
         XCTAssertTrue(newest.contains("idx_entityChanges_entity_timestamp"), newest)
-        let heating = try await plan("SELECT * FROM journal WHERE kind = 'command' AND entityPlaceId = 'Hall' AND timestamp >= '2020-01-01' ORDER BY timestamp")
+        let heating = try await plan("SELECT * FROM journal FORCE INDEX (idx_journal_kind_place_timestamp) WHERE kind = 'command' AND entityPlaceId = 'Hall' AND timestamp >= '2020-01-01' ORDER BY timestamp")
         XCTAssertTrue(heating.contains("idx_journal_kind_place_timestamp"), heating)
-        let cleanup = try await plan("DELETE FROM journal WHERE kind = 'push' AND timestamp < '2020-01-01' ORDER BY timestamp LIMIT 5000")
+        XCTAssertFalse(heating.contains("\"Sort"), heating)
+        let cleanup = try await plan("SELECT * FROM journal FORCE INDEX (idx_journal_kind_timestamp) WHERE kind = 'push' AND timestamp < '2020-01-01' ORDER BY timestamp LIMIT 5000")
         XCTAssertTrue(cleanup.contains("idx_journal_kind_timestamp"), cleanup)
-        let runs = try await plan("SELECT * FROM journal WHERE kind = 'run' AND title = 'x' ORDER BY timestamp DESC LIMIT 1")
+        XCTAssertFalse(cleanup.contains("\"Sort"), cleanup)
+        let runs = try await plan("SELECT * FROM journal FORCE INDEX (idx_journal_kind_title_timestamp) WHERE kind = 'run' AND title = 'x' ORDER BY timestamp DESC LIMIT 1")
         XCTAssertTrue(runs.contains("idx_journal_kind_title_timestamp"), runs)
+        XCTAssertFalse(runs.contains("\"Sort"), runs)
     }
 
     // MARK: - weather

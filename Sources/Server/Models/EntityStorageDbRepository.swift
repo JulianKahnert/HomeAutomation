@@ -29,6 +29,16 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
     /// The newest change per entity, with the tiebreak of `getCurrent`. An entity of an unknown
     /// characteristic type is skipped.
     func getAllCurrent() async throws -> [EntityStorageItem] {
+        try await newestChanges(ofType: nil)
+    }
+
+    /// Like `getAllCurrent`, for the entities of one characteristic type only.
+    func getAllCurrent(of type: CharacteristicsType) async throws -> [EntityStorageItem] {
+        try await newestChanges(ofType: type)
+    }
+
+    private func newestChanges(ofType type: CharacteristicsType?) async throws -> [EntityStorageItem] {
+        let typeFilter: SQLQueryString = type.map { "WHERE e.\(ident: "characteristicType") = \(bind: $0.rawValue)" } ?? ""
         // One backward dive into `idx_entityChanges_entity_timestamp` per directory entry (the index carries the
         // primary key), instead of a window over the whole table.
         let rows = try await sqlDatabase().raw("""
@@ -38,6 +48,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
                      WHERE c.\(ident: "entityId") = e.\(ident: "id")
                      ORDER BY c.\(ident: "timestamp") DESC, c.\(ident: "id") DESC
                      LIMIT 1) AS newest
+            \(typeFilter)
             """)
             .all()
         let ids = try rows.map { try $0.decode(column: "id", as: Int.self) }
@@ -49,7 +60,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
                 .filter(\.$id ~~ chunk)
                 .with(\.$entity)
                 .all()
-            items += changes.compactMap { EntityStorageItem(entity: $0.entity, change: $0) }
+            items += changes.compactMap { EntityStorageItem(entity: $0.entity, change: $0, withLastReport: true) }
         }
         return items
     }
@@ -65,7 +76,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
             .sort(\.$id, .descending)
             .limit(limit)
             .all()
-            .compactMap { EntityStorageItem(entity: entity, change: $0) }
+            .compactMap { EntityStorageItem(entity: entity, change: $0, withLastReport: true) }
     }
 
     private func findEntity(_ entityId: EntityId) async throws -> EntityDbItem? {
@@ -110,6 +121,20 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
         if item.entityId.characteristicType.isHeatingRelated {
             log.debug("Stored heating entity item", metadata: ["entityId": "\(item.entityId)", "value": "\(value)"])
         }
+    }
+
+    /// One conditional UPDATE: the time only moves forward.
+    func recordLastReport(of entityId: EntityId, at date: Date) async throws {
+        try await EntityDbItem.query(on: database())
+            .filter(\.$placeId == entityId.placeId)
+            .filter(\.$serviceName == entityId.name)
+            .filter(\.$characteristicType == entityId.characteristicType.rawValue)
+            .group(.or) { group in
+                group.filter(\.$lastReport == nil)
+                group.filter(\.$lastReport < date)
+            }
+            .set(\.$lastReport, to: date)
+            .update()
     }
 
     /// Whether the value moved out of its type's write dead band (the descriptor's storage rule) around the last
@@ -217,20 +242,9 @@ extension EntityStorageDbRepository: EntityRetentionStore {
     func deleteEntries(ofType type: CharacteristicsType, olderThan date: Date) async throws {
         let sql = try sqlDatabase()
         for entityKey in try await entityKeys(ofType: type) {
-            while true {
-                try await sql.raw("""
-                    DELETE FROM \(ident: EntityChangeDbItem.schema)
-                    WHERE \(ident: "entityId") = \(bind: entityKey) AND \(ident: "timestamp") < \(bind: date)
-                    ORDER BY \(ident: "timestamp") LIMIT \(literal: Self.deleteBatchSize)
-                    """)
-                    .run()
-                let left = try await sql.raw("""
-                    SELECT 1 AS \(ident: "found") FROM \(ident: EntityChangeDbItem.schema)
-                    WHERE \(ident: "entityId") = \(bind: entityKey) AND \(ident: "timestamp") < \(bind: date) LIMIT 1
-                    """)
-                    .first()
-                if left == nil { break }
-            }
+            try await sql.deleteInBatches(from: EntityChangeDbItem.schema,
+                                          where: "\(ident: "entityId") = \(bind: entityKey) AND \(ident: "timestamp") < \(bind: date)",
+                                          batchSize: Self.deleteBatchSize)
         }
     }
 
@@ -244,6 +258,7 @@ extension EntityStorageDbRepository: EntityRetentionStore {
                 .filter(\.$timestamp < date)
                 .sort(\.$timestamp, .ascending)
                 .first()?.timestamp {
+                try Task.checkCancellation()
                 let from = Date(timeIntervalSince1970: (oldest.timeIntervalSince1970 / 3600).rounded(.down) * 3600)
                 let to = min(from.addingTimeInterval(Self.rollupSpan), date)
                 try await database().transaction { database in

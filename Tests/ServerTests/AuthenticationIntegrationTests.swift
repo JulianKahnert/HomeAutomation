@@ -6,6 +6,7 @@
 //
 //  Integration tests for authentication with the full app configuration
 
+import HAApplicationLayer
 @testable import HAImplementations
 @testable import HAModels
 @testable import Server
@@ -14,6 +15,7 @@ import XCTVapor
 
 final class AuthenticationIntegrationTests: XCTestCase {
     var app: Application!
+    private var loop: Task<Void, Never>!
 
     override func setUp() async throws {
         app = try await Application.make(.testing)
@@ -29,6 +31,9 @@ final class AuthenticationIntegrationTests: XCTestCase {
         let mockLocation = Location(latitude: 52.52, longitude: 13.405)
         app.homeAutomationConfigService = HomeAutomationConfigService(location: mockLocation, persist: { _ in })
         app.automationService = try await makeAutomationService(automations: [])
+        app.configReader = StoredConfig(config: ConfigDTO(location: mockLocation, automations: []))
+        app.homeManager = await HomeManager(getAdapter: { nil }, storageRepo: MemoryStorage(), notificationSender: SilentSender(), location: mockLocation)
+        loop = app.startEventLoop()
 
         // The WebSocket route registration needs an actor system present
         app.starActorSystem = StarActorSystem(name: "server-tests")
@@ -38,6 +43,7 @@ final class AuthenticationIntegrationTests: XCTestCase {
     }
 
     override func tearDown() async throws {
+        loop.cancel()
         try await app.asyncShutdown()
         app = nil
     }
@@ -163,6 +169,7 @@ final class AuthenticationIntegrationTests: XCTestCase {
         testApp.starActorSystem = StarActorSystem(name: "server-tests")
         testApp.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405), persist: { _ in })
         testApp.automationService = try await makeAutomationService(automations: [])
+        testApp.configReader = StoredConfig(config: ConfigDTO(location: Location(latitude: 52.52, longitude: 13.405), automations: []))
         try routes(testApp)
 
         // Should work without token when auth is disabled
@@ -235,11 +242,22 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
     // MARK: - Config deploy hook
 
-    func testPostingAConfigYieldsAConfigDeployedEvent() async throws {
-        let (stream, continuation) = AsyncStream.makeStream(of: HomeEvent.self)
+    func testPostingAConfigEntersTheEventLoopAsADeployCommand() async throws {
+        let (stream, continuation) = AsyncStream.makeStream(of: HomeInput.self)
         app.homeEventsStream = stream
         app.homeEventsContinuation = continuation
         let body = try JSONEncoder().encode(ConfigDTO(location: Location(latitude: 1, longitude: 2), automations: []))
+        // stands in for the event loop: takes the deploy command and answers it
+        let loop = Task { () -> [String] in
+            var names: [String] = []
+            for await input in stream {
+                guard case .write(let command) = input else { continue }
+                names.append(command.kind.name)
+                command.complete(.success(nil))
+                break
+            }
+            return names
+        }
 
         try await app.test(.POST, "/config?skipValidation=true", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123")
@@ -249,11 +267,7 @@ final class AuthenticationIntegrationTests: XCTestCase {
             XCTAssertEqual(res.status, .ok)
         })
 
-        continuation.finish()
-        var events: [HomeEvent] = []
-        for await event in stream {
-            events.append(event)
-        }
-        XCTAssertEqual(events, [.configDeployed])
+        let names = await loop.value
+        XCTAssertEqual(names, ["deploy"])
     }
 }

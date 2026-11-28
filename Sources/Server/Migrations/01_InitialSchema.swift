@@ -22,11 +22,12 @@ enum ServerMigrations {
 struct InitialSchema: AsyncMigration {
     /// The tables with text columns; they are converted to a binary collation.
     private static let textTables = [
-        DeviceToken.schema, WeatherHour.schema, EntityDbItem.schema, EntityChangeDbItem.schema, JournalDbItem.schema
+        DeviceToken.schema, WeatherHour.schema, EntityDbItem.schema, EntityChangeDbItem.schema, JournalDbItem.schema,
+        HomekitInventoryDbItem.schema
     ]
     private static let tables = [
         DeviceToken.schema, ConfigItem.schema, WeatherHour.schema, EntityHourlyAggregate.schema,
-        EntityChangeDbItem.schema, EntityDbItem.schema, JournalDbItem.schema
+        EntityChangeDbItem.schema, EntityDbItem.schema, JournalDbItem.schema, HomekitInventoryDbItem.schema
     ]
 
     func prepare(on database: Database) async throws {
@@ -78,6 +79,7 @@ struct InitialSchema: AsyncMigration {
             .field("serviceName", .string, .required)
             .field("characteristicType", .string, .required)
             .field("characteristicsName", .string)
+            .field("lastReport", .datetime)
             .unique(on: "placeId", "serviceName", "characteristicType")
             .create()
 
@@ -124,6 +126,30 @@ struct InitialSchema: AsyncMigration {
             .field("commandValue", .double)
             .create()
 
+        // The inventory is replaced as a whole with each snapshot of the adapter, so it has no unique key.
+        try await database.schema(HomekitInventoryDbItem.schema)
+            .field(.id, .int64, .identifier(auto: true))
+            .field("homeName", .string, .required)
+            .field("roomName", .string, .required)
+            .field("accessoryName", .string, .required)
+            .field("accessoryCategory", .string, .required)
+            .field("isReachable", .bool, .required)
+            .field("manufacturer", .string)
+            .field("model", .string)
+            .field("serviceType", .custom("VARCHAR(64)"), .required)
+            .field("serviceTypeDescription", .string, .required)
+            .field("serviceName", .string, .required)
+            .field("isPrimaryService", .bool, .required)
+            .field("characteristicType", .custom("VARCHAR(64)"), .required)
+            .field("characteristicDescription", .string, .required)
+            .field("mappedType", .custom("VARCHAR(32)"))
+            .field("isReadable", .bool, .required)
+            .field("isNotifiable", .bool, .required)
+            .field("isWritable", .bool, .required)
+            .field("value", .string)
+            .field("syncedAt", .datetime, .required)
+            .create()
+
         for table in Self.textTables {
             try await sql.raw("ALTER TABLE \(ident: table) CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin").run()
         }
@@ -135,7 +161,9 @@ struct InitialSchema: AsyncMigration {
             ("idx_journal_kind_timestamp", JournalDbItem.schema, ["kind", "timestamp"]),
             ("idx_journal_runId", JournalDbItem.schema, ["runId"]),
             ("idx_journal_kind_title_timestamp", JournalDbItem.schema, ["kind", "title", "timestamp"]),
-            ("idx_journal_kind_place_timestamp", JournalDbItem.schema, ["kind", "entityPlaceId", "timestamp"])
+            ("idx_journal_kind_place_timestamp", JournalDbItem.schema, ["kind", "entityPlaceId", "timestamp"]),
+            // "Which characteristics of a mapped type does HomeKit have".
+            ("idx_homekitInventory_mappedType_room_accessory", HomekitInventoryDbItem.schema, ["mappedType", "roomName", "accessoryName"])
         ]
         for index in indexes {
             let builder = sql.create(index: index.name).on(index.table)

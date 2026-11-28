@@ -7,15 +7,17 @@
 
 import HAModels
 
-public protocol HomeKitAdapterable: EntityValidator, Sendable {
+public protocol HomeKitAdapterable: Sendable {
     func getAllEntitiesLive() async -> [EntityStorageItem]
-    func findEntity(_ entity: EntityId) async throws
 
     func perform(_ action: HomeManagableAction) async throws
     func trigger(scene sceneName: String) async throws
 
     func listThermostats() async throws -> [Thermostat]
     func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem]
+
+    /// Everything HomeKit knows, see `HomeKitInventory`. Values are best-effort and bounded in time.
+    func homeKitInventory() async -> HomeKitInventory
 }
 
 #if canImport(HomeKit)
@@ -44,6 +46,10 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         await homeKitHomeManager.updateEntitiesNow()
     }
 
+    public func homeKitInventory() async -> HomeKitInventory {
+        await homeKitHomeManager.inventory()
+    }
+
     public func getAllEntitiesLive() async -> [EntityStorageItem] {
         let start = ContinuousClock.now
         let characteristics = await getCharacteristics()
@@ -65,17 +71,6 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         let duration = start.duration(to: .now)
         log.info("getAllEntitiesLive() — returned \(result.count) entities from \(characteristics.count) characteristics in \(duration)")
         return result
-    }
-
-    public func findEntity(_ entity: EntityId) async throws {
-        let characteristics = await getCharacteristics()
-        let filteredCharacteristics = characteristics.filter({ $0.entityId == entity })
-        guard filteredCharacteristics.count == 1 else {
-            log.debug("Found: \(filteredCharacteristics)")
-            log.error("Validation: Could not find entity \(entity)")
-            assertionFailure()
-            throw OptionalError.notFound
-        }
     }
 
     public func perform(_ action: HomeManagableAction) async throws {

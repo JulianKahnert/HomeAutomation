@@ -128,6 +128,46 @@ extension HMCharacteristic: @retroactive Comparable {
         entityCharacteristicType?.isSubscribed ?? false
     }
 
+    /// Our type for this characteristic, or `nil`; unlike `entityCharacteristicType` quiet about unmapped ones.
+    var mappedCharacteristicType: CharacteristicsType? {
+        HomeKitCharacteristic(characteristicType: characteristicType)?
+            .toCharacteristicsType(serviceType: service?.serviceType, isBoolFormat: metadata?.format == HMCharacteristicMetadataFormatBool)
+    }
+
+    /// One read of the value as text for the inventory; `nil` when the read fails.
+    func inventoryValue() async -> String? {
+        do {
+            try await readValue()
+            return value.map { "\($0)" }
+        } catch {
+            homeKitLogger.debug("Inventory value not read", metadata: logMetadata.merging(["error": "\(error)"]) { _, new in new })
+            return nil
+        }
+    }
+
+    /// The characteristic as an entry of the inventory.
+    func inventory(value: String?) -> HomeKitInventory.Characteristic {
+        HomeKitInventory.Characteristic(
+            type: characteristicType,
+            typeDescription: localizedDescription,
+            isReadable: isReadable,
+            isNotifiable: isNotifiable,
+            isWritable: properties.contains(HMCharacteristicPropertyWritable),
+            mappedType: mappedCharacteristicType,
+            value: value
+        )
+    }
+
+    /// Whether a resync yields this characteristic's value to the server: it is subscribed or polled.
+    var shouldReport: Bool {
+        entityCharacteristicType?.isReported ?? false
+    }
+
+    /// Whether the periodic poll reads this characteristic.
+    var shouldPoll: Bool {
+        entityCharacteristicType?.isPolled ?? false
+    }
+
     private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Cooling Threshold Temperature", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event", "Smoke Detected", "Leak Detected", "Status Tampered"])
     var entityCharacteristicType: CharacteristicsType? {
         guard let homeKitCharacteristic = HomeKitCharacteristic(characteristicType: characteristicType) else {

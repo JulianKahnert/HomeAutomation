@@ -160,25 +160,12 @@ struct JournalDbRepository: JournalStore {
         guard let sql = database() as? any SQLDatabase else {
             throw Abort(.internalServerError, reason: "Database does not support SQL queries")
         }
-        let kinds: [(kind: JournalKind, onlyWithoutReason: Bool)] = [(.run, false), (.push, false), (.command, true)]
-        for (kind, onlyWithoutReason) in kinds {
-            // The probe carries the same filter, so the heating commands that stay do not keep the loop running.
-            let reasonFilter: SQLQueryString = onlyWithoutReason ? " AND \(ident: "reason") IS NULL" : ""
-            while true {
-                try await sql.raw("""
-                    DELETE FROM \(ident: JournalDbItem.schema)
-                    WHERE \(ident: "kind") = \(bind: kind.rawValue) AND \(ident: "timestamp") < \(bind: date)\(reasonFilter)
-                    ORDER BY \(ident: "timestamp") LIMIT \(literal: Self.deleteBatchSize)
-                    """)
-                    .run()
-                let left = try await sql.raw("""
-                    SELECT 1 AS \(ident: "found") FROM \(ident: JournalDbItem.schema)
-                    WHERE \(ident: "kind") = \(bind: kind.rawValue) AND \(ident: "timestamp") < \(bind: date)\(reasonFilter) LIMIT 1
-                    """)
-                    .first()
-                if left == nil { break }
-            }
+        let table = JournalDbItem.schema
+        for kind in [JournalKind.run, .push] {
+            try await sql.deleteInBatches(from: table, where: "\(ident: "kind") = \(bind: kind.rawValue) AND \(ident: "timestamp") < \(bind: date)", batchSize: Self.deleteBatchSize)
         }
+        // The heating commands that stay do not keep the loop running: the probe carries the same filter.
+        try await sql.deleteInBatches(from: table, where: "\(ident: "kind") = \(bind: JournalKind.command.rawValue) AND \(ident: "timestamp") < \(bind: date) AND \(ident: "reason") IS NULL", batchSize: Self.deleteBatchSize)
     }
 
     static let deleteBatchSize = 5_000

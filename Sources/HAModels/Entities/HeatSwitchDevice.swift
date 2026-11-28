@@ -7,7 +7,7 @@
 
 import Shared
 
-open class HeatSwitchDevice: Codable, @unchecked Sendable, Validatable, Log {
+open class HeatSwitchDevice: Codable, @unchecked Sendable, Log {
     public let heatSwitchId: EntityId
 
     public init(heatSwitchId: EntityId) {
@@ -18,7 +18,4 @@ open class HeatSwitchDevice: Codable, @unchecked Sendable, Validatable, Log {
         await hm.perform(.setHeating(heatSwitchId, active: active))
     }
 
-    public func validate(with hm: any EntityValidator) async throws {
-        try await hm.findEntity(heatSwitchId)
-    }
 }

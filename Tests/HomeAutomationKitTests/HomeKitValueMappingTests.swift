@@ -40,9 +40,8 @@ struct HomeKitValueMappingTests {
     }
 
     @Test func motionSensorReadsTheBool() {
-        let ctx = context(characteristic: Mapping.motionDetectedCharacteristic)
-        #expect(Mapping.value(.motionSensor, raw: true, context: ctx) == .bool(true))
-        #expect(Mapping.value(.motionSensor, raw: "x", context: ctx) == nil)
+        #expect(Mapping.value(.motionSensor, raw: true, context: context()) == .bool(true))
+        #expect(Mapping.value(.motionSensor, raw: "x", context: context()) == nil)
     }
 
     // MARK: sensors
@@ -77,14 +76,14 @@ struct HomeKitValueMappingTests {
         #expect(Mapping.value(.airQualitySensor, raw: "3", context: context()) == nil)
     }
 
-    @Test func batteryLevelIsTheInt64AndNeedsTheBatteryService() {
+    @Test func batteryLevelIsTheInt64() {
         #expect(Mapping.value(.batterySensor, raw: Int64(87), context: context()) == .number(87))
         #expect(Mapping.value(.batterySensor, raw: 87.5, context: context()) == nil)
     }
 
     // MARK: switches and states
 
-    @Test func powerStateNeedsTheBoolFormat() {
+    @Test func powerStateIsTheBool() {
         #expect(Mapping.value(.switcher, raw: true, context: context()) == .bool(true))
         #expect(Mapping.value(.switcher, raw: 1.5, context: context()) == nil)
     }
@@ -210,7 +209,6 @@ struct HomeKitValueMappingTests {
     #if canImport(HomeKit)
     @Test func uuidConstantsMatchHomeKit() {
         #expect(Mapping.occupancyDetectedCharacteristic == HMCharacteristicTypeOccupancyDetected)
-        #expect(Mapping.motionDetectedCharacteristic == HMCharacteristicTypeMotionDetected)
     }
 
     /// What becomes an entity: a characteristic only on the service its kind belongs to.

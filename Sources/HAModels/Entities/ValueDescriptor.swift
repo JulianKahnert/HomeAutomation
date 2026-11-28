@@ -116,6 +116,14 @@ public struct ValueDescriptor: Sendable, Equatable {
         validRange: 1...100_000
     )
 
+    /// One percentage point is the battery's resolution; the 7 days only keep a flat level visibly alive.
+    private static let batteryStorage = StorageRule(
+        deadBand: .init(absoluteChange: 1, maxInterval: .seconds(7 * 24 * 3600)),
+        rawRetentionDays: nil,
+        hourlyRollup: false,
+        validRange: nil
+    )
+
     private static func bool(isSettableFromApp: Bool = false) -> ValueDescriptor {
         ValueDescriptor(
             shape: .bool,
@@ -172,7 +180,7 @@ public struct ValueDescriptor: Sendable, Equatable {
         case .pmDensitySensor:
             return number()
         case .batterySensor:
-            return number(constraint: .wholeNumber)
+            return number(storage: batteryStorage, constraint: .wholeNumber)
         case .brightness:
             return number(constraint: .wholeNumber)
         case .colorTemperature:

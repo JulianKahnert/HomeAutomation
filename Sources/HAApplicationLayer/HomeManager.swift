@@ -37,9 +37,6 @@ public final class HomeManager: HomeManagable {
     /// The current state of every entity, loaded from the database at start and then the last change, never a
     /// replay. No expiry and no eviction, so a replay is no change however long ago the last change was.
     private var currentStates: [EntityId: EntityStorageItem] = [:]
-    /// The entities a source reported in this process; a state merely loaded from the database does not
-    /// prove the entity still exists in HomeKit.
-    private var reportedEntities: Set<EntityId> = []
     /// When each source (the origin of a report) last reported, a replay included. Memory only: empty after a
     /// restart until the first report, so a silent source differs from an unchanged one.
     private var lastReportBySource: [Origin: Date] = [:]
@@ -54,7 +51,26 @@ public final class HomeManager: HomeManagable {
     /// Changed entity states on their way to the database. One task drains it in order, so a burst
     /// of events (the adapter's full resync on every reconnect) uses one database connection at a
     /// time instead of one query per event at once.
-    private let persistQueue: AsyncStream<EntityStorageItem>.Continuation
+    private let persistQueue: AsyncStream<PersistJob>.Continuation
+    /// What the persist task does next: save a change, or note a report that changed nothing.
+    private enum PersistJob: Sendable {
+        case change(EntityStorageItem)
+        case lastReport(EntityId, Date)
+
+        var entityId: EntityId {
+            switch self {
+            case .change(let item): return item.entityId
+            case .lastReport(let entityId, _): return entityId
+            }
+        }
+    }
+
+    /// A report that changed nothing writes its time to the database at most this often per entity (the time of a
+    /// change is stored with the change itself).
+    public static let lastReportWriteInterval: TimeInterval = 5 * 60
+    /// When the time of each entity's last report was last handed to the database (or loaded from it).
+    private var lastReportQueued: [EntityId: Date] = [:]
+    private let now: @Sendable () -> Date
     /// Far above one full resync (~200 entities); only reached while the database is stuck. The
     /// oldest queued states are dropped first. An entity whose only queued state is dropped is
     /// missing from the history until its next change, because a replay of that value is not queued.
@@ -81,7 +97,9 @@ public final class HomeManager: HomeManagable {
                 onReportedChange: @escaping @Sendable (EntityStorageItem) -> Void = { _ in },
                 retryTicks: AsyncStream<Void>? = nil,
                 persistRetryDelays: [Duration] = [.seconds(1), .seconds(5)],
-                logger: Logger = Logger(label: "HomeManager")) {
+                logger: Logger = Logger(label: "HomeManager"),
+                now: @escaping @Sendable () -> Date = { Date() }) {
+        self.now = now
         self.log = logger
         let deliveries = DeliveryQueue(sender: notificationSender)
         self.deliveries = deliveries
@@ -93,13 +111,13 @@ public final class HomeManager: HomeManagable {
         self.storageRepo = storageRepo
         self.location = location
 
-        let (persistStream, persistQueue) = AsyncStream<EntityStorageItem>.makeStream(bufferingPolicy: .bufferingNewest(Self.persistQueueLimit))
+        let (persistStream, persistQueue) = AsyncStream<PersistJob>.makeStream(bufferingPolicy: .bufferingNewest(Self.persistQueueLimit))
         self.persistQueue = persistQueue
         // Normal priority: a background consumer is starved under load. A slow database still never delays a
         // command, because the queue is a separate task that commands only yield into (ADR-004).
         Task.detached { [storageRepo, log] in
-            for await item in persistStream {
-                await Self.persist(item, in: storageRepo, retryDelays: persistRetryDelays, log: log)
+            for await job in persistStream {
+                await Self.persist(job, in: storageRepo, retryDelays: persistRetryDelays, log: log)
             }
         }
 
@@ -173,6 +191,8 @@ public final class HomeManager: HomeManagable {
             // a report that arrived during the load is newer than the stored state
             for item in stored where currentStates[item.entityId] == nil {
                 currentStates[item.entityId] = item
+                // the stored time of the last report counts for the throttle: a restart does not write at once
+                lastReportQueued[item.entityId] = item.lastReport
             }
             log.info("Loaded the stored entity states", metadata: ["count": "\(stored.count)"])
             await loadRecentReadings(of: stored)
@@ -199,16 +219,26 @@ public final class HomeManager: HomeManagable {
                 let history = try await storageRepo.getHistory(for: item.entityId, startDate: cutoff, endDate: nil, cursor: nil, limit: Self.readingLimit)
                 // changes reported while the load ran are newer and already in front
                 let known = Set((recentReadings[item.entityId] ?? []).map { Self.microseconds($0.timestamp) })
-                recentReadings[item.entityId, default: []] += history.filter { !known.contains(Self.microseconds($0.timestamp)) }
+                recentReadings[item.entityId, default: []] += history.filter { !Self.isKnown($0.timestamp, in: known) }
             } catch {
                 log.error("Failed to load the recent readings", metadata: ["entityId": "\(item.entityId)", "error": "\(error)"])
             }
         }
     }
 
-    /// A timestamp at the precision of the database (`DATETIME(6)`): a change read back from it equals the one held in memory.
+    /// A timestamp at the precision of the database (`DATETIME(6)`). The MySQL driver cuts the sub-microsecond digits
+    /// off on write (it does not round), so this cuts them off too; the date read back can then still be one
+    /// microsecond lower through floating point, which `isKnown` tolerates.
     nonisolated private static func microseconds(_ date: Date) -> Int64 {
-        Int64((date.timeIntervalSince1970 * 1_000_000).rounded())
+        let seconds = date.timeIntervalSince1970
+        let whole = seconds.rounded(.towardZero)
+        return Int64(whole) * 1_000_000 + Int64((seconds - whole) * 1_000_000)
+    }
+
+    /// Whether `date` is one of the `known` timestamps, up to the one microsecond of the round trip through the database.
+    nonisolated private static func isKnown(_ date: Date, in known: Set<Int64>) -> Bool {
+        let value = microseconds(date)
+        return known.contains(value) || known.contains(value - 1) || known.contains(value + 1)
     }
 
     nonisolated private static func key(of radiator: EntityId) -> String {
@@ -251,11 +281,6 @@ public final class HomeManager: HomeManagable {
 
     public func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem] {
         try await getAdapter().get(with: log).readThermostat(thermostat)
-    }
-
-    public func findEntity(_ entityId: EntityId) async throws {
-        guard !reportedEntities.contains(entityId) else { return }
-        return try await getAdapter().get(with: log).findEntity(entityId)
     }
 
     public func perform(_ action: HomeManagableAction) async {
@@ -380,8 +405,7 @@ public final class HomeManager: HomeManagable {
         }
     }
 
-    @discardableResult
-    public func report(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> Bool {
+    public func reportState(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> StateChange? {
         // Like `perform`: a run that was superseded must not change state any more. Checked on this actor, so it is
         // atomic with the write: the lane cancels the old run before the new one starts.
         try Task.checkCancellation()
@@ -390,15 +414,20 @@ public final class HomeManager: HomeManagable {
             throw ReportError.valueDoesNotFit(entityId)
         }
         // The caller's precondition is part of that section: it sees the state this report replaces.
-        guard ifCurrent(currentStates[entityId]) else { return false }
-        // No suspension point between the check, the state, the persist and the emit: the state holds before the
-        // event reaches the stream, and two reports of one entity cannot interleave.
+        guard ifCurrent(currentStates[entityId]) else { return nil }
+        // No suspension point between the check, the state, the persist, the emit and the read-back: the state holds
+        // before the event reaches the stream, two reports of one entity cannot interleave, and the answer is the
+        // state this report left, not one a later report changed.
         let changed = record(item)
         if let changed {
             onReportedChange(changed)
         }
+        guard let answer = currentStates[entityId].flatMap({ StateChange(item: $0, changed: changed != nil) }) else {
+            log.error("Failed to read the state that was just set", metadata: ["entityId": "\(entityId)"])
+            throw CoreCommandError.stateUnreadable(entityId)
+        }
         await invalidateContradictedCommands(for: item)
-        return changed != nil
+        return answer
     }
 
     public func states(of type: CharacteristicsType) async -> [EntityStorageItem] {
@@ -442,8 +471,7 @@ public final class HomeManager: HomeManagable {
         if item.origin == .homekit {
             liveness.recordEvent(at: Date())
         }
-        reportedEntities.insert(item.entityId)
-        let reportedAt = Date()
+        let reportedAt = now()
         lastReportBySource[item.origin] = reportedAt
 
         // Only the values decide whether this is new information. An unknown entity counts as a
@@ -451,6 +479,7 @@ public final class HomeManager: HomeManagable {
         guard currentStates[item.entityId]?.hasSameValue(as: item) != true else {
             // A replay keeps the known state, so its timestamp stays the time of the last change.
             currentStates[item.entityId]?.lastReport = reportedAt
+            queueLastReportIfDue(of: item.entityId, at: reportedAt)
             return nil
         }
         var state = item
@@ -459,35 +488,52 @@ public final class HomeManager: HomeManagable {
         remember(reading: item)
 
         // Persist item in the background to avoid blocking automation execution
-        switch persistQueue.yield(item) {
+        enqueue(.change(state))
+        // A change is a report like any other: its time goes through the same throttle. The stored change already
+        // shows as a report through its own timestamp.
+        queueLastReportIfDue(of: item.entityId, at: reportedAt)
+        return state
+    }
+
+    private func queueLastReportIfDue(of entityId: EntityId, at reportedAt: Date) {
+        if let queued = lastReportQueued[entityId], reportedAt.timeIntervalSince(queued) < Self.lastReportWriteInterval { return }
+        lastReportQueued[entityId] = reportedAt
+        enqueue(.lastReport(entityId, reportedAt))
+    }
+
+    /// Hands a job to the persist queue and counts what the full queue drops, a time of the last report like a change.
+    private func enqueue(_ job: PersistJob) {
+        switch persistQueue.yield(job) {
         case .dropped(let dropped):
             droppedPersistItems += 1
             if droppedPersistItems == 1 || droppedPersistItems.isMultiple(of: 500) {
-                log.warning("Persist queue full, dropped \(droppedPersistItems) entity item(s) so far, last one \(dropped.entityId)")
+                log.warning("Persist queue full, dropped \(droppedPersistItems) job(s) so far, last one \(dropped.entityId)")
             }
         case .enqueued(let remaining) where droppedPersistItems > 0 && remaining >= Self.persistQueueLimit / 2:
-            log.notice("Persist queue draining again after dropping \(droppedPersistItems) entity item(s)")
+            log.notice("Persist queue draining again after dropping \(droppedPersistItems) job(s)")
             droppedPersistItems = 0
         default:
             break
         }
-        return state
     }
 
     /// Retries inside the serial queue instead of forgetting the current state: a forgotten state would make
     /// the next identical replay count as a change and trigger automations again.
-    nonisolated private static func persist(_ item: EntityStorageItem, in storageRepo: StorageRepository, retryDelays: [Duration], log: Logger) async {
+    nonisolated private static func persist(_ job: PersistJob, in storageRepo: StorageRepository, retryDelays: [Duration], log: Logger) async {
         var attempt = 0
         while true {
             do {
-                try await persistOnce(item, in: storageRepo)
+                switch job {
+                case .change(let item): try await persistOnce(item, in: storageRepo)
+                case .lastReport(let entityId, let date): try await storageRepo.recordLastReport(of: entityId, at: date)
+                }
                 return
             } catch {
                 guard attempt < retryDelays.count else {
-                    log.critical("Failed to persist entity item \(item.entityId) after \(attempt + 1) attempts: \(error)")
+                    log.critical("Failed to persist entity item \(job.entityId) after \(attempt + 1) attempts: \(error)")
                     return
                 }
-                log.warning("Failed to persist entity item \(item.entityId), retrying: \(error)")
+                log.warning("Failed to persist entity item \(job.entityId), retrying: \(error)")
                 try? await Task.sleep(for: retryDelays[attempt])
                 attempt += 1
             }
@@ -529,7 +575,7 @@ public final class HomeManager: HomeManagable {
             log.error("Failed to read the entity history", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
         }
         let known = Set(recent.map { Self.microseconds($0.timestamp) })
-        let merged = recent + stored.filter { !known.contains(Self.microseconds($0.timestamp)) }
+        let merged = recent + stored.filter { !Self.isKnown($0.timestamp, in: known) }
         return Array(merged.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 

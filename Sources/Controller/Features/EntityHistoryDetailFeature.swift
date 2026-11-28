@@ -21,6 +21,8 @@ struct EntityHistoryDetailFeature: Sendable {
         let entity: EntityInfo
         var historyItems: [EntityHistoryItem] = []
         var isLoading = false
+        /// A reload keeps the shown items until its first page arrives, which replaces them.
+        var replacesHistory = false
         var timeRange: TimeRange = .hour
         @Presents var alert: AlertState<Action.Alert>?
 
@@ -99,16 +101,18 @@ struct EntityHistoryDetailFeature: Sendable {
                 }
 
             case .refresh:
-                return refresh(&state)
+                return refresh(&state, clearing: false)
 
             case let .historyResponse(.success(response)):
                 state.isLoading = false
 
-                // Append new items and remove duplicates
-                let newItems = response.items.filter { newItem in
-                    !state.historyItems.contains(where: { $0.id == newItem.id })
+                // The server's cursor is exclusive, so a page never repeats an item of the pages before.
+                if state.replacesHistory {
+                    state.historyItems = response.items
+                    state.replacesHistory = false
+                } else {
+                    state.historyItems.append(contentsOf: response.items)
                 }
-                state.historyItems.append(contentsOf: newItems)
                 state.historyItems.sort { $0.timestamp > $1.timestamp }
                 return .none
 
@@ -126,7 +130,7 @@ struct EntityHistoryDetailFeature: Sendable {
                 return .none
 
             case .binding(\.timeRange):
-                return refresh(&state)
+                return refresh(&state, clearing: true)
 
             case .binding:
                 return .none
@@ -138,11 +142,15 @@ struct EntityHistoryDetailFeature: Sendable {
         .ifLet(\.$alert, action: \.alert)
     }
 
-    private func refresh(_ state: inout State) -> Effect<Action> {
+    /// `clearing` empties the list at once (a new range); otherwise the old items stay until the first page.
+    private func refresh(_ state: inout State, clearing: Bool) -> Effect<Action> {
         state.isLoading = true
         state.rangeEnd = now
         state.alert = nil
-        state.historyItems = []
+        if clearing {
+            state.historyItems = []
+        }
+        state.replacesHistory = !clearing
 
         let entityId = state.entity.entityId
         let dateRange = state.dateRange
@@ -215,9 +223,7 @@ struct EntityHistoryDetailView: View {
         .refreshable {
             await store.send(.refresh).finish()
         }
-        .onAppear {
-            store.send(.onAppear)
-        }
+        .task { await store.send(.onAppear).finish() }
         .alert($store.scope(\.$alert, action: \.alert))
     }
 

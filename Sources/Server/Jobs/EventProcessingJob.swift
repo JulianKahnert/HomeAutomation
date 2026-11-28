@@ -60,20 +60,25 @@ final class EventLoopGauge: Sendable {
     }
 }
 
-/// Where everything that happens is yielded into the event stream; stamps each event for the ``EventLoopGauge``.
+/// Where everything that happens is yielded into the event stream; stamps each event and write for the ``EventLoopGauge``.
 struct HomeEventSink: Sendable {
-    let continuation: AsyncStream<HomeEvent>.Continuation
+    let continuation: AsyncStream<HomeInput>.Continuation
     let gauge: EventLoopGauge
 
     func yield(_ event: HomeEvent) {
+        yield(.event(event))
+    }
+
+    @discardableResult
+    func yield(_ input: HomeInput) -> AsyncStream<HomeInput>.Continuation.YieldResult {
         gauge.stamp()
-        continuation.yield(event)
+        return continuation.yield(input)
     }
 }
 
 struct HomeEventProcessingJob: Job, Log {
     let gauge: EventLoopGauge
-    let homeEventsStream: AsyncStream<HomeEvent>
+    let homeEventsStream: AsyncStream<HomeInput>
     let automationService: AutomationService
     let homeManager: any HomeManagable
 
@@ -81,10 +86,53 @@ struct HomeEventProcessingJob: Job, Log {
         // Serial processing preserves event ordering (history writes and automation triggering).
         // `trigger(with:)` returns quickly — long-running `execute()` runs in the background inside
         // AutomationService — so a slow automation does not stall the loop.
-        for await event in homeEventsStream {
+        for await input in homeEventsStream {
             gauge.took()
-            await handle(event)
+            switch input {
+            case .event(let event): await handle(event)
+            case .write(let command): await handle(command)
+            }
             gauge.finished()
+        }
+    }
+
+    /// Runs a write of the API in its turn and answers the caller. A command that only starts or cancels work
+    /// (`stopAutomation` cancels a run, it does not wait for it or for its lane) never holds the loop, and neither does a
+    /// config save: the change is applied in memory here, in order, and the caller is answered when the save ends.
+    private func handle(_ command: WriteCommand) async {
+        log.debug("Handle write", metadata: ["command": "\(command.kind.name)"])
+        do {
+            switch command.kind {
+            case .setState(let entityId, let value):
+                // The report sets the state at once, yields the change into this stream (already checked) and answers
+                // the state it left. A refusal by a precondition cannot happen: there is none.
+                guard let change = try await homeManager.reportState(entityId, value: value, origin: .app, ifCurrent: { _ in true }) else {
+                    throw CoreCommandError.stateUnreadable(entityId)
+                }
+                command.complete(.success(change))
+                return
+            case .setAutomationActive(let name, let isActive):
+                complete(command, after: await automationService.startSettingActive(with: name, to: isActive))
+                return
+            case .stopAutomation(let name):
+                await automationService.stopAutomation(with: name)
+            case .deploy(let automations, let location):
+                let saved = await automationService.startDeploy(automations, location: location)
+                // The automations are swapped in memory, so automations that react see the new ones.
+                await automationService.trigger(with: .configDeployed)
+                complete(command, after: saved)
+                return
+            }
+            command.complete(.success(nil))
+        } catch {
+            command.complete(.failure(error))
+        }
+    }
+
+    /// Answers the caller when `saved` ends, off the loop: a slow database holds the caller (up to its timeout), not the loop.
+    private func complete(_ command: WriteCommand, after saved: Task<Void, any Error>) {
+        Task {
+            command.complete(await saved.result.map { _ -> StateChange? in nil })
         }
     }
 

@@ -13,8 +13,9 @@ public struct EntityHistoryItem: Identifiable, Sendable, Codable, Equatable, Has
     public let timestamp: Date
     /// Where the change came from; `nil` for an item that is no single change, such as an hourly aggregate.
     public let origin: String?
-    /// When the entity last reported, a replay included. Only set on the newest item of a history, and only while the
-    /// server holds it in memory; `nil` after a restart until the first report.
+    /// When the entity last reported, a replay included. Only set on the newest item of a history. Stored per entity,
+    /// written at most every five minutes, so it can lag by that much; the newest change's own timestamp counts as a
+    /// report. `nil` until the entity has reported once after the column exists.
     public let lastReport: Date?
     /// The value kind (the raw value of the `CharacteristicsType`) and the value. A kind this build does not know still arrives here, with
     /// its raw value. The typed accessors below derive from the pair.

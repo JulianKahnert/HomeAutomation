@@ -13,7 +13,7 @@ import SQLKit
 @testable import StarActorSystem
 import XCTVapor
 
-/// `/health` and the history route carry the time of the last report, kept in memory by the home manager.
+/// `/health` carries the last report per source (memory of the home manager); the history route the stored last report of the entity.
 final class LastReportEndpointTests: XCTestCase {
     var app: Application!
     private let token = "last-report-test-token"
@@ -39,7 +39,7 @@ final class LastReportEndpointTests: XCTestCase {
                                                                EntityChangeDbItem.schema: [changeRow]]),
                           as: DatabaseID(string: "in-memory"), isDefault: true)
         homeManager = await HomeManager(getAdapter: { nil },
-                                        storageRepo: EmptyStorage(),
+                                        storageRepo: MemoryStorage(),
                                         notificationSender: SilentSender(),
                                         location: Location(latitude: 52.52, longitude: 13.405))
         app.homeManager = homeManager
@@ -88,12 +88,12 @@ final class LastReportEndpointTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(Health.self, from: body).lastReports, [:])
     }
 
-    func testHistoryCarriesTheLastReportOnTheCurrentState() async throws {
-        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: changedAt, isDeviceOn: true))
-        // a replay: the state stays, the report is newer
-        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: changedAt.addingTimeInterval(600), isDeviceOn: true))
-        let reported = await homeManager.lastReport(of: switchId)
-        let lastReport = try XCTUnwrap(reported)
+    func testHistoryCarriesTheStoredLastReportOnTheNewestChangeOnly() async throws {
+        let lastReport = changedAt.addingTimeInterval(600)
+        let older = EntityStorageItem(entityId: switchId, timestamp: changedAt.addingTimeInterval(-3600), isDeviceOn: false)
+        let newest = EntityStorageItem(entityId: switchId, timestamp: changedAt, isDeviceOn: true, lastReport: lastReport)
+        // no core: the answer comes from storage alone
+        app.storageReader = MemoryStorage(seed: [older, newest])
 
         let (status, body) = try await get("/entities/history?placeId=Bad%20-%20OG&name=Licht&characteristicType=switcher")
 
@@ -101,12 +101,12 @@ final class LastReportEndpointTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let history = try decoder.decode(History.self, from: body)
-        XCTAssertEqual(history.items.count, 1)
-        XCTAssertEqual(history.items.first?.timestamp, changedAt)
+        XCTAssertEqual(history.items.count, 2)
         XCTAssertEqual(try XCTUnwrap(history.items.first?.lastReport).timeIntervalSince1970, lastReport.timeIntervalSince1970, accuracy: 1)
+        XCTAssertNil(history.items.last?.lastReport)
     }
 
-    func testHistoryHasNoLastReportBeforeTheFirstReport() async throws {
+    func testTheNewestChangeCountsAsTheLastReportBeforeAnyStoredReport() async throws {
         let (status, body) = try await get("/entities/history?placeId=Bad%20-%20OG&name=Licht&characteristicType=switcher")
 
         XCTAssertEqual(status, .ok, String(decoding: body, as: UTF8.self))
@@ -114,7 +114,8 @@ final class LastReportEndpointTests: XCTestCase {
         decoder.dateDecodingStrategy = .iso8601
         let history = try decoder.decode(History.self, from: body)
         XCTAssertEqual(history.items.count, 1)
-        XCTAssertNil(history.items.first?.lastReport)
+        // no stored report time: the change's own timestamp counts as the report
+        XCTAssertEqual(try XCTUnwrap(history.items.first?.lastReport).timeIntervalSince1970, changedAt.timeIntervalSince1970, accuracy: 1)
     }
 
     /// The adapter link reaches `.up` once the peer's hello arrived.

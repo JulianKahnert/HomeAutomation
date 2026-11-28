@@ -51,15 +51,10 @@ extension HMCharacteristic: @retroactive Comparable {
         }
         let type = entityId.characteristicType
         let context = HomeKitValueMapping.Context(
-            serviceType: service?.serviceType,
             characteristicType: characteristicType,
-            isBoolFormat: metadata?.format == HMCharacteristicMetadataFormatBool,
             minimumValue: metadata?.minimumValue?.doubleValue,
             maximumValue: metadata?.maximumValue?.doubleValue
         )
-        guard HomeKitValueMapping.needsRead(type, context: context) else {
-            return EntityStorageItem(entityId: entityId, timestamp: timestamp)
-        }
         do {
             try await readValue()
             // Taken right after the read: the sibling reads below must not mix a later hue with an earlier saturation.
@@ -141,7 +136,7 @@ extension HMCharacteristic: @retroactive Comparable {
             assertionFailure()
             return nil
         }
-        return homeKitCharacteristic.toCharacteristicsType(serviceType: service?.serviceType)
+        return homeKitCharacteristic.toCharacteristicsType(serviceType: service?.serviceType, isBoolFormat: metadata?.format == HMCharacteristicMetadataFormatBool)
     }
 }
 #endif

@@ -32,7 +32,7 @@ final class AuthenticationIntegrationTests: XCTestCase {
         app.homeAutomationConfigService = HomeAutomationConfigService(location: mockLocation, persist: { _ in })
         app.automationService = try await makeAutomationService(automations: [])
         app.configReader = StoredConfig(config: ConfigDTO(location: mockLocation, automations: []))
-        app.homeManager = await HomeManager(getAdapter: { nil }, storageRepo: EmptyStorage(), notificationSender: SilentSender(), location: mockLocation)
+        app.homeManager = await HomeManager(getAdapter: { nil }, storageRepo: MemoryStorage(), notificationSender: SilentSender(), location: mockLocation)
         loop = app.startEventLoop()
 
         // The WebSocket route registration needs an actor system present

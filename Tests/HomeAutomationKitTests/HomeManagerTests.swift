@@ -1100,6 +1100,8 @@ private actor RecordingStorageRepository: StorageRepository {
         []
     }
 
+    func recordLastReport(of entityId: EntityId, at date: Date) async throws {}
+
     func waitForAdds(_ count: Int, timeout: Duration = .seconds(30), sourceLocation: SourceLocation = #_sourceLocation) async {
         let deadline = ContinuousClock.now + timeout
         while added.count < count, ContinuousClock.now < deadline {

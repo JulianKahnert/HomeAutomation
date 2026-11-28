@@ -112,7 +112,7 @@ struct StoragePolicyTests {
         try await store.addPush(JournalPush(timestamp: now.addingTimeInterval(-31 * 86_400), runId: oldRun.id, title: "Old", message: "", pushId: "old"))
         try await store.addPush(JournalPush(timestamp: now.addingTimeInterval(-29 * 86_400), runId: newRun.id, title: "New", message: "", pushId: "new"))
         let homeManager = await HomeManager(getAdapter: { nil },
-                                            storageRepo: EmptyStorage(),
+                                            storageRepo: MemoryStorage(),
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 0, longitude: 0),
                                             journal: journal,

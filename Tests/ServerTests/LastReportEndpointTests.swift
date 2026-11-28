@@ -39,7 +39,7 @@ final class LastReportEndpointTests: XCTestCase {
                                                                EntityChangeDbItem.schema: [changeRow]]),
                           as: DatabaseID(string: "in-memory"), isDefault: true)
         homeManager = await HomeManager(getAdapter: { nil },
-                                        storageRepo: EmptyStorage(),
+                                        storageRepo: MemoryStorage(),
                                         notificationSender: SilentSender(),
                                         location: Location(latitude: 52.52, longitude: 13.405))
         app.homeManager = homeManager
@@ -106,7 +106,7 @@ final class LastReportEndpointTests: XCTestCase {
         XCTAssertNil(history.items.last?.lastReport)
     }
 
-    func testHistoryHasNoLastReportBeforeTheFirstReport() async throws {
+    func testTheNewestChangeCountsAsTheLastReportBeforeAnyStoredReport() async throws {
         let (status, body) = try await get("/entities/history?placeId=Bad%20-%20OG&name=Licht&characteristicType=switcher")
 
         XCTAssertEqual(status, .ok, String(decoding: body, as: UTF8.self))
@@ -114,7 +114,8 @@ final class LastReportEndpointTests: XCTestCase {
         decoder.dateDecodingStrategy = .iso8601
         let history = try decoder.decode(History.self, from: body)
         XCTAssertEqual(history.items.count, 1)
-        XCTAssertNil(history.items.first?.lastReport)
+        // no stored report time: the change's own timestamp counts as the report
+        XCTAssertEqual(try XCTUnwrap(history.items.first?.lastReport).timeIntervalSince1970, changedAt.timeIntervalSince1970, accuracy: 1)
     }
 
     /// The adapter link reaches `.up` once the peer's hello arrived.

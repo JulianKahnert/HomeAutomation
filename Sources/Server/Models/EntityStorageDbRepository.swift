@@ -49,7 +49,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
                 .filter(\.$id ~~ chunk)
                 .with(\.$entity)
                 .all()
-            items += changes.compactMap { EntityStorageItem(entity: $0.entity, change: $0) }
+            items += changes.compactMap { EntityStorageItem(entity: $0.entity, change: $0, withLastReport: true) }
         }
         return items
     }
@@ -65,7 +65,7 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
             .sort(\.$id, .descending)
             .limit(limit)
             .all()
-            .compactMap { EntityStorageItem(entity: entity, change: $0) }
+            .compactMap { EntityStorageItem(entity: entity, change: $0, withLastReport: true) }
     }
 
     private func findEntity(_ entityId: EntityId) async throws -> EntityDbItem? {
@@ -104,12 +104,23 @@ final class EntityStorageDbRepository: StorageRepository, Sendable {
             return
         }
         let entity = try await entity(for: item.entityId)
+        // A change is a report: its time is stored with it (before the dead band, which only decides the row).
+        if let lastReport = item.lastReport, entity.lastReport != lastReport {
+            entity.lastReport = lastReport
+            try await entity.save(on: database())
+        }
         guard try await passesDeadBand(value, at: item.timestamp, of: entity) else { return }
         try await EntityChangeDbItem(entityId: entity.requireID(), timestamp: item.timestamp, value: value, shape: ValueDescriptor.descriptor(for: item.entityId.characteristicType).shape, origin: item.origin.rawValue)
             .save(on: database())
         if item.entityId.characteristicType.isHeatingRelated {
             log.debug("Stored heating entity item", metadata: ["entityId": "\(item.entityId)", "value": "\(value)"])
         }
+    }
+
+    func recordLastReport(of entityId: EntityId, at date: Date) async throws {
+        guard let entity = try await findEntity(entityId), entity.lastReport.map({ $0 < date }) ?? true else { return }
+        entity.lastReport = date
+        try await entity.save(on: database())
     }
 
     /// Whether the value moved out of its type's write dead band (the descriptor's storage rule) around the last

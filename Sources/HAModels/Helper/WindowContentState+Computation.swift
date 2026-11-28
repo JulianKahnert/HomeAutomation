@@ -48,18 +48,44 @@ public extension WindowContentState {
     }
 }
 
-public extension HomeManagable {
-    /// The window Live Activity's content state, computed from the window deadlines and the outdoor temperature.
-    /// The one computation behind the Live Activity and `GET /windowstates`.
-    func getWindowContentState() async -> WindowContentState {
-        let deadlines = await states(of: .deadline)
+public extension WindowContentState {
+    /// The content state from the stored deadline states: the one computation behind the Live Activity (memory of the
+    /// `HomeManager`) and `GET /windowstates` (the database).
+    /// - Parameters:
+    ///   - deadlines: The current state of every deadline entity.
+    ///   - history: The changes of one deadline entity, newest first.
+    init(deadlines: [EntityStorageItem],
+         history: @Sendable (EntityId) async -> [EntityStorageItem],
+         outdoorTemperature: Double?) async {
         var windows: [(deadlineId: EntityId, deadline: Deadline, opened: Date)] = []
         for item in deadlines {
             guard let deadline = item.deadline, let end = deadline.end else { continue }
-            let history = await getFullEntityHistory(with: item.entityId, limit: 50)
-            windows.append((item.entityId, deadline, WindowContentState.opened(end: end, history: history) ?? item.timestamp))
+            let changes = await history(item.entityId)
+            windows.append((item.entityId, deadline, WindowContentState.opened(end: end, history: changes) ?? item.timestamp))
         }
+        self.init(windows: windows, outdoorTemperature: outdoorTemperature)
+    }
+}
+
+public extension HomeManagable {
+    /// The window Live Activity's content state, computed from the window deadlines and the outdoor temperature.
+    func getWindowContentState() async -> WindowContentState {
+        let deadlines = await states(of: .deadline)
         let outdoor = try? await getCurrentEntity(with: .outdoorTemperature).temperatureInC?.value
-        return WindowContentState(windows: windows, outdoorTemperature: outdoor)
+        return await WindowContentState(deadlines: deadlines,
+                                        history: { await getFullEntityHistory(with: $0, limit: 50) },
+                                        outdoorTemperature: outdoor)
+    }
+}
+
+public extension StorageRepository {
+    /// The content state of the open windows from the stored states, for the API (no running core needed).
+    func windowContentState() async throws -> WindowContentState {
+        let current = try await getAllCurrent()
+        let deadlines = current.filter { $0.entityId.characteristicType == .deadline }
+        let outdoor = current.first { $0.entityId == .outdoorTemperature }?.temperatureInC?.value
+        return await WindowContentState(deadlines: deadlines,
+                                        history: { (try? await self.getHistory(for: $0, startDate: nil, endDate: nil, cursor: nil, limit: 50)) ?? [] },
+                                        outdoorTemperature: outdoor)
     }
 }

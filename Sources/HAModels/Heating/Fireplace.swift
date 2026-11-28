@@ -56,6 +56,11 @@ public enum Fireplace {
         return state(of: item)
     }
 
+    /// The state the database holds, for the API: the same derivation as ``state(with:)``.
+    public static func state(from storage: any StorageRepository) async throws -> FireplaceState {
+        state(of: try await storage.getCurrent(stateId))
+    }
+
     /// The state a stored fireplace item stands for; `nil` (never held) is off.
     public static func state(of item: EntityStorageItem?) -> FireplaceState {
         guard let item, item.isDeviceOn == true else { return .off }

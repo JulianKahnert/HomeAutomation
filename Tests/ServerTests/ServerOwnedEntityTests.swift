@@ -15,6 +15,7 @@ import XCTVapor
 
 final class ServerOwnedEntityTests: XCTestCase {
     var app: Application!
+    private var loop: Task<Void, Never>!
     private let token = "server-owned-test-token"
 
     override func setUp() async throws {
@@ -25,19 +26,18 @@ final class ServerOwnedEntityTests: XCTestCase {
         app.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405), persist: { _ in })
         app.automationService = try await makeAutomationService(automations: [])
         app.starActorSystem = StarActorSystem(name: "server-owned-tests")
-        let (stream, continuation) = AsyncStream.makeStream(of: HomeEvent.self)
-        app.homeEventsStream = stream
-        app.homeEventsContinuation = continuation
         app.databases.use(InMemoryDatabaseConfiguration(), as: DatabaseID(string: "in-memory"), isDefault: true)
         // no adapter: a server-owned entity needs none, a HomeKit entity cannot be checked
         app.homeManager = await HomeManager(getAdapter: { nil },
                                             storageRepo: EmptyStorage(),
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 52.52, longitude: 13.405))
+        loop = app.startEventLoop()
         try routes(app)
     }
 
     override func tearDown() async throws {
+        loop.cancel()
         try await app.asyncShutdown()
         app = nil
     }
@@ -67,13 +67,13 @@ final class ServerOwnedEntityTests: XCTestCase {
 
     func testAReportedChangeReachesAnAutomationOnceWithOriginServer() async throws {
         let holiday = EntityId.serverOwned(name: "holiday", characteristic: .switcher)
-        let (stream, continuation) = AsyncStream.makeStream(of: HomeEvent.self)
+        let (stream, continuation) = AsyncStream.makeStream(of: HomeInput.self)
         // wired like configure.swift
         let homeManager = await HomeManager(getAdapter: { nil },
                                             storageRepo: EmptyStorage(),
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 52.52, longitude: 13.405),
-                                            onReportedChange: { continuation.yield(.change(entity: $0)) })
+                                            onReportedChange: { continuation.yield(.event(.change(entity: $0))) })
         let seen = Mutex<[EntityStorageItem]>([])
         let automation = RecordingAutomation(entityId: holiday, onTrigger: { item in seen.withLock { $0.append(item) } })
         let automationService = try AutomationService(using: homeManager, runs: NoRuns(), automations: [automation])

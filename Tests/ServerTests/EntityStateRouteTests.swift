@@ -14,6 +14,7 @@ import XCTVapor
 
 final class EntityStateRouteTests: XCTestCase {
     var app: Application!
+    private var loop: Task<Void, Never>!
     private let token = "entity-state-test-token"
     private let settable = EntityId.serverOwned(name: "fireplace", characteristic: .switcher)
 
@@ -25,18 +26,18 @@ final class EntityStateRouteTests: XCTestCase {
         app.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405), persist: { _ in })
         app.automationService = try await makeAutomationService(automations: [])
         app.starActorSystem = StarActorSystem(name: "entity-state-tests")
-        let (stream, continuation) = AsyncStream.makeStream(of: HomeEvent.self)
-        app.homeEventsStream = stream
-        app.homeEventsContinuation = continuation
         app.databases.use(InMemoryDatabaseConfiguration(), as: DatabaseID(string: "in-memory"), isDefault: true)
         app.homeManager = await HomeManager(getAdapter: { nil },
                                             storageRepo: EmptyStorage(),
                                             notificationSender: SilentSender(),
-                                            location: Location(latitude: 52.52, longitude: 13.405))
+                                            location: Location(latitude: 52.52, longitude: 13.405),
+                                            onReportedChange: { [app] in app?.homeEventSink.yield(.change(entity: $0)) })
+        loop = app.startEventLoop()
         try routes(app)
     }
 
     override func tearDown() async throws {
+        loop.cancel()
         try await app.asyncShutdown()
         app = nil
     }

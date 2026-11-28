@@ -539,20 +539,15 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     /// The tabular `EXPLAIN` of a statement as one text (every row's `select_type`, `key` and `Extra`); the tests below
     /// assert that an index is used, so a later schema edit cannot silently drop one.
-    /// MySQLNIO asserts ("Statement not closed") on `EXPLAIN DELETE`, so a DELETE is explained as the SELECT that finds its
-    /// rows: the optimizer picks the same index.
-    private static func explainable(_ statement: String) -> String {
-        statement.hasPrefix("DELETE FROM") ? "SELECT * FROM" + statement.dropFirst("DELETE FROM".count) : statement
-    }
-
+    /// The tabular `EXPLAIN` of a statement as one text (every row's `key` and `Extra`); the tests below assert that an
+    /// index is used, so a later schema edit cannot silently drop one. It goes through the driver's text protocol:
+    /// over the prepared-statement path `sql.raw` uses, MySQLNIO returns no rows for an EXPLAIN (and asserts on EXPLAIN DELETE).
     private func plan(_ statement: String) async throws -> String {
-        let sql = try XCTUnwrap(app.db as? SQLDatabase)
-        let rows = try await sql.raw(SQLQueryString("EXPLAIN " + Self.explainable(statement))).all()
+        let mysql = try XCTUnwrap(app.db as? MySQLDatabase)
+        let rows = try await mysql.simpleQuery("EXPLAIN " + statement).get()
         XCTAssertFalse(rows.isEmpty, "EXPLAIN returned no rows for \(statement)")
-        return try rows.map { row in
-            let key = try row.decode(column: "key", as: String?.self) ?? "-"
-            let extra = try row.decode(column: "Extra", as: String?.self) ?? "-"
-            return "key=\(key) extra=\(extra)"
+        return rows.map { row in
+            "key=\(row.column("key")?.string ?? "-") extra=\(row.column("Extra")?.string ?? "-")"
         }.joined(separator: "\n")
     }
 

@@ -99,7 +99,7 @@ struct CommandCacheTests {
     func onlyContradictedIsReset() async {
         let manager = CommandCache()
         let onAction = HomeManagableAction.turnOn(switchId)
-        let brightnessAction = HomeManagableAction.setBrightness(switchId, 0.5)
+        let brightnessAction = HomeManagableAction.setBrightness(brightnessId, 0.5)
 
         #expect(await manager.isDuplicate(onAction) == false)
         await manager.markExecuted(onAction)
@@ -114,6 +114,19 @@ struct CommandCacheTests {
         // turnOn may be re-issued, setBrightness is still deduped.
         #expect(await manager.isDuplicate(onAction) == false)
         #expect(await manager.isDuplicate(brightnessAction) == true)
+    }
+
+    @Test("A command that reached the device replaces the cached opposite command of the same entity")
+    func oppositeCommandIsReplaced() async {
+        let manager = CommandCache()
+        await manager.markExecuted(.turnOff(switchId))
+        await manager.markExecuted(.turnOn(switchId))
+
+        #expect(await manager.isDuplicate(.turnOff(switchId)) == false)
+        #expect(await manager.isDuplicate(.turnOn(switchId)) == true)
+
+        await manager.forget(switchId)
+        #expect(await manager.isDuplicate(.turnOn(switchId)) == false)
     }
 
     @Test("Expired cache entries are dropped and the index self-heals")

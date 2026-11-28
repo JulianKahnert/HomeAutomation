@@ -27,24 +27,11 @@ actor HomeAutomationConfigService: Log, AutomationRepository {
         self.persist = persist
     }
 
-    /// Takes the location of a deployed config; it is stored with the next `save`.
-    func set(location: Location) {
-        self.location = location
-    }
-
-    /// The save that was handed over last; the next one waits for it, so an older snapshot never lands after a newer one.
-    private var tail: Task<Void, any Error>?
-
-    func save(_ automations: [any Automatable]) async throws {
+    /// Saves are serialized by the `AutomationService`, which hands them over in the order of the changes.
+    func save(_ automations: [any Automatable], location newLocation: Location?) async throws {
+        if let newLocation { location = newLocation }
         let configDto = ConfigDTO(location: location, automations: automations.map(AnyAutomation.create(from:)))
-        let data = try JSONEncoder().encode(configDto)
-        let previous = tail
-        let task = Task { [persist] in
-            _ = await previous?.result
-            try await persist(data)
-        }
-        tail = task
-        try await task.value
+        try await persist(try JSONEncoder().encode(configDto))
     }
 
     /// - Parameter database: Resolved per query, so saves are not tied to one event loop's pool.

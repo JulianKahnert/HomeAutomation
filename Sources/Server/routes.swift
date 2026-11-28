@@ -94,8 +94,7 @@ func routes(_ app: Application) throws {
             }
         }
 
-        await req.application.homeAutomationConfigService.set(location: configDTO.location)
-        try await req.application.automationService.deploy(configDTO.automations.map(\.automation))
+        try await req.application.automationService.deploy(configDTO.automations.map(\.automation), location: configDTO.location)
         // After the config is stored, so automations that react see the new one.
         req.application.homeEventSink.yield(.configDeployed)
 

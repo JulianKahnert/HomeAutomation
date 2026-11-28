@@ -41,6 +41,20 @@ struct DeliveryQueueTests {
         #expect(await queue.lastPushDate(id: "b") != nil)
     }
 
+    @Test("a send that never returns does not block the next delivery")
+    func hungSendDoesNotBlockQueue() async {
+        let sender = GatedSender()
+        let queue = DeliveryQueue(sender: sender, sendTimeout: .milliseconds(50))
+
+        // the gate stays closed: the first send hangs until the timeout gives it up
+        await queue.deliver(.push(title: "hangs", message: "", id: "a"))
+        await sender.openGate()
+        await queue.deliver(.push(title: "arrives", message: "", id: "b"))
+
+        #expect(await sender.titles == ["hangs", "arrives"])
+        #expect(await queue.lastPushDate(id: "b") != nil)
+    }
+
     @Test("every delivery kind reaches the sender with the caller's content")
     func allKindsReachSender() async {
         let recorder = RecordingNotificationSender()

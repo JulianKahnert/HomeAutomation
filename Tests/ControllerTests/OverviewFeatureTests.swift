@@ -71,7 +71,7 @@ struct OverviewFeatureTests {
         #expect(stopped.withLock { $0 } == ["Night Light"])
     }
 
-    @Test("a failed stop shows the error but keeps the server's health")
+    @Test("a failed stop has its own error and leaves the server status alone")
     func stopFailureKeepsHealth() async {
         struct StopError: Error, LocalizedError { var errorDescription: String? { "stop failed" } }
         var state = OverviewFeature.State()
@@ -84,8 +84,9 @@ struct OverviewFeatureTests {
 
         await store.send(.stopButtonTapped("Night Light"))
         await store.receive(\.stopResponse) {
-            $0.error = "stop failed"
+            $0.stopError = "stop failed"
         }
+        #expect(store.state.error == nil)
     }
 
     @Test("polls every 30 seconds until the task is cancelled")

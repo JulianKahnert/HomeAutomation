@@ -7,6 +7,7 @@ import ComposableArchitecture
 @testable import Controller
 import Foundation
 import HAModels
+import ServerClient
 import Testing
 
 @MainActor
@@ -75,8 +76,6 @@ struct AutomationDetailsTests {
                 placeId == "Hall" ? [motionHistory, EntityHistory(entityId: thermo, items: [])] : []
             }
         }
-        // `.serverLocation` lives in `UserDefaults.standard`, so a previous run may have stored one.
-        store.state.$location.withLock { $0 = nil }
 
         await store.send(.task) {
             $0.end = now
@@ -105,10 +104,56 @@ struct AutomationDetailsTests {
         // `\.stopOperationResponse.success` on `Result<Void, Error>` crashes the Swift 6.4 beta compiler.
         await store.receive(\.stopOperationResponse) {
             $0.isLoading = false
+            $0.end = now
             $0.$automation.withLock { $0.isRunning = false }
         }
-        await store.receive(\.task) {
-            $0.end = now
+    }
+
+    @Test("a failed change and a failed stop name what failed")
+    func failureTexts() async {
+        struct Failure: Error, LocalizedError { var errorDescription: String? { "boom" } }
+        let store = TestStore(initialState: AutomationDetails.State(automation: Shared(value: info(type: "Turn", isRunning: true)))) {
+            AutomationDetails()
+        } withDependencies: {
+            $0.serverClient.activate = { _ in throw Failure() }
+            $0.serverClient.stop = { _ in throw Failure() }
+        }
+
+        await store.send(.updateIsActive(true)) { $0.isLoading = true }
+        await store.receive(\.isActiveOperationResponse) {
+            $0.isLoading = false
+            $0.error = "Failed to change Night Light: boom"
+        }
+        await store.send(.stopAutomation) {
+            $0.error = nil
+            $0.isLoading = true
+        }
+        await store.receive(\.stopOperationResponse) {
+            $0.isLoading = false
+            $0.error = "Failed to stop Night Light: boom"
+        }
+    }
+
+    @Test("a busy server keeps the new value without an error and reloads after a short delay")
+    func busyKeepsValueAndReloads() async {
+        let clock = TestClock()
+        let reloaded = AutomationInfo(name: "Night Light", isActive: false, isRunning: false, type: "Turn", recordsRuns: true)
+        let store = TestStore(initialState: AutomationDetails.State(automation: Shared(value: info(type: "Turn")))) {
+            AutomationDetails()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.serverClient.deactivate = { _ in throw ServerClientError.busy }
+            $0.serverClient.getAutomations = { [reloaded] }
+        }
+
+        await store.send(.updateIsActive(false)) { $0.isLoading = true }
+        await store.receive(\.isActiveOperationResponse) {
+            $0.isLoading = false
+            $0.$automation.withLock { $0.isActive = false }
+        }
+        await clock.advance(by: .seconds(5))
+        await store.receive(\.automationsResponse.success) {
+            $0.$automation.withLock { $0 = reloaded }
         }
     }
 }

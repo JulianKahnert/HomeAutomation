@@ -9,6 +9,7 @@
 import ComposableArchitecture
 import Foundation
 import HAModels
+import ServerClient
 import SwiftUI
 
 @Reducer
@@ -19,6 +20,7 @@ struct HeatingFeature: Sendable {
 
     private enum CancelID {
         case detail
+        case fireplaceReload
     }
 
     @ObservableState
@@ -61,6 +63,7 @@ struct HeatingFeature: Sendable {
         case task
     }
 
+    @Dependency(\.continuousClock) var clock
     @Dependency(\.date) var date
     @Dependency(\.serverClient) var serverClient
 
@@ -100,6 +103,14 @@ struct HeatingFeature: Sendable {
             case let .fireplaceSwitched(.success(fireplace)):
                 state.fireplace = fireplace
                 return .none
+
+            case let .fireplaceSwitched(.failure(error)) where error as? ServerClientError == .busy:
+                // The server queued the switch and will still apply it: keep the shown state and look again soon.
+                return .run { send in
+                    try await clock.sleep(for: .seconds(5))
+                    await send(.fireplaceLoaded(Result { try await serverClient.getFireplace() }))
+                }
+                .cancellable(id: CancelID.fireplaceReload, cancelInFlight: true)
 
             case let .fireplaceSwitched(.failure(error)):
                 state.fireplaceError = error.localizedDescription

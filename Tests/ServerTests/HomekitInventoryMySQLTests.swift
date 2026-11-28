@@ -111,14 +111,19 @@ final class HomekitInventoryMySQLTests: XCTestCase {
 
     /// Keep in sync with `docs/database-schema.md`.
     static let missingContactSensorsQuery = """
+        WITH cfg AS (
+          -- the config blob holds the JSON as base64 text in quotes (how the server writes it) or as plain JSON
+          SELECT CAST(IF(LEFT(s, 1) = '"', CONVERT(FROM_BASE64(JSON_UNQUOTE(s)) USING utf8mb4), s) AS JSON) AS doc
+          FROM (SELECT CONVERT(json USING utf8mb4) AS s FROM config) raw
+        )
         SELECT CONCAT(i.roomName, ' / ', i.accessoryName) AS v
         FROM homekitInventory i
         WHERE i.mappedType = 'contactSensor'
           AND NOT EXISTS (
-            SELECT 1 FROM config c
-            WHERE JSON_SEARCH(CAST(CONVERT(c.json USING utf8mb4) AS JSON), 'one',
+            SELECT 1 FROM cfg
+            WHERE JSON_SEARCH(cfg.doc, 'one',
                     REPLACE(REPLACE(REPLACE(i.accessoryName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.name') IS NOT NULL
-              AND JSON_SEARCH(CAST(CONVERT(c.json USING utf8mb4) AS JSON), 'one',
+              AND JSON_SEARCH(cfg.doc, 'one',
                     REPLACE(REPLACE(REPLACE(i.roomName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.placeId') IS NOT NULL)
         GROUP BY i.roomName, i.accessoryName
         ORDER BY i.roomName, i.accessoryName

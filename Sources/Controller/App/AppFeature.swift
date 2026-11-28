@@ -75,9 +75,6 @@ struct AppFeature: Sendable {
         case registerPushToken(PushToken)
         case clearDeliveredNotifications
 
-        // Background tasks
-        case refreshWindowStates
-
         // Scene phase changes
         case scenePhaseChanged(old: ScenePhase, new: ScenePhase)
         case refreshAll
@@ -174,13 +171,6 @@ struct AppFeature: Sendable {
                     await pushNotification.clearDeliveredNotifications()
                 }
 
-            // MARK: - Background Tasks
-
-            case .refreshWindowStates:
-                return .run { send in
-                    await send(.settings(.refreshWindowStates))
-                }
-
             // MARK: - Scene Phase Changes
 
             case let .scenePhaseChanged(old: oldPhase, new: newPhase):
@@ -202,7 +192,7 @@ struct AppFeature: Sendable {
                     .send(.overview(.refresh)),
                     .send(.automations(.refresh)),
                     .send(.heating(.refresh)),
-                    .send(.refreshWindowStates),
+                    .send(.settings(.refreshWindowStates)),
                     .send(.startMonitoringLiveActivities),
                     .send(.clearDeliveredNotifications)
                 )

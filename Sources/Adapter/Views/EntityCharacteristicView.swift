@@ -11,10 +11,9 @@ import SwiftUI
 
 struct EntityCharacteristicView: View {
     let item: EntityStorageItem
-    let type: CharacteristicsType
 
     var body: some View {
-        switch type {
+        switch item.entityId.characteristicType {
         case .motionSensor:
             if let motionDetected = item.motionDetected {
                 Spacer()
@@ -97,7 +96,7 @@ struct EntityCharacteristicView: View {
                 Spacer()
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Color(red: Double(color.red) / 255, green: Double(color.green) / 255, blue: Double(color.blue) / 255))
+                        .fill(Color(red: Double(color.red), green: Double(color.green), blue: Double(color.blue)))
                         .frame(width: 20, height: 20)
                     Text("RGB")
                         .font(.caption)
@@ -148,8 +147,7 @@ struct EntityCharacteristicView: View {
             Text("Target")
             EntityCharacteristicView(
                 item: EntityStorageItem(entityId: EntityId(placeId: "Bad", name: "Thermostat", characteristicsName: nil, characteristic: .targetTemperature),
-                                        targetTemperatureInC: 21),
-                type: .targetTemperature)
+                                        targetTemperatureInC: 21))
         }
     }
 }

@@ -49,9 +49,34 @@ struct ActivityFeedView: View {
     }
 }
 
-#Preview {
+#Preview("Empty") {
     NavigationStack {
         ActivityFeedView(store: Store(initialState: ActivityFeedFeature.State(runs: [])) {
+            ActivityFeedFeature()
+        })
+    }
+}
+
+#Preview("Runs") {
+    let trigger = AutomationTrigger(kind: .sunset, entityId: nil, summary: "Sunset")
+    NavigationStack {
+        ActivityFeedView(store: Store(initialState: ActivityFeedFeature.State(runs: [
+            AutomationRun(
+                automationName: "Bathroom Night Light",
+                startedAt: Date().addingTimeInterval(-3600),
+                endedAt: Date().addingTimeInterval(-3590),
+                trigger: trigger,
+                outcome: .failed,
+                errorDescription: "Mirror Light (Bathroom) not reachable"
+            ),
+            AutomationRun(
+                automationName: "Evening Lights",
+                startedAt: Date().addingTimeInterval(-7200),
+                endedAt: Date().addingTimeInterval(-7195),
+                trigger: trigger,
+                outcome: .completed
+            )
+        ])) {
             ActivityFeedFeature()
         })
     }

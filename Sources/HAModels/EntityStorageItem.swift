@@ -25,7 +25,8 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     public var origin: Origin
 
     /// When the entity last reported, a replay included; `timestamp` stays the time of the last change.
-    /// Memory only: never stored, `nil` after a restart until the first report. Like `origin` it is no part of
+    /// Stored per entity, written at most every five minutes (`entities.lastReport`); a reader of the current state
+    /// returns the later of that and the newest change's timestamp. Like `origin` it is no part of
     /// the value (see `HomeManager.addEntityHistory`).
     public var lastReport: Date?
 

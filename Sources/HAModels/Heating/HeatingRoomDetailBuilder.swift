@@ -87,7 +87,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
     ///   - sensorFailureLimit: A reading older than this no longer counts: the grid shows a gap.
     ///     Rows are only stored when a value changed, so the limit counts from the later of the last change and the
     ///     last report: an unchanged value that still reports shows no gap, a silent sensor does.
-    ///   - lastReport: When an entity last reported (memory of the server); `nil` when unknown, as after a restart.
+    ///   - lastReport: When an entity last reported (stored per entity, written at most every five minutes); `nil` until the entity has reported once.
     public init(storage: any StorageRepository,
                 journal: any JournalStore,
                 now: @escaping @Sendable () -> Date = { Date() },

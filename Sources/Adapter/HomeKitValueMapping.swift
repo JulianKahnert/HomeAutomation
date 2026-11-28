@@ -9,12 +9,11 @@ import HAModels
 /// Turns the raw value HomeKit reports for a characteristic into the ``Value`` of its entity.
 ///
 /// A pure function of the characteristic type of the entity and what HomeKit said, so every type is tested
-/// without HomeKit. The HomeKit constants it compares with are written out as their HAP UUIDs and checked
-/// against the HomeKit symbols in `HomeKitValueMappingTests`.
+/// without HomeKit. The HomeKit constant it compares with is written out as its HAP UUID and checked
+/// against the HomeKit symbol in `HomeKitValueMappingTests`.
 enum HomeKitValueMapping {
     // Characteristics
     static let occupancyDetectedCharacteristic = "00000071-0000-1000-8000-0026BB765291"
-    static let motionDetectedCharacteristic = "00000022-0000-1000-8000-0026BB765291"
 
     /// What the mapping needs to know about the characteristic besides the value.
     struct Context {

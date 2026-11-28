@@ -8,7 +8,7 @@
 import Foundation
 import Shared
 
-open class AirSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
+open class AirSensorDevice: Codable, @unchecked Sendable, Log {
     /// Current Temperature
     public let temperatureSensorId: EntityId
 
@@ -36,41 +36,4 @@ open class AirSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
         self.airQualitySensorId = airQualitySensorId
     }
 
-    public func validate(with hm: any EntityValidator) async throws {
-
-        try await hm.findEntity(temperatureSensorId)
-        try await hm.findEntity(relativeHumiditySensorId)
-
-        if let carbonDioxideSensorId {
-            do {
-                try await hm.findEntity(carbonDioxideSensorId)
-            } catch {
-                log.warning("Failed to get battery sensor for \(carbonDioxideSensorId)")
-            }
-        }
-
-        if let pmDensitySensorId {
-            do {
-                try await hm.findEntity(pmDensitySensorId)
-            } catch {
-                log.warning("Failed to get battery sensor for \(pmDensitySensorId)")
-            }
-        }
-
-        if let batterySensorId {
-            do {
-                try await hm.findEntity(batterySensorId)
-            } catch {
-                log.warning("Failed to get battery sensor for \(batterySensorId)")
-            }
-        }
-
-        if let airQualitySensorId {
-            do {
-                try await hm.findEntity(airQualitySensorId)
-            } catch {
-                log.warning("Failed to get battery sensor for \(airQualitySensorId)")
-            }
-        }
-    }
 }

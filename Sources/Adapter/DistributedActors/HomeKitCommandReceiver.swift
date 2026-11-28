@@ -34,10 +34,6 @@ public distributed actor HomeKitCommandReceiver {
         return entities
     }
 
-    public distributed func findEntity(_ entity: EntityId) async throws {
-        try await adapter.findEntity(entity)
-    }
-
     public distributed func perform(_ action: HomeManagableAction) async throws {
         do {
             try await adapter.perform(action)

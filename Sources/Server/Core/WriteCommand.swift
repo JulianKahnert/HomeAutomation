@@ -7,6 +7,7 @@ import HAApplicationLayer
 import HAModels
 import Logging
 import Shared
+import Synchronization
 
 /// What the event loop takes from its stream: an event of the house, or a write of the API. Both take the same
 /// way, in the order they arrive, so a write is ordered after every event that was queued before it.
@@ -35,8 +36,37 @@ struct WriteCommand: Sendable {
     }
 
     let kind: Kind
-    /// Resolves the caller's wait: the new state for `setState`, `nil` for every other kind. Called once, by the loop.
-    let complete: @Sendable (Result<StateChange?, any Error>) -> Void
+    private let completion: WriteCompletion
+
+    /// - Parameter complete: Resolves the caller's wait: the new state for `setState`, `nil` for every other kind.
+    ///   Called once: by the loop, or with ``CoreCommandError/dropped`` when the command is released unhandled.
+    init(kind: Kind, complete: @escaping @Sendable (Result<StateChange?, any Error>) -> Void) {
+        self.kind = kind
+        self.completion = WriteCompletion(complete)
+    }
+
+    func complete(_ result: Result<StateChange?, any Error>) {
+        completion.resolve(result)
+    }
+}
+
+/// Resolves a caller's wait exactly once. When the last copy of the command is released without an answer (the stream
+/// ended with the write still in it), the caller gets ``CoreCommandError/dropped`` instead of waiting forever with a
+/// leaked continuation.
+private final class WriteCompletion: Sendable {
+    private let handler: Mutex<(@Sendable (Result<StateChange?, any Error>) -> Void)?>
+
+    init(_ handler: @escaping @Sendable (Result<StateChange?, any Error>) -> Void) {
+        self.handler = Mutex(handler)
+    }
+
+    func resolve(_ result: Result<StateChange?, any Error>) {
+        handler.withLock { $0.take() }?(result)
+    }
+
+    deinit {
+        handler.withLock { $0.take() }?(.failure(CoreCommandError.dropped))
+    }
 }
 
 /// The command port over the event flow: every command enters the core as an event in the stream the adapter and the
@@ -79,6 +109,8 @@ struct EventFlowCommandPort: CommandPort, Log {
     }
 
     private func send(_ kind: WriteCommand.Kind) async throws -> StateChange? {
+        // A request that is already cancelled enqueues nothing.
+        try Task.checkCancellation()
         let command = kind.name
         let sink = sink
         let timedOut: @Sendable () -> any Error = {

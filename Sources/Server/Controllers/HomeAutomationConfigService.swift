@@ -35,25 +35,20 @@ actor HomeAutomationConfigService: Log, AutomationRepository {
     }
 
     /// - Parameter database: Resolved per query, so saves are not tied to one event loop's pool.
-    static func load(from database: @escaping @Sendable () -> any Database) async -> (service: HomeAutomationConfigService, automations: [any Automatable]) {
+    /// - Returns: `isReadable` is `false` when the stored config could not be read, so nothing may overwrite it.
+    static func load(from database: @escaping @Sendable () -> any Database) async -> (service: HomeAutomationConfigService, automations: [any Automatable], isReadable: Bool) {
         let persist: @Sendable (Data) async throws -> Void = { try await ConfigItem.save(json: $0, on: database()) }
         do {
-            var data = try await ConfigItem.loadJSON(on: database())
-            if data == nil, FileManager.default.fileExists(atPath: legacyFileURL.path) {
+            if try await ConfigItem.loadJSON(on: database()) == nil, FileManager.default.fileExists(atPath: legacyFileURL.path) {
                 log.notice("Importing legacy config file into the database")
-                let legacyData = try Data(contentsOf: legacyFileURL)
-                try await persist(legacyData)
-                data = legacyData
+                try await persist(try Data(contentsOf: legacyFileURL))
             }
-            guard let data else {
-                log.info("No config stored yet - falling back to default config")
-                return (Self(location: defaultLocation, persist: persist), [])
-            }
-            let config = try JSONDecoder().decode(ConfigDTO.self, from: data)
-            return (Self(location: config.location, persist: persist), config.automations.map(\.automation))
+            // The one place that decodes the stored config and falls back to the default location.
+            let config = try await ConfigDbRepository(database: database).load()
+            return (Self(location: config.location, persist: persist), config.automations.map(\.automation), true)
         } catch {
             log.error("Failed to load config - falling back to default config: \(error)")
-            return (Self(location: defaultLocation, persist: persist), [])
+            return (Self(location: defaultLocation, persist: persist), [], false)
         }
     }
 }

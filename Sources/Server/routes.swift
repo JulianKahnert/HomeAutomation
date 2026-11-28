@@ -1,6 +1,7 @@
 import HAApplicationLayer
 import HAImplementations
 import HAModels
+import OpenAPIRuntime
 import OpenAPIVapor
 import Shared
 import Vapor
@@ -29,19 +30,9 @@ func routes(_ app: Application) throws {
         let configDTO = try req.content.decode(ConfigDTO.self)
         let skipValidation = req.query["skipValidation"] == "true"
 
-        // The command port validates the entities (unless skipped) and deploys in its turn in the event loop.
-        do {
-            try await req.application.commandPort.deploy(configDTO.automations.map(\.automation), location: configDTO.location, skipValidation: skipValidation)
-        } catch let error as CoreCommandError {
-            switch error {
-            case .unknownEntities(let missingEntityIds):
-                throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
-            case .timedOut:
-                throw Abort(.serviceUnavailable, reason: "The server core did not answer in time")
-            default:
-                throw error
-            }
-        }
+        // The command port validates the entities (unless skipped) and deploys in its turn in the event loop; its
+        // errors answer as `CoreCommandError` says (422 unknown entities, 503 busy).
+        try await req.application.commandPort.deploy(configDTO.automations.map(\.automation), location: configDTO.location, skipValidation: skipValidation)
 
         return configDTO
     }
@@ -53,5 +44,5 @@ func routes(_ app: Application) throws {
     )
 
     let handler = OpenAPIController()
-    try handler.registerHandlers(on: transport)
+    try handler.registerHandlers(on: transport, middlewares: [ErrorHandlingMiddleware()])
 }

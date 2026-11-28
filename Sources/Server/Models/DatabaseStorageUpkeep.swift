@@ -31,39 +31,42 @@ struct DatabaseStorageUpkeep: StorageUpkeep, Log {
     func perform(_ step: StorageUpkeepStep, now: Date) async throws {
         switch step {
         case .cleanup:
-            await cleanUp(now: now)
+            try await cleanUp(now: now)
         case .rollup:
-            await rollUp(now: now)
+            try await rollUp(now: now)
         case .journal:
             try await journal.deleteEntries(olderThan: now.addingTimeInterval(-1 * Duration.days(Self.journalRetentionDays).timeInterval))
         }
     }
 
-    private func cleanUp(now: Date) async {
-        await attempt("Database cleanup") {
+    private func cleanUp(now: Date) async throws {
+        try await attempt("Database cleanup") {
             for (type, cutoff) in StoragePolicy.cleanupCutoffs(now: now) {
                 log.info("Deleting entries past their retention", metadata: ["type": "\(type.rawValue)", "before": "\(cutoff)"])
                 try await entities.deleteEntries(ofType: type, olderThan: cutoff)
             }
             log.info("Database cleanup completed successfully")
         }
-        await attempt("Noisy entity check") {
+        try await attempt("Noisy entity check") {
             try await noisyEntityWarner.check(entities, now: now)
         }
     }
 
-    private func rollUp(now: Date) async {
+    private func rollUp(now: Date) async throws {
         for target in StoragePolicy.rollupCutoffs(now: now) {
-            await attempt("Hourly rollup", metadata: ["type": "\(target.type.rawValue)"]) {
+            try await attempt("Hourly rollup", metadata: ["type": "\(target.type.rawValue)"]) {
                 try await entities.rollUpHourly(type: target.type, validRange: target.validRange, olderThan: target.before)
             }
         }
     }
 
-    /// Runs one upkeep piece; a failure is logged and the next piece still runs.
-    private func attempt(_ piece: String, metadata: Logger.Metadata = [:], _ work: () async throws -> Void) async {
+    /// Runs one upkeep piece; a failure is logged and the next piece still runs. A cancellation (a stop, a superseding
+    /// run) is no failure: it ends the whole upkeep.
+    private func attempt(_ piece: String, metadata: Logger.Metadata = [:], _ work: () async throws -> Void) async throws {
         do {
             try await work()
+        } catch let cancellation as CancellationError {
+            throw cancellation
         } catch {
             log.error("Database upkeep failed", metadata: metadata.merging(["piece": "\(piece)", "error": "\(error)"]) { current, _ in current })
         }

@@ -117,9 +117,6 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return Set(items)
     }
 
-    func findEntity(_ entity: EntityId) async throws {
-    }
-
     func trigger(scene sceneName: String) async {
     }
 
@@ -195,8 +192,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     func lastReports() async -> [String: Date] { [:] }
 
     /// Server-owned states reported by an automation under test, with the origin they were reported with.
-    @discardableResult
-    func report(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> Bool {
+    func reportState(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> StateChange? {
         // like `HomeManager`: a superseded (cancelled) run cannot report
         try Task.checkCancellation()
         guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
@@ -204,10 +200,11 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
             throw ReportError.valueDoesNotFit(entityId)
         }
         let current = storageItems.last { $0.entityId == entityId }
-        guard ifCurrent(current) else { return false }
+        guard ifCurrent(current) else { return nil }
         // like `HomeManager`: a value-identical replay changes nothing
-        guard current?.value != item.value else { return false }
-        return await addEntityHistory(item)
+        guard current?.value != item.value else { return current.flatMap { StateChange(item: $0, changed: false) } }
+        let changed = await addEntityHistory(item)
+        return StateChange(item: item, changed: changed)
     }
 
     func states(of type: CharacteristicsType) async -> [EntityStorageItem] {

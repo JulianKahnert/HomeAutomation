@@ -27,8 +27,6 @@ private actor AdapterProbe {
     private(set) var startedPerforms = 0
     private(set) var completedPerforms = 0
     private(set) var performedActions: [HomeManagableAction] = []
-    /// The entities the adapter was asked to find.
-    private(set) var foundEntities: [EntityId] = []
 
     private var failure: FakeAdapterError?
     private let performDuration: Duration?
@@ -77,10 +75,6 @@ private actor AdapterProbe {
         return items
     }
 
-    func find(_ entityId: EntityId) {
-        foundEntities.append(entityId)
-    }
-
     /// A held `turnOn` waits for `releaseHeldTurnOn()` and then fails; every other action succeeds at once.
     private var holdsFailingTurnOn = false
     private var heldTurnOn: CheckedContinuation<Void, Never>?
@@ -121,10 +115,6 @@ private distributed actor FakeEntityAdapter: EntityAdapterable {
 
     distributed func getAllEntitiesLive() async -> [EntityStorageItem] {
         []
-    }
-
-    distributed func findEntity(_ entity: EntityId) async throws {
-        await probe.find(entity)
     }
 
     distributed func perform(_ action: HomeManagableAction) async throws {
@@ -895,29 +885,6 @@ struct HomeManagerTests {
         await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(timeIntervalSince1970: 2_000), isDeviceOn: true))
 
         #expect(try await homeManager.getCurrentEntity(with: switchId).timestamp == changed)
-    }
-
-    @Test("An entity reported since the start is found without asking the adapter")
-    func reportedEntityIsFoundWithoutTheAdapter() async throws {
-        let probe = AdapterProbe()
-        let homeManager = await makeHomeManager(probe: probe)
-        await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, isDeviceOn: true))
-
-        try await homeManager.findEntity(switchId)
-
-        #expect(await probe.foundEntities.isEmpty)
-    }
-
-    @Test("An entity with only a stored state is looked up at the adapter, so one removed from HomeKit is noticed")
-    func storedEntityIsFoundAtTheAdapter() async throws {
-        let probe = AdapterProbe()
-        let stored = EntityStorageItem(entityId: switchId, timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true)
-        let homeManager = await makeHomeManager(probe: probe, storageRepo: MockStorageRepository(items: [stored]))
-        await homeManager.loadCurrentStates(timeout: .seconds(2))
-
-        try await homeManager.findEntity(switchId)
-
-        #expect(await probe.foundEntities == [switchId])
     }
 
     // MARK: - restart

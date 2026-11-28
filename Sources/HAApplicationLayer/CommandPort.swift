@@ -5,29 +5,16 @@
 
 import HAModels
 
-/// What a write sets: the state after the write and whether it changed.
-public struct StateChange: Sendable, Equatable {
-    public let item: EntityStorageItem
-    public let changed: Bool
-
-    public init(item: EntityStorageItem, changed: Bool) {
-        self.item = item
-        self.changed = changed
-    }
-}
-
 /// Why a command did not run to its end.
 public enum CoreCommandError: Error, Equatable {
-    /// The value does not fit the shape of the entity's value kind.
-    case valueDoesNotFit(EntityId)
-    /// The entity is not one the server can set (not server-owned).
-    case notSettable(EntityId)
     /// The state that was just set cannot be read back.
     case stateUnreadable(EntityId)
     /// A deploy that names entities HomeKit does not know.
     case unknownEntities(Set<EntityId>)
     /// The core did not answer in time; the command is handled when the event loop reaches it.
     case timedOut(command: String)
+    /// The command was dropped before the event loop took it (the stream ended, the server is shutting down); it will not run.
+    case dropped
 }
 
 /// The one way the API layer writes into the server core. The API layer reads through repositories and knows

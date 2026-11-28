@@ -106,9 +106,9 @@ extension HomeKitAdapter {
                         await characteristic.inventoryItem(inHome: homeName)
                     }
                 }
-                return await group.reduce(into: [HomeKitInventoryItem]()) { $0.append($1) }
+                return await group.reduce(into: [HomeKitInventoryItem?]()) { $0.append($1) }
             }
-            return items.sorted { ($0.roomName, $0.accessoryName, $0.serviceName, $0.characteristicType) < ($1.roomName, $1.accessoryName, $1.serviceName, $1.characteristicType) }
+            return items.compactMap(\.self).sorted { ($0.roomName, $0.accessoryName, $0.serviceName, $0.characteristicType) < ($1.roomName, $1.accessoryName, $1.serviceName, $1.characteristicType) }
         }
 
         func getHomes() async -> [HMHome] {

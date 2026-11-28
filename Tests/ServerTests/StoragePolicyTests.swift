@@ -20,7 +20,7 @@ struct StoragePolicyTests {
     }
 
     @Test(arguments: [CharacteristicsType.temperatureSensor, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration, .heating, .valve,
-                      .relativeHumiditySensor, .contactSensor, .batterySensor, .lock, .motionSensor, .switcher,
+                      .relativeHumiditySensor, .contactSensor, .lock, .motionSensor, .switcher,
                       .brightness, .colorTemperature, .color, .airQualitySensor, .pmDensitySensor, .energyPrice])
     func keepsRawForeverWithoutRollupOrDeadBand(_ type: CharacteristicsType) {
         #expect(rule(type).rawRetentionDays == nil)
@@ -42,6 +42,17 @@ struct StoragePolicyTests {
         #expect(!range.contains(0))
         #expect(range.contains(420))
         #expect(rule(.lightSensor).validRange?.contains(0) == true)
+    }
+
+    @Test func batteryStoresOnlyChangesOfAPercentagePoint() throws {
+        let band = try #require(rule(.batterySensor).deadBand)
+        #expect(band.absoluteChange == 1)
+        let last = (value: 80.0, timestamp: now)
+        #expect(!band.shouldStore(80, at: now.addingTimeInterval(3 * 3600), lastStored: last))
+        #expect(!band.shouldStore(80.4, at: now.addingTimeInterval(3 * 3600), lastStored: last))
+        #expect(band.shouldStore(79, at: now.addingTimeInterval(3 * 3600), lastStored: last))
+        #expect(rule(.batterySensor).hourlyRollup == false)
+        #expect(rule(.batterySensor).rawRetentionDays == nil)
     }
 
     @Test(arguments: CharacteristicsType.allCases)

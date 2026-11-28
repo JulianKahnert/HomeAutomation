@@ -14,6 +14,12 @@ import Shared
 import UIKit
 #endif
 
+private extension [HMHome] {
+    var readableCharacteristics: [HMCharacteristic] {
+        flatMap(\.accessories).flatMap(\.services).flatMap(\.characteristics).filter(\.isReadable)
+    }
+}
+
 extension HomeKitAdapter {
     final class HomeKitHomeManager: NSObject, @unchecked Sendable {
         private let log = Logger(label: "HomeKitHomeManager")
@@ -46,6 +52,9 @@ extension HomeKitAdapter {
         private let eveMatterValvePoller = EveMatterValvePoller()
         #endif
 
+        /// Reads battery level, temperature and humidity every `CharacteristicsType.pollInterval`, see `startPolling()`.
+        private var pollTask: Task<Void, Never>?
+
         init(entityStream: AsyncStream<EntityStorageItem>, entityStreamContinuation: AsyncStream<EntityStorageItem>.Continuation) {
             self.entityStream = entityStream
             self.entityStreamContinuation = entityStreamContinuation
@@ -58,8 +67,13 @@ extension HomeKitAdapter {
             manager.delegate = self
 
             startManagerResets()
+            startPolling()
             #if canImport(Matter)
             #endif
+        }
+
+        deinit {
+            pollTask?.cancel()
         }
 
         func getHomes() async -> [HMHome] {
@@ -169,12 +183,26 @@ extension HomeKitAdapter {
                 }
             }
 
-            // send all items initially that are subscribed
-            let items = await withTaskGroup(of: Optional<EntityStorageItem>.self) { group in
-                for characteristic in allCharacteristics {
-                    guard characteristic.shouldSubscribe else { continue }
+            // send all items initially that are subscribed or polled (the battery is read here, not subscribed)
+            await yieldReadings(of: homes.readableCharacteristics.filter(\.shouldReport), priority: .medium)
 
-                    group.addTask(priority: .medium) {
+            if let resubscribeReasons {
+                log.info("Resubscribed characteristic notifications", metadata: [
+                    "reasons": "\(resubscribeReasons.joined(separator: ","))",
+                    "characteristics": "\(allCharacteristics.filter(\.shouldSubscribe).count)",
+                    "failures": "\(subscriptionErrors)"
+                ])
+            }
+
+            let duration = start.duration(to: .now)
+            log.info("updateEntities() — completed in \(duration) (changes: \(subscriptionChanges), errors: \(subscriptionErrors))")
+        }
+
+        /// Reads `characteristics` once each and yields the values onto the entity stream.
+        private func yieldReadings(of characteristics: [HMCharacteristic], priority: TaskPriority) async {
+            let items = await withTaskGroup(of: Optional<EntityStorageItem>.self) { group in
+                for characteristic in characteristics {
+                    group.addTask(priority: priority) {
                         return await characteristic.getEntityStorageItem()
                     }
                 }
@@ -187,17 +215,32 @@ extension HomeKitAdapter {
             for item in items.compactMap(\.self) {
                 self.entityStreamContinuation.yield(item)
             }
+        }
 
-            if let resubscribeReasons {
-                log.info("Resubscribed characteristic notifications", metadata: [
-                    "reasons": "\(resubscribeReasons.joined(separator: ","))",
-                    "characteristics": "\(allCharacteristics.filter(\.shouldSubscribe).count)",
-                    "failures": "\(subscriptionErrors)"
-                ])
+        /// Reads the polled characteristics (battery level, temperature, humidity) every `pollInterval`, in addition
+        /// to the read of every full resync. Notifications are unreliable for some standalone sensors and the battery
+        /// is not subscribed. The server keeps an unchanged value out of the history. The task ends with the manager.
+        private func startPolling() {
+            pollTask = Task(priority: .low) { [weak self] in
+                while !Task.isCancelled {
+                    do {
+                        try await Task.sleep(for: CharacteristicsType.pollInterval)
+                    } catch {
+                        return
+                    }
+                    guard let self else { return }
+                    await pollCharacteristics()
+                }
             }
+        }
 
-            let duration = start.duration(to: .now)
-            log.info("updateEntities() — completed in \(duration) (changes: \(subscriptionChanges), errors: \(subscriptionErrors))")
+        private func pollCharacteristics() async {
+            let start = ContinuousClock.now
+            let homes = await homesPublisher.get()
+            let characteristics = homes.readableCharacteristics.filter(\.shouldPoll)
+            log.info("pollCharacteristics() — reading \(characteristics.count) characteristics")
+            await yieldReadings(of: characteristics, priority: .low)
+            log.info("pollCharacteristics() — completed in \(start.duration(to: .now))")
         }
 
         private func update(homes: [HMHome], resubscribeReason: String? = nil, releasesRetiredManager: Bool = false) {

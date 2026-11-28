@@ -128,6 +128,16 @@ extension HMCharacteristic: @retroactive Comparable {
         entityCharacteristicType?.isSubscribed ?? false
     }
 
+    /// Whether a resync yields this characteristic's value to the server: it is subscribed or polled.
+    var shouldReport: Bool {
+        entityCharacteristicType?.isReported ?? false
+    }
+
+    /// Whether the periodic poll reads this characteristic.
+    var shouldPoll: Bool {
+        entityCharacteristicType?.isPolled ?? false
+    }
+
     private static let skippableCharacteristics = Set(["Active", "Camera Operating Mode Indicator", "Charging State", "Configured Name", "Cooling Threshold Temperature", "Current Heater Cooler State", "Current Heating Cooling State", "Custom", "Event Snapshots Active", "Firmware Version", "Hardware Version", "In Use", "Is Configured", "Label Index", "Lock Mechanism Current State", "Lock Mechanism Target State", "Lock Physical Controls", "Manufacturer", "Model", "Mute", "Name", "Night Vision", "Outlet In Use", "Program Mode", "Recording Audio Active", "Remaining Duration", "Saturation", "Serial Number", "Set Duration", "Software Version", "Status Active", "Status Fault", "Status Low Battery", "Temperature Display Units", "Valve Type", "Volatile Organic Compound Density", "Volume", "Programmable Switch Event", "Smoke Detected", "Leak Detected", "Status Tampered"])
     var entityCharacteristicType: CharacteristicsType? {
         guard let homeKitCharacteristic = HomeKitCharacteristic(characteristicType: characteristicType) else {

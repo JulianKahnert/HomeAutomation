@@ -162,9 +162,8 @@ struct InitialSchema: AsyncMigration {
             ("idx_journal_runId", JournalDbItem.schema, ["runId"]),
             ("idx_journal_kind_title_timestamp", JournalDbItem.schema, ["kind", "title", "timestamp"]),
             ("idx_journal_kind_place_timestamp", JournalDbItem.schema, ["kind", "entityPlaceId", "timestamp"]),
-            // "Which characteristics of a mapped type does HomeKit have", and everything of a room.
-            ("idx_homekitInventory_mappedType_room_accessory", HomekitInventoryDbItem.schema, ["mappedType", "roomName", "accessoryName"]),
-            ("idx_homekitInventory_room_accessory", HomekitInventoryDbItem.schema, ["roomName", "accessoryName"])
+            // "Which characteristics of a mapped type does HomeKit have".
+            ("idx_homekitInventory_mappedType_room_accessory", HomekitInventoryDbItem.schema, ["mappedType", "roomName", "accessoryName"])
         ]
         for index in indexes {
             let builder = sql.create(index: index.name).on(index.table)

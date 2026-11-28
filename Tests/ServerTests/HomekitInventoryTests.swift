@@ -141,16 +141,47 @@ struct HomekitInventoryTests {
         #expect(stored.withLock { $0 } == 0)
     }
 
-    @Test("The sync refreshes at its start and on every completed handshake")
-    func runRefreshesAtStartAndOnHandshake() async throws {
-        let count = Mutex(0)
-        let sync = HomekitInventorySync(fetch: { count.withLock { $0 += 1 }; return Self.sample }, store: { _, _ in })
+    @Test("The sync refreshes on every handshake and never overlaps; a burst of handshakes queues one more refresh")
+    func runCoalescesTriggers() async throws {
+        let started = Mutex(0)
+        let running = Mutex(0)
+        let overlapped = Mutex(false)
+        let release = AsyncStream.makeStream(of: Void.self)
+        let sync = HomekitInventorySync(fetch: {
+            started.withLock { $0 += 1 }
+            if running.withLock({ $0 += 1; return $0 > 1 }) { overlapped.withLock { $0 = true } }
+            if started.withLock({ $0 }) == 1 {
+                for await _ in release.stream { break }
+            }
+            running.withLock { $0 -= 1 }
+            return Self.sample
+        }, store: { _, _ in })
         let (handshakes, continuation) = AsyncStream.makeStream(of: Void.self)
         let task = Task { await sync.run(handshakes: handshakes, interval: .seconds(3600)) }
 
-        try await waitUntil { count.withLock { $0 } == 1 }
         continuation.yield()
-        try await waitUntil { count.withLock { $0 } == 2 }
+        try await waitUntil { started.withLock { $0 } == 1 }
+        for _ in 0 ..< 5 { continuation.yield() }   // while the first refresh is running
+        try await Task.sleep(for: .milliseconds(100))
+        release.continuation.yield()
+        try await waitUntil { started.withLock { $0 } == 2 }
+        try await Task.sleep(for: .milliseconds(100))
+
+        #expect(started.withLock { $0 } == 2)
+        #expect(overlapped.withLock { $0 } == false)
+        task.cancel()
+        continuation.finish()
+        await task.value
+    }
+
+    @Test("The interval triggers a refresh without a handshake")
+    func runRefreshesOnTheInterval() async throws {
+        let count = Mutex(0)
+        let sync = HomekitInventorySync(fetch: { count.withLock { $0 += 1 }; return Self.sample }, store: { _, _ in })
+        let (handshakes, continuation) = AsyncStream.makeStream(of: Void.self)
+        let task = Task { await sync.run(handshakes: handshakes, interval: .milliseconds(20)) }
+
+        try await waitUntil { count.withLock { $0 } >= 2 }
         task.cancel()
         continuation.finish()
         await task.value

@@ -26,6 +26,15 @@ private struct InventoryTimeout: Error {}
 /// The values of an inventory read so far, filled by concurrent reads.
 private final class InventoryValues: Sendable {
     private let storage = Mutex<[UUID: String]>([:])
+    private let homeList = Mutex<[HMHome]>([])
+
+    func set(homes: [HMHome]) {
+        homeList.withLock { $0 = homes }
+    }
+
+    func homes() -> [HMHome] {
+        homeList.withLock { $0 }
+    }
 
     func set(_ text: String, for id: UUID) {
         storage.withLock { $0[id] = text }
@@ -124,31 +133,46 @@ extension HomeKitAdapter {
             pollTask?.cancel()
         }
 
-        /// The longest the reads of the values of an inventory may take together; it stays below `StarActorSystem`'s
-        /// remote call timeout (30 s). A value not read in time is left out.
-        static let inventoryValuesTimeout: Duration = .seconds(20)
+        /// The longest the whole inventory may take (waiting for the homes and reading the values); it stays below
+        /// `StarActorSystem`'s remote call timeout (30 s). A value not read in time is left out.
+        static let inventoryTimeout: Duration = .seconds(20)
+        /// How many values are read at the same time, so a timed-out inventory leaves only this many reads running
+        /// (HomeKit's `readValue()` ignores cancellation).
+        private static let inventoryReadWidth = 8
 
         /// Everything HomeKit knows: homes, rooms, accessories, services and characteristics, for any accessory type.
         func inventory() async -> HomeKitInventory {
-            let homes = await homesPublisher.get()
             let values = InventoryValues()
             do {
-                try await raceTimeout(Self.inventoryValuesTimeout, timeoutError: { InventoryTimeout() }, operation: {
+                try await raceTimeout(Self.inventoryTimeout, timeoutError: { InventoryTimeout() }, operation: { [homesPublisher] in
+                    let homes = await homesPublisher.get()
+                    values.set(homes: homes)
+                    var pending = homes.flatMap(\.accessories).flatMap(\.services).flatMap(\.characteristics).filter(\.isReadable)[...].makeIterator()
                     await withTaskGroup(of: Void.self) { group in
-                        for characteristic in homes.flatMap(\.accessories).flatMap(\.services).flatMap(\.characteristics) where characteristic.isReadable {
+                        func addNext() -> Bool {
+                            guard !Task.isCancelled, let characteristic = pending.next() else { return false }
                             group.addTask(priority: .low) {
                                 if let text = await characteristic.inventoryValue() {
                                     values.set(text, for: characteristic.uniqueIdentifier)
                                 }
                             }
+                            return true
                         }
-                        await group.waitForAll()
+                        var started = 0
+                        while started < Self.inventoryReadWidth, addNext() {
+                            started += 1
+                        }
+                        while await group.next() != nil {
+                            _ = addNext()
+                        }
                     }
                 })
             } catch {
-                log.warning("HomeKit inventory: not every value was read in time", metadata: ["error": "\(error)"])
+                log.warning("HomeKit inventory: not complete in time", metadata: ["error": "\(error)"])
             }
-            return HomeKitInventory(homes: homes.map { $0.inventory(values: values.snapshot()) })
+            let homes = values.homes()
+            let texts = values.snapshot()
+            return HomeKitInventory(homes: homes.map { $0.inventory(values: texts) })
         }
 
         func getHomes() async -> [HMHome] {

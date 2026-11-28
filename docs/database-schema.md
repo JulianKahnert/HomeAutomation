@@ -17,7 +17,7 @@ Every table with text columns is converted to the binary collation `utf8mb4_0900
 - `entities` (`EntityDbItem`): id; placeId, serviceName, characteristicType string NOT NULL; characteristicsName string; lastReport datetime (nullable: when the entity last reported, an unchanged report included; written at most every five minutes per entity, for a change like for an unchanged report, so it lags by up to five minutes; the readers return the later of it and the newest change's timestamp, so a stored change shows as a report at once; `NULL` until the entity reports after the column exists); UNIQUE (placeId, serviceName, characteristicType).
 - `entityChanges` (`EntityChangeDbItem`): id BIGINT AUTO_INCREMENT (rows append at the end of the clustered index; equal timestamps order by write, the higher id is the later one); entityId UUID NOT NULL, foreign key `fk_entityChanges_entityId` to `entities.id` ON DELETE RESTRICT (the app never deletes an entity; to remove one by hand, delete its changes in batches first); timestamp datetime NOT NULL; number DOUBLE; text string; origin VARCHAR(32) NOT NULL DEFAULT 'homekit'. CHECK `chk_entityChanges_value`: `number IS NOT NULL OR text IS NOT NULL`. Indexes `idx_entityChanges_entity_timestamp` (entityId, timestamp; serves every per-entity read, and the foreign key) and `idx_entityChanges_timestamp_entity` (timestamp, entityId; covers the daily row count per entity). Nothing else: the foreign key creates no index of its own because its index exists first.
 - `journal` (`JournalDbItem`): id; kind VARCHAR(16) NOT NULL (`run`, `command`, `push`); timestamp datetime NOT NULL; runId UUID; title string NOT NULL; detail VARCHAR(1000) NOT NULL; entityPlaceId, entityName, entityCharacteristicsName, entityCharacteristicType string; triggerKind, outcome VARCHAR(32); endedAt datetime; errorDescription TEXT; status, reason VARCHAR(32); pushId string; commandValue DOUBLE. Indexes `idx_journal_kind_timestamp` (kind, timestamp), `idx_journal_runId` (runId), `idx_journal_kind_title_timestamp` (kind, title, timestamp; the runs of one automation and the distinct automation names) and `idx_journal_kind_place_timestamp` (kind, entityPlaceId, timestamp; the heating commands of a room).
-- `homekitInventory` (`HomekitInventoryDbItem`): id BIGINT AUTO_INCREMENT; homeName, roomName, accessoryName, accessoryCategory, serviceTypeDescription, serviceName, characteristicDescription string NOT NULL; isReachable, isPrimaryService bool NOT NULL; manufacturer, model string; serviceType, characteristicType VARCHAR(64) NOT NULL (HomeKit UUIDs); mappedType VARCHAR(32) (the `CharacteristicsType` the adapter maps the characteristic to, `NULL` when it maps none); isReadable, isNotifiable, isWritable bool NOT NULL; value string (current value as text, `NULL` for a write-only characteristic or a failed read); syncedAt datetime NOT NULL. Indexes: `idx_homekitInventory_mappedType_room_accessory` (mappedType, roomName, accessoryName) and `idx_homekitInventory_room_accessory` (roomName, accessoryName).
+- `homekitInventory` (`HomekitInventoryDbItem`): id BIGINT AUTO_INCREMENT; homeName, roomName, accessoryName, accessoryCategory, serviceTypeDescription, serviceName, characteristicDescription string NOT NULL; isReachable, isPrimaryService bool NOT NULL; manufacturer, model string; serviceType, characteristicType VARCHAR(64) NOT NULL (HomeKit UUIDs); mappedType VARCHAR(32) (the `CharacteristicsType` the adapter maps the characteristic to, `NULL` when it maps none); isReadable, isNotifiable, isWritable bool NOT NULL; value string (current value as text, `NULL` for a write-only characteristic or a failed read); syncedAt datetime NOT NULL. Index: `idx_homekitInventory_mappedType_room_accessory` (mappedType, roomName, accessoryName).
 
 Texts longer than their column are cut by the server to the column width (counted in Unicode scalars, as MySQL counts) before they are written: `journal.title` 255, `journal.detail` 1000, `entityChanges.text` 255. A longer value would fail the insert in strict mode.
 
@@ -46,18 +46,18 @@ What changed in the schema that the script moving the old data must respect:
 - Foreign keys are RESTRICT: insert `entities` before `entityChanges` and `entityHourlyAggregates`; delete in the opposite order.
 - The weather columns are DOUBLE instead of FLOAT; copy the values as they are.
 - Timestamps are UTC with at most 6 fractional digits.
-- `homekitInventory` starts empty: the adapter fills it on its next connect (and again when HomeKit's homes change). Nothing is to be moved into it.
+- `homekitInventory` starts empty: the server fills it with the first inventory it pulls after an adapter connect. Nothing is to be moved into it.
 - The migration creates all indexes on the empty tables; for a very large import, loading first and building the secondary indexes afterwards is faster, but the final index set must be the one listed above.
 
 ## HomeKit inventory
 
-`homekitInventory` lists everything HomeKit has, one row per characteristic, also what the adapter does not map (`mappedType` is `NULL`) and what it skips. The server pulls the whole snapshot from the adapter (`homeKitInventory()` on the adapter's command receiver, like `getAllEntitiesLive()`): right at its start when the adapter is already connected, after each adapter connect, and once a day while connected. The adapter builds it from HomeKit's own model (homes, rooms, accessories, services, characteristics), values are read best-effort within 20 s. The server logs an info line with the counts (homes, rooms, accessories, services, characteristics, unmapped characteristics, unreachable accessories, duration) and, at debug level (`HA_DEBUG_LOGGING`), one line per accessory; a failure is a warning and keeps the stored inventory. The server replaces the table as a whole in one transaction (`syncedAt` is the time of that snapshot). `entities` stays what it is: the mapped characteristics that reported. `entities.placeId` is the room name and `entities.name` the accessory name, the same names as `roomName` and `accessoryName` here.
+`homekitInventory` lists everything HomeKit has, one row per characteristic, also what the adapter does not map (`mappedType` is `NULL`) and what it skips. The server pulls the whole snapshot from the adapter (`homeKitInventory()` on the adapter's command receiver, like `getAllEntitiesLive()`): after each adapter connect and once a day while connected. The first connect after the server's start is the start-up fetch (the adapter is never connected before the server listens). Pulls never overlap: triggers that arrive while one runs collapse into one more. The adapter builds it from HomeKit's own model (homes, rooms, accessories, services, characteristics), values are read best-effort within 20 s. The server logs an info line with the counts (homes, rooms, accessories, services, characteristics, unmapped characteristics, unreachable accessories, duration) and, at debug level (`HA_DEBUG_LOGGING`), one line per accessory; a failure is a warning and keeps the stored inventory. The server replaces the table as a whole in one transaction (`syncedAt` is the time of that snapshot). `entities` stays what it is: the mapped characteristics that reported. `entities.placeId` is the room name and `entities.name` the accessory name, the same names as `roomName` and `accessoryName` here.
 
 ### Example queries
 
 Run them on the Mac mini, e.g. `docker exec -i <db container> mysql -u vapor_username -p vapor_database`.
 
-Contact sensors that HomeKit has and no stored automation references (the config is a JSON blob, the server stores it as base64 text, which the query decodes; a sensor counts as referenced when a `contactSensorId` with its accessory name and its room is somewhere in it; `REPLACE` with the escape character `|` keeps `_` and `%` in names from acting as wildcards of `JSON_SEARCH`):
+Contact sensors that HomeKit has and no stored automation references (the config is a JSON blob, the server stores it as base64 text, which the query decodes; a sensor counts as referenced when one `contactSensorId` in the config has both its room as `placeId` and its accessory name as `name`):
 
 ```sql
 WITH cfg AS (
@@ -69,11 +69,12 @@ SELECT CONCAT(i.roomName, ' / ', i.accessoryName) AS missing
 FROM homekitInventory i
 WHERE i.mappedType = 'contactSensor'
   AND NOT EXISTS (
-    SELECT 1 FROM cfg
-    WHERE JSON_SEARCH(cfg.doc, 'one',
-            REPLACE(REPLACE(REPLACE(i.accessoryName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.name') IS NOT NULL
-      AND JSON_SEARCH(cfg.doc, 'one',
-            REPLACE(REPLACE(REPLACE(i.roomName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.placeId') IS NOT NULL)
+    SELECT 1
+    FROM cfg,
+      JSON_TABLE(JSON_EXTRACT(cfg.doc, '$**.contactSensorId'), '$[*]' COLUMNS (
+        placeId VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin PATH '$.placeId',
+        name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin PATH '$.name')) ref
+    WHERE ref.placeId = i.roomName AND ref.name = i.accessoryName)
 GROUP BY i.roomName, i.accessoryName
 ORDER BY i.roomName, i.accessoryName;
 ```

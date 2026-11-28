@@ -36,6 +36,10 @@ final class HomekitInventoryMySQLTests: XCTestCase {
 
     private typealias Item = HomekitInventoryTests
 
+    private func storedRows() async throws -> [HomekitInventoryDbItem] {
+        try await HomekitInventoryDbItem.query(on: app.db).sort(\.$id).all()
+    }
+
     private func strings(_ query: SQLQueryString) async throws -> [String] {
         let sql = try XCTUnwrap(app.db as? SQLDatabase)
         return try await sql.raw(query).all().map { try $0.decode(column: "v", as: String.self) }
@@ -45,12 +49,12 @@ final class HomekitInventoryMySQLTests: XCTestCase {
         let repository = app.homekitInventoryRepository
         let first = Date(timeIntervalSince1970: 1_800_000_000)
         try await repository.replace(with: Item.inventory([("Bad", Item.accessory("A", characteristics: [Item.characteristic()])), ("Bad", Item.accessory("B", characteristics: [Item.characteristic()]))]), syncedAt: first)
-        var rows = try await repository.all()
+        var rows = try await storedRows()
         XCTAssertEqual(rows.map(\.accessoryName), ["A", "B"])
 
         let second = first.addingTimeInterval(60)
         try await repository.replace(with: Item.inventory([("Bad", Item.accessory("C", characteristics: [Item.characteristic(type: nil, value: nil)]))]), syncedAt: second)
-        rows = try await repository.all()
+        rows = try await storedRows()
 
         XCTAssertEqual(rows.map(\.accessoryName), ["C"])
         XCTAssertNil(rows.first?.mappedType)
@@ -69,34 +73,43 @@ final class HomekitInventoryMySQLTests: XCTestCase {
             try await repository.replace(with: Item.inventory([("Bad", Item.accessory("New", characteristics: [Item.characteristic()])), ("Bad", Item.accessory("Boom", characteristics: [Item.characteristic()]))]), syncedAt: Date())
             XCTFail("expected a failure")
         } catch {}
-        let names = try await repository.all().map(\.accessoryName)
+        let names = try await storedRows().map(\.accessoryName)
         XCTAssertEqual(names, ["Old"])
     }
 
     func testIndexesAndBinaryCollation() async throws {
         let names = try await strings("SELECT DISTINCT INDEX_NAME AS v FROM information_schema.statistics WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'homekitInventory'")
-        XCTAssertEqual(names.sorted(), ["PRIMARY", "idx_homekitInventory_mappedType_room_accessory", "idx_homekitInventory_room_accessory"])
+        XCTAssertEqual(names.sorted(), ["PRIMARY", "idx_homekitInventory_mappedType_room_accessory"])
         let collations = try await strings("SELECT DISTINCT COLLATION_NAME AS v FROM information_schema.columns WHERE TABLE_SCHEMA = 't' AND TABLE_NAME = 'homekitInventory' AND COLLATION_NAME IS NOT NULL")
         XCTAssertEqual(collations, ["utf8mb4_0900_bin"])
     }
 
     /// The query of `docs/database-schema.md`: contact sensors of HomeKit that no stored automation references.
     func testTheDocumentedQueryFindsContactSensorsMissingFromTheAutomations() async throws {
-        let known = ContactSensorDevice(contactSensorId: EntityId(placeId: "Bad", name: "Fenster_1", characteristicsName: nil, characteristic: .contactSensor), batterySensorId: nil)
-        let automation = AnyAutomation.create(from: WindowOpen("window", windowContact: known))
-        let config = ConfigDTO(location: Location(latitude: 52.5, longitude: 13.4), automations: [automation])
+        func sensor(_ room: String, _ name: String) -> ContactSensorDevice {
+            ContactSensorDevice(contactSensorId: EntityId(placeId: room, name: name, characteristicsName: nil, characteristic: .contactSensor), batterySensorId: nil)
+        }
+        // "Fenster" exists in Küche (referenced) and in Bad (not): name and room must match on the same sensor
+        let automations = [
+            AnyAutomation.create(from: WindowOpen("window", windowContact: sensor("Bad", "Fenster_1"))),
+            AnyAutomation.create(from: WindowOpen("window-kueche", windowContact: sensor("Küche", "Fenster"))),
+            AnyAutomation.create(from: WindowOpen("window-flur", windowContact: sensor("Flur", "Tür")))
+        ]
+        let config = ConfigDTO(location: Location(latitude: 52.5, longitude: 13.4), automations: automations)
         try await ConfigItem.save(json: try JSONEncoder().encode(config), on: app.db)
         func contact(_ type: CharacteristicsType = .contactSensor) -> [HomeKitInventory.Characteristic] { [Item.characteristic(type: type)] }
         try await app.homekitInventoryRepository.replace(with: Item.inventory([
             ("Bad", Item.accessory("Fenster_1", characteristics: contact())),
             ("Bad", Item.accessory("FensterX1", characteristics: contact())),   // `_` must not act as a wildcard
             ("Küche", Item.accessory("Fenster", characteristics: contact())),
+            ("Bad", Item.accessory("Fenster", characteristics: contact())),
+            ("Küche", Item.accessory("Tür", characteristics: contact())),
             ("Küche", Item.accessory("Lampe", characteristics: contact(.switcher)))
         ]), syncedAt: Date())
 
         let missing = try await strings(SQLQueryString(Self.missingContactSensorsQuery))
 
-        XCTAssertEqual(missing, ["Bad / FensterX1", "Küche / Fenster"])
+        XCTAssertEqual(missing, ["Bad / Fenster", "Bad / FensterX1", "Küche / Tür"])
     }
 
     func testTheCharacteristicsPerRoomQuery() async throws {
@@ -120,11 +133,12 @@ final class HomekitInventoryMySQLTests: XCTestCase {
         FROM homekitInventory i
         WHERE i.mappedType = 'contactSensor'
           AND NOT EXISTS (
-            SELECT 1 FROM cfg
-            WHERE JSON_SEARCH(cfg.doc, 'one',
-                    REPLACE(REPLACE(REPLACE(i.accessoryName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.name') IS NOT NULL
-              AND JSON_SEARCH(cfg.doc, 'one',
-                    REPLACE(REPLACE(REPLACE(i.roomName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.placeId') IS NOT NULL)
+            SELECT 1
+            FROM cfg,
+              JSON_TABLE(JSON_EXTRACT(cfg.doc, '$**.contactSensorId'), '$[*]' COLUMNS (
+                placeId VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin PATH '$.placeId',
+                name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin PATH '$.name')) ref
+            WHERE ref.placeId = i.roomName AND ref.name = i.accessoryName)
         GROUP BY i.roomName, i.accessoryName
         ORDER BY i.roomName, i.accessoryName
         """

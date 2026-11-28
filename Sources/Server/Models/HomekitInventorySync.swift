@@ -48,14 +48,16 @@ struct HomekitInventorySync: Sendable {
         }
     }
 
-    /// Refreshes on every element of `handshakes` and every `refreshInterval`, until the task is cancelled.
+    /// Refreshes on every element of `handshakes` and every `interval`, until the task is cancelled. One loop does all
+    /// refreshes, so they never overlap; triggers that arrive while one runs collapse into one more (an adapter that
+    /// keeps reconnecting queues at most one). The first handshake after the server's start is the start-up fetch:
+    /// the adapter is never connected before the server listens.
     func run(handshakes: AsyncStream<Void>, interval: Duration = Self.refreshInterval) async {
+        let (triggers, trigger) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
         await withTaskGroup(of: Void.self) { group in
             group.addTask {
-                // Right at the start, when the adapter is already connected; otherwise its first connect triggers it.
-                await refresh()
                 for await _ in handshakes {
-                    await refresh()
+                    trigger.yield()
                 }
             }
             group.addTask {
@@ -65,19 +67,30 @@ struct HomekitInventorySync: Sendable {
                     } catch {
                         return
                     }
+                    trigger.yield()
+                }
+            }
+            group.addTask {
+                for await _ in triggers {
                     await refresh()
                 }
             }
+            // The first child that ends (cancellation) ends the others; the consumer ends once `triggers` finishes.
+            await group.next()
+            group.cancelAll()
+            trigger.finish()
             await group.waitForAll()
         }
     }
 }
 
-/// Cancels a background task when the application shuts down.
+/// Cancels a background task when the application shuts down and waits until it has ended, so a running
+/// database write is over before the connection pool closes.
 struct CancelOnShutdown: LifecycleHandler {
     let task: Task<Void, Never>
 
-    func shutdown(_ application: Application) {
+    func shutdownAsync(_ application: Application) async {
         task.cancel()
+        await task.value
     }
 }

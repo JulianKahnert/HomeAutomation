@@ -133,7 +133,7 @@ A job of the scheduler with a cadence that polls a source (valves, weather, pric
 A HomeKit characteristic the adapter reads itself instead of waiting for a notification: battery level, temperature and humidity. It is read on every full resync and every three hours and sent as a normal report with origin `homekit`. The battery is not subscribed, because more subscriptions make HomeKit drop notifications.
 
 **HomeKit inventory** (HomeKit-Bestand)
-The list of everything HomeKit has, one row per characteristic, mapped to our model or not, in the table `homekitInventory`. The adapter sends it after each connect and when the homes change; it is the query surface for "what does HomeKit have that our automations do not use". Not the same as the entities, which are only the mapped characteristics that reported.
+The list of everything HomeKit has, one row per characteristic, mapped to our model or not, in the table `homekitInventory`. The server pulls it from the adapter after each connect and once a day; it is the query surface for "what does HomeKit have that our automations do not use". Not the same as the entities, which are only the mapped characteristics that reported.
 
 **Lane** (Spur)
 The queue of events one automation works through in order. A slow automation delays only its own lane. When several changes of the same entity wait in one lane only the newest stays; events without a state (button press, clock, sun, server start, deploy) are never collapsed.

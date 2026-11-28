@@ -12,7 +12,7 @@ struct HomekitInventoryDbRepository: Sendable {
     /// Resolved per query, see `EntityStorageDbRepository.database`.
     let database: @Sendable () -> any Database
 
-    /// Deletes every row and inserts `items`, in one transaction: a reader sees the old or the new snapshot, never a mix.
+    /// Deletes every row and inserts the rows of `inventory`, in one transaction: a reader sees the old or the new snapshot, never a mix.
     func replace(with inventory: HomeKitInventory, syncedAt: Date) async throws {
         let rows = inventory.rows.map { HomekitInventoryDbItem($0, syncedAt: syncedAt) }
         try await database().transaction { transaction in
@@ -21,9 +21,5 @@ struct HomekitInventoryDbRepository: Sendable {
                 try await chunk.create(on: transaction)
             }
         }
-    }
-
-    func all() async throws -> [HomekitInventoryDbItem] {
-        try await HomekitInventoryDbItem.query(on: database()).sort(\.$id).all()
     }
 }

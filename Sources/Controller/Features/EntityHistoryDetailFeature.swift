@@ -300,7 +300,7 @@ struct EntityHistoryDetailView: View {
                         .frame(width: 24, height: 24)
                         .overlay(Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 1))
                 }
-                Text(item.valueDescription)
+                Text(item.localizedValueDescription())
             }
         }
     }

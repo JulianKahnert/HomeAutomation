@@ -56,6 +56,17 @@
         }
       }
     },
+    "%@° hue": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@° Farbton"
+          }
+        }
+      }
+    },
     "%lld open": {
       "extractionState": "manual",
       "localizations": {
@@ -232,6 +243,17 @@
         }
       }
     },
+    "Auto": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisch"
+          }
+        }
+      }
+    },
     "Automation": {
       "extractionState": "manual",
       "localizations": {
@@ -376,6 +398,17 @@
         }
       }
     },
+    "Closed": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geschlossen"
+          }
+        }
+      }
+    },
     "Color": {
       "extractionState": "manual",
       "localizations": {
@@ -427,6 +460,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kontaktsensor"
+          }
+        }
+      }
+    },
+    "Cool": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kühlen"
           }
         }
       }
@@ -805,6 +849,17 @@
         }
       }
     },
+    "Heat": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heizen"
+          }
+        }
+      }
+    },
     "Heating": {
       "extractionState": "manual",
       "localizations": {
@@ -1025,6 +1080,17 @@
         }
       }
     },
+    "Locked": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verriegelt"
+          }
+        }
+      }
+    },
     "Logs": {
       "extractionState": "manual",
       "localizations": {
@@ -1065,6 +1131,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mittelwert"
+          }
+        }
+      }
+    },
+    "Mode %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modus %@"
           }
         }
       }
@@ -1168,6 +1245,17 @@
         }
       }
     },
+    "No deadline": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Frist"
+          }
+        }
+      }
+    },
     "No heating automation is set up. Create a RoomHeating automation in the configuration.": {
       "extractionState": "manual",
       "localizations": {
@@ -1186,6 +1274,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kein Verlauf in diesem Zeitraum."
+          }
+        }
+      }
+    },
+    "No motion": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Bewegung"
           }
         }
       }
@@ -1230,6 +1329,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "OK"
+          }
+        }
+      }
+    },
+    "Offset %@°C": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abweichung %@°C"
           }
         }
       }
@@ -1296,6 +1406,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ergebnis"
+          }
+        }
+      }
+    },
+    "Overdue since %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Überfällig seit %@"
           }
         }
       }
@@ -1707,6 +1828,17 @@
         }
       }
     },
+    "Target %@°C": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Soll %@°C"
+          }
+        }
+      }
+    },
     "Target Temperature": {
       "extractionState": "manual",
       "localizations": {
@@ -1894,6 +2026,28 @@
         }
       }
     },
+    "Unlocked": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entriegelt"
+          }
+        }
+      }
+    },
+    "Until %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bis %@"
+          }
+        }
+      }
+    },
     "Updated %@ ago": {
       "extractionState": "manual",
       "localizations": {
@@ -1912,6 +2066,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ventil"
+          }
+        }
+      }
+    },
+    "Valve %lld%%": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ventil %lld %%"
           }
         }
       }
@@ -1989,6 +2154,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "grau: Fenster offen"
+          }
+        }
+      }
+    },
+    "history.value.noData": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No data"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Daten"
+          }
+        }
+      }
+    },
+    "history.value.off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aus"
+          }
+        }
+      }
+    },
+    "history.value.on": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein"
           }
         }
       }

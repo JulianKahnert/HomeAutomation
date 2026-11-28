@@ -65,7 +65,7 @@ struct LastReportPersistenceTests {
             await manager.addEntityHistory(EntityStorageItem(entityId: lamp, timestamp: date, isDeviceOn: true))
         }
         await flush(manager, storage: storage)
-        
+
         // 301 s writes; 400 and 600 are within five minutes of it; 602 writes; 700 is within
         #expect(storage.lastReportWrites.map(\.date) == [start.addingTimeInterval(301), start.addingTimeInterval(602)])
         #expect(await manager.lastReport(of: lamp) == start.addingTimeInterval(700))

@@ -80,7 +80,8 @@ final class WriteEventFlowTests: XCTestCase {
         // queued before the loop runs: the adapter's report, the write, a later report
         app.homeEventSink.yield(.change(entity: before))
         let answer = Mutex<Result<StateChange?, any Error>?>(nil)
-        app.homeEventSink.yield(.write(WriteCommand(kind: .setState(Fireplace.stateId, .bool(true)), complete: { result in answer.withLock { $0 = result } })))
+        let write = WriteCommand(kind: .setState(Fireplace.stateId, .bool(true)), complete: { result in answer.withLock { $0 = result } })
+        app.homeEventSink.yield(.write(write))
         app.homeEventSink.yield(.change(entity: EntityStorageItem(entityId: lamp, isDeviceOn: false)))
 
         startLoop()
@@ -232,7 +233,7 @@ private struct Probe: Automatable {
         try container.encode(name, forKey: .name)
     }
 
-    func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
+    func shouldTrigger(with event: HomeEvent, using homeManager: HomeManagable) async throws -> Bool {
         guard let blocks else { return false }
         switch event {
         case .serverStarted:
@@ -246,7 +247,7 @@ private struct Probe: Automatable {
         }
     }
 
-    func execute(using hm: HomeManagable) async throws {
+    func execute(using homeManager: HomeManagable) async throws {
         guard let blocks else { return }
         await blocks.runStarted.open()
         do {

@@ -81,13 +81,15 @@ struct EventFlowCommandPort: CommandPort, Log {
     private func send(_ kind: WriteCommand.Kind) async throws -> StateChange? {
         let command = kind.name
         let sink = sink
-        return try await raceTimeout(timeout, timeoutError: {
+        let timedOut: @Sendable () -> any Error = {
             Self.log.warning("The event loop did not answer in time, the command is handled when it gets there", metadata: ["command": "\(command)"])
             return CoreCommandError.timedOut(command: command)
-        }, operation: {
+        }
+        let enter: @Sendable () async throws -> StateChange? = {
             try await withCheckedThrowingContinuation { continuation in
                 sink.yield(.write(WriteCommand(kind: kind, complete: { continuation.resume(with: $0) })))
             }
-        })
+        }
+        return try await raceTimeout(timeout, timeoutError: timedOut, operation: enter)
     }
 }

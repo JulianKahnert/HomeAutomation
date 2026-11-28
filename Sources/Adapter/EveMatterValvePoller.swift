@@ -93,13 +93,13 @@ actor EveMatterValvePoller {
         var items: [EntityStorageItem] = []
         if let percent = EveMatterValve.percent(fromRawValue: rawValvePosition) {
             let entityId = EntityId(placeId: thermostat.placeId, name: thermostat.name, characteristicsName: thermostat.characteristicsName, characteristic: .valvePosition)
-            items.append(EntityStorageItem(entityId: entityId, valvePositionPercent: percent))
+            if let item = EntityStorageItem(entityId: entityId, value: .number(Double(percent))) { items.append(item) }
         } else {
             log.warning("Eve valve position out of range, skipped", metadata: ["thermostat": "\(thermostat)", "rawValue": "\(rawValvePosition)"])
         }
         if let rawCalibration, let offset = EveMatterValve.calibrationInC(fromRawValue: rawCalibration) {
             let entityId = EntityId(placeId: thermostat.placeId, name: thermostat.name, characteristicsName: thermostat.characteristicsName, characteristic: .temperatureCalibration)
-            items.append(EntityStorageItem(entityId: entityId, temperatureCalibrationInC: offset))
+            if let item = EntityStorageItem(entityId: entityId, value: .number(offset)) { items.append(item) }
         }
         return items
     }

@@ -56,7 +56,7 @@ public protocol HomeManagable: EntityValidator, Sendable {
     /// - Parameters:
     ///   - entityId: A server-owned entity: `entityId.isServerOwned`.
     ///   - value: Must fit the shape of the entity's value kind.
-    ///   - origin: `server` (default) or `app`.
+    ///   - origin: `server` (default), `app` or the name of a polling job (`Origin.job(_:)`).
     ///   - ifCurrent: A precondition on the entity's current state (`nil` while unknown). It is checked in the same
     ///     synchronous section that sets the state, so no other writer can change the entity between the check and
     ///     the write; read, decide and report in two calls and one can. When it returns `false` nothing is reported.
@@ -88,16 +88,10 @@ public enum ReportError: Error, Equatable {
 }
 
 public extension HomeManagable {
-    /// Reports unconditionally.
+    /// Reports unconditionally, with origin `server` unless given.
     @discardableResult
-    func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
+    func report(_ entityId: EntityId, value: Value, origin: Origin = .server) async throws -> Bool {
         try await report(entityId, value: value, origin: origin, ifCurrent: { _ in true })
-    }
-
-    /// Reports with origin `server`.
-    @discardableResult
-    func report(_ entityId: EntityId, value: Value) async throws -> Bool {
-        try await report(entityId, value: value, origin: .server)
     }
 }
 

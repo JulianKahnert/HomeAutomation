@@ -26,10 +26,6 @@ private actor SlowSender: NotificationSender {
         while sendsStarted == 0 { try? await Task.sleep(for: .milliseconds(1)) }
     }
 
-    func waitForEvents(_ count: Int) async {
-        while events.count < count { try? await Task.sleep(for: .milliseconds(1)) }
-    }
-
     func sendNotification(title: String, message: String, id: String, category: String?) async throws {}
 
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,

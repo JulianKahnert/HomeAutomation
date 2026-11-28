@@ -48,12 +48,12 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         switch action {
         case .turnOn:
             guard let item = try? item.get(with: log) else { break }
-            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, motionDetected: nil, illuminance: nil, isDeviceOn: true, isContactOpen: nil, isDoorLocked: nil, stateOfCharge: nil, isHeaterActive: nil)
+            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, isDeviceOn: true)
             storageItems.append(newItem)
              entityStreamContinuation.yield(newItem)
         case .turnOff:
             guard let item = try? item.get(with: log) else { break }
-            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, motionDetected: nil, illuminance: nil, isDeviceOn: false, isContactOpen: nil, isDoorLocked: nil, stateOfCharge: nil, isHeaterActive: nil)
+            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, isDeviceOn: false)
             storageItems.append(newItem)
         case .setBrightness:
             break
@@ -63,7 +63,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
             break
         case .lockDoor:
             guard let item = try? item.get(with: log) else { break }
-            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, motionDetected: nil, illuminance: nil, isDeviceOn: nil, isContactOpen: nil, isDoorLocked: true, stateOfCharge: nil, isHeaterActive: nil)
+            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, isDoorLocked: true)
             storageItems.append(newItem)
         case .addEntityToScene:
             break
@@ -123,17 +123,9 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     func trigger(scene sceneName: String) async {
     }
 
-    /// Runs once right after the next `getCurrentEntity`, with the value it returned: lets a test change the state
-    /// between a caller's read and its report.
-    var afterNextRead: (@HomeManagerActor () -> Void)?
-
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
         guard let item = storageItems.last(where: { $0.entityId == entityId }) else {
             throw OptionalError.notFound
-        }
-        if let hook = afterNextRead {
-            afterNextRead = nil
-            hook()
         }
         return item
     }
@@ -145,12 +137,8 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         heatingWrites.last { $0.placeId == radiator.placeId && $0.entityId.name == radiator.name }
     }
 
-    /// Commands waiting to be sent again, by entity; a test seeds them.
-    var queuedRetries: [EntityId: HomeManagableAction] = [:]
-
-    func queuedRetry(of entityId: EntityId) async -> HomeManagableAction? {
-        queuedRetries[entityId]
-    }
+    /// The mock never fails a command, so nothing waits to be sent again.
+    func queuedRetry(of entityId: EntityId) async -> HomeManagableAction? { nil }
 
     /// The fireplace as a test seeds and reads it: the states of `Fireplace.stateId`, oldest first.
     var fireplaceSwitches: [FireplaceSwitch] {
@@ -213,7 +201,10 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         guard let item = EntityStorageItem(entityId: entityId, value: value, origin: origin) else {
             throw ReportError.valueDoesNotFit(entityId)
         }
-        guard ifCurrent(storageItems.last { $0.entityId == entityId }) else { return false }
+        let current = storageItems.last { $0.entityId == entityId }
+        guard ifCurrent(current) else { return false }
+        // like `HomeManager`: a value-identical replay changes nothing
+        guard current?.value != item.value else { return false }
         return await addEntityHistory(item)
     }
 

@@ -35,7 +35,7 @@ struct RoomHeatingFireplaceTests {
 
     /// The server switched the radiator off for `reason` at `date`.
     private func seedOff(reason: HeatingWriteReason, at date: Date) {
-        homeManager.heatingWrites.append(seededWrite(timestamp: date, entityId: left.heatingId, reason: reason, actionName: "setHeating", isActive: false))
+        homeManager.heatingWrites.append(seededWrite(timestamp: date, action: .setHeating(left.heatingId, active: false), reason: reason))
     }
 
     private func change(_ id: EntityId) -> HomeEvent {
@@ -230,7 +230,7 @@ struct RoomHeatingFireplaceRadiatorsTests {
     }
 
     private func seedOff(_ radiator: Radiator, reason: HeatingWriteReason, at date: Date) {
-        homeManager.heatingWrites.append(seededWrite(timestamp: date, entityId: radiator.heatingId, reason: reason, actionName: "setHeating", isActive: false))
+        homeManager.heatingWrites.append(seededWrite(timestamp: date, action: .setHeating(radiator.heatingId, active: false), reason: reason))
     }
 
     @Test("The fireplace on switches only the listed radiators off")
@@ -364,17 +364,15 @@ struct FireplaceTimeoutTests {
         #expect(homeManager.sentNotifications.first?.message.contains(FireplaceTimeout.durationText(maxDuration)) == true)
     }
 
-    @Test("A fireplace switched off and on again after the timeout read it is not ended by that run")
-    func restartBetweenReadAndReport() async throws {
+    @Test("A fireplace switched off and on again after the timeout trigger is not ended by that run")
+    func restartAfterTheTrigger() async throws {
         setFireplace(on: true, at: start)
         let now = start.addingTimeInterval(maxDuration)
         let restartedAt = now.addingTimeInterval(-10)
         let homeManager = self.homeManager
-        homeManager.afterNextRead = {
-            // the app ends the fireplace and starts it again: the stored switch-on time is new
-            homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: restartedAt.addingTimeInterval(-1), isOn: false))
-            homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: restartedAt, isOn: true))
-        }
+        // the app ends the fireplace and starts it again: the stored switch-on time is new
+        homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: restartedAt.addingTimeInterval(-1), isOn: false))
+        homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: restartedAt, isOn: true))
 
         try await FireplaceTimeout().execute(using: homeManager, now: now)
 

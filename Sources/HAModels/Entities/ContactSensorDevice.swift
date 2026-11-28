@@ -22,12 +22,6 @@ open class ContactSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
         return try item.isContactOpen.get(with: log)
     }
 
-    func getStateOfCharge(with hm: HomeManagable) async throws -> Int {
-        let batterySensorId = try batterySensorId.get(with: log)
-        let item = try await hm.getCurrentEntity(with: batterySensorId)
-        return try item.stateOfCharge.get(with: log)
-    }
-
     public func validate(with hm: any EntityValidator) async throws {
 
         try await hm.findEntity(contactSensorId)

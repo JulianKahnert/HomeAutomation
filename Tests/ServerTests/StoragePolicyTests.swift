@@ -201,6 +201,8 @@ private actor RecordingRunDeleter: JournalStore {
     func addCommand(_ command: ActionLogItem) async throws {}
     func setCommandStatus(_ id: UUID, to status: ActionLogItem.Status) async throws {}
     func commands(limit: Int?, runId: UUID?) async throws -> [ActionLogItem] { [] }
+    func heatingWrites(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem] { [] }
+    func lastHeatingWrites() async throws -> [ActionLogItem] { [] }
     func addPush(_ push: JournalPush) async throws {}
     func pushes(runId: UUID?) async throws -> [JournalPush] { [] }
     func deleteEntries(olderThan date: Date) async throws {

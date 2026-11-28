@@ -309,9 +309,9 @@ struct OpenAPIController: APIProtocol {
     private func heatingDetailBuilder() -> HeatingRoomDetailBuilder {
         let homeManager = request.application.homeManager
         return HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
-                                 writes: Journal(store: request.application.journalRepository),
-                                 lastReport: { await homeManager.lastReport(of: $0) },
-                                 calendar: HeatingOverviewBuilder.berlin)
+                                        journal: request.application.journalRepository,
+                                        lastReport: { await homeManager.lastReport(of: $0) },
+                                        calendar: HeatingOverviewBuilder.berlin)
     }
 
     // MARK: - /heating/fireplace

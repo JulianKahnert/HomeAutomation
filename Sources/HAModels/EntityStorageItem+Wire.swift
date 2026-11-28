@@ -1,5 +1,5 @@
 //
-//  EntityStorageItem+GenericValue.swift
+//  EntityStorageItem+Wire.swift
 //  HAModels
 //
 

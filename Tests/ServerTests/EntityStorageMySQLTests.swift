@@ -368,13 +368,13 @@ final class EntityStorageMySQLTests: XCTestCase {
         try await repository.addCommand(command(kitchen, at: 2_500, reason: nil))
         try await repository.addCommand(command(bath, at: 2_000, reason: .plan))
 
-        let all = try await repository.heatingCommands(placeId: "Kitchen", startDate: nil, endDate: nil)
+        let all = try await repository.heatingWrites(placeId: "Kitchen", startDate: nil, endDate: nil)
         XCTAssertEqual(all.map(\.reason), [.plan, .window, .system])
         XCTAssertEqual(all.first?.value, 21)
-        let lastPerRadiator = try await repository.lastHeatingCommands()
+        let lastPerRadiator = try await repository.lastHeatingWrites()
         XCTAssertEqual(Set(lastPerRadiator.map(\.entityId.placeId)), ["Kitchen", "Bath"])
 
-        let ranged = try await repository.heatingCommands(placeId: "Kitchen", startDate: Date(timeIntervalSince1970: 1_500), endDate: Date(timeIntervalSince1970: 3_000))
+        let ranged = try await repository.heatingWrites(placeId: "Kitchen", startDate: Date(timeIntervalSince1970: 1_500), endDate: Date(timeIntervalSince1970: 3_000))
         XCTAssertEqual(ranged.map(\.reason), [.window])
     }
 

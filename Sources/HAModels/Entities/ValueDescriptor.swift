@@ -21,7 +21,6 @@ public struct ValueDescriptor: Sendable, Equatable {
         case boolean
         case number
         case color
-        case enumeration
         case deadline
     }
 

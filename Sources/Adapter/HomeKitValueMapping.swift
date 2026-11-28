@@ -19,8 +19,6 @@ enum HomeKitValueMapping {
     static let contactSensorService = "00000080-0000-1000-8000-0026BB765291"
     static let lockMechanismService = "00000045-0000-1000-8000-0026BB765291"
     static let batteryService = "00000096-0000-1000-8000-0026BB765291"
-    static let heaterCoolerService = "000000BC-0000-1000-8000-0026BB765291"
-    static let valveService = "000000D0-0000-1000-8000-0026BB765291"
     // Characteristics
     static let occupancyDetectedCharacteristic = "00000071-0000-1000-8000-0026BB765291"
     static let motionDetectedCharacteristic = "00000022-0000-1000-8000-0026BB765291"
@@ -56,14 +54,13 @@ enum HomeKitValueMapping {
             return service == lockMechanismService
         case .batterySensor:
             return service == batteryService
-        case .heating:
-            return service == heaterCoolerService
-        case .valve:
-            return service == valveService
         case .brightness, .colorTemperature, .color, .temperatureSensor, .relativeHumiditySensor, .carbonDioxideSensorId,
-             .pmDensitySensor, .airQualitySensor, .targetTemperature, .heatingMode, .valvePosition:
+             .pmDensitySensor, .airQualitySensor, .targetTemperature, .heatingMode, .valvePosition,
+             // classified from the service already (`HomeKitCharacteristic.toCharacteristicsType`)
+             .heating, .valve:
             return true
         case .temperatureCalibration, .energyPrice, .deadline:
+            // not a HomeKit characteristic
             return false
         }
     }

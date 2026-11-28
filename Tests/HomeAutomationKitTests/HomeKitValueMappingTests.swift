@@ -126,16 +126,12 @@ struct HomeKitValueMappingTests {
     }
 
     @Test func heaterIsActiveForOneOnAHeaterCooler() {
-        #expect(Mapping.needsRead(.heating, context: context(service: Mapping.heaterCoolerService)))
-        #expect(!Mapping.needsRead(.heating, context: context(service: Mapping.batteryService)))
         #expect(Mapping.value(.heating, raw: 1, context: context()) == .bool(true))
         #expect(Mapping.value(.heating, raw: 0, context: context()) == .bool(false))
         #expect(Mapping.value(.heating, raw: 2, context: context()) == nil)
     }
 
     @Test func valveIsOpenWhileInUse() {
-        #expect(Mapping.needsRead(.valve, context: context(service: Mapping.valveService)))
-        #expect(!Mapping.needsRead(.valve, context: context(service: Mapping.batteryService)))
         // HMCharacteristicValueInUseState: 0 not in use, 1 in use
         #expect(Mapping.value(.valve, raw: 1, context: context()) == .bool(true))
         #expect(Mapping.value(.valve, raw: 0, context: context()) == .bool(false))
@@ -144,9 +140,8 @@ struct HomeKitValueMappingTests {
         #expect(Mapping.value(.valve, raw: "1", context: context()) == nil)
     }
 
-    @Test func typesWithoutHomeKitSourceNeverRead() {
+    @Test func typesWithoutHomeKitSourceHaveNoValue() {
         for type in [CharacteristicsType.temperatureCalibration, .energyPrice, .deadline] {
-            #expect(!Mapping.needsRead(type, context: context()))
             #expect(Mapping.value(type, raw: 1.0, context: context()) == nil)
         }
     }
@@ -242,8 +237,6 @@ struct HomeKitValueMappingTests {
         #expect(Mapping.contactSensorService == HMServiceTypeContactSensor)
         #expect(Mapping.lockMechanismService == HMServiceTypeLockMechanism)
         #expect(Mapping.batteryService == HMServiceTypeBattery)
-        #expect(Mapping.heaterCoolerService == HMServiceTypeHeaterCooler)
-        #expect(Mapping.valveService == HMServiceTypeValve)
         #expect(Mapping.occupancyDetectedCharacteristic == HMCharacteristicTypeOccupancyDetected)
         #expect(Mapping.motionDetectedCharacteristic == HMCharacteristicTypeMotionDetected)
     }

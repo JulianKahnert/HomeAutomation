@@ -163,6 +163,36 @@ extension HMCharacteristic: @retroactive Comparable {
                                     value: text)
     }
 
+    /// Our type for this characteristic, or `nil`; unlike `entityCharacteristicType` quiet about unmapped ones.
+    var mappedCharacteristicType: CharacteristicsType? {
+        HomeKitCharacteristic(characteristicType: characteristicType)?
+            .toCharacteristicsType(serviceType: service?.serviceType, isBoolFormat: metadata?.format == HMCharacteristicMetadataFormatBool)
+    }
+
+    /// One read of the value as text for the inventory; `nil` when the read fails.
+    func inventoryValue() async -> String? {
+        do {
+            try await readValue()
+            return value.map { "\($0)" }
+        } catch {
+            homeKitLogger.debug("Inventory value not read", metadata: logMetadata.merging(["error": "\(error)"]) { _, new in new })
+            return nil
+        }
+    }
+
+    /// The characteristic as an entry of the inventory.
+    func inventory(value: String?) -> HomeKitInventory.Characteristic {
+        HomeKitInventory.Characteristic(
+            type: characteristicType,
+            typeDescription: localizedDescription,
+            isReadable: isReadable,
+            isNotifiable: isNotifiable,
+            isWritable: properties.contains(HMCharacteristicPropertyWritable),
+            mappedType: mappedCharacteristicType,
+            value: value
+        )
+    }
+
     /// Whether a resync yields this characteristic's value to the server: it is subscribed or polled.
     var shouldReport: Bool {
         entityCharacteristicType?.isReported ?? false

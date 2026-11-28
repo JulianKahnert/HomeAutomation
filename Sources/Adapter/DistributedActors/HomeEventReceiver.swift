@@ -20,23 +20,11 @@ public distributed actor HomeEventReceiver {
     public typealias ActorSystem = StarActorSystem
 
     private let emit: @Sendable (HomeEvent) -> Void
-    private let storeInventory: @Sendable ([HomeKitInventoryItem]) async throws -> Void
 
-    /// - Parameters:
-    ///   - emit: Hands an incoming event to the server's event stream.
-    ///   - storeInventory: Replaces the stored HomeKit inventory with a snapshot.
-    public init(emit: @escaping @Sendable (HomeEvent) -> Void,
-                storeInventory: @escaping @Sendable ([HomeKitInventoryItem]) async throws -> Void = { _ in },
-                actorSystem: ActorSystem) {
+    /// - Parameter emit: Hands an incoming event to the server's event stream.
+    public init(emit: @escaping @Sendable (HomeEvent) -> Void, actorSystem: ActorSystem) {
         self.actorSystem = actorSystem
         self.emit = emit
-        self.storeInventory = storeInventory
-    }
-
-    /// Replaces the stored HomeKit inventory with the adapter's snapshot of everything HomeKit knows.
-    public distributed func process(inventory: [HomeKitInventoryItem]) async throws {
-        log.info("Storing HomeKit inventory", metadata: ["characteristics": "\(inventory.count)"])
-        try await storeInventory(inventory)
     }
 
     /// process  an incoming HomeKit event

@@ -44,12 +44,12 @@ final class HomekitInventoryMySQLTests: XCTestCase {
     func testAReplaceSwapsTheWholeSnapshot() async throws {
         let repository = app.homekitInventoryRepository
         let first = Date(timeIntervalSince1970: 1_800_000_000)
-        try await repository.replace(with: [Item.item(accessory: "A"), Item.item(accessory: "B")], syncedAt: first)
+        try await repository.replace(with: Item.inventory([("Bad", Item.accessory("A", characteristics: [Item.characteristic()])), ("Bad", Item.accessory("B", characteristics: [Item.characteristic()]))]), syncedAt: first)
         var rows = try await repository.all()
         XCTAssertEqual(rows.map(\.accessoryName), ["A", "B"])
 
         let second = first.addingTimeInterval(60)
-        try await repository.replace(with: [Item.item(accessory: "C", type: nil, value: nil)], syncedAt: second)
+        try await repository.replace(with: Item.inventory([("Bad", Item.accessory("C", characteristics: [Item.characteristic(type: nil, value: nil)]))]), syncedAt: second)
         rows = try await repository.all()
 
         XCTAssertEqual(rows.map(\.accessoryName), ["C"])
@@ -60,12 +60,13 @@ final class HomekitInventoryMySQLTests: XCTestCase {
 
     func testAFailedReplaceKeepsTheOldSnapshot() async throws {
         let repository = app.homekitInventoryRepository
-        try await repository.replace(with: [Item.item(accessory: "Old")], syncedAt: Date())
+        func one(_ name: String) -> HomeKitInventory { Item.inventory([("Bad", Item.accessory(name, characteristics: [Item.characteristic()]))]) }
+        try await repository.replace(with: one("Old"), syncedAt: Date())
         // a NUL-free but over-wide room name is fitted; an invalid mapped type cannot be made, so force a failure with a duplicate id
         let sql = try XCTUnwrap(app.db as? SQLDatabase)
         try await sql.raw("ALTER TABLE homekitInventory ADD CONSTRAINT chk_fail CHECK (accessoryName <> 'Boom')").run()
         do {
-            try await repository.replace(with: [Item.item(accessory: "New"), Item.item(accessory: "Boom")], syncedAt: Date())
+            try await repository.replace(with: Item.inventory([("Bad", Item.accessory("New", characteristics: [Item.characteristic()])), ("Bad", Item.accessory("Boom", characteristics: [Item.characteristic()]))]), syncedAt: Date())
             XCTFail("expected a failure")
         } catch {}
         let names = try await repository.all().map(\.accessoryName)
@@ -85,12 +86,13 @@ final class HomekitInventoryMySQLTests: XCTestCase {
         let automation = AnyAutomation.create(from: WindowOpen("window", windowContact: known))
         let config = ConfigDTO(location: Location(latitude: 52.5, longitude: 13.4), automations: [automation])
         try await ConfigItem.save(json: try JSONEncoder().encode(config), on: app.db)
-        try await app.homekitInventoryRepository.replace(with: [
-            Item.item(room: "Bad", accessory: "Fenster_1"),
-            Item.item(room: "Bad", accessory: "FensterX1"),   // `_` must not act as a wildcard
-            Item.item(room: "Küche", accessory: "Fenster"),
-            Item.item(room: "Küche", accessory: "Lampe", type: .switcher)
-        ], syncedAt: Date())
+        func contact(_ type: CharacteristicsType = .contactSensor) -> [HomeKitInventory.Characteristic] { [Item.characteristic(type: type)] }
+        try await app.homekitInventoryRepository.replace(with: Item.inventory([
+            ("Bad", Item.accessory("Fenster_1", characteristics: contact())),
+            ("Bad", Item.accessory("FensterX1", characteristics: contact())),   // `_` must not act as a wildcard
+            ("Küche", Item.accessory("Fenster", characteristics: contact())),
+            ("Küche", Item.accessory("Lampe", characteristics: contact(.switcher)))
+        ]), syncedAt: Date())
 
         let missing = try await strings(SQLQueryString(Self.missingContactSensorsQuery))
 
@@ -98,9 +100,11 @@ final class HomekitInventoryMySQLTests: XCTestCase {
     }
 
     func testTheCharacteristicsPerRoomQuery() async throws {
-        try await app.homekitInventoryRepository.replace(with: [
-            Item.item(room: "Bad", accessory: "A"), Item.item(room: "Bad", accessory: "B", type: nil), Item.item(room: "Küche", accessory: "C")
-        ], syncedAt: Date())
+        try await app.homekitInventoryRepository.replace(with: Item.inventory([
+            ("Bad", Item.accessory("A", characteristics: [Item.characteristic()])),
+            ("Bad", Item.accessory("B", characteristics: [Item.characteristic(type: nil)])),
+            ("Küche", Item.accessory("C", characteristics: [Item.characteristic()]))
+        ]), syncedAt: Date())
         let rows = try await strings(SQLQueryString("SELECT CONCAT(roomName, ': ', COUNT(*), ' / ', SUM(mappedType IS NULL)) AS v FROM homekitInventory GROUP BY roomName ORDER BY roomName"))
         XCTAssertEqual(rows, ["Bad: 2 / 1", "Küche: 1 / 0"])
     }

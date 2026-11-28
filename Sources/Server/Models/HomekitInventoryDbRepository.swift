@@ -13,8 +13,8 @@ struct HomekitInventoryDbRepository: Sendable {
     let database: @Sendable () -> any Database
 
     /// Deletes every row and inserts `items`, in one transaction: a reader sees the old or the new snapshot, never a mix.
-    func replace(with items: [HomeKitInventoryItem], syncedAt: Date) async throws {
-        let rows = items.map { HomekitInventoryDbItem($0, syncedAt: syncedAt) }
+    func replace(with inventory: HomeKitInventory, syncedAt: Date) async throws {
+        let rows = inventory.rows.map { HomekitInventoryDbItem($0, syncedAt: syncedAt) }
         try await database().transaction { transaction in
             try await HomekitInventoryDbItem.query(on: transaction).delete()
             for chunk in stride(from: 0, to: rows.count, by: 500).map({ Array(rows[$0 ..< min($0 + 500, rows.count)]) }) {

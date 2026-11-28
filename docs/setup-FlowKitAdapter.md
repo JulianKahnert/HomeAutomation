@@ -60,7 +60,7 @@ The adapter subscribes to HomeKit notifications only for the types that matter (
 
 ## HomeKit inventory
 
-After each connect to the server, and when an accessory is added, removed or renamed, the adapter sends the server a list of everything HomeKit has (one row per characteristic, with one read of its value), also what it does not map. The server keeps it in the table `homekitInventory`, see `docs/database-schema.md` for the columns and example queries.
+The server asks the adapter for a list of everything HomeKit has (`homeKitInventory()`: homes, rooms, accessories, services and characteristics, with one read of each readable value, also for what the adapter does not map). It does so at its start, after each adapter connect and once a day. The server keeps it in the table `homekitInventory`, see `docs/database-schema.md` for the columns and example queries.
 
 ## Setup on iOS/iPadOS
 

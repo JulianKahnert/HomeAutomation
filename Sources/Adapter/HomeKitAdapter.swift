@@ -15,6 +15,9 @@ public protocol HomeKitAdapterable: Sendable {
 
     func listThermostats() async throws -> [Thermostat]
     func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem]
+
+    /// Everything HomeKit knows, see `HomeKitInventory`. Values are best-effort and bounded in time.
+    func homeKitInventory() async -> HomeKitInventory
 }
 
 #if canImport(HomeKit)
@@ -43,13 +46,9 @@ public final class HomeKitAdapter: HomeKitAdapterable {
         await homeKitHomeManager.updateEntitiesNow()
     }
 
-    /// Everything HomeKit knows, one row per characteristic, see `HomeKitInventoryItem`.
-    public func inventory() async -> [HomeKitInventoryItem] {
+    public func homeKitInventory() async -> HomeKitInventory {
         await homeKitHomeManager.inventory()
     }
-
-    /// One element per debounced request for a fresh inventory (the homes changed).
-    public var inventoryRequests: AsyncStream<Void> { homeKitHomeManager.inventoryRequests }
 
     public func getAllEntitiesLive() async -> [EntityStorageItem] {
         let start = ContinuousClock.now

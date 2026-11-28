@@ -10,6 +10,7 @@ import HAModels
 import HomeKit
 import Logging
 import Shared
+import Synchronization
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -17,6 +18,53 @@ import UIKit
 private extension [HMHome] {
     var readableCharacteristics: [HMCharacteristic] {
         flatMap(\.accessories).flatMap(\.services).flatMap(\.characteristics).filter(\.isReadable)
+    }
+}
+
+private struct InventoryTimeout: Error {}
+
+/// The values of an inventory read so far, filled by concurrent reads.
+private final class InventoryValues: Sendable {
+    private let storage = Mutex<[UUID: String]>([:])
+
+    func set(_ text: String, for id: UUID) {
+        storage.withLock { $0[id] = text }
+    }
+
+    func snapshot() -> [UUID: String] {
+        storage.withLock { $0 }
+    }
+}
+
+private extension HMHome {
+    func inventory(values: [UUID: String]) -> HomeKitInventory.Home {
+        let allRooms = rooms + [roomForEntireHome()]
+        var seen = Set<UUID>()
+        let inventoryRooms = allRooms.filter { seen.insert($0.uniqueIdentifier).inserted }.map { room in
+            HomeKitInventory.Room(name: room.name, accessories: room.accessories.map { $0.inventory(values: values) })
+        }
+        return HomeKitInventory.Home(name: name, rooms: inventoryRooms)
+    }
+}
+
+private extension HMAccessory {
+    func inventory(values: [UUID: String]) -> HomeKitInventory.Accessory {
+        HomeKitInventory.Accessory(
+            name: name,
+            manufacturer: manufacturer,
+            model: model,
+            category: category.localizedDescription,
+            isReachable: isReachable,
+            services: services.map { service in
+                HomeKitInventory.Service(
+                    type: service.serviceType,
+                    typeDescription: service.localizedDescription,
+                    name: service.name,
+                    isPrimary: service.isPrimaryService,
+                    characteristics: service.characteristics.map { $0.inventory(value: values[$0.uniqueIdentifier]) }
+                )
+            }
+        )
     }
 }
 
@@ -52,12 +100,6 @@ extension HomeKitAdapter {
         private let eveMatterValvePoller = EveMatterValvePoller()
         #endif
 
-        /// One element per request for a fresh inventory snapshot (the homes changed), already debounced.
-        let inventoryRequests: AsyncStream<Void>
-        private let inventoryRequestsContinuation: AsyncStream<Void>.Continuation
-        /// Homes change in bursts (a new accessory brings services and names one by one); the snapshot reads every value.
-        private var inventoryDebouncer: AsyncDebouncer!
-
         /// Reads battery level, temperature and humidity every `CharacteristicsType.pollInterval`, see `startPolling()`.
         private var pollTask: Task<Void, Never>?
 
@@ -65,12 +107,8 @@ extension HomeKitAdapter {
             self.entityStream = entityStream
             self.entityStreamContinuation = entityStreamContinuation
 
-            (inventoryRequests, inventoryRequestsContinuation) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
             manager = HMHomeManager()
             super.init()
-            inventoryDebouncer = AsyncDebouncer(delay: .seconds(30), maxDelay: .seconds(120)) { [weak self] in
-                self?.inventoryRequestsContinuation.yield()
-            }
             entityUpdateDebouncer = AsyncDebouncer(delay: .seconds(5)) { [weak self] in
                 await self?.updateEntities()
             }
@@ -86,29 +124,31 @@ extension HomeKitAdapter {
             pollTask?.cancel()
         }
 
-        /// Asks for a fresh inventory snapshot after the debounce delay.
-        func scheduleInventoryUpdate() {
-            Task { await inventoryDebouncer.schedule() }
-        }
+        /// The longest the reads of the values of an inventory may take together; it stays below `StarActorSystem`'s
+        /// remote call timeout (30 s). A value not read in time is left out.
+        static let inventoryValuesTimeout: Duration = .seconds(20)
 
-        /// Everything HomeKit knows, one row per characteristic: mapped or not, skipped by the mapping or not.
-        func inventory() async -> [HomeKitInventoryItem] {
+        /// Everything HomeKit knows: homes, rooms, accessories, services and characteristics, for any accessory type.
+        func inventory() async -> HomeKitInventory {
             let homes = await homesPublisher.get()
-            var characteristics: [(homeName: String, characteristic: HMCharacteristic)] = []
-            for home in homes {
-                for characteristic in home.accessories.flatMap(\.services).flatMap(\.characteristics) {
-                    characteristics.append((home.name, characteristic))
-                }
-            }
-            let items = await withTaskGroup(of: HomeKitInventoryItem?.self) { group in
-                for (homeName, characteristic) in characteristics {
-                    group.addTask(priority: .low) {
-                        await characteristic.inventoryItem(inHome: homeName)
+            let values = InventoryValues()
+            do {
+                try await raceTimeout(Self.inventoryValuesTimeout, timeoutError: { InventoryTimeout() }, operation: {
+                    await withTaskGroup(of: Void.self) { group in
+                        for characteristic in homes.flatMap(\.accessories).flatMap(\.services).flatMap(\.characteristics) where characteristic.isReadable {
+                            group.addTask(priority: .low) {
+                                if let text = await characteristic.inventoryValue() {
+                                    values.set(text, for: characteristic.uniqueIdentifier)
+                                }
+                            }
+                        }
+                        await group.waitForAll()
                     }
-                }
-                return await group.reduce(into: [HomeKitInventoryItem?]()) { $0.append($1) }
+                })
+            } catch {
+                log.warning("HomeKit inventory: not every value was read in time", metadata: ["error": "\(error)"])
             }
-            return items.compactMap(\.self).sorted { ($0.roomName, $0.accessoryName, $0.serviceName, $0.characteristicType) < ($1.roomName, $1.accessoryName, $1.serviceName, $1.characteristicType) }
+            return HomeKitInventory(homes: homes.map { $0.inventory(values: values.snapshot()) })
         }
 
         func getHomes() async -> [HMHome] {
@@ -356,7 +396,6 @@ extension HomeKitAdapter.HomeKitHomeManager: HMHomeManagerDelegate {
         log.info("homeManager.homeManagerDidUpdateHomes")
         // also the first callback of the manager created by a reset, whose registrations start empty
         update(homes: manager.homes, resubscribeReason: "homeManagerDidUpdateHomes", releasesRetiredManager: true)
-        scheduleInventoryUpdate()
     }
     func homeManager(_ manager: HMHomeManager, didUpdate status: HMHomeManagerAuthorizationStatus) {
         log.info("homeManager.didUpdate \(status.rawValue)")
@@ -368,13 +407,11 @@ extension HomeKitAdapter.HomeKitHomeManager: HMHomeManagerDelegate {
 extension HomeKitAdapter.HomeKitHomeManager: HMHomeDelegate {
     func home(_ home: HMHome, didAdd accessory: HMAccessory) {
         log.info("home:didAdd accessory \(accessory.name)")
-        scheduleInventoryUpdate()
         update(homes: manager.homes)
     }
 
     func home(_ home: HMHome, didRemove accessory: HMAccessory) {
         log.info("home:didRemove accessory \(accessory.name)")
-        scheduleInventoryUpdate()
         update(homes: manager.homes)
     }
 
@@ -392,7 +429,6 @@ extension HomeKitAdapter.HomeKitHomeManager: HMHomeDelegate {
 extension HomeKitAdapter.HomeKitHomeManager: HMAccessoryDelegate {
     func accessoryDidUpdateName(_ accessory: HMAccessory) {
         log.info("accessory:accessoryDidUpdateName(HMAccessory) \(accessory.name)")
-        scheduleInventoryUpdate()
         update(homes: manager.homes)
 
     }
@@ -403,12 +439,10 @@ extension HomeKitAdapter.HomeKitHomeManager: HMAccessoryDelegate {
     }
     func accessoryDidUpdateServices(_ accessory: HMAccessory) {
         log.info("accessory:accessoryDidUpdateServices(HMAccessory) \(accessory.name)")
-        scheduleInventoryUpdate()
         update(homes: manager.homes)
     }
     func accessory(_ accessory: HMAccessory, didUpdateNameFor: HMService) {
         log.info("accessory:accessory(HMAccessory, didUpdateNameFor: HMService) \(accessory.name)")
-        scheduleInventoryUpdate()
         update(homes: manager.homes)
     }
     func accessory(_ accessory: HMAccessory, service: HMService, didUpdateValueFor characteristic: HMCharacteristic) {

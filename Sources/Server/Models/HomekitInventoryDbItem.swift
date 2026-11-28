@@ -7,7 +7,7 @@ import Fluent
 import Foundation
 import HAModels
 
-/// One characteristic of the HomeKit inventory, see `HomeKitInventoryItem`. The table is replaced as a whole with
+/// One characteristic of the HomeKit inventory, see `HomeKitInventory`. The table is replaced as a whole with
 /// each snapshot of the adapter; `syncedAt` is the time of that snapshot. Text columns are fitted to their width.
 final class HomekitInventoryDbItem: Model, @unchecked Sendable {
     static let schema = "homekitInventory"
@@ -24,6 +24,12 @@ final class HomekitInventoryDbItem: Model, @unchecked Sendable {
     @Field(key: "accessoryName")
     var accessoryName: String
 
+    @Field(key: "accessoryCategory")
+    var accessoryCategory: String
+
+    @Field(key: "isReachable")
+    var isReachable: Bool
+
     @OptionalField(key: "manufacturer")
     var manufacturer: String?
 
@@ -33,8 +39,14 @@ final class HomekitInventoryDbItem: Model, @unchecked Sendable {
     @Field(key: "serviceType")
     var serviceType: String
 
+    @Field(key: "serviceTypeDescription")
+    var serviceTypeDescription: String
+
     @Field(key: "serviceName")
     var serviceName: String
+
+    @Field(key: "isPrimaryService")
+    var isPrimaryService: Bool
 
     @Field(key: "characteristicType")
     var characteristicType: String
@@ -63,21 +75,25 @@ final class HomekitInventoryDbItem: Model, @unchecked Sendable {
 
     init() {}
 
-    init(_ item: HomeKitInventoryItem, syncedAt: Date) {
-        homeName = item.homeName.fitted(toScalars: Self.nameWidth)
-        roomName = item.roomName.fitted(toScalars: Self.nameWidth)
-        accessoryName = item.accessoryName.fitted(toScalars: Self.nameWidth)
-        manufacturer = item.manufacturer?.fitted(toScalars: Self.nameWidth)
-        model = item.model?.fitted(toScalars: Self.nameWidth)
-        serviceType = item.serviceType.fitted(toScalars: Self.typeWidth)
-        serviceName = item.serviceName.fitted(toScalars: Self.nameWidth)
-        characteristicType = item.characteristicType.fitted(toScalars: Self.typeWidth)
-        characteristicDescription = item.characteristicDescription.fitted(toScalars: Self.nameWidth)
-        mappedType = item.mappedType?.rawValue
-        isReadable = item.isReadable
-        isNotifiable = item.isNotifiable
-        isWritable = item.isWritable
-        value = item.value?.fitted(toScalars: Self.valueWidth)
+    init(_ row: HomeKitInventory.Row, syncedAt: Date) {
+        homeName = row.homeName.fitted(toScalars: Self.nameWidth)
+        roomName = row.roomName.fitted(toScalars: Self.nameWidth)
+        accessoryName = row.accessory.name.fitted(toScalars: Self.nameWidth)
+        accessoryCategory = row.accessory.category.fitted(toScalars: Self.nameWidth)
+        isReachable = row.accessory.isReachable
+        manufacturer = row.accessory.manufacturer?.fitted(toScalars: Self.nameWidth)
+        model = row.accessory.model?.fitted(toScalars: Self.nameWidth)
+        serviceType = row.service.type.fitted(toScalars: Self.typeWidth)
+        serviceTypeDescription = row.service.typeDescription.fitted(toScalars: Self.nameWidth)
+        serviceName = row.service.name.fitted(toScalars: Self.nameWidth)
+        isPrimaryService = row.service.isPrimary
+        characteristicType = row.characteristic.type.fitted(toScalars: Self.typeWidth)
+        characteristicDescription = row.characteristic.typeDescription.fitted(toScalars: Self.nameWidth)
+        mappedType = row.characteristic.mappedType?.rawValue
+        isReadable = row.characteristic.isReadable
+        isNotifiable = row.characteristic.isNotifiable
+        isWritable = row.characteristic.isWritable
+        value = row.characteristic.value?.fitted(toScalars: Self.valueWidth)
         self.syncedAt = syncedAt
     }
 

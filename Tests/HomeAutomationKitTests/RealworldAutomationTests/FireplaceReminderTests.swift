@@ -144,7 +144,7 @@ struct FireplaceReminderTests {
         #expect(result.riseInC == 2)
         #expect(result.window == 600)
         #expect(result.minInterval == 60)
-        #expect(result.triggerEntityIds == [sensor])
+        #expect(Set(result.getEntityIds()) == [sensor])
         #expect(FireplaceReminder(roomSensor: sensor).riseInC == 1.0)
         #expect(FireplaceReminder(roomSensor: sensor).window == 30 * 60)
         #expect(FireplaceReminder(roomSensor: sensor).minInterval == 2 * 3600)

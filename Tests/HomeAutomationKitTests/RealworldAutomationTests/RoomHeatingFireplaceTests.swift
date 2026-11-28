@@ -183,7 +183,6 @@ struct RoomHeatingFireplaceTests {
         let decoded = try JSONDecoder().decode(AnyAutomation.self, from: JSONEncoder().encode(AnyAutomation.create(from: room())))
 
         let decodedRoom = try #require(decoded.automation as? RoomHeating)
-        #expect(decodedRoom.triggerEntityIds == [window.contactSensorId, Fireplace.stateId])
         #expect(decodedRoom.contacts.map(\.source) == [.window, .fireplace])
     }
 
@@ -441,7 +440,6 @@ struct FireplaceTimeoutTests {
         let decoded = try JSONDecoder().decode(AnyAutomation.self, from: JSONEncoder().encode(AnyAutomation.create(from: FireplaceTimeout())))
         let timeout = try #require(decoded.automation as? FireplaceTimeout)
         #expect(timeout.name == "fireplace-timeout")
-        #expect(timeout.triggerEntityIds.isEmpty)
 
         let old = #"{"isActive":true,"name":"fireplace-timeout","maxDuration":28800,"fireplace":{"switchId":{"placeId":"Keller","name":"Kamin","characteristicType":"switcher"}}}"#
         let decodedOld = try JSONDecoder().decode(FireplaceTimeout.self, from: Data(old.utf8))

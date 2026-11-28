@@ -20,8 +20,6 @@ public struct FireplaceReminder: Automatable {
     /// No second reminder before this much time has passed since the last one.
     public let minInterval: TimeInterval
 
-    public var triggerEntityIds: Set<EntityId> { [roomSensor] }
-
     public init(_ name: String = "fireplace-reminder", roomSensor: EntityId, riseInC: Double = 1.0, window: TimeInterval = 30 * 60, minInterval: TimeInterval = 2 * 3600) {
         self.name = name
         self.roomSensor = roomSensor

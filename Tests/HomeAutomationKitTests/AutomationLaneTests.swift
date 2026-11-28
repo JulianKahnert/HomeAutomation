@@ -35,7 +35,6 @@ private struct LaneAutomation: Automatable {
     var isActive = true
     let name: String
     var lanePolicy = LanePolicy.supersede
-    var triggerEntityIds: Set<EntityId> { [] }
     var probe: LaneProbe?
     var recordsRuns: Bool { false }
 

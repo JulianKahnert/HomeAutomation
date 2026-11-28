@@ -26,7 +26,6 @@ private struct TestAutomation: Automatable {
     var recordsRuns = true
     var lanePolicy = LanePolicy.supersede
     var summaryDetail: String?
-    var triggerEntityIds: Set<EntityId> { [] }
     /// Receives the run id seen inside `execute`; not part of the config.
     var onExecute: (@Sendable (UUID?) -> Void)?
     var firstRun = FirstRun()

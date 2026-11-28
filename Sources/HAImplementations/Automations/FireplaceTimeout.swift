@@ -16,8 +16,6 @@ public struct FireplaceTimeout: Automatable {
     public var isActive = true
     public let name: String
 
-    public var triggerEntityIds: Set<EntityId> { [] }
-
     public init(_ name: String = "fireplace-timeout") {
         self.name = name
     }

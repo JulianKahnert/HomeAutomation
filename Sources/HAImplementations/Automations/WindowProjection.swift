@@ -21,7 +21,6 @@ public struct WindowProjection: Automatable {
 
     public var isActive = true
     public let name: String
-    public private(set) var triggerEntityIds = Set<EntityId>()
     public var lanePolicy: LanePolicy { .runEach }
 
     public init(_ name: String = WindowProjection.defaultName) {

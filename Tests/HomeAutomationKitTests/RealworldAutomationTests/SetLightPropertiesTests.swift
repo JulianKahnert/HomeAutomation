@@ -241,21 +241,6 @@ struct SetLightPropertiesTests {
         #expect(shouldNotTrigger == false)
     }
 
-    @Test("Test triggerEntityIds is empty")
-    func testTriggerEntityIds() {
-        let automation = SetLightProperties(
-            "test-entity-ids",
-            at: Time(hour: 20, minute: 0),
-            lights: [light1, light2],
-            color: RGB(red: 1.0, green: 1.0, blue: 1.0),
-            colorTemperature: nil,
-            brightness: nil
-        )
-
-        // SetLightProperties is time-based, not entity-based
-        #expect(automation.triggerEntityIds.isEmpty)
-    }
-
     @Test("Test color temperature normalized values")
     func testColorTemperatureNormalizedValues() async throws {
         // Test with minimum value (0.0 - warmest)

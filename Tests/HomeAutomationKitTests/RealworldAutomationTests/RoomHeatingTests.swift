@@ -433,7 +433,6 @@ struct RoomHeatingTests {
         let decoded = try JSONDecoder().decode(AnyAutomation.self, from: JSONEncoder().encode(AnyAutomation.create(from: room())))
 
         let decodedRoom = try #require(decoded.automation as? RoomHeating)
-        #expect(decodedRoom.triggerEntityIds == [windowA.contactSensorId, windowB.contactSensorId])
         #expect(Set(decodedRoom.getEntityIds()).isSuperset(of: [windowA.contactSensorId, windowB.contactSensorId]))
     }
 }

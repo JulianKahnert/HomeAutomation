@@ -14,10 +14,6 @@ public struct WindowOpen: Automatable {
     public let name: String
     public let windowContact: ContactSensorDevice
     public let notificationWait: Duration
-    public var triggerEntityIds: Set<EntityId> {
-        [windowContact.contactSensorId]
-    }
-
     public init(_ name: String, windowContact: ContactSensorDevice, notificationWait: Duration = .minutes(15)) {
         self.name = name
         self.windowContact = windowContact

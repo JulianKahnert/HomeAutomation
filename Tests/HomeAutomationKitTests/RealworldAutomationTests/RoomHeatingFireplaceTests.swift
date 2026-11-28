@@ -327,81 +327,176 @@ struct RoomHeatingFireplaceRadiatorsTests {
     }
 }
 
-@Suite("FireplaceTimeout automation")
+@Suite("FireplaceTimeout automation: the fireplace question")
 @HomeManagerActor
 struct FireplaceTimeoutTests {
     private let homeManager = MockHomeAdapter()
     private let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
     private let maxDuration = Fireplace.maxDuration
+    private let answerTimeout = Fireplace.answerTimeout
 
     private func setFireplace(on: Bool, at date: Date) {
         homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: date, isOn: on))
     }
 
-    @Test("Before the maximum duration nothing happens")
-    func beforeMaxDuration() async throws {
-        setFireplace(on: true, at: start)
-        let now = start.addingTimeInterval(maxDuration - 60)
-
-        #expect(try await !FireplaceTimeout().shouldTrigger(with: .time(date: now), using: homeManager))
+    private func setQuestion(_ deadline: Deadline, at date: Date) {
+        homeManager.storageItems.append(EntityStorageItem(entityId: Fireplace.questionId, timestamp: date, deadline: deadline, origin: .server))
     }
 
-    @Test("After the maximum duration the server ends the fireplace and a push says so")
-    func endsAfterMaxDuration() async throws {
+    private var question: Deadline? {
+        homeManager.storageItems.last { $0.entityId == Fireplace.questionId }?.deadline
+    }
+
+    /// Runs the automation like the lane does: only when it triggers.
+    private func tick(_ timeout: FireplaceTimeout, at now: Date) async throws {
+        let event = HomeEvent.time(date: now)
+        if try await timeout.shouldTrigger(with: event, using: homeManager) {
+            try await timeout.execute(using: homeManager, on: event, now: now)
+        }
+    }
+
+    @Test("Before the question is due nothing happens")
+    func beforeTheQuestion() async throws {
+        setFireplace(on: true, at: start)
+
+        #expect(try await !FireplaceTimeout().shouldTrigger(with: .time(date: start.addingTimeInterval(maxDuration - 60)), using: homeManager))
+    }
+
+    @Test("After the maximum duration the server asks with a Live Activity and leaves the fireplace on")
+    func asks() async throws {
         setFireplace(on: true, at: start)
         let now = start.addingTimeInterval(maxDuration)
+
+        try await tick(FireplaceTimeout(), at: now)
+
+        #expect(homeManager.fireplaceSwitches.last?.isOn == true)
+        #expect(question == .overdue(since: Date(timeIntervalSince1970: now.timeIntervalSince1970)))
+        let started = try #require(homeManager.sentLiveActivities.first)
+        #expect(homeManager.sentLiveActivities.count == 1)
+        #expect(started.activityName == FireplaceContentState.activityTypeName)
+        #expect(started.options.priority == .high)
+        #expect(started.options.alert?.title == "Ist der Kamin noch an?")
+        let contentState = try #require(started.contentState as? FireplaceContentState)
+        #expect(contentState.since == start)
+        #expect(abs(contentState.endsAt.timeIntervalSince(now.addingTimeInterval(answerTimeout))) < 0.001)
+        #expect(homeManager.sentNotifications.isEmpty)
+        #expect(try await Fireplace.state(with: homeManager).isAsking)
+    }
+
+    @Test("The question is asked once, however many ticks follow")
+    func asksOnce() async throws {
+        setFireplace(on: true, at: start)
         let timeout = FireplaceTimeout()
 
-        #expect(try await timeout.shouldTrigger(with: .time(date: now), using: homeManager))
-        try await timeout.execute(using: homeManager, now: now)
+        for minute in 0..<5 {
+            try await tick(timeout, at: start.addingTimeInterval(maxDuration + Double(minute) * 60))
+        }
 
+        #expect(homeManager.sentLiveActivities.count == 1)
+    }
+
+    @Test("Without an answer the server switches the fireplace off after the answer timeout, with a push")
+    func endsWithoutAnswer() async throws {
+        setFireplace(on: true, at: start)
+        let timeout = FireplaceTimeout()
+        try await tick(timeout, at: start.addingTimeInterval(maxDuration))
+
+        try await tick(timeout, at: start.addingTimeInterval(maxDuration + answerTimeout - 60))
+        #expect(homeManager.fireplaceSwitches.last?.isOn == true)
+
+        try await tick(timeout, at: start.addingTimeInterval(maxDuration + answerTimeout))
         #expect(homeManager.fireplaceSwitches.last?.isOn == false)
         #expect(homeManager.storageItems.last { $0.entityId == Fireplace.stateId }?.origin == .server)
         #expect(homeManager.performedActions.isEmpty)
         #expect(homeManager.sentNotifications.map(\.title) == ["Kamin aus"])
         #expect(homeManager.sentNotifications.first?.id == Fireplace.notificationId)
-        #expect(homeManager.sentNotifications.first?.message.contains(FireplaceTimeout.durationText(maxDuration)) == true)
     }
 
-    @Test("A fireplace switched off and on again after the timeout trigger is not ended by that run")
+    @Test("The switch-off closes the question and ends the Live Activity on every device")
+    func offEndsTheQuestion() async throws {
+        setFireplace(on: true, at: start)
+        setQuestion(.overdue(since: start.addingTimeInterval(maxDuration)), at: start.addingTimeInterval(maxDuration))
+        setFireplace(on: false, at: start.addingTimeInterval(maxDuration + 60))
+        let timeout = FireplaceTimeout()
+        let change = HomeEvent.change(try #require(homeManager.storageItems.last { $0.entityId == Fireplace.stateId }))
+
+        #expect(try await timeout.shouldTrigger(with: change, using: homeManager))
+        try await timeout.execute(using: homeManager, on: change, now: start.addingTimeInterval(maxDuration + 60))
+
+        #expect(question == Deadline.none)
+        #expect(homeManager.endedLiveActivities == [FireplaceContentState.activityTypeName])
+        #expect(homeManager.sentNotifications.isEmpty)
+    }
+
+    @Test("\"Ja\" sets the next question ahead and ends the Live Activity on every device")
+    func yesAsksAgainLater() async throws {
+        setFireplace(on: true, at: start)
+        setQuestion(.overdue(since: start.addingTimeInterval(maxDuration)), at: start.addingTimeInterval(maxDuration))
+        let answeredAt = start.addingTimeInterval(maxDuration + 300)
+        // what `POST /heating/fireplace/answer` writes for "Ja"
+        setQuestion(.running(until: answeredAt.addingTimeInterval(maxDuration)), at: answeredAt)
+        let timeout = FireplaceTimeout()
+        let change = HomeEvent.change(try #require(homeManager.storageItems.last { $0.entityId == Fireplace.questionId }))
+
+        #expect(try await timeout.shouldTrigger(with: change, using: homeManager))
+        try await timeout.execute(using: homeManager, on: change, now: answeredAt)
+
+        #expect(homeManager.endedLiveActivities == [FireplaceContentState.activityTypeName])
+        #expect(homeManager.fireplaceSwitches.last?.isOn == true)
+        let state = try await Fireplace.state(with: homeManager)
+        #expect(!state.isAsking)
+        #expect(state.asksAt == answeredAt.addingTimeInterval(maxDuration))
+
+        // past the old end nothing happens, at the new question it asks again
+        try await tick(timeout, at: start.addingTimeInterval(maxDuration + answerTimeout))
+        #expect(homeManager.fireplaceSwitches.last?.isOn == true)
+        #expect(homeManager.sentLiveActivities.isEmpty)
+        try await tick(timeout, at: answeredAt.addingTimeInterval(maxDuration))
+        #expect(homeManager.sentLiveActivities.count == 1)
+    }
+
+    @Test("The question just asked is no answer: its change ends nothing")
+    func ownQuestionEndsNothing() async throws {
+        setFireplace(on: true, at: start)
+        let timeout = FireplaceTimeout()
+        let now = start.addingTimeInterval(maxDuration)
+        try await tick(timeout, at: now)
+        let change = HomeEvent.change(try #require(homeManager.storageItems.last { $0.entityId == Fireplace.questionId }))
+
+        try await timeout.execute(using: homeManager, on: change, now: now)
+
+        #expect(homeManager.endedLiveActivities.isEmpty)
+        #expect(homeManager.sentLiveActivities.count == 1)
+    }
+
+    @Test("A fireplace switched off and on again after the end trigger is not ended by that run")
     func restartAfterTheTrigger() async throws {
         setFireplace(on: true, at: start)
-        let now = start.addingTimeInterval(maxDuration)
-        let restartedAt = now.addingTimeInterval(-10)
-        let homeManager = self.homeManager
+        setQuestion(.overdue(since: start.addingTimeInterval(maxDuration)), at: start.addingTimeInterval(maxDuration))
+        let now = start.addingTimeInterval(maxDuration + answerTimeout)
+        #expect(try await FireplaceTimeout().shouldTrigger(with: .time(date: now), using: homeManager))
         // the app ends the fireplace and starts it again: the stored switch-on time is new
-        homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: restartedAt.addingTimeInterval(-1), isOn: false))
-        homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: restartedAt, isOn: true))
+        let restartedAt = now.addingTimeInterval(-10)
+        setFireplace(on: false, at: restartedAt.addingTimeInterval(-1))
+        setFireplace(on: true, at: restartedAt)
 
-        try await FireplaceTimeout().execute(using: homeManager, now: now)
+        try await FireplaceTimeout().execute(using: homeManager, on: .time(date: now), now: now)
 
         #expect(homeManager.fireplaceSwitches.last == FireplaceSwitch(timestamp: restartedAt, isOn: true))
         #expect(homeManager.sentNotifications.isEmpty)
     }
 
-    @Test("The push goes out once per time the fireplace was on, however many ticks follow")
-    func pushOnce() async throws {
+    @Test("A question of an earlier fire does not count for a new one")
+    func oldQuestionIsIgnored() async throws {
         setFireplace(on: true, at: start)
-        let timeout = FireplaceTimeout()
+        setQuestion(.overdue(since: start.addingTimeInterval(maxDuration)), at: start.addingTimeInterval(maxDuration))
+        setFireplace(on: false, at: start.addingTimeInterval(maxDuration + 60))
+        let again = start.addingTimeInterval(maxDuration + 120)
+        setFireplace(on: true, at: again)
 
-        for minute in 0..<5 {
-            let now = start.addingTimeInterval(maxDuration + Double(minute) * 60)
-            if try await timeout.shouldTrigger(with: .time(date: now), using: homeManager) {
-                try await timeout.execute(using: homeManager, now: now)
-            }
-        }
-        // a second run that raced the first one finds the fireplace off and sends nothing
-        try await timeout.execute(using: homeManager, now: start.addingTimeInterval(maxDuration))
-
-        #expect(homeManager.sentNotifications.count == 1)
-        #expect(homeManager.fireplaceSwitches.filter { !$0.isOn }.count == 1)
-    }
-
-    @Test("The push names the duration in German", arguments: [
-        (2 * 3600.0, "2 Stunden"), (3600.0, "1 Stunde"), (5400.0, "1 Stunde und 30 Minuten"), (60.0, "1 Minute"), (45 * 60.0, "45 Minuten"),
-    ])
-    func durationText(duration: TimeInterval, text: String) {
-        #expect(FireplaceTimeout.durationText(duration) == text)
+        let state = try await Fireplace.state(with: homeManager)
+        #expect(!state.isAsking)
+        #expect(state.asksAt == again.addingTimeInterval(maxDuration))
     }
 
     @Test("A fireplace that is off is left alone")
@@ -412,27 +507,44 @@ struct FireplaceTimeoutTests {
         #expect(try await !FireplaceTimeout().shouldTrigger(with: .time(date: start.addingTimeInterval(maxDuration * 2)), using: homeManager))
     }
 
-    @Test("A fireplace never switched is off: no end, no push")
+    @Test("A fireplace never switched is off: no question, no end, no push")
     func neverSwitched() async throws {
-        try await FireplaceTimeout().execute(using: homeManager, now: start.addingTimeInterval(maxDuration * 2))
+        try await FireplaceTimeout().execute(using: homeManager, on: .time(date: start), now: start.addingTimeInterval(maxDuration * 2))
 
         #expect(homeManager.fireplaceSwitches.isEmpty)
         #expect(homeManager.sentNotifications.isEmpty)
+        #expect(homeManager.sentLiveActivities.isEmpty)
+        #expect(homeManager.endedLiveActivities.isEmpty)
     }
 
-    @Test("The end is the stored switch-on time plus the maximum duration")
-    func endsAt() async throws {
+    @Test("The question is the stored switch-on time plus the maximum duration, the end the answer timeout later")
+    func times() async throws {
         setFireplace(on: true, at: start)
 
-        #expect(try await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
-        #expect(try await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(maxDuration))
+        let state = try await Fireplace.state(with: homeManager)
+        #expect(state == FireplaceState(isOn: true, since: start))
+        #expect(state.asksAt == start.addingTimeInterval(maxDuration))
+        #expect(state.endsAt == start.addingTimeInterval(maxDuration + answerTimeout))
     }
 
-    @Test("Another event does not trigger it")
-    func onlyTimeTriggers() async throws {
+    @Test("Another clock event does not trigger it, a change of another entity neither")
+    func onlyItsTriggers() async throws {
         setFireplace(on: true, at: start.addingTimeInterval(-maxDuration * 2))
 
         #expect(try await !FireplaceTimeout().shouldTrigger(with: .sunrise, using: homeManager))
+        let other = EntityStorageItem(entityId: EntityId(placeId: "Cellar", name: "Window", characteristicsName: nil, characteristic: .contactSensor),
+                                      isContactOpen: true)
+        #expect(try await !FireplaceTimeout().shouldTrigger(with: .change(other), using: homeManager))
+    }
+
+    @Test("The question is a deadline, but the window Live Activity does not take it for a window")
+    func questionIsNoWindow() async throws {
+        let item = EntityStorageItem(entityId: Fireplace.questionId, deadline: .overdue(since: start), origin: .server)
+        homeManager.storageItems.append(item)
+
+        #expect(WindowContentState.window(of: Fireplace.questionId) == nil)
+        #expect(try await !WindowProjection().shouldTrigger(with: .change(item), using: homeManager))
+        #expect(await homeManager.getWindowContentState().windows.isEmpty)
     }
 
     @Test("It survives the configuration JSON, also one written with the former switch and duration")
@@ -464,7 +576,7 @@ struct FireplaceSwitchTests {
         homeManager.fireplaceSwitches.append(FireplaceSwitch(timestamp: start, isOn: true))
 
         #expect(try await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: start))
-        #expect(try await Fireplace.state(with: homeManager).endsAt == start.addingTimeInterval(Fireplace.maxDuration))
+        #expect(try await Fireplace.state(with: homeManager).asksAt == start.addingTimeInterval(Fireplace.maxDuration))
         #expect(homeManager.performedActions.isEmpty)
     }
 
@@ -480,10 +592,13 @@ struct FireplaceSwitchTests {
         #expect(try await Fireplace.state(with: homeManager) == .off)
     }
 
-    @Test("The end the server names wins over the one derived from the start")
+    @Test("The question and the end the server names win over the ones derived from the start")
     func namedEnd() {
         let named = Date(timeIntervalSinceReferenceDate: 900_000_000)
         #expect(FireplaceState(isOn: true, since: start, endsAt: named).endsAt == named)
-        #expect(FireplaceState(isOn: true, since: start).endsAt == start.addingTimeInterval(Fireplace.maxDuration))
+        #expect(FireplaceState(isOn: true, since: start, asksAt: named).asksAt == named)
+        #expect(FireplaceState(isOn: true, since: start, asksAt: named).endsAt == named.addingTimeInterval(Fireplace.answerTimeout))
+        #expect(FireplaceState(isOn: true, since: start).asksAt == start.addingTimeInterval(Fireplace.maxDuration))
+        #expect(FireplaceState(isOn: true, since: start).endsAt == start.addingTimeInterval(Fireplace.maxDuration + Fireplace.answerTimeout))
     }
 }

@@ -128,15 +128,22 @@ struct HeatingFireplaceFeatureTests {
         }
     }
 
-    @Test("the subtitle says when the fireplace ends, and is empty while it is off")
+    @Test("the subtitle says when the server asks whether the fireplace still burns, and is empty while it is off")
     func hint() {
         let burning = FireplaceState(isOn: true, since: start)
-        let end = start.addingTimeInterval(Fireplace.maxDuration)
+        let asksAt = start.addingTimeInterval(Fireplace.maxDuration)
 
-        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(-3_600)) == "Kamin an · endet in 1 h")
-        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(-1_800)) == "Kamin an · endet in < 1 h")
-        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(3_600)) == "Kamin an · endet gleich")
+        #expect(HeatingFormat.fireplaceHint(burning, now: asksAt.addingTimeInterval(-3_600)) == "Kamin an · Rückfrage in 1 h")
+        #expect(HeatingFormat.fireplaceHint(burning, now: asksAt.addingTimeInterval(-1_800)) == "Kamin an · Rückfrage in < 1 h")
+        #expect(HeatingFormat.fireplaceHint(burning, now: asksAt.addingTimeInterval(60)) == "Kamin an · Rückfrage gleich")
         #expect(HeatingFormat.fireplaceHint(.off, now: start) == nil)
+    }
+
+    @Test("while the question is open the subtitle says so")
+    func hintWhileAsking() {
+        let asking = FireplaceState(isOn: true, since: start, asksAt: start.addingTimeInterval(Fireplace.maxDuration), isAsking: true)
+
+        #expect(HeatingFormat.fireplaceHint(asking, now: start.addingTimeInterval(Fireplace.maxDuration + 60)) == "Kamin an · Rückfrage offen")
     }
 
     @Test("the push category carries the action that switches the fireplace on, without opening the app")

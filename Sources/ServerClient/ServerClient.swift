@@ -202,6 +202,15 @@ public struct ServerClient {
         return FireplaceState(try response.ok.body.json)
     }
 
+    /// Answers "Ist der Kamin noch an?": `false` switches the fireplace off, `true` sets the next question ahead.
+    /// The server ends the question's Live Activity on every device.
+    public func answerFireplaceQuestion(stillOn: Bool) async throws -> FireplaceState {
+        let response = try await client.answerFireplaceQuestion(body: .json(.init(stillOn: stillOn)))
+        if case .serviceUnavailable = response { throw ServerClientError.busy }
+        if case .undocumented(let status, _) = response { throw ServerClientError(undocumentedStatus: status) }
+        return FireplaceState(try response.ok.body.json)
+    }
+
     /// The time grid of a heating room (glossary: actual, plan target, Δ). Throws when the server answers
     /// 400 (unknown range) or 404 (no heating automation for the room).
     public func getHeatingRoom(placeId: String, range: HeatingRange) async throws -> HeatingRoomDetail {
@@ -260,9 +269,9 @@ extension FireplaceState {
         self.init(isOn: true, since: answer.timestamp)
     }
 
-    /// Takes the end the server named, so an app of another version shows when this server ends the fireplace.
+    /// Takes the question and the end the server named, so an app of another version shows when this server asks and ends.
     init(_ body: Components.Schemas.Fireplace) {
-        self.init(isOn: body.isOn, since: body.since, endsAt: body.endsAt)
+        self.init(isOn: body.isOn, since: body.since, asksAt: body.asksAt, isAsking: body.isAsking ?? false, endsAt: body.endsAt)
     }
 }
 

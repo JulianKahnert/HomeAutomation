@@ -51,6 +51,8 @@ final class FireplaceEndpointTests: XCTestCase {
     private struct State: Decodable {
         let isOn: Bool
         let since: Date?
+        let asksAt: Date?
+        let isAsking: Bool?
         let endsAt: Date?
     }
 
@@ -108,7 +110,10 @@ final class FireplaceEndpointTests: XCTestCase {
         XCTAssertEqual(state?.isOn, true)
         let since = try XCTUnwrap(state?.since)
         XCTAssertEqual(since.timeIntervalSince1970, before.timeIntervalSince1970, accuracy: 5)
-        XCTAssertEqual(try XCTUnwrap(state?.endsAt).timeIntervalSince1970, since.addingTimeInterval(Fireplace.maxDuration).timeIntervalSince1970, accuracy: 1)
+        XCTAssertEqual(try XCTUnwrap(state?.asksAt).timeIntervalSince1970, since.addingTimeInterval(Fireplace.maxDuration).timeIntervalSince1970, accuracy: 1)
+        let endsAt = since.addingTimeInterval(Fireplace.maxDuration + Fireplace.answerTimeout)
+        XCTAssertEqual(try XCTUnwrap(state?.endsAt).timeIntervalSince1970, endsAt.timeIntervalSince1970, accuracy: 1)
+        XCTAssertEqual(state?.isAsking, false)
         // the rooms that follow the fireplace hear it as a change with origin app
         XCTAssertEqual(events.all.map(\.origin), [.app])
         XCTAssertEqual(events.all.first?.entityId, Fireplace.stateId)
@@ -122,6 +127,53 @@ final class FireplaceEndpointTests: XCTestCase {
         let (_, read) = try await request(.GET, token: token)
         XCTAssertEqual(read?.isOn, false)
         XCTAssertEqual(events.all.compactMap(\.isDeviceOn), [true, false])
+    }
+
+    @discardableResult
+    private func answer(stillOn: Bool) async throws -> (HTTPStatus, State?) {
+        try await request(.POST, "/heating/fireplace/answer", token: token, body: #"{"stillOn":\#(stillOn)}"#)
+    }
+
+    func testAnswerRequiresAuthentication() async throws {
+        let (status, _) = try await request(.POST, "/heating/fireplace/answer", token: nil, body: #"{"stillOn":true}"#)
+        XCTAssertEqual(status, .unauthorized)
+    }
+
+    func testAnswerNoSwitchesTheFireplaceOff() async throws {
+        try await switchFireplace(true)
+        await storage.waitForChanges(1)
+
+        let (status, state) = try await answer(stillOn: false)
+        XCTAssertEqual(status, .ok)
+        XCTAssertEqual(state?.isOn, false)
+        await storage.waitForChanges(2)
+        XCTAssertEqual(try await Fireplace.state(from: storage), .off)
+        XCTAssertEqual(events.all.last?.entityId, Fireplace.stateId)
+        XCTAssertEqual(events.all.last?.origin, .app)
+    }
+
+    func testAnswerYesSetsTheNextQuestionAhead() async throws {
+        try await switchFireplace(true)
+        await storage.waitForChanges(1)
+        let before = Date()
+
+        let (status, state) = try await answer(stillOn: true)
+        XCTAssertEqual(status, .ok)
+        XCTAssertEqual(state?.isOn, true)
+        XCTAssertEqual(state?.isAsking, false)
+        let asksAt = before.addingTimeInterval(Fireplace.maxDuration)
+        XCTAssertEqual(try XCTUnwrap(state?.asksAt).timeIntervalSince1970, asksAt.timeIntervalSince1970, accuracy: 5)
+        // the fireplace stays on; the question entity changed with origin app, which FireplaceTimeout hears
+        XCTAssertEqual(events.all.last?.entityId, Fireplace.questionId)
+        XCTAssertEqual(events.all.last?.origin, .app)
+        XCTAssertEqual(events.all.filter { $0.entityId == Fireplace.stateId }.count, 1)
+    }
+
+    func testAnswerYesWhileOffChangesNothing() async throws {
+        let (status, state) = try await answer(stillOn: true)
+        XCTAssertEqual(status, .ok)
+        XCTAssertEqual(state?.isOn, false)
+        XCTAssertTrue(events.all.isEmpty)
     }
 
     func testRepeatedOnKeepsTheStartAndTellsNobody() async throws {
@@ -152,5 +204,5 @@ private final class EventLog: @unchecked Sendable {
 struct SilentSender: NotificationSender {
     func sendNotification(title: String, message: String, id: String, category: String?) async throws {}
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String, options: LiveActivityOptions) async {}
-    func endAllLiveActivities(ofActivityType activityType: String) async {}
+    func endAllLiveActivities<ContentState: Encodable & Sendable>(ofActivityType activityType: String, finalContentState: ContentState) async {}
 }

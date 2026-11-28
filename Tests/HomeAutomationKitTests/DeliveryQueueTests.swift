@@ -63,7 +63,7 @@ struct DeliveryQueueTests {
         let options = LiveActivityOptions(alert: nil, staleDate: Date(timeIntervalSince1970: 0), priority: .low)
 
         await queue.deliver(.liveActivity(contentState: state, activityName: WindowContentState.activityTypeName, options: options))
-        await queue.deliver(.endLiveActivities(activityType: WindowContentState.activityTypeName))
+        await queue.deliver(.endLiveActivities(activityType: WindowContentState.activityTypeName, finalContentState: WindowContentState.empty))
         await queue.deliver(.push(title: "t", message: "m", id: "i", category: "c"))
 
         #expect(await recorder.events == [
@@ -111,5 +111,5 @@ private actor GatedSender: NotificationSender {
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
                                                                        activityName: String,
                                                                        options: LiveActivityOptions) async {}
-    func endAllLiveActivities(ofActivityType activityType: String) async {}
+    func endAllLiveActivities<ContentState: Encodable & Sendable>(ofActivityType activityType: String, finalContentState: ContentState) async {}
 }

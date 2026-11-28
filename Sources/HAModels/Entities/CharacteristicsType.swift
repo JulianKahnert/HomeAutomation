@@ -23,7 +23,8 @@ public enum CharacteristicsType: String, Sendable, Codable, CaseIterable {
     case temperatureCalibration
     /// Electricity price in EUR per kWh, read through `energyPriceInEURPerKWh`.
     case energyPrice
-    /// The deadline of a window (server-owned): none, running until a moment or overdue, read through `deadline`.
+    /// A server-owned deadline (a window's Fensterschließzeit, the fireplace question): none, running until a moment or
+    /// overdue, read through `deadline`.
     case deadline
 }
 

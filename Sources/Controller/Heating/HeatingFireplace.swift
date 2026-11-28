@@ -12,13 +12,16 @@ import SwiftUI
 import UserNotifications
 
 extension HeatingFormat {
-    /// "Kamin an · endet in 1 h" while the fireplace burns, `nil` while it is off.
+    /// "Kamin an · Rückfrage in 1 h" while the fireplace burns, "Kamin an · Rückfrage offen" while the server
+    /// waits for an answer, `nil` while it is off.
     static func fireplaceHint(_ state: FireplaceState, now: Date) -> String? {
-        guard state.isOn, let end = state.endsAt else { return nil }
-        let hours = end.timeIntervalSince(now) / 3_600
-        if hours <= 0 { return "Kamin an · endet gleich" }
-        if hours < 1 { return "Kamin an · endet in < 1 h" }
-        return "Kamin an · endet in \(Int(hours.rounded())) h"
+        guard state.isOn else { return nil }
+        if state.isAsking { return "Kamin an · Rückfrage offen" }
+        guard let asksAt = state.asksAt else { return "Kamin an" }
+        let hours = asksAt.timeIntervalSince(now) / 3_600
+        if hours <= 0 { return "Kamin an · Rückfrage gleich" }
+        if hours < 1 { return "Kamin an · Rückfrage in < 1 h" }
+        return "Kamin an · Rückfrage in \(Int(hours.rounded())) h"
     }
 }
 

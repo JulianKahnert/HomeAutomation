@@ -6,6 +6,7 @@
 //
 
 import Fluent
+import HAModels
 import Vapor
 
 final class DeviceToken: Model, Content, @unchecked Sendable {
@@ -39,5 +40,13 @@ final class DeviceToken: Model, Content, @unchecked Sendable {
         self.tokenString = tokenString
         self.tokenType = tokenType
         self.activityType = activityType
+    }
+}
+
+extension DeviceToken {
+    /// The activity type a push-to-start token starts. Apps before the fireplace question registered one token
+    /// without a type, which was always the window's.
+    var startActivityType: String {
+        activityType ?? WindowContentState.activityTypeName
     }
 }

@@ -18,7 +18,9 @@ public protocol NotificationSender: Sendable {
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
                                                                        activityName: String,
                                                                        options: LiveActivityOptions) async
-    func endAllLiveActivities(ofActivityType activityType: String) async
+    /// Ends every running Live Activity of `activityType` on every device; `finalContentState` must decode as its content state.
+    func endAllLiveActivities<ContentState: Encodable & Sendable>(ofActivityType activityType: String,
+                                                                  finalContentState: ContentState) async
 }
 
 extension NotificationSender {

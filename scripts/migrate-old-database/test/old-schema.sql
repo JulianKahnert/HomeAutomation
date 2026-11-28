@@ -71,7 +71,13 @@ INSERT INTO entityItems (id, timestamp, entityPlaceId, entityServiceName, entity
     (UNHEX('0100000000000000000000000000000f'), '2026-11-21 13:00:00', 'Kueche', 'Lampe', NULL, 'switcher',
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
     (UNHEX('01000000000000000000000000000010'), '2026-11-21 13:00:00', 'Kueche', 'Alt', NULL, 'obsoleteType',
-        NULL, NULL, 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+        NULL, NULL, 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+    -- differs from 'Kueche' only in case: one entity in the old collation, two in the new binary one
+    (UNHEX('01000000000000000000000000000011'), '2026-11-21 14:00:00', 'kueche', 'Lampe', NULL, 'switcher',
+        NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+    -- a color temperature written as FLOAT keeps its short decimal
+    (UNHEX('01000000000000000000000000000012'), '2026-11-21 14:00:00', 'Kueche', 'Lampe', NULL, 'colorTemperature',
+        NULL, NULL, NULL, NULL, NULL, 0.3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 INSERT INTO automationRuns VALUES
     (UNHEX('02000000000000000000000000000001'), 'motion-at-night-flur', '2026-11-21 10:00:00', '2026-11-21 10:05:00', 'entityChange',

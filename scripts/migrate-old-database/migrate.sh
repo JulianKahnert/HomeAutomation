@@ -62,11 +62,13 @@ drop_legacy_tables
 trap 'drop_legacy_tables || true' EXIT
 
 printf 'Loading the old tables as legacy_* into the new database...\n'
-# Renames every table of the dump on the statements that name it. The old schema has no foreign keys, views
-# or triggers, so no other statement refers to a table name.
+# Renames every table of the dump on the statements that name it (the old schema has no foreign keys, views or
+# triggers, so no other statement refers to a table name) and gives each table the binary collation of the new
+# schema, so the old names compare with the new ones exactly. The old columns carry no collation of their own.
 # shellcheck disable=SC2016  # the backticks are literal MySQL identifier quotes
 gzip -dc "$dump" \
-    | sed -E 's/^(DROP TABLE IF EXISTS|CREATE TABLE|INSERT INTO|LOCK TABLES|\/\*!40000 ALTER TABLE) `([A-Za-z0-9_]+)`/\1 `legacy_\2`/' \
+    | sed -E -e 's/^(DROP TABLE IF EXISTS|CREATE TABLE|INSERT INTO|LOCK TABLES|\/\*!40000 ALTER TABLE) `([A-Za-z0-9_]+)`/\1 `legacy_\2`/' \
+             -e '/^\) ENGINE=/s/DEFAULT CHARSET=[a-z0-9]+( COLLATE=[a-z0-9_]+)?/DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin/' \
     | db
 
 printf 'Moving the rows (%s at the end)...\n' "$end_statement"

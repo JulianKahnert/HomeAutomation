@@ -1,76 +1,87 @@
 -- Moves the data of the old schema into the new one (docs/database-schema.md, "Moving data from the old schema").
--- Runs in the new database after migrate.sh loaded the old tables under the prefix `legacy_`.
--- Re-runnable: every row keeps the id of its old row (new entities match on their unique key), and duplicates
--- are skipped with ON DUPLICATE KEY UPDATE, which, unlike INSERT IGNORE, still fails on a bad value.
+-- Runs in the new database after migrate.sh loaded the old tables under the prefix `legacy_`, converted to the
+-- binary collation of the new schema, so names match exactly as in Swift.
+-- Re-runnable: journal rows keep the UUID of their old row and skip a duplicate with ON DUPLICATE KEY UPDATE
+-- (which, unlike INSERT IGNORE, still fails on a bad value); entities match on their unique key; an entity change
+-- (BIGINT id of its own) is left out when the entity already has a change at that exact timestamp.
 -- migrate.sh ends the transaction opened below with COMMIT, or ROLLBACK for --check, and drops the legacy_ tables.
 
+-- Setup before the transaction, since DDL would commit it. Plain tables, not TEMPORARY ones: MySQL cannot open a
+-- temporary table twice in one query (the report does).
+
 -- The old characteristic types the new CharacteristicsType still has; rows of any other type are left out.
--- A plain table, not a TEMPORARY one: MySQL cannot open a temporary table twice in one query (the report does).
--- Created before the transaction, since DDL would commit it.
 DROP TABLE IF EXISTS legacy_knownTypes;
-CREATE TABLE legacy_knownTypes (name VARCHAR(255) PRIMARY KEY);
+CREATE TABLE legacy_knownTypes (name VARCHAR(255) PRIMARY KEY) COLLATE utf8mb4_0900_bin;
 INSERT INTO legacy_knownTypes VALUES
     ('motionSensor'), ('lightSensor'), ('batterySensor'), ('contactSensor'),
     ('temperatureSensor'), ('relativeHumiditySensor'), ('carbonDioxideSensorId'), ('pmDensitySensor'), ('airQualitySensor'),
     ('switcher'), ('brightness'), ('colorTemperature'), ('color'), ('valve'),
     ('lock'), ('heating'), ('targetTemperature'), ('heatingMode'), ('valvePosition'), ('temperatureCalibration');
 
+-- The value of each old row of a known type: it sits in the column of its type (one value per row, as the old
+-- adapter wrote it). A Bool becomes 1 or 0, a color the text "red green blue". The Eve valve values came from the
+-- adapter's poller; their origin is now the ValveJob, like new rows of these types. A FLOAT goes through its
+-- shortest text, so 0.3 stays 0.3 in the DOUBLE column instead of 0.30000001192092896.
+DROP TABLE IF EXISTS legacy_values;
+CREATE TABLE legacy_values (
+    INDEX (entityPlaceId, entityServiceName, entityCharacteristicType)
+) COLLATE utf8mb4_0900_bin AS
+SELECT o.id, o.timestamp, o.entityPlaceId, o.entityServiceName, o.entityCharacteristicsName, o.entityCharacteristicType,
+       CASE o.entityCharacteristicType
+           WHEN 'motionSensor' THEN o.motionDetected
+           WHEN 'lightSensor' THEN o.illuminanceInLux
+           WHEN 'batterySensor' THEN o.stateOfCharge
+           WHEN 'contactSensor' THEN o.isContactOpen
+           WHEN 'temperatureSensor' THEN o.temperatureInC
+           WHEN 'relativeHumiditySensor' THEN o.relativeHumidity
+           WHEN 'carbonDioxideSensorId' THEN o.carbonDioxideSensorId
+           WHEN 'pmDensitySensor' THEN o.pmDensity
+           WHEN 'airQualitySensor' THEN o.airQuality
+           WHEN 'switcher' THEN o.isDeviceOn
+           WHEN 'brightness' THEN o.brightness
+           WHEN 'colorTemperature' THEN CAST(CAST(o.colorTemperature AS CHAR) AS DOUBLE)
+           WHEN 'valve' THEN o.valveOpen
+           WHEN 'lock' THEN o.isDoorLocked
+           WHEN 'heating' THEN o.isHeaterActive
+           WHEN 'targetTemperature' THEN o.targetTemperatureInC
+           WHEN 'heatingMode' THEN o.heatingMode
+           WHEN 'valvePosition' THEN o.valvePositionPercent
+           WHEN 'temperatureCalibration' THEN o.temperatureCalibrationInC
+       END AS number,
+       CASE WHEN o.entityCharacteristicType = 'color'
+            THEN CONCAT(o.colorRed, ' ', o.colorGreen, ' ', o.colorBlue)
+       END AS text,
+       CASE WHEN o.entityCharacteristicType IN ('valvePosition', 'temperatureCalibration')
+            THEN 'ValveJob' ELSE 'homekit'
+       END AS origin
+FROM legacy_entityItems o
+JOIN legacy_knownTypes k ON k.name = o.entityCharacteristicType;
+
 START TRANSACTION;
 
--- 1. entities: one row per place, service and type, with the newest name seen.
+-- 1. entities: one row per place, service and type that has a value, with the newest name seen.
 INSERT INTO entities (id, placeId, serviceName, characteristicType, characteristicsName)
 SELECT UUID_TO_BIN(UUID()), entityPlaceId, entityServiceName, entityCharacteristicType, entityCharacteristicsName
 FROM (
-    SELECT o.entityPlaceId, o.entityServiceName, o.entityCharacteristicType, o.entityCharacteristicsName,
-           ROW_NUMBER() OVER (PARTITION BY o.entityPlaceId, o.entityServiceName, o.entityCharacteristicType
-                              ORDER BY o.timestamp DESC) AS newest
-    FROM legacy_entityItems o
-    JOIN legacy_knownTypes k ON k.name = o.entityCharacteristicType
+    SELECT entityPlaceId, entityServiceName, entityCharacteristicType, entityCharacteristicsName,
+           ROW_NUMBER() OVER (PARTITION BY entityPlaceId, entityServiceName, entityCharacteristicType
+                              ORDER BY timestamp DESC) AS newest
+    FROM legacy_values
+    WHERE number IS NOT NULL OR text IS NOT NULL
 ) named
 WHERE newest = 1
 ON DUPLICATE KEY UPDATE id = entities.id;
 
--- 2. entityChanges: the value of each old row sits in the column of its type (one value per row, as the
--- old adapter wrote it). A Bool becomes 1 or 0, a color the text "red green blue". The Eve valve values came
--- from the adapter's poller; their origin is now the ValveJob, like new rows of these types.
-INSERT INTO entityChanges (id, entityId, timestamp, number, text, origin)
-SELECT id, entityId, timestamp, number, text, origin
-FROM (
-    SELECT o.id, e.id AS entityId, o.timestamp,
-           CASE o.entityCharacteristicType
-               WHEN 'motionSensor' THEN o.motionDetected
-               WHEN 'lightSensor' THEN o.illuminanceInLux
-               WHEN 'batterySensor' THEN o.stateOfCharge
-               WHEN 'contactSensor' THEN o.isContactOpen
-               WHEN 'temperatureSensor' THEN o.temperatureInC
-               WHEN 'relativeHumiditySensor' THEN o.relativeHumidity
-               WHEN 'carbonDioxideSensorId' THEN o.carbonDioxideSensorId
-               WHEN 'pmDensitySensor' THEN o.pmDensity
-               WHEN 'airQualitySensor' THEN o.airQuality
-               WHEN 'switcher' THEN o.isDeviceOn
-               WHEN 'brightness' THEN o.brightness
-               WHEN 'colorTemperature' THEN o.colorTemperature
-               WHEN 'valve' THEN o.valveOpen
-               WHEN 'lock' THEN o.isDoorLocked
-               WHEN 'heating' THEN o.isHeaterActive
-               WHEN 'targetTemperature' THEN o.targetTemperatureInC
-               WHEN 'heatingMode' THEN o.heatingMode
-               WHEN 'valvePosition' THEN o.valvePositionPercent
-               WHEN 'temperatureCalibration' THEN o.temperatureCalibrationInC
-           END AS number,
-           CASE WHEN o.entityCharacteristicType = 'color'
-                THEN CONCAT(o.colorRed, ' ', o.colorGreen, ' ', o.colorBlue)
-           END AS text,
-           CASE WHEN o.entityCharacteristicType IN ('valvePosition', 'temperatureCalibration')
-                THEN 'ValveJob' ELSE 'homekit'
-           END AS origin
-    FROM legacy_entityItems o
-    JOIN entities e ON e.placeId = o.entityPlaceId
-                   AND e.serviceName = o.entityServiceName
-                   AND e.characteristicType = o.entityCharacteristicType
-) changes
-WHERE number IS NOT NULL OR text IS NOT NULL
-ON DUPLICATE KEY UPDATE id = entityChanges.id;
+-- 2. entityChanges, oldest first per entity: the auto-increment id is the tiebreak of equal timestamps.
+INSERT INTO entityChanges (entityId, timestamp, number, text, origin)
+SELECT e.id, v.timestamp, v.number, v.text, v.origin
+FROM legacy_values v
+JOIN entities e ON e.placeId = v.entityPlaceId
+               AND e.serviceName = v.entityServiceName
+               AND e.characteristicType = v.entityCharacteristicType
+WHERE (v.number IS NOT NULL OR v.text IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM entityChanges c WHERE c.entityId = e.id AND c.timestamp = v.timestamp)
+ORDER BY e.id, v.timestamp, v.id;
 
 -- 3. entityHourlyAggregates: the old key (place, service, type) becomes the entity id.
 INSERT INTO entityHourlyAggregates (entityId, hourStart, minValue, meanValue, `maxValue`, lastValue, valueCount)
@@ -89,11 +100,12 @@ FROM DUAL
 WHERE EXISTS (SELECT 1 FROM legacy_fireplaceSwitches)
 ON DUPLICATE KEY UPDATE id = entities.id;
 
-INSERT INTO entityChanges (id, entityId, timestamp, number, text, origin)
-SELECT f.id, e.id, f.timestamp, f.isOn, NULL, 'app'
+INSERT INTO entityChanges (entityId, timestamp, number, text, origin)
+SELECT e.id, f.timestamp, f.isOn, NULL, 'app'
 FROM legacy_fireplaceSwitches f
 JOIN entities e ON e.placeId = 'server' AND e.serviceName = 'fireplace' AND e.characteristicType = 'switcher'
-ON DUPLICATE KEY UPDATE id = entityChanges.id;
+WHERE NOT EXISTS (SELECT 1 FROM entityChanges c WHERE c.entityId = e.id AND c.timestamp = f.timestamp)
+ORDER BY f.timestamp, f.id;
 
 -- 5. The plan target per room: `heatingWrites.planTargetInC` becomes the changes of the server-owned entity
 -- (server, <room>, targetTemperature) that RoomHeating reports now. Every radiator of a room carried the same
@@ -103,8 +115,8 @@ SELECT UUID_TO_BIN(UUID()), 'server', placeId, 'targetTemperature', NULL
 FROM (SELECT DISTINCT placeId FROM legacy_heatingWrites WHERE planTargetInC IS NOT NULL) rooms
 ON DUPLICATE KEY UPDATE id = entities.id;
 
-INSERT INTO entityChanges (id, entityId, timestamp, number, text, origin)
-SELECT p.id, e.id, p.timestamp, p.planTargetInC, NULL, 'server'
+INSERT INTO entityChanges (entityId, timestamp, number, text, origin)
+SELECT e.id, p.timestamp, p.planTargetInC, NULL, 'server'
 FROM (
     SELECT id, placeId, timestamp, planTargetInC,
            LAG(planTargetInC) OVER (PARTITION BY placeId ORDER BY timestamp, id) AS previous
@@ -112,8 +124,9 @@ FROM (
     WHERE planTargetInC IS NOT NULL
 ) p
 JOIN entities e ON e.placeId = 'server' AND e.serviceName = p.placeId AND e.characteristicType = 'targetTemperature'
-WHERE p.previous IS NULL OR p.previous <> p.planTargetInC
-ON DUPLICATE KEY UPDATE id = entityChanges.id;
+WHERE (p.previous IS NULL OR p.previous <> p.planTargetInC)
+  AND NOT EXISTS (SELECT 1 FROM entityChanges c WHERE c.entityId = e.id AND c.timestamp = p.timestamp)
+ORDER BY p.timestamp, p.id;
 
 -- 6. Radiator writes become journal commands with their reason; the journal cleanup keeps them for good.
 -- A write that never reached the radiator (sentToDevice = 0) was only a plan target and is in step 5.
@@ -166,12 +179,10 @@ SELECT 'entityItems rows' AS what, (SELECT COUNT(*) FROM legacy_entityItems) AS 
 UNION ALL SELECT 'entityItems rows of an unknown type',
     (SELECT COUNT(*) FROM legacy_entityItems o LEFT JOIN legacy_knownTypes k ON k.name = o.entityCharacteristicType WHERE k.name IS NULL), NULL
 UNION ALL SELECT 'entityItems rows without a value of their type',
-    (SELECT COUNT(*) FROM legacy_entityItems o
-     JOIN legacy_knownTypes k ON k.name = o.entityCharacteristicType
-     LEFT JOIN entityChanges c ON c.id = o.id
-     WHERE c.id IS NULL), NULL
+    (SELECT COUNT(*) FROM legacy_values WHERE number IS NULL AND text IS NULL), NULL
 UNION ALL SELECT 'entities (old: place, service, type)',
-    (SELECT COUNT(*) FROM (SELECT DISTINCT entityPlaceId, entityServiceName, entityCharacteristicType FROM legacy_entityItems) d),
+    (SELECT COUNT(*) FROM (SELECT DISTINCT entityPlaceId, entityServiceName, entityCharacteristicType FROM legacy_values
+                           WHERE number IS NOT NULL OR text IS NOT NULL) d),
     (SELECT COUNT(*) FROM entities)
 UNION ALL SELECT 'entityChanges', NULL, (SELECT COUNT(*) FROM entityChanges)
 UNION ALL SELECT 'entityHourlyAggregates', (SELECT COUNT(*) FROM legacy_entityHourlyAggregates), (SELECT COUNT(*) FROM entityHourlyAggregates)

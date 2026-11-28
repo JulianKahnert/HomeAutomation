@@ -76,7 +76,7 @@ expect "--check leaves the new database as it was" "$counts" "1 1 0 0 0 0"
 "$test_dir/../migrate.sh" "$work/dump.sql.gz" "$new_container" >"$work/run.log"
 cat "$work/run.log"
 
-expect "counts" "$counts" "15 19 5 1 1 1"
+expect "counts" "$counts" "16 21 5 1 1 1"
 expect "no legacy_ table left" \
     "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name LIKE 'legacy\\_%'" "0"
 expect "an entity the new server knew keeps its id and gains the old change" \
@@ -99,7 +99,7 @@ expect "numbers per type" \
      ORDER BY e.characteristicType, e.placeId" \
     "carbonDioxideSensorId 812 heatingMode 1 lightSensor 59.27 targetTemperature 21 temperatureCalibration -1.5 temperatureSensor 21.4 valvePosition 35"
 expect "origins" \
-    "SELECT c.origin, COUNT(*) FROM entityChanges c GROUP BY c.origin ORDER BY c.origin" "app 2 homekit 13 server 2 ValveJob 2"
+    "SELECT c.origin, COUNT(*) FROM entityChanges c GROUP BY c.origin ORDER BY c.origin" "ValveJob 2 app 2 homekit 15 server 2"
 expect "the fireplace becomes the server-owned switch" \
     "SELECT c.number FROM entityChanges c JOIN entities e ON e.id = c.entityId
      WHERE e.placeId = 'server' AND e.serviceName = 'fireplace' ORDER BY c.timestamp" "1 0"
@@ -113,6 +113,13 @@ expect "radiator writes become journal commands" \
 expect "runs become journal runs, a running one is interrupted" \
     "SELECT title, outcome, HEX(runId) = HEX(id), entityPlaceId FROM journal WHERE kind = 'run' ORDER BY timestamp" \
     "motion-at-night-flur completed 1 Flur room-heating-bad-og interrupted 1 NULL"
+expect "names that differ only in case are two entities (binary collation)" \
+    "SELECT e.placeId, c.number FROM entities e JOIN entityChanges c ON c.entityId = e.id
+     WHERE e.serviceName = 'Lampe' AND e.characteristicType = 'switcher' AND c.timestamp < '2026-11-28'
+     ORDER BY BINARY e.placeId" "Kueche 1 kueche 0"
+expect "a FLOAT keeps its short decimal" \
+    "SELECT c.number FROM entityChanges c JOIN entities e ON e.id = c.entityId
+     WHERE e.characteristicType = 'colorTemperature' ORDER BY c.timestamp" "0.5 0.3"
 expect "aggregates point to the entity" \
     "SELECT e.placeId, e.characteristicType, a.valueCount FROM entityHourlyAggregates a JOIN entities e ON e.id = a.entityId" \
     "Flur lightSensor 12"
@@ -120,7 +127,7 @@ grep -q 'entityItems rows of an unknown type *| *1 ' "$work/run.log" || { printf
 grep -q 'entityItems rows without a value of their type *| *1 ' "$work/run.log" || { printf 'FAIL  report: no value\n'; failures=$((failures + 1)); }
 
 "$test_dir/../migrate.sh" "$work/dump.sql.gz" "$new_container" >"$work/rerun.log"
-expect "a second run adds nothing" "$counts" "15 19 5 1 1 1"
+expect "a second run adds nothing" "$counts" "16 21 5 1 1 1"
 
 if [[ "$failures" -gt 0 ]]; then
     printf '%s check(s) failed\n' "$failures"

@@ -12,7 +12,7 @@
 ```
 
 - **Server** — Vapor app (runs as Docker container, Swift 6.2, Ubuntu Noble, jemalloc). HTTP API (OpenAPI), MySQL persistence, database migrations, scheduled jobs, APNS push notifications, automations engine. Configured via [HomeAutomation-config-template](https://github.com/JulianKahnert/HomeAutomation-config-template).
-- **Adapter** (FlowKit Adapter) — Bridges HomeKit entities to the Server via the in-repo `StarActorSystem` (distributed actors over an authenticated WebSocket, `/adapter/v1` on port 8080; see ADR-001 in the knowledge base). No business logic; reads HomeKit characteristics and forwards state.
+- **Adapter** (FlowKit Adapter) — Bridges HomeKit entities to the Server via the in-repo `StarActorSystem` (distributed actors over an authenticated WebSocket, `/adapter/v1` on port 8080; see ADR-001 in the knowledge base, `wissen/entscheidungen/`). No business logic; reads HomeKit characteristics and forwards state.
 - **Controller** (FlowKit Controller) — iOS app using TCA (The Composable Architecture). Activates/deactivates automations, shows switched devices, entity state history charts, window Live Activities. Communicates with Server via generated OpenAPI client.
 
 ## Build Commands
@@ -236,7 +236,7 @@ Additional workflows: `docker-publish.yaml` (amd64 + arm64 image for pushes to `
 - `docs/setup-FlowKitAdapter.md` — Adapter setup: launchctl, iOS guided access, logging
 - `docs/setup-server.md` — Server Docker setup, log levels, migration
 - `docs/database-schema.md` — the database schema and how data of the old schema moves over
-- More on how the features work: the project's folder in the knowledge base (the Obsidian vault), under `references/`. Without the vault (a cloud session, CI), go on without it.
+- More on how the features work: the project's folder in the knowledge base (the Obsidian vault), under `wissen/` (index: `readme.md`). Without the vault (a cloud session, CI), go on without it.
 
 ## Agent skills
 

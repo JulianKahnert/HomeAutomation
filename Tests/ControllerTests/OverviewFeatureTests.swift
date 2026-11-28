@@ -49,50 +49,73 @@ struct OverviewFeatureTests {
 
     @Test("stopping an automation refreshes the overview")
     func stopRefreshes() async {
+        let now = Date(timeIntervalSince1970: 100_000)
         let stopped = Mutex<[String]>([])
         let store = TestStore(initialState: OverviewFeature.State()) {
             OverviewFeature()
         } withDependencies: {
-            $0.date.now = Date(timeIntervalSince1970: 100_000)
+            $0.date.now = now
             $0.serverClient.stop = { name in stopped.withLock { $0.append(name) } }
             $0.serverClient.isHealthy = { true }
             $0.serverClient.getAutomations = { [] }
             $0.serverClient.getRecentRuns = { _, _ in [] }
         }
-        store.exhaustivity = .off
 
         await store.send(.stopButtonTapped("Night Light"))
-        await store.receive(\.refresh)
-        await store.receive(\.refreshResponse.success)
+        await store.receive(\.stopResponse)
+        await store.receive(\.refreshResponse.success) {
+            $0.isHealthy = true
+            $0.lastUpdated = now
+        }
 
         #expect(stopped.withLock { $0 } == ["Night Light"])
     }
 
+    @Test("a failed stop shows the error but keeps the server's health")
+    func stopFailureKeepsHealth() async {
+        struct StopError: Error, LocalizedError { var errorDescription: String? { "stop failed" } }
+        var state = OverviewFeature.State()
+        state.isHealthy = true
+        let store = TestStore(initialState: state) {
+            OverviewFeature()
+        } withDependencies: {
+            $0.serverClient.stop = { _ in throw StopError() }
+        }
+
+        await store.send(.stopButtonTapped("Night Light"))
+        await store.receive(\.stopResponse) {
+            $0.error = "stop failed"
+        }
+    }
+
     @Test("polls every 30 seconds until the task is cancelled")
     func pollingStopsOnCancel() async {
+        let now = Date(timeIntervalSince1970: 100_000)
         let clock = TestClock()
         let store = TestStore(initialState: OverviewFeature.State()) {
             OverviewFeature()
         } withDependencies: {
             $0.continuousClock = clock
-            $0.date.now = Date(timeIntervalSince1970: 100_000)
+            $0.date.now = now
             $0.serverClient.isHealthy = { true }
             $0.serverClient.getAutomations = { [] }
             $0.serverClient.getRecentRuns = { _, _ in [] }
         }
-        store.exhaustivity = .off
 
         let task = await store.send(.task)
         await store.receive(\.refresh)
-        await store.receive(\.refreshResponse)
+        await store.receive(\.refreshResponse.success) {
+            $0.isHealthy = true
+            $0.lastUpdated = now
+        }
 
         await clock.advance(by: .seconds(30))
         await store.receive(\.refresh)
-        await store.receive(\.refreshResponse)
+        await store.receive(\.refreshResponse.success)
 
+        // An exhaustive store fails on any refresh that still arrives after this.
         await task.cancel()
         await clock.advance(by: .seconds(60))
-        #expect(store.state.isHealthy == true)
     }
 
     @Test("tapping a running automation switches to its tab and opens the details")

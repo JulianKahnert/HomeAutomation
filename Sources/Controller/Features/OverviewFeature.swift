@@ -48,6 +48,7 @@ struct OverviewFeature: Sendable {
         case refresh
         case refreshResponse(Result<Snapshot, Error>)
         case stopButtonTapped(String)
+        case stopResponse(Result<Void, Error>)
         case task
 
         enum Delegate: Sendable {
@@ -77,21 +78,7 @@ struct OverviewFeature: Sendable {
                 return .none
 
             case .refresh:
-                let since = now.addingTimeInterval(-86400)
-                return .run { send in
-                    await send(.refreshResponse(Result {
-                        async let isHealthy = serverClient.isHealthy()
-                        async let automations = serverClient.getAutomations()
-                        async let runs = serverClient.getRecentRuns(since, 200)
-                        return try await Snapshot(
-                            isHealthy: isHealthy,
-                            automations: automations,
-                            runs: runs
-                        )
-                    }))
-                }
-                // The timer, pull-to-refresh and the other tabs all refresh: only the newest answer may land.
-                .cancellable(id: CancelID.refresh, cancelInFlight: true)
+                return refresh()
 
             case let .refreshResponse(.success(snapshot)):
                 state.error = nil
@@ -110,11 +97,16 @@ struct OverviewFeature: Sendable {
 
             case let .stopButtonTapped(name):
                 return .run { send in
-                    try await serverClient.stop(name)
-                    await send(.refresh)
-                } catch: { error, send in
-                    await send(.refreshResponse(.failure(error)))
+                    await send(.stopResponse(Result { try await serverClient.stop(name) }))
                 }
+
+            case .stopResponse(.success):
+                return refresh()
+
+            case let .stopResponse(.failure(error)):
+                // The stop failed, not the server: its health stays as it was.
+                state.error = error.localizedDescription
+                return .none
 
             case .task:
                 // Ends with the view's task, so polling stops when the tab is left.
@@ -127,6 +119,24 @@ struct OverviewFeature: Sendable {
             }
         }
         .forEach(\.path, action: \.path)
+    }
+
+    private func refresh() -> Effect<Action> {
+        let since = now.addingTimeInterval(-86400)
+        return .run { send in
+            await send(.refreshResponse(Result {
+                async let isHealthy = serverClient.isHealthy()
+                async let automations = serverClient.getAutomations()
+                async let runs = serverClient.getRecentRuns(since, 200)
+                return try await Snapshot(
+                    isHealthy: isHealthy,
+                    automations: automations,
+                    runs: runs
+                )
+            }))
+        }
+        // The timer, pull-to-refresh and the other tabs all refresh: only the newest answer may land.
+        .cancellable(id: CancelID.refresh, cancelInFlight: true)
     }
 }
 
@@ -194,15 +204,20 @@ struct OverviewView: View {
                 }
 
                 Section("Recent Runs") {
-                    ForEach(store.recentRuns.prefix(5)) { run in
-                        NavigationLink(state: OverviewPath.State.run(RunDetailFeature.State(run: run))) {
-                            RunRow(run: run)
+                    if store.recentRuns.isEmpty {
+                        Text("No runs in the last 24 hours.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(store.recentRuns.prefix(5)) { run in
+                            NavigationLink(state: OverviewPath.State.run(RunDetailFeature.State(run: run))) {
+                                RunRow(run: run)
+                            }
                         }
+                        NavigationLink(
+                            "Show All",
+                            state: OverviewPath.State.feed(ActivityFeedFeature.State(runs: store.recentRuns))
+                        )
                     }
-                    NavigationLink(
-                        "Show All",
-                        state: OverviewPath.State.feed(ActivityFeedFeature.State(runs: store.recentRuns))
-                    )
                 }
             }
             .navigationTitle("Overview")
@@ -223,14 +238,25 @@ struct OverviewView: View {
         }
     }
 
+    private func dot(_ color: Color) -> some View {
+        Image(systemName: "circle.fill").foregroundStyle(color)
+    }
+
     private var statusRow: some View {
         HStack {
-            Image(systemName: "circle.fill")
-                .foregroundStyle(store.isHealthy == true ? Color.green : Color.red)
-            if store.error != nil {
+            switch (store.error, store.isHealthy) {
+            case (.some, _):
+                dot(.red)
                 Text("Server unreachable")
-            } else {
-                Text(store.isHealthy == false ? "Adapter disconnected" : "Adapter connected")
+            case (nil, true?):
+                dot(.green)
+                Text("Adapter connected")
+            case (nil, false?):
+                dot(.red)
+                Text("Adapter disconnected")
+            case (nil, nil):
+                ProgressView()
+                Text("Connecting…")
             }
             Spacer()
             if let lastUpdated = store.lastUpdated {

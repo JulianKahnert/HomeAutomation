@@ -99,16 +99,15 @@ struct HeatingFireplaceFeatureTests {
     func failure() async {
         let truth = FireplaceState.off
         let store = store(loaded: truth, switching: { _ in throw Failure() })
-        store.exhaustivity = .off
 
-        await store.send(.setFireplace(true))
-        await store.receive(\.fireplaceSwitched.failure)
-        await store.receive(\.fireplaceLoaded.success)
-
-        #expect(store.state.fireplace == truth)
-        #expect(store.state.fireplaceError != nil)
-        await store.send(.dismissFireplaceError)
-        #expect(store.state.fireplaceError == nil)
+        await store.send(.setFireplace(true)) {
+            $0.fireplace = FireplaceState(isOn: true, since: start)
+        }
+        await store.receive(\.fireplaceSwitched.failure) {
+            $0.fireplaceError = Failure().localizedDescription
+        }
+        await store.receive(\.fireplaceLoaded.success) { $0.fireplace = truth }
+        await store.send(.dismissFireplaceError) { $0.fireplaceError = nil }
     }
 
     @Test("the subtitle says when the fireplace ends, and is empty while it is off")

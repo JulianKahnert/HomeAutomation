@@ -6,7 +6,7 @@
 import HAModels
 import SwiftUI
 
-/// Outcome or command status as a tinted SF Symbol label, the way system lists show state.
+/// A run's outcome as a tinted SF Symbol label, the way system lists show state.
 struct StatusLabel: View {
     let text: String
     let systemImage: String

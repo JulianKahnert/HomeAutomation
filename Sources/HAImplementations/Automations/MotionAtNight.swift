@@ -27,14 +27,6 @@ public struct MotionAtNight: Automatable {
     public let maxTemperature: Float
 
     public let lights: [SwitchDevice]
-    public var triggerEntityIds: Set<EntityId> {
-        var ids = Set(motionSensors.map(\.motionSensorId) + windowContacts.map(\.contactSensorId))
-        if let lightSensorId = lightSensor.lightSensorId {
-            ids.insert(lightSensorId)
-        }
-        return ids
-    }
-
     public init(_ name: String, noMotionWait: Duration? = nil, dimWait: Duration? = nil, colorTemperatureDelay: Duration? = nil, motionSensors: [MotionSensorDevice], lightSensor: MotionSensorDevice, lights: [SwitchDevice], windowContacts: [ContactSensorDevice] = [], minBrightness: Float, maxBrightness: Float = 1, maxTemperature: Float = 1) {
         self.name = name
         if let noMotionWait { self.noMotionWait = noMotionWait }

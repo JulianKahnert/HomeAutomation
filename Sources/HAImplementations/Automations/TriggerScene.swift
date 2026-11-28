@@ -13,10 +13,6 @@ public struct TriggerScene: Automatable {
     public let name: String
     public let time: Time
     public let sceneName: String
-    public var triggerEntityIds: Set<EntityId> {
-        []
-    }
-
     public init(_ name: String, at time: Time, sceneName: String) {
         self.name = name
         self.time = time

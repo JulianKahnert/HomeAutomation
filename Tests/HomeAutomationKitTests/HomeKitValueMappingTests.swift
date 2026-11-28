@@ -15,18 +15,14 @@ struct HomeKitValueMappingTests {
     private typealias Mapping = HomeKitValueMapping
 
     private func context(
-        service: String? = nil,
         characteristic: String = "",
-        isBoolFormat: Bool = false,
         minimum: Double? = nil,
         maximum: Double? = nil,
         saturation: Any? = nil,
         brightness: Any? = nil
     ) -> Mapping.Context {
         Mapping.Context(
-            serviceType: service,
             characteristicType: characteristic,
-            isBoolFormat: isBoolFormat,
             minimumValue: minimum,
             maximumValue: maximum,
             saturation: saturation,
@@ -37,31 +33,21 @@ struct HomeKitValueMappingTests {
     // MARK: motionSensor
 
     @Test func occupancyIsMotionWhenTheInt64ValueIsOne() {
-        let ctx = context(service: Mapping.occupancySensorService, characteristic: Mapping.occupancyDetectedCharacteristic)
-        #expect(Mapping.needsRead(.motionSensor, context: ctx))
+        let ctx = context(characteristic: Mapping.occupancyDetectedCharacteristic)
         #expect(Mapping.value(.motionSensor, raw: Int64(1), context: ctx) == .bool(true))
         #expect(Mapping.value(.motionSensor, raw: Int64(0), context: ctx) == .bool(false))
         #expect(Mapping.value(.motionSensor, raw: nil, context: ctx) == .bool(false))
     }
 
     @Test func motionSensorReadsTheBool() {
-        let ctx = context(service: Mapping.motionSensorService, characteristic: Mapping.motionDetectedCharacteristic)
-        #expect(Mapping.needsRead(.motionSensor, context: ctx))
+        let ctx = context(characteristic: Mapping.motionDetectedCharacteristic)
         #expect(Mapping.value(.motionSensor, raw: true, context: ctx) == .bool(true))
         #expect(Mapping.value(.motionSensor, raw: "x", context: ctx) == nil)
-    }
-
-    @Test func motionNeedsTheMatchingServiceAndCharacteristic() {
-        #expect(!Mapping.needsRead(.motionSensor, context: context(service: Mapping.motionSensorService, characteristic: Mapping.occupancyDetectedCharacteristic)))
-        #expect(!Mapping.needsRead(.motionSensor, context: context(service: Mapping.lightSensorService, characteristic: Mapping.motionDetectedCharacteristic)))
-        #expect(!Mapping.needsRead(.motionSensor, context: context()))
     }
 
     // MARK: sensors
 
     @Test func illuminanceIsTheDoubleInLux() {
-        #expect(Mapping.needsRead(.lightSensor, context: context(service: Mapping.lightSensorService)))
-        #expect(!Mapping.needsRead(.lightSensor, context: context(service: Mapping.motionSensorService)))
         #expect(Mapping.value(.lightSensor, raw: 12.5, context: context()) == .number(12.5))
         #expect(Mapping.value(.lightSensor, raw: Float(1), context: context()) == nil)
     }
@@ -92,8 +78,6 @@ struct HomeKitValueMappingTests {
     }
 
     @Test func batteryLevelIsTheInt64AndNeedsTheBatteryService() {
-        #expect(Mapping.needsRead(.batterySensor, context: context(service: Mapping.batteryService)))
-        #expect(!Mapping.needsRead(.batterySensor, context: context(service: Mapping.lightSensorService)))
         #expect(Mapping.value(.batterySensor, raw: Int64(87), context: context()) == .number(87))
         #expect(Mapping.value(.batterySensor, raw: 87.5, context: context()) == nil)
     }
@@ -101,23 +85,17 @@ struct HomeKitValueMappingTests {
     // MARK: switches and states
 
     @Test func powerStateNeedsTheBoolFormat() {
-        #expect(Mapping.needsRead(.switcher, context: context(isBoolFormat: true)))
-        #expect(!Mapping.needsRead(.switcher, context: context(isBoolFormat: false)))
         #expect(Mapping.value(.switcher, raw: true, context: context()) == .bool(true))
         #expect(Mapping.value(.switcher, raw: 1.5, context: context()) == nil)
     }
 
     @Test func contactIsOpenUnlessDetected() {
-        #expect(Mapping.needsRead(.contactSensor, context: context(service: Mapping.contactSensorService)))
-        #expect(!Mapping.needsRead(.contactSensor, context: context(service: Mapping.lockMechanismService)))
         #expect(Mapping.value(.contactSensor, raw: 0, context: context()) == .bool(false))
         #expect(Mapping.value(.contactSensor, raw: 1, context: context()) == .bool(true))
         #expect(Mapping.value(.contactSensor, raw: 2, context: context()) == nil)
     }
 
     @Test func lockIsSecuredOnlyForOne() {
-        #expect(Mapping.needsRead(.lock, context: context(service: Mapping.lockMechanismService)))
-        #expect(!Mapping.needsRead(.lock, context: context(service: Mapping.contactSensorService)))
         #expect(Mapping.value(.lock, raw: 1, context: context()) == .bool(true))
         #expect(Mapping.value(.lock, raw: 0, context: context()) == .bool(false))
         #expect(Mapping.value(.lock, raw: 2, context: context()) == .bool(false))
@@ -126,16 +104,12 @@ struct HomeKitValueMappingTests {
     }
 
     @Test func heaterIsActiveForOneOnAHeaterCooler() {
-        #expect(Mapping.needsRead(.heating, context: context(service: Mapping.heaterCoolerService)))
-        #expect(!Mapping.needsRead(.heating, context: context(service: Mapping.batteryService)))
         #expect(Mapping.value(.heating, raw: 1, context: context()) == .bool(true))
         #expect(Mapping.value(.heating, raw: 0, context: context()) == .bool(false))
         #expect(Mapping.value(.heating, raw: 2, context: context()) == nil)
     }
 
     @Test func valveIsOpenWhileInUse() {
-        #expect(Mapping.needsRead(.valve, context: context(service: Mapping.valveService)))
-        #expect(!Mapping.needsRead(.valve, context: context(service: Mapping.batteryService)))
         // HMCharacteristicValueInUseState: 0 not in use, 1 in use
         #expect(Mapping.value(.valve, raw: 1, context: context()) == .bool(true))
         #expect(Mapping.value(.valve, raw: 0, context: context()) == .bool(false))
@@ -144,9 +118,8 @@ struct HomeKitValueMappingTests {
         #expect(Mapping.value(.valve, raw: "1", context: context()) == nil)
     }
 
-    @Test func typesWithoutHomeKitSourceNeverRead() {
+    @Test func typesWithoutHomeKitSourceHaveNoValue() {
         for type in [CharacteristicsType.temperatureCalibration, .energyPrice, .deadline] {
-            #expect(!Mapping.needsRead(type, context: context()))
             #expect(Mapping.value(type, raw: 1.0, context: context()) == nil)
         }
     }
@@ -236,16 +209,30 @@ struct HomeKitValueMappingTests {
 
     #if canImport(HomeKit)
     @Test func uuidConstantsMatchHomeKit() {
-        #expect(Mapping.occupancySensorService == HMServiceTypeOccupancySensor)
-        #expect(Mapping.motionSensorService == HMServiceTypeMotionSensor)
-        #expect(Mapping.lightSensorService == HMServiceTypeLightSensor)
-        #expect(Mapping.contactSensorService == HMServiceTypeContactSensor)
-        #expect(Mapping.lockMechanismService == HMServiceTypeLockMechanism)
-        #expect(Mapping.batteryService == HMServiceTypeBattery)
-        #expect(Mapping.heaterCoolerService == HMServiceTypeHeaterCooler)
-        #expect(Mapping.valveService == HMServiceTypeValve)
         #expect(Mapping.occupancyDetectedCharacteristic == HMCharacteristicTypeOccupancyDetected)
         #expect(Mapping.motionDetectedCharacteristic == HMCharacteristicTypeMotionDetected)
+    }
+
+    /// What becomes an entity: a characteristic only on the service its kind belongs to.
+    @Test(arguments: [
+        (HMCharacteristicTypeBatteryLevel, HMServiceTypeBattery, true, CharacteristicsType.batterySensor),
+        (HMCharacteristicTypeBatteryLevel, HMServiceTypeLightSensor, true, nil),
+        (HMCharacteristicTypeContactState, HMServiceTypeContactSensor, true, .contactSensor),
+        (HMCharacteristicTypeContactState, HMServiceTypeLockMechanism, true, nil),
+        (HMCharacteristicTypeCurrentLightLevel, HMServiceTypeLightSensor, true, .lightSensor),
+        (HMCharacteristicTypeCurrentLightLevel, HMServiceTypeMotionSensor, true, nil),
+        (HMCharacteristicTypeMotionDetected, HMServiceTypeMotionSensor, true, .motionSensor),
+        (HMCharacteristicTypeMotionDetected, HMServiceTypeOccupancySensor, true, nil),
+        (HMCharacteristicTypeOccupancyDetected, HMServiceTypeOccupancySensor, true, .motionSensor),
+        (HMCharacteristicTypeOccupancyDetected, HMServiceTypeMotionSensor, true, nil),
+        (HMCharacteristicTypeTargetLockMechanismState, HMServiceTypeLockMechanism, true, .lock),
+        (HMCharacteristicTypeTargetLockMechanismState, HMServiceTypeContactSensor, true, nil),
+        (HMCharacteristicTypePowerState, HMServiceTypeOutlet, true, .switcher),
+        (HMCharacteristicTypePowerState, HMServiceTypeOutlet, false, nil)
+    ] as [(String, String, Bool, CharacteristicsType?)])
+    func entitiesAreClassifiedByTheirService(characteristic: String, service: String, isBoolFormat: Bool, expected: CharacteristicsType?) throws {
+        let homeKitCharacteristic = try #require(HomeKitCharacteristic(characteristicType: characteristic))
+        #expect(homeKitCharacteristic.toCharacteristicsType(serviceType: service, isBoolFormat: isBoolFormat) == expected)
     }
 
     @Test func enumRawValuesMatchHomeKit() {

@@ -32,9 +32,6 @@ public protocol Automatable: Sendable, Codable {
     /// The unique name of the automation.
     var name: String { get }
 
-    /// A set of entity IDs that act as triggers for the automation process.
-    var triggerEntityIds: Set<EntityId> { get }
-
     /// Determines if the given event should trigger this automation.
     ///
     /// - Parameters:

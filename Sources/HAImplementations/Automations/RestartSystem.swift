@@ -12,7 +12,6 @@ public struct RestartSystem: Automatable {
     public var isActive = true
     public let name: String
     public let time: Time
-    public var triggerEntityIds = Set<EntityId>()
 
     public init(_ name: String, at time: Time) {
         self.name = name

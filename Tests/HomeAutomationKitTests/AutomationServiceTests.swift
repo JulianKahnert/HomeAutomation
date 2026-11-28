@@ -26,7 +26,6 @@ private struct TestAutomation: Automatable {
     var recordsRuns = true
     var lanePolicy = LanePolicy.supersede
     var summaryDetail: String?
-    var triggerEntityIds: Set<EntityId> { [] }
     /// Receives the run id seen inside `execute`; not part of the config.
     var onExecute: (@Sendable (UUID?) -> Void)?
     var firstRun = FirstRun()
@@ -86,6 +85,23 @@ struct AutomationServiceTests {
 
         #expect(await service.automations.map(\.isActive) == [false])
         #expect(await store.saved.map(\.isActive) == [false])
+    }
+
+    @Test func saveOrderFollowsTheOrderOfTheChanges() async throws {
+        let store = GatedAutomationRepository()
+        let service = try AutomationService(using: homeManager, runs: repository, automations: [TestAutomation(name: "a", mode: .complete)], repository: store)
+
+        let disable = Task { try await service.setAutomationActive(with: "a", to: false) }
+        await store.waitUntilFirstSaveStarted()
+        let enable = Task { try await service.setAutomationActive(with: "a", to: true) }
+        // the second change reaches the service while the first save is blocked
+        while await service.automations.map(\.isActive) != [true] { await Task.yield() }
+        await store.openGate()
+        try await disable.value
+        try await enable.value
+
+        // the newer snapshot is written last, so the stored state is the one the service holds
+        #expect(await store.written.map { $0.map(\.isActive) } == [[false], [true]])
     }
 
     @Test func aDeactivatedAutomationDoesNotRun() async throws {
@@ -247,5 +263,36 @@ struct AutomationServiceTests {
         let runId = try #require(await iterator.next())
         let run = try #require(await repository.nextFinishedRun())
         #expect(runId == run.id)
+    }
+}
+
+/// Blocks its first save until `openGate()`; records every snapshot in the order it was written.
+private actor GatedAutomationRepository: AutomationRepository {
+    private(set) var written: [[any Automatable]] = []
+    private var started = false
+    private var gateIsOpen = false
+    private var gateWaiters: [CheckedContinuation<Void, Never>] = []
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func waitUntilFirstSaveStarted() async {
+        if started { return }
+        await withCheckedContinuation { startWaiters.append($0) }
+    }
+
+    func openGate() {
+        gateIsOpen = true
+        gateWaiters.forEach { $0.resume() }
+        gateWaiters = []
+    }
+
+    func save(_ automations: [any Automatable], location: Location?) async throws {
+        let isFirst = !started
+        started = true
+        startWaiters.forEach { $0.resume() }
+        startWaiters = []
+        if isFirst, !gateIsOpen {
+            await withCheckedContinuation { gateWaiters.append($0) }
+        }
+        written.append(automations)
     }
 }

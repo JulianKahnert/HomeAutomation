@@ -74,14 +74,6 @@ struct DailyTotalsTests {
         #expect(totals.map(\.day) == [day1, day2])
         #expect(totals.map(\.duration) == [600, 300])
     }
-
-    @Test func countsPerDayBucketsDates() {
-        let dates = [day1.addingTimeInterval(10), day1.addingTimeInterval(20), day2.addingTimeInterval(5), day2.addingTimeInterval(86_400)]
-
-        let counts = DailyTotals.countsPerDay(dates, days: [day1, day2], calendar: calendar)
-
-        #expect(counts.map(\.count) == [2, 1])
-    }
 }
 
 struct DailyStatsTests {

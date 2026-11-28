@@ -42,19 +42,13 @@ public protocol JournalStore: AutomationRunRepository {
     func commands(limit: Int?, runId: UUID?) async throws -> [ActionLogItem]
     /// The executed radiator commands (those with a reason) to the radiators of room `placeId` in
     /// `startDate ..< endDate` (open ends allowed), oldest first.
-    func heatingCommands(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem]
+    func heatingWrites(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem]
     /// The newest executed radiator command of every radiator, whatever its characteristic; the server loads them at start.
-    func lastHeatingCommands() async throws -> [ActionLogItem]
+    func lastHeatingWrites() async throws -> [ActionLogItem]
     func addPush(_ push: JournalPush) async throws
     /// Newest first.
     func pushes(runId: UUID?) async throws -> [JournalPush]
     /// Removes entries of every kind that are older than `date`, except the radiator commands that carry a
     /// heating reason: those are kept for good, so the last command of every radiator survives any cleanup.
     func deleteEntries(olderThan date: Date) async throws
-}
-
-public extension JournalStore {
-    /// A store that does not keep radiator commands answers none.
-    func heatingCommands(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem] { [] }
-    func lastHeatingCommands() async throws -> [ActionLogItem] { [] }
 }

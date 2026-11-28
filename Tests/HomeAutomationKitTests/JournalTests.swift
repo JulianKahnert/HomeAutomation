@@ -120,7 +120,7 @@ struct JournalTests {
         let kept = try await store.commands(limit: nil, runId: nil)
         #expect(Set(kept.compactMap(\.reason)) == [.fireplace, .plan])
         #expect(kept.allSatisfy { $0.reason != nil })
-        #expect(try await store.lastHeatingCommands().first?.value == 21)
+        #expect(try await store.lastHeatingWrites().first?.value == 21)
     }
 }
 
@@ -141,6 +141,8 @@ private actor StallingStore: JournalStore {
     func addCommand(_ command: ActionLogItem) async throws { try await stall() }
     func setCommandStatus(_ id: UUID, to status: ActionLogItem.Status) async throws { try await stall() }
     func commands(limit: Int?, runId: UUID?) async throws -> [ActionLogItem] { [] }
+    func heatingWrites(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem] { [] }
+    func lastHeatingWrites() async throws -> [ActionLogItem] { [] }
     func addPush(_ push: JournalPush) async throws { try await stall() }
     func pushes(runId: UUID?) async throws -> [JournalPush] { [] }
     func deleteEntries(olderThan date: Date) async throws {}
@@ -159,6 +161,8 @@ private actor FlakyStore: JournalStore {
     func addCommand(_ command: ActionLogItem) async throws { throw StoreError() }
     func setCommandStatus(_ id: UUID, to status: ActionLogItem.Status) async throws { throw StoreError() }
     func commands(limit: Int?, runId: UUID?) async throws -> [ActionLogItem] { throw StoreError() }
+    func heatingWrites(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem] { throw StoreError() }
+    func lastHeatingWrites() async throws -> [ActionLogItem] { throw StoreError() }
     func addPush(_ push: JournalPush) async throws { pushes.append(push) }
     func pushes(runId: UUID?) async throws -> [JournalPush] { pushes }
     func deleteEntries(olderThan date: Date) async throws { throw StoreError() }

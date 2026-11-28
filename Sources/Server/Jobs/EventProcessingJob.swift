@@ -96,8 +96,9 @@ struct HomeEventProcessingJob: Job, Log {
             // A value-identical replay carries no new information: the adapter re-yields its
             // full entity state on every rescan (reconnect resync, reachability flap), and
             // triggering on those would supersede running automations for nothing.
-            // A server-owned state was checked and set when it was reported; checking it again would find it equal.
-            if !item.origin.isCheckedAtSource {
+            // A server-owned state was checked and set when it was reported (`HomeManagable.report`, whatever the
+            // origin: app, server or a polling job); checking it again would find it equal and drop the event.
+            if !(item.entityId.isServerOwned && item.origin != .homekit) {
                 guard await homeManager.addEntityHistory(item) else { return }
             }
         }

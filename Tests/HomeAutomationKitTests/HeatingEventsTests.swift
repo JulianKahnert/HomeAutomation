@@ -29,15 +29,14 @@ struct HeatingEventsTests {
     private var fireplaceContact: HeatingRoomSources.Contact { .init(source: .fireplace, name: "Kamin", entityId: fireplace) }
 
     private func write(_ reason: HeatingWriteReason, _ minutes: Double, target value: Double? = nil, active: Bool? = nil, plan: Double? = nil) -> HeatingFixture {
-        HeatingFixture(timestamp: ago(minutes), entityId: value != nil ? target : heating, reason: reason,
-                     actionName: value != nil ? "setTargetTemperature" : "setHeating", isActive: active,
-                     targetTemperatureInC: value, planTargetInC: plan)
+        let action: HomeManagableAction = value.map { .setTargetTemperature(target, celsius: $0) } ?? .setHeating(heating, active: active ?? false)
+        return HeatingFixture(timestamp: ago(minutes), action: action, reason: reason, planTargetInC: plan)
     }
 
     private func events(_ items: [EntityStorageItem] = [], writes: [HeatingFixture] = [], contacts: [HeatingRoomSources.Contact] = [],
                         range: HeatingRange = .day) async throws -> [HeatingEvent] {
         let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items),
-                                               writes: InMemoryHeatingCommands(writes),
+                                               journal: seededJournal(writes),
                                                now: { now })
         return try await builder.detail(for: sources(contacts: contacts), range: range).events
     }
@@ -202,34 +201,24 @@ struct HeatingEventsTests {
 
     @Test("the writes the events look at reach back at most a day before the range, however old the state before it is")
     func writeLookback() async throws {
-        let writes = WriteQueryLog()
+        let journal = StartSpyJournal(seededJournal())
         let items = [EntityStorageItem(entityId: window, timestamp: ago(60 * 24 * 90), isContactOpen: false)]   // a quiet contact, last changed months ago
-        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: writes, now: { now })
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), journal: journal, now: { now })
 
         _ = try await builder.detail(for: sources(contacts: [windowContact]), range: .day)
 
-        #expect(await writes.startDates == [now.addingTimeInterval(-HeatingRange.day.duration - 24 * 3_600)])
+        #expect(await journal.requestedStarts == [now.addingTimeInterval(-HeatingRange.day.duration - 24 * 3_600)])
     }
 
     @Test("without events the detail skips the contacts and loads the writes of the range only")
     func withoutEvents() async throws {
-        let writes = WriteQueryLog()
+        let journal = StartSpyJournal(seededJournal())
         let items = [EntityStorageItem(entityId: window, timestamp: ago(200), isContactOpen: true)]
-        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: writes, now: { now })
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), journal: journal, now: { now })
 
         let detail = try await builder.detail(for: sources(contacts: [windowContact]), range: .day, includeEvents: false)
 
         #expect(detail.events.isEmpty)
-        #expect(await writes.startDates == [now.addingTimeInterval(-HeatingRange.day.duration)])
-    }
-}
-
-/// Answers no writes and remembers from when each query asked.
-private actor WriteQueryLog: HeatingCommandSource {
-    private(set) var startDates: [Date?] = []
-
-    func writes(placeId: String, startDate: Date?, endDate: Date?) async -> [ActionLogItem] {
-        startDates.append(startDate)
-        return []
+        #expect(await journal.requestedStarts == [now.addingTimeInterval(-HeatingRange.day.duration)])
     }
 }

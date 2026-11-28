@@ -38,9 +38,18 @@ public actor CommandCache {
         return cachedAction == action
     }
 
-    /// Must only be called once the command actually reached the device.
+    /// Must only be called once the command actually reached the device. The entity has one state, so this
+    /// replaces any cached command of the same entity (`turnOn` replaces `turnOff`).
     public func markExecuted(_ action: HomeManagableAction) async {
+        await forget(action.entityId)
         await cache.insert(action, forKey: CommandCacheKey(action))
+    }
+
+    /// Drops every cached command of `entityId`.
+    public func forget(_ entityId: EntityId) async {
+        for key in await cache.keys where key.entityId == entityId {
+            await cache.removeValue(forKey: key)
+        }
     }
 
     /// Reset cached commands for `item.entityId` that the freshly observed device state contradicts.

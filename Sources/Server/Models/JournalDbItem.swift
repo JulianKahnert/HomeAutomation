@@ -71,7 +71,6 @@ final class JournalDbItem: Model, @unchecked Sendable {
     @OptionalField(key: "reason")
     var reason: String?
 
-
     @OptionalField(key: "commandValue")
     var commandValue: Double?
 

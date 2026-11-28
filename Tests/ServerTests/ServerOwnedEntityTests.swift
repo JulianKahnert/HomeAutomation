@@ -65,13 +65,6 @@ final class ServerOwnedEntityTests: XCTestCase {
         XCTAssertNotEqual(status, .ok)
     }
 
-    func testOnlyOriginsThatCheckedAtTheSourceSkipTheLoopCheck() {
-        XCTAssertTrue(Origin.server.isCheckedAtSource)
-        XCTAssertTrue(Origin.app.isCheckedAtSource)
-        XCTAssertFalse(Origin.homekit.isCheckedAtSource)
-        XCTAssertFalse(Origin.job("ValveJob").isCheckedAtSource)
-    }
-
     func testAReportedChangeReachesAnAutomationOnceWithOriginServer() async throws {
         let holiday = EntityId.serverOwned(name: "holiday", characteristic: .switcher)
         let (stream, continuation) = AsyncStream.makeStream(of: HomeEvent.self)
@@ -94,13 +87,15 @@ final class ServerOwnedEntityTests: XCTestCase {
         // unchanged: no event
         try await homeManager.report(holiday, value: .bool(true))
         try await homeManager.report(holiday, value: .bool(false))
-        try await waitUntil { seen.withLock { $0.count } >= 2 }
+        // a polling job reports with its own origin and is checked at the source just the same
+        try await homeManager.report(holiday, value: .bool(true), origin: .job("EnergyPriceJob"))
+        try await waitUntil { seen.withLock { $0.count } >= 3 }
         await automationService.waitUntilIdle()
 
         // Each change arrives once. A second check in the loop would find the state already set and drop the event.
         let items = seen.withLock { $0 }
-        XCTAssertEqual(items.map(\.isDeviceOn), [true, false])
-        XCTAssertEqual(items.map(\.origin), [.server, .server])
+        XCTAssertEqual(items.map(\.isDeviceOn), [true, false, true])
+        XCTAssertEqual(items.map(\.origin), [.server, .server, .job("EnergyPriceJob")])
     }
 
     func testAReportedStateAppearsInTheHistoryRoute() async throws {
@@ -159,7 +154,6 @@ private struct RecordingAutomation: Automatable {
     let name = "recording"
     let entityId: EntityId
     let onTrigger: @Sendable (EntityStorageItem) -> Void
-    var triggerEntityIds: Set<EntityId> { [entityId] }
     var lanePolicy: LanePolicy { .runEach }
 
     init(entityId: EntityId, onTrigger: @escaping @Sendable (EntityStorageItem) -> Void) {

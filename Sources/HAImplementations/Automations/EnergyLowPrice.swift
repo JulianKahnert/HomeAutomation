@@ -21,10 +21,6 @@ public struct EnergyLowPrice: Automatable {
 
     /// the devices will only be triggered, if the price is lower or equal to this threshold
     public let thresholdInEUR: Double?
-    public var triggerEntityIds: Set<EntityId> {
-        []
-    }
-
     public init(_ name: String, switches: [SwitchDevice], dailyActivationDuration: Duration = .hours(2), thresholdInEUR: Double?) {
         self.name = name
         self.switches = switches

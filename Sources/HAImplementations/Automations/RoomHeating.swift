@@ -29,8 +29,6 @@ public struct RoomHeating: Automatable {
     /// The label under the room's bar in the overview; `nil` derives it from the name.
     public let shortLabel: String?
 
-    public var triggerEntityIds: Set<EntityId> { Set(contacts.map(\.triggerEntityId)) }
-
     /// The plan this room follows.
     public var effectivePlan: HeatingPlan { plan ?? configuration.standardPlan }
 

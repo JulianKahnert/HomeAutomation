@@ -10,8 +10,8 @@ import Foundation
 struct HeatingEventBuilder {
     let room: HeatingRoomSources
     let writes: [ActionLogItem]
-    /// Stored states of the room's plan target entity, oldest first, including the one before the range.
-    let planTargetItems: [EntityStorageItem]
+    /// Stored plan targets (time and °C) of the room's plan target entity, oldest first, including the one before the range.
+    let planItems: [(Date, Double)]
     /// Stored states of each contact, oldest first, including the one before the range.
     let contactItems: [EntityId: [EntityStorageItem]]
     /// Stored targets of each radiator (by name), oldest first, including the one before the range.
@@ -105,7 +105,7 @@ struct HeatingEventBuilder {
     /// The plan target the room had when a cluster began: the last stored plan-target state at that time.
     /// The plan write reports the target a moment before it writes the radiators, hence the small margin.
     private func planTarget(at date: Date) -> Double? {
-        planTargetItems.last { $0.timestamp <= date.addingTimeInterval(Self.echo) && $0.targetTemperatureInC != nil }?.targetTemperatureInC
+        planItems.planTarget(at: date, margin: Self.echo)
     }
 
     private func pointEvent(_ reason: HeatingWriteReason, _ cluster: [ActionLogItem]) -> HeatingEvent? {

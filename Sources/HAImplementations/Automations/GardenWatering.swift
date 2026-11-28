@@ -18,10 +18,6 @@ public struct GardenWatering: Automatable {
     public let time: Time
     public let location: Location
     public let rainbirdZones: [ValveDevice]
-    public var triggerEntityIds: Set<EntityId> {
-        []
-    }
-
     public init(_ name: String, time: Time, location: Location, rainbirdZones: [ValveDevice]) {
         self.name = name
         self.time = time

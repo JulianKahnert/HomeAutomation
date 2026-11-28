@@ -15,7 +15,6 @@ public struct HealthCheck: Automatable {
     public var isActive = true
     public let name: String
     public let url: URL
-    public var triggerEntityIds = Set<EntityId>()
     public var recordsRuns: Bool { false }
 
     public init(_ name: String, url: URL) {

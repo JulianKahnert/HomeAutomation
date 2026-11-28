@@ -15,10 +15,6 @@ public struct CreateScene: Automatable {
     public let sceneName: String
     public let turnOn: Bool
     public let entities: [SwitchDevice]
-    public var triggerEntityIds: Set<EntityId> {
-        []
-    }
-
     public init(_ name: String, at time: Time, sceneName: String, turnOn: Bool = true, entities: [SwitchDevice]) {
         self.name = name
         self.time = time

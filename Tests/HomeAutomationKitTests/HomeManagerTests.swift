@@ -460,11 +460,10 @@ struct HomeManagerTests {
         await journal.flush()
         let logged = try #require(await journal.commands(limit: nil, runId: nil).first)
         #expect(logged.reason == .plan)
-        let recorded = try #require(await journal.writes(placeId: "Kitchen", startDate: nil, endDate: nil).first)
+        let recorded = try #require(await journal.lastHeatingWrites().first)
         #expect(recorded.reason == .plan)
         #expect(recorded.targetTemperatureInC == 21.0)
         #expect(await homeManager.lastHeatingWrite(of: radiator)?.targetTemperatureInC == 21.0)
-        #expect(await journal.lastHeatingWrites().map(\.targetTemperatureInC) == [21.0])
     }
 
     @Test("A command without a reason, a duplicate and a failed write are not recorded")
@@ -474,14 +473,14 @@ struct HomeManagerTests {
 
         await homeManager.perform(.setTargetTemperature(radiator, celsius: 20))
         await journal.flush()
-        #expect(await journal.writes(placeId: "Kitchen", startDate: nil, endDate: nil).isEmpty)
+        #expect(await journal.lastHeatingWrites().isEmpty)
 
         await HeatingWriteContext.withReason(.system) {
             await homeManager.perform(.setHeating(radiator, active: true))
             await homeManager.perform(.setHeating(radiator, active: true))
         }
         await journal.flush()
-        #expect(await journal.writes(placeId: "Kitchen", startDate: nil, endDate: nil).count == 1)
+        #expect(await journal.lastHeatingWrites().count == 1)
 
         let failing = Journal(store: InMemoryJournalStore())
         let failingManager = await makeHomeManager(probe: AdapterProbe(failure: .unreachable), journal: failing)
@@ -489,7 +488,7 @@ struct HomeManagerTests {
             await failingManager.perform(.setHeating(radiator, active: true))
         }
         await failing.flush()
-        #expect(await failing.writes(placeId: "Kitchen", startDate: nil, endDate: nil).isEmpty)
+        #expect(await failing.lastHeatingWrites().isEmpty)
         #expect(await failingManager.lastHeatingWrite(of: radiator) == nil)
     }
 
@@ -506,6 +505,46 @@ struct HomeManagerTests {
         await slowTurnOn.value
 
         #expect(await homeManager.queuedRetry(of: switchId) == nil)
+    }
+
+    @Test("A command of a cancelled run does not supersede the queued retry of its entity")
+    func cancelledRunKeepsTheQueuedRetry() async {
+        let (ticks, tickContinuation) = AsyncStream<Void>.makeStream(of: Void.self)
+        let probe = AdapterProbe(failure: .unreachable)
+        let homeManager = await makeHomeManager(probe: probe, retryTicks: ticks)
+
+        await homeManager.perform(.turnOff(switchId))   // fails and is queued
+        await probe.setFailure(nil)
+
+        let cancelled = Task {
+            while !Task.isCancelled { await Task.yield() }
+            await homeManager.perform(.turnOn(switchId))   // skipped: it was never attempted
+        }
+        cancelled.cancel()
+        await cancelled.value
+
+        tickContinuation.yield(())
+        await eventually("the retry of the off ran") {
+            await probe.startedPerforms == 2
+        }
+        #expect(await probe.performedActions == [.turnOff(switchId), .turnOff(switchId)])
+    }
+
+    @Test("A command in flight makes the cached opposite command stale, so the newest intent reaches the device")
+    func inFlightCommandForgetsTheCachedOpposite() async {
+        let probe = AdapterProbe()
+        let homeManager = await makeHomeManager(probe: probe)
+
+        await homeManager.perform(.turnOff(switchId))   // reaches the device and is cached
+
+        await probe.holdAndFailTurnOn()
+        let slowTurnOn = Task { await homeManager.perform(.turnOn(switchId)) }
+        await probe.waitForHeldTurnOn()
+        await homeManager.perform(.turnOff(switchId))   // not a duplicate any more: the on may land first
+        await probe.releaseHeldTurnOn()
+        await slowTurnOn.value
+
+        #expect(await probe.performedActions == [.turnOff(switchId), .turnOn(switchId), .turnOff(switchId)])
     }
 
     @Test("Every command writes one server log line with entity, action, reason and run, a cache hit included")

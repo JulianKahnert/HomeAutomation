@@ -61,7 +61,7 @@ struct JournalTests {
 
         journal.recordPush(JournalPush(runId: nil, title: "t", message: "m", pushId: "i"))
         let flushing = Task { await journal.flush() }
-        while journal.enqueuedCount < 2 { await Task.yield() }
+        await eventually("the push and the flush marker are queued") { journal.enqueuedCount >= 2 }
         // More writes than the queue holds push the oldest items out, the flush marker among them.
         for _ in 0...Journal.queueLimit {
             journal.recordPush(JournalPush(runId: nil, title: "t", message: "m", pushId: "i"))

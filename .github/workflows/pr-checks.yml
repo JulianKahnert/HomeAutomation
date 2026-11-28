@@ -38,6 +38,19 @@ jobs:
 
       - name: Run Tests
         run: swift test
+        env:
+          # SnapshotTesting writes the failing renders here instead of the runner's temp folder.
+          SNAPSHOT_ARTIFACTS: ${{ runner.temp }}/snapshot-failures
+
+      # The runner's renders are the references to record (see Snapshotting+FixedScale.swift),
+      # so keep them when a snapshot does not match.
+      - name: Upload failing snapshots
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: snapshot-failures
+          path: ${{ runner.temp }}/snapshot-failures
+          if-no-files-found: ignore
 
   ios-apps:
     name: iOS Apps Build

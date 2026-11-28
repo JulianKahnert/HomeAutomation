@@ -539,16 +539,14 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     /// The tabular `EXPLAIN` of a statement as one text (every row's `select_type`, `key` and `Extra`); the tests below
     /// assert that an index is used, so a later schema edit cannot silently drop one.
-    /// The tabular `EXPLAIN` of a statement as one text (every row's `key` and `Extra`); the tests below assert that an
+    /// The tabular `EXPLAIN` of a statement as one text (the description of every row, which holds `key` and `Extra`); the tests below assert that an
     /// index is used, so a later schema edit cannot silently drop one. It goes through the driver's text protocol:
     /// over the prepared-statement path `sql.raw` uses, MySQLNIO returns no rows for an EXPLAIN (and asserts on EXPLAIN DELETE).
     private func plan(_ statement: String) async throws -> String {
         let mysql = try XCTUnwrap(app.db as? MySQLDatabase)
         let rows = try await mysql.simpleQuery("EXPLAIN " + statement).get()
         XCTAssertFalse(rows.isEmpty, "EXPLAIN returned no rows for \(statement)")
-        return rows.map { row in
-            "key=\(row.column("key")?.string ?? "-") extra=\(row.column("Extra")?.string ?? "-")"
-        }.joined(separator: "\n")
+        return rows.map { String(describing: $0) }.joined(separator: "\n")
     }
 
     func testQueryPlansUseTheIndexes() async throws {

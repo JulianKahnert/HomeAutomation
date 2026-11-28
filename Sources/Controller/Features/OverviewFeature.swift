@@ -8,6 +8,7 @@
 import ComposableArchitecture
 import Foundation
 import HAModels
+import ServerClient
 import Sharing
 import SwiftUI
 
@@ -37,7 +38,10 @@ struct OverviewFeature: Sendable {
         var lastUpdated: Date?
         /// Last 24 hours, newest first.
         var recentRuns: [AutomationRun] = []
+        /// Set when a refresh failed: the server is not reachable.
         var error: String?
+        /// Set when stopping an automation failed; the server itself is fine.
+        var stopError: String?
         var path = StackState<OverviewPath.State>()
     }
 
@@ -96,6 +100,7 @@ struct OverviewFeature: Sendable {
                 return .none
 
             case let .stopButtonTapped(name):
+                state.stopError = nil
                 return .run { send in
                     await send(.stopResponse(Result { try await serverClient.stop(name) }))
                 }
@@ -104,8 +109,11 @@ struct OverviewFeature: Sendable {
                 return refresh()
 
             case let .stopResponse(.failure(error)):
-                // The stop failed, not the server: its health stays as it was.
-                state.error = error.localizedDescription
+                // The stop failed, not the server: `error` and its health stay as they were. A busy server queued
+                // the stop; the next poll shows the result.
+                if error as? ServerClientError != .busy {
+                    state.stopError = error.localizedDescription
+                }
                 return .none
 
             case .task:
@@ -171,7 +179,7 @@ struct OverviewView: View {
 
                 let running = store.automations.filter(\.isRunning)
                 if !running.isEmpty {
-                    Section("Running") {
+                    Section {
                         ForEach(running) { automation in
                             Button {
                                 store.send(.automationTapped(automation.name))
@@ -185,11 +193,6 @@ struct OverviewView: View {
                                             .lineLimit(1)
                                     }
                                     Spacer()
-                                    Button("Stop") {
-                                        store.send(.stopButtonTapped(automation.name))
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .tint(.accentColor)
                                     // Reads like a navigation row: it leaves the tab, so it cannot be a NavigationLink.
                                     Image(systemName: "chevron.forward")
                                         .font(.footnote.weight(.semibold))
@@ -199,6 +202,22 @@ struct OverviewView: View {
                             // `.primary` and `.secondary` resolve relative to the button's tint, so the
                             // label stays accent-colored unless the tint itself is the label color.
                             .tint(.primary)
+                            // A button inside the row's button would not be its own control for VoiceOver.
+                            .swipeActions {
+                                Button("Stop", role: .destructive) {
+                                    store.send(.stopButtonTapped(automation.name))
+                                }
+                            }
+                            .accessibilityAction(named: "Stop") {
+                                store.send(.stopButtonTapped(automation.name))
+                            }
+                        }
+                    } header: {
+                        Text("Running")
+                    } footer: {
+                        if let stopError = store.stopError {
+                            Text(stopError)
+                                .foregroundStyle(Color.red)
                         }
                     }
                 }
@@ -239,7 +258,7 @@ struct OverviewView: View {
     }
 
     private func dot(_ color: Color) -> some View {
-        Image(systemName: "circle.fill").foregroundStyle(color)
+        Image(systemName: "circle.fill").foregroundStyle(color).accessibilityHidden(true)
     }
 
     private var statusRow: some View {

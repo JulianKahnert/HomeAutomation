@@ -36,13 +36,40 @@ struct EntityHistoryDetailFeatureTests {
         await store.send(.refresh) { [now] in
             $0.isLoading = true
             $0.rangeEnd = now
+            $0.replacesHistory = true
         }
         await store.receive(\.historyResponse.success) {
             $0.isLoading = false
+            $0.replacesHistory = false
             $0.historyItems = [first]
         }
         await store.receive(\.historyResponse.success) {
             $0.historyItems = [first, second]
+        }
+    }
+
+    @Test("a reload keeps the shown items until the first page replaces them")
+    func reloadKeepsItems() async {
+        let old = EntityHistoryItem(timestamp: Date(timeIntervalSince1970: 1), valueKind: "temperatureSensor", value: .number(19))
+        let fresh = EntityHistoryItem(timestamp: Date(timeIntervalSince1970: 10), valueKind: "temperatureSensor", value: .number(21))
+        var state = EntityHistoryDetailFeature.State(entity: entity)
+        state.historyItems = [old]
+        let store = TestStore(initialState: state) {
+            EntityHistoryDetailFeature()
+        } withDependencies: { [now] in
+            $0.date.now = now
+            $0.serverClient.getEntityHistory = { _, _, _, _, _, _ in EntityHistoryResponse(items: [fresh], nextCursor: nil) }
+        }
+
+        await store.send(.refresh) { [now] in
+            $0.isLoading = true
+            $0.rangeEnd = now
+            $0.replacesHistory = true
+        }
+        await store.receive(\.historyResponse.success) {
+            $0.isLoading = false
+            $0.replacesHistory = false
+            $0.historyItems = [fresh]
         }
     }
 
@@ -78,6 +105,7 @@ struct EntityHistoryDetailFeatureTests {
         await store.send(.refresh) { [now] in
             $0.isLoading = true
             $0.rangeEnd = now
+            $0.replacesHistory = true
         }
         await store.receive(\.historyResponse.failure) {
             $0.isLoading = false

@@ -7,6 +7,7 @@ import ComposableArchitecture
 @testable import Controller
 import Foundation
 import HAModels
+import ServerClient
 import Testing
 import UserNotifications
 
@@ -108,6 +109,23 @@ struct HeatingFireplaceFeatureTests {
         }
         await store.receive(\.fireplaceLoaded.success) { $0.fireplace = truth }
         await store.send(.dismissFireplaceError) { $0.fireplaceError = nil }
+    }
+
+    @Test("a busy server keeps the shown state and reloads after a short delay")
+    func busy() async {
+        let clock = TestClock()
+        let applied = FireplaceState(isOn: true, since: start.addingTimeInterval(3))
+        let store = store(loaded: applied, switching: { _ in throw ServerClientError.busy })
+        store.dependencies.continuousClock = clock
+
+        await store.send(.setFireplace(true)) {
+            $0.fireplace = FireplaceState(isOn: true, since: start)
+        }
+        await store.receive(\.fireplaceSwitched.failure)
+        await clock.advance(by: .seconds(5))
+        await store.receive(\.fireplaceLoaded.success) {
+            $0.fireplace = applied
+        }
     }
 
     @Test("the subtitle says when the fireplace ends, and is empty while it is off")

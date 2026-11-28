@@ -7,6 +7,7 @@ import ComposableArchitecture
 @testable import Controller
 import Foundation
 import HAModels
+import ServerClient
 import Testing
 
 @MainActor
@@ -62,6 +63,36 @@ struct AutomationsFeatureTests {
             } message: {
                 TextState("Failed to change Evening: \(ActivateError().localizedDescription)")
             }
+        }
+    }
+
+    @Test("a busy server keeps the new value and reloads after a short delay")
+    func busyKeepsValueAndReloads() async {
+        let clock = TestClock()
+        let store = TestStore(initialState: AutomationsFeature.State()) {
+            AutomationsFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.serverClient.deactivate = { _ in throw ServerClientError.busy }
+            // What the server did with the queued change.
+            $0.serverClient.getAutomations = { [automations] in
+                var done = automations
+                done[id: "Evening"]?.isActive = false
+                return Array(done)
+            }
+        }
+        store.state.$automations.withLock { $0 = automations }
+
+        await store.send(.setActive(name: "Evening", false)) {
+            $0.$automations.withLock { $0[id: "Evening"]?.isActive = false }
+        }
+        await store.receive(\.setActiveResponse)
+        await clock.advance(by: .seconds(5))
+        await store.receive(\.refresh) {
+            $0.isLoading = true
+        }
+        await store.receive(\.automationsResponse.success) {
+            $0.isLoading = false
         }
     }
 }

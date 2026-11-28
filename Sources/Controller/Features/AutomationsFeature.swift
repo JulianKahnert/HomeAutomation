@@ -8,6 +8,7 @@
 import ComposableArchitecture
 import Foundation
 import HAModels
+import ServerClient
 import Sharing
 import SwiftUI
 
@@ -75,7 +76,10 @@ struct AutomationsFeature: Sendable {
 
     // MARK: - Dependencies
 
+    @Dependency(\.continuousClock) var clock
     @Dependency(\.serverClient) var serverClient
+
+    private enum CancelID { case reload }
 
     // MARK: - Body
 
@@ -124,6 +128,14 @@ struct AutomationsFeature: Sendable {
 
             case .setActiveResponse(_, .success):
                 return .none
+
+            case let .setActiveResponse(_, .failure(error)) where error as? ServerClientError == .busy:
+                // The server queued the change and will still apply it: keep the new value and look again soon.
+                return .run { send in
+                    try await clock.sleep(for: .seconds(5))
+                    await send(.refresh)
+                }
+                .cancellable(id: CancelID.reload, cancelInFlight: true)
 
             case let .setActiveResponse(name, .failure(error)):
                 state.$automations.withLock { $0[id: name]?.isActive.toggle() }

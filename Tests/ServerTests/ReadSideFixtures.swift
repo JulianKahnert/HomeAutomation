@@ -16,6 +16,8 @@ actor MemoryStorage: StorageRepository {
     private var changes: [EntityId: [EntityStorageItem]] = [:]
     private var lastReports: [EntityId: Date] = [:]
     private var added = 0
+    /// The entities in the order their changes were stored.
+    private(set) var addedIds: [EntityId] = []
     private var waiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     init(seed: [EntityStorageItem] = []) {
@@ -45,6 +47,7 @@ actor MemoryStorage: StorageRepository {
         changes[item.entityId, default: []].append(stored)
         if let lastReport = item.lastReport { lastReports[item.entityId] = lastReport }
         added += 1
+        addedIds.append(item.entityId)
         let ready = waiters.filter { $0.count <= added }
         waiters.removeAll { $0.count <= added }
         for waiter in ready { waiter.continuation.resume() }

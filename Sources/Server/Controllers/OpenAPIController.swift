@@ -20,6 +20,8 @@ struct OpenAPIController: APIProtocol {
     /// declared on the `limit` parameters in `openapi.yaml`.
     static let maxLimit = 1000
     static let defaultLimit = 100
+    /// What a write answers when the event loop does not get to it in time (503, not in the OpenAPI spec).
+    static let coreBusyStatus = 503
 
     /// Enforces the `minimum`/`maximum` bounds from `openapi.yaml` server-side.
     ///
@@ -68,7 +70,11 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        try await request.application.commandPort.setAutomationActive(name: name, to: true)
+        do {
+            try await request.application.commandPort.setAutomationActive(name: name, to: true)
+        } catch CoreCommandError.timedOut {
+            return .undocumented(statusCode: Self.coreBusyStatus, .init())
+        }
         return .ok
     }
 
@@ -78,7 +84,11 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        try await request.application.commandPort.setAutomationActive(name: name, to: false)
+        do {
+            try await request.application.commandPort.setAutomationActive(name: name, to: false)
+        } catch CoreCommandError.timedOut {
+            return .undocumented(statusCode: Self.coreBusyStatus, .init())
+        }
         return .ok
     }
 
@@ -88,7 +98,11 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        try await request.application.commandPort.stopAutomation(name: name)
+        do {
+            try await request.application.commandPort.stopAutomation(name: name)
+        } catch CoreCommandError.timedOut {
+            return .undocumented(statusCode: Self.coreBusyStatus, .init())
+        }
         return .ok
     }
 
@@ -190,7 +204,7 @@ struct OpenAPIController: APIProtocol {
         } catch CoreCommandError.notSettable {
             return .forbidden
         } catch CoreCommandError.timedOut {
-            throw Abort(.serviceUnavailable, reason: "The server core did not answer in time")
+            return .undocumented(statusCode: Self.coreBusyStatus, .init())
         } catch CoreCommandError.stateUnreadable {
             request.logger.error("Failed to read the state that was just set", metadata: ["entityId": "\(entityId)"])
             throw Abort(.internalServerError)

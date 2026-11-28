@@ -58,6 +58,16 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
         return Array(filtered.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 
+    /// The reports that changed nothing and were handed to the storage, in order.
+    var lastReportWrites: [(entityId: EntityId, date: Date)] {
+        lock.withLock { writtenLastReports }
+    }
+    private var writtenLastReports: [(entityId: EntityId, date: Date)] = []
+
+    func recordLastReport(of entityId: EntityId, at date: Date) async throws {
+        lock.withLock { writtenLastReports.append((entityId, date)) }
+    }
+
     func getAllEntityIds() async throws -> [EntityId] {
         var seen = Set<EntityId>()
         var uniqueEntityIds: [EntityId] = []

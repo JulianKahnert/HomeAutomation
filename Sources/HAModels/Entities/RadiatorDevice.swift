@@ -7,7 +7,7 @@ import Shared
 
 /// A radiator thermostat (glossary: radiator). Named by capability, not by manufacturer: other
 /// manufacturers than Eve may follow.
-open class RadiatorDevice: Codable, @unchecked Sendable, Validatable, Log {
+open class RadiatorDevice: Codable, @unchecked Sendable, Log {
     /// `Active` of the HeaterCooler service: written `false` to switch the radiator off.
     public let heatingId: EntityId
     /// The heating threshold, the target temperature the radiator holds.
@@ -38,8 +38,4 @@ open class RadiatorDevice: Codable, @unchecked Sendable, Validatable, Log {
         await hm.perform(.setHeating(heatingId, active: false))
     }
 
-    public func validate(with hm: any EntityValidator) async throws {
-        try await hm.findEntity(heatingId)
-        try await hm.findEntity(targetTemperatureId)
-    }
 }

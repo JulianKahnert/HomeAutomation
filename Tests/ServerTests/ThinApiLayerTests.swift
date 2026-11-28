@@ -130,15 +130,33 @@ final class ThinApiLayerTests: XCTestCase {
 
     // MARK: - boundary
 
-    /// The API layer knows the command port and the repositories, never the types of the core.
-    func testTheApiLayerReferencesNeitherHomeManagerNorAutomationService() throws {
+    /// The API layer knows the command port and the repositories, never the types or accessors of the core. It is every
+    /// file that declares or extends `OpenAPIController`, plus the route registration; only `HealthRoute.swift` may
+    /// touch the core. Comments are ignored.
+    func testTheApiLayerReferencesNothingOfTheCore() throws {
         let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/Server")
-        let forbidden = ["HomeManager", "HomeManagable", "AutomationService", "homeManager", "automationService"]
-        for file in ["Controllers/OpenAPIController.swift", "routes.swift"] {
-            let text = try String(contentsOf: sources.appendingPathComponent(file), encoding: .utf8)
+        let forbidden = ["HomeManager", "HomeManagable", "AutomationService", "homeManager", "automationService", "homeEventSink",
+                         "homeEventsContinuation", "homeEventsStream", "scheduler", "homeAutomationConfigService",
+                         "entityStorageDbRepository", "journalRepository", "eventLoopGauge"]
+        var files = [sources.appendingPathComponent("routes.swift")]
+        let enumerator = try XCTUnwrap(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        for case let url as URL in enumerator where url.pathExtension == "swift" && url.lastPathComponent != "HealthRoute.swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            if text.contains("OpenAPIController") && !files.contains(url) { files.append(url) }
+        }
+        XCTAssertGreaterThanOrEqual(files.count, 2)
+        for file in files {
+            let code = try String(contentsOf: file, encoding: .utf8)
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .map { line -> String in
+                    var line = String(line)
+                    if let range = line.range(of: "//") { line.removeSubrange(range.lowerBound...) }
+                    return line
+                }
+                .joined(separator: "\n")
             for word in forbidden {
-                XCTAssertFalse(text.contains(word), "\(file) references \(word)")
+                XCTAssertFalse(code.contains(word), "\(file.lastPathComponent) references \(word)")
             }
         }
     }

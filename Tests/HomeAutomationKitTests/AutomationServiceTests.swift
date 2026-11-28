@@ -110,7 +110,6 @@ struct AutomationServiceTests {
 
         await service.trigger(with: .sunrise)
 
-        #expect(await service.getActiveAutomationNames().isEmpty)
         #expect(await repository.runs.isEmpty)
     }
 

@@ -12,12 +12,8 @@ public actor HomeManagerActor: GlobalActor {
     public static let shared = HomeManagerActor()
 }
 
-public protocol EntityValidator {
-    func findEntity(_ entity: EntityId) async throws
-}
-
 @HomeManagerActor
-public protocol HomeManagable: EntityValidator, Sendable {
+public protocol HomeManagable: Sendable {
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem
     /// When each reporting source (an origin: `homekit`, `server` or a job name) last reported, a replay included.
     /// Memory only, so a source is missing after a restart until its first report.
@@ -60,12 +56,12 @@ public protocol HomeManagable: EntityValidator, Sendable {
     ///   - ifCurrent: A precondition on the entity's current state (`nil` while unknown). It is checked in the same
     ///     synchronous section that sets the state, so no other writer can change the entity between the check and
     ///     the write; read, decide and report in two calls and one can. When it returns `false` nothing is reported.
-    /// - Returns: `true` when the state changed, `false` when the value was the one it already had or `ifCurrent`
-    ///   refused the report.
+    /// - Returns: The state after the report, read in the same synchronous section that set it, with whether it
+    ///   changed; `nil` when `ifCurrent` refused the report. The ``report(_:value:origin:ifCurrent:)`` extension
+    ///   reduces it to the `changed` flag.
     /// - Throws: ``ReportError`` for a report that is refused: an entity that is not server-owned, a value that does
     ///   not fit the kind. That is a programmer error of the caller, not an outcome.
-    @discardableResult
-    func report(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> Bool
+    func reportState(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> StateChange?
     /// The current states of all entities of one characteristic type, in no particular order; from memory.
     func states(of type: CharacteristicsType) async -> [EntityStorageItem]
 
@@ -88,6 +84,13 @@ public enum ReportError: Error, Equatable {
 }
 
 public extension HomeManagable {
+    /// Like ``reportState(_:value:origin:ifCurrent:)``, reduced to whether the state changed (`false` for a replay or a
+    /// refusal by `ifCurrent`).
+    @discardableResult
+    func report(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> Bool {
+        try await reportState(entityId, value: value, origin: origin, ifCurrent: ifCurrent)?.changed ?? false
+    }
+
     /// Reports unconditionally, with origin `server` unless given.
     @discardableResult
     func report(_ entityId: EntityId, value: Value, origin: Origin = .server) async throws -> Bool {

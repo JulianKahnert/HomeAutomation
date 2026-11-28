@@ -82,8 +82,7 @@ public struct ServerClient {
         let response = try await client.activateAutomation(path: .init(name: name))
         switch response {
         case .ok: return
-        // 503 while the server queues the change; once openapi.yaml documents it, this switch stops compiling
-        // and must map the new case to `.busy`.
+        case .serviceUnavailable: throw ServerClientError.busy
         case .undocumented(let status, _): throw ServerClientError(undocumentedStatus: status)
         }
     }
@@ -92,8 +91,7 @@ public struct ServerClient {
         let response = try await client.deactivateAutomation(path: .init(name: name))
         switch response {
         case .ok: return
-        // 503 while the server queues the change; once openapi.yaml documents it, this switch stops compiling
-        // and must map the new case to `.busy`.
+        case .serviceUnavailable: throw ServerClientError.busy
         case .undocumented(let status, _): throw ServerClientError(undocumentedStatus: status)
         }
     }
@@ -102,8 +100,7 @@ public struct ServerClient {
         let response = try await client.stopAutomation(path: .init(name: name))
         switch response {
         case .ok: return
-        // 503 while the server queues the change; once openapi.yaml documents it, this switch stops compiling
-        // and must map the new case to `.busy`.
+        case .serviceUnavailable: throw ServerClientError.busy
         case .undocumented(let status, _): throw ServerClientError(undocumentedStatus: status)
         }
     }
@@ -200,6 +197,7 @@ public struct ServerClient {
     public func setFireplace(isOn: Bool) async throws -> FireplaceState {
         let entityId = Components.Schemas.EntityId(Fireplace.stateId)
         let response = try await client.setEntityState(body: .json(.init(entityId: entityId, value: .init(.bool(isOn)))))
+        if case .serviceUnavailable = response { throw ServerClientError.busy }
         if case .undocumented(let status, _) = response { throw ServerClientError(undocumentedStatus: status) }
         return FireplaceState(try response.ok.body.json)
     }

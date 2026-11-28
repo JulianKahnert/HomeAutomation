@@ -29,7 +29,7 @@ final class ServerOwnedEntityTests: XCTestCase {
         app.databases.use(InMemoryDatabaseConfiguration(), as: DatabaseID(string: "in-memory"), isDefault: true)
         // no adapter: a server-owned entity needs none, a HomeKit entity cannot be checked
         app.homeManager = await HomeManager(getAdapter: { nil },
-                                            storageRepo: EmptyStorage(),
+                                            storageRepo: MemoryStorage(),
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 52.52, longitude: 13.405))
         loop = app.startEventLoop()
@@ -70,7 +70,7 @@ final class ServerOwnedEntityTests: XCTestCase {
         let (stream, continuation) = AsyncStream.makeStream(of: HomeInput.self)
         // wired like configure.swift
         let homeManager = await HomeManager(getAdapter: { nil },
-                                            storageRepo: EmptyStorage(),
+                                            storageRepo: MemoryStorage(),
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 52.52, longitude: 13.405),
                                             onReportedChange: { continuation.yield(.event(.change(entity: $0))) })

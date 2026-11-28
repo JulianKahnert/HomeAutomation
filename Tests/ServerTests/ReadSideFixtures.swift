@@ -7,6 +7,7 @@ import Foundation
 import HAApplicationLayer
 @testable import HAImplementations
 import HAModels
+import Shared
 @testable import Server
 import XCTVapor
 
@@ -66,8 +67,17 @@ actor MemoryStorage: StorageRepository {
 
     func getAllEntityIds() async throws -> [EntityId] { Array(changes.keys) }
 
-    /// Returns once `count` changes were added, without polling.
-    func waitForChanges(_ count: Int) async {
+    /// Returns once `count` changes were added, without polling; fails the test after `timeout` instead of hanging.
+    func waitForChanges(_ count: Int, timeout: Duration = .seconds(10), file: StaticString = #filePath, line: UInt = #line) async {
+        guard added < count else { return }
+        do {
+            try await raceTimeout(timeout, timeoutError: { TestWaitTimeout() }) { await self.registerWaiter(count) }
+        } catch {
+            XCTFail("Fewer than \(count) changes were added within \(timeout)", file: file, line: line)
+        }
+    }
+
+    private func registerWaiter(_ count: Int) async {
         guard added < count else { return }
         await withCheckedContinuation { waiters.append((count, $0)) }
     }
@@ -92,3 +102,6 @@ extension Application {
         return Task { await job.run() }
     }
 }
+
+/// A wait in a test that did not end in time.
+struct TestWaitTimeout: Error {}

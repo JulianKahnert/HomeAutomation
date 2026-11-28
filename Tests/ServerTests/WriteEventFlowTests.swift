@@ -8,6 +8,7 @@ import HAApplicationLayer
 @testable import HAImplementations
 @testable import HAModels
 @testable import Server
+import Shared
 import StarActorSystem
 import Synchronization
 import XCTVapor
@@ -160,6 +161,82 @@ final class WriteEventFlowTests: XCTestCase {
         XCTAssertNotNil(gauge.reportsBacklog(olderThan: 60, now: later))
     }
 
+    // MARK: - failures and slow saves
+
+    func testAFailingSaveAnswers500FastAndNotAfterTheTimeout() async throws {
+        automationService = try AutomationService(using: app.homeManager, runs: NoRuns(), automations: [Probe()], repository: ThrowingRepository())
+        startLoop()
+        let status = try await send(.POST, "/config/automations/probe/activate")
+        XCTAssertEqual(status, .internalServerError)
+    }
+
+    func testAStoppedLoopAnswers503ForADeployAndTheDeployRunsLater() async throws {
+        app.commandPort = EventFlowCommandPort(sink: app.homeEventSink, timeout: .milliseconds(50), unknownEntities: { _ in [] })
+        let dto = ConfigDTO(location: Location(latitude: 1, longitude: 2), automations: [AnyAutomation.create(from: DatabaseCleanup())])
+        let body = String(decoding: try JSONEncoder().encode(dto), as: UTF8.self)
+
+        let status = try await send(.POST, "/config?skipValidation=true", json: body)
+        XCTAssertEqual(status, .serviceUnavailable)
+
+        startLoop()
+        // an event queued behind the deploy is handled after it
+        let lamp = EntityId(placeId: "room", name: "lamp", characteristicsName: nil, characteristic: .switcher)
+        app.homeEventSink.yield(.change(entity: EntityStorageItem(entityId: lamp, isDeviceOn: true)))
+        await storage.waitForChanges(1)
+        let names = await automationService.automations.map(\.name)
+        XCTAssertEqual(names, ["DatabaseCleanup"])
+    }
+
+    func testASlowSaveDoesNotHoldTheLoop() async throws {
+        let repository = BlockingRepository()
+        automationService = try AutomationService(using: app.homeManager, runs: NoRuns(), automations: [Probe()], repository: repository)
+        startLoop()
+
+        // the activate waits for its save, which does not end
+        let app = try XCTUnwrap(app)
+        let token = token
+        let request = Task { () -> HTTPStatus in
+            var status: HTTPStatus = .internalServerError
+            try await app.test(.POST, "/config/automations/probe/deactivate", beforeRequest: { req in
+                req.headers.add(name: .authorization, value: "Bearer \(token)")
+            }, afterResponse: { res async in status = res.status })
+            return status
+        }
+        await repository.saveStarted.wait()
+
+        // an event behind it is still handled by the loop
+        let lamp = EntityId(placeId: "room", name: "lamp", characteristicsName: nil, characteristic: .switcher)
+        app.homeEventSink.yield(.change(entity: EntityStorageItem(entityId: lamp, isDeviceOn: true)))
+        await storage.waitForChanges(1)
+
+        await repository.releaseSave.open()
+        let status = try await request.value
+        XCTAssertEqual(status, .ok)
+    }
+
+    func testACancelledRequestEnqueuesNoWrite() async throws {
+        let gate = Signal()
+        let port = app.commandPort
+        let task = Task {
+            await gate.wait()
+            try await port.stopAutomation(name: "probe")
+        }
+        task.cancel()
+        await gate.open()
+        let result = await task.result
+        XCTAssertThrowsError(try result.get()) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertEqual(app.eventLoopGauge.age(now: Date().addingTimeInterval(120)), 0)
+    }
+
+    func testAWriteReleasedUnhandledAnswersDropped() {
+        let answer = Mutex<Result<StateChange?, any Error>?>(nil)
+        do {
+            _ = WriteCommand(kind: .stopAutomation(name: "probe"), complete: { result in answer.withLock { $0 = result } })
+        }
+        guard case .failure(let error)? = answer.withLock({ $0 }) else { return XCTFail("no answer") }
+        XCTAssertEqual(error as? CoreCommandError, .dropped)
+    }
+
     // MARK: - stop never waits on a lane
 
     func testStopCancelsTheRunWhileItsLaneIsBusyChecking() async throws {
@@ -184,6 +261,22 @@ final class WriteEventFlowTests: XCTestCase {
     }
 }
 
+private struct ThrowingRepository: AutomationRepository {
+    struct Failure: Error {}
+    func save(_ automations: [any Automatable], location: Location?) async throws { throw Failure() }
+}
+
+/// A repository whose save starts and then waits until the test releases it.
+private final class BlockingRepository: AutomationRepository {
+    let saveStarted = Signal()
+    let releaseSave = Signal()
+
+    func save(_ automations: [any Automatable], location: Location?) async throws {
+        await saveStarted.open()
+        await releaseSave.wait()
+    }
+}
+
 /// A one-shot signal: `wait` returns once `open` was called, whichever comes first.
 actor Signal {
     private var isOpen = false
@@ -195,7 +288,17 @@ actor Signal {
         waiters = []
     }
 
-    func wait() async {
+    /// Returns once opened; fails the test after `timeout` instead of hanging.
+    func wait(timeout: Duration = .seconds(10), file: StaticString = #filePath, line: UInt = #line) async {
+        guard !isOpen else { return }
+        do {
+            try await raceTimeout(timeout, timeoutError: { TestWaitTimeout() }) { await self.park() }
+        } catch {
+            XCTFail("A signal was not opened within \(timeout)", file: file, line: line)
+        }
+    }
+
+    private func park() async {
         guard !isOpen else { return }
         await withCheckedContinuation { waiters.append($0) }
     }

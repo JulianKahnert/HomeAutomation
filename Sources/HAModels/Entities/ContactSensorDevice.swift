@@ -8,7 +8,7 @@
 import Foundation
 import Shared
 
-open class ContactSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
+open class ContactSensorDevice: Codable, @unchecked Sendable, Log {
     public let contactSensorId: EntityId
     public let batterySensorId: EntityId?
 
@@ -22,15 +22,4 @@ open class ContactSensorDevice: Codable, @unchecked Sendable, Validatable, Log {
         return try item.isContactOpen.get(with: log)
     }
 
-    public func validate(with hm: any EntityValidator) async throws {
-
-        try await hm.findEntity(contactSensorId)
-        if let batterySensorId {
-            do {
-                try await hm.findEntity(batterySensorId)
-            } catch {
-                log.warning("Failed to get battery sensor for \(batterySensorId)")
-            }
-        }
-    }
 }

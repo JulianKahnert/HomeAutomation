@@ -80,7 +80,6 @@ struct GoldenThunkIDTests {
         try await eventProxy.process(event: .change(entity: EntityStorageItem(entityId: entityId)))
         // server → adapter
         _ = try await commandProxy.getAllEntitiesLive()
-        try await commandProxy.findEntity(entityId)
         try await commandProxy.perform(.turnOn(entityId))
         try await commandProxy.trigger(scene: "some scene")
         let thermostat = Thermostat(placeId: "place", name: "name", characteristicsName: nil)
@@ -95,7 +94,6 @@ struct GoldenThunkIDTests {
         ])
         #expect(serverTargets == [
             "$s7Adapter22HomeKitCommandReceiverC18getAllEntitiesLiveSay8HAModels17EntityStorageItemVGyYaKFTE",
-            "$s7Adapter22HomeKitCommandReceiverC10findEntityyy8HAModels0G2IdVYaKFTE",
             "$s7Adapter22HomeKitCommandReceiverC7performyy8HAModels0B15ManagableActionOYaKFTE",
             "$s7Adapter22HomeKitCommandReceiverC7trigger5sceneySS_tYaKFTE",
             "$s7Adapter22HomeKitCommandReceiverC15listThermostatsSay8HAModels10ThermostatVGyYaKFTE",
@@ -116,7 +114,6 @@ struct GoldenThunkIDTests {
 /// execute, not real HomeKit behavior.
 private struct FakeHomeKitAdapter: HomeKitAdapterable {
     func getAllEntitiesLive() async -> [EntityStorageItem] { [] }
-    func findEntity(_ entity: EntityId) async throws {}
     func perform(_ action: HomeManagableAction) async throws {}
     func trigger(scene sceneName: String) async throws {}
     func listThermostats() async throws -> [Thermostat] { [] }

@@ -7,7 +7,7 @@
 
 import Shared
 
-open class ValveDevice: Codable, @unchecked Sendable, Validatable, Log {
+open class ValveDevice: Codable, @unchecked Sendable, Log {
     public let valveId: EntityId
 
     public init(valveId: EntityId) {
@@ -18,7 +18,4 @@ open class ValveDevice: Codable, @unchecked Sendable, Validatable, Log {
         await hm.perform(.setValve(valveId, active: active))
     }
 
-    public func validate(with hm: any EntityValidator) async throws {
-        try await hm.findEntity(valveId)
-    }
 }

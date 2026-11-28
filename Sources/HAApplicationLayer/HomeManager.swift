@@ -37,9 +37,6 @@ public final class HomeManager: HomeManagable {
     /// The current state of every entity, loaded from the database at start and then the last change, never a
     /// replay. No expiry and no eviction, so a replay is no change however long ago the last change was.
     private var currentStates: [EntityId: EntityStorageItem] = [:]
-    /// The entities a source reported in this process; a state merely loaded from the database does not
-    /// prove the entity still exists in HomeKit.
-    private var reportedEntities: Set<EntityId> = []
     /// When each source (the origin of a report) last reported, a replay included. Memory only: empty after a
     /// restart until the first report, so a silent source differs from an unchanged one.
     private var lastReportBySource: [Origin: Date] = [:]
@@ -276,11 +273,6 @@ public final class HomeManager: HomeManagable {
         try await getAdapter().get(with: log).readThermostat(thermostat)
     }
 
-    public func findEntity(_ entityId: EntityId) async throws {
-        guard !reportedEntities.contains(entityId) else { return }
-        return try await getAdapter().get(with: log).findEntity(entityId)
-    }
-
     public func perform(_ action: HomeManagableAction) async {
         // Only a command that is really attempted supersedes anything: a cancelled run's skipped command must not
         // count as the newest intent, or it would drop a queued retry and a still running command's bookkeeping.
@@ -403,8 +395,7 @@ public final class HomeManager: HomeManagable {
         }
     }
 
-    @discardableResult
-    public func report(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> Bool {
+    public func reportState(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> StateChange? {
         // Like `perform`: a run that was superseded must not change state any more. Checked on this actor, so it is
         // atomic with the write: the lane cancels the old run before the new one starts.
         try Task.checkCancellation()
@@ -413,15 +404,20 @@ public final class HomeManager: HomeManagable {
             throw ReportError.valueDoesNotFit(entityId)
         }
         // The caller's precondition is part of that section: it sees the state this report replaces.
-        guard ifCurrent(currentStates[entityId]) else { return false }
-        // No suspension point between the check, the state, the persist and the emit: the state holds before the
-        // event reaches the stream, and two reports of one entity cannot interleave.
+        guard ifCurrent(currentStates[entityId]) else { return nil }
+        // No suspension point between the check, the state, the persist, the emit and the read-back: the state holds
+        // before the event reaches the stream, two reports of one entity cannot interleave, and the answer is the
+        // state this report left, not one a later report changed.
         let changed = record(item)
         if let changed {
             onReportedChange(changed)
         }
+        guard let answer = currentStates[entityId].flatMap({ StateChange(item: $0, changed: changed != nil) }) else {
+            log.error("Failed to read the state that was just set", metadata: ["entityId": "\(entityId)"])
+            throw CoreCommandError.stateUnreadable(entityId)
+        }
         await invalidateContradictedCommands(for: item)
-        return changed != nil
+        return answer
     }
 
     public func states(of type: CharacteristicsType) async -> [EntityStorageItem] {
@@ -465,7 +461,6 @@ public final class HomeManager: HomeManagable {
         if item.origin == .homekit {
             liveness.recordEvent(at: Date())
         }
-        reportedEntities.insert(item.entityId)
         let reportedAt = now()
         lastReportBySource[item.origin] = reportedAt
 
@@ -480,30 +475,36 @@ public final class HomeManager: HomeManagable {
         var state = item
         state.lastReport = reportedAt
         currentStates[item.entityId] = state
-        // the stored change carries the time of this report
-        lastReportQueued[item.entityId] = reportedAt
         remember(reading: item)
 
         // Persist item in the background to avoid blocking automation execution
-        switch persistQueue.yield(.change(state)) {
-        case .dropped(let dropped):
-            droppedPersistItems += 1
-            if droppedPersistItems == 1 || droppedPersistItems.isMultiple(of: 500) {
-                log.warning("Persist queue full, dropped \(droppedPersistItems) entity item(s) so far, last one \(dropped.entityId)")
-            }
-        case .enqueued(let remaining) where droppedPersistItems > 0 && remaining >= Self.persistQueueLimit / 2:
-            log.notice("Persist queue draining again after dropping \(droppedPersistItems) entity item(s)")
-            droppedPersistItems = 0
-        default:
-            break
-        }
+        enqueue(.change(state))
+        // A change is a report like any other: its time goes through the same throttle. The stored change already
+        // shows as a report through its own timestamp.
+        queueLastReportIfDue(of: item.entityId, at: reportedAt)
         return state
     }
 
     private func queueLastReportIfDue(of entityId: EntityId, at reportedAt: Date) {
         if let queued = lastReportQueued[entityId], reportedAt.timeIntervalSince(queued) < Self.lastReportWriteInterval { return }
         lastReportQueued[entityId] = reportedAt
-        persistQueue.yield(.lastReport(entityId, reportedAt))
+        enqueue(.lastReport(entityId, reportedAt))
+    }
+
+    /// Hands a job to the persist queue and counts what the full queue drops, a time of the last report like a change.
+    private func enqueue(_ job: PersistJob) {
+        switch persistQueue.yield(job) {
+        case .dropped(let dropped):
+            droppedPersistItems += 1
+            if droppedPersistItems == 1 || droppedPersistItems.isMultiple(of: 500) {
+                log.warning("Persist queue full, dropped \(droppedPersistItems) job(s) so far, last one \(dropped.entityId)")
+            }
+        case .enqueued(let remaining) where droppedPersistItems > 0 && remaining >= Self.persistQueueLimit / 2:
+            log.notice("Persist queue draining again after dropping \(droppedPersistItems) job(s)")
+            droppedPersistItems = 0
+        default:
+            break
+        }
     }
 
     /// Retries inside the serial queue instead of forgetting the current state: a forgotten state would make

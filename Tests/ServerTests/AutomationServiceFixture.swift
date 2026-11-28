@@ -21,7 +21,7 @@ actor NoRuns: AutomationRunRepository {
 func makeAutomationService(automations: [any Automatable],
                            repository: any AutomationRepository = InMemoryAutomationRepository()) async throws -> AutomationService {
     let homeManager = await HomeManager(getAdapter: { nil },
-                                        storageRepo: EmptyStorage(),
+                                        storageRepo: MemoryStorage(),
                                         notificationSender: SilentSender(),
                                         location: Location(latitude: 52.52, longitude: 13.405))
     return try AutomationService(using: homeManager, runs: NoRuns(), automations: automations, repository: repository)

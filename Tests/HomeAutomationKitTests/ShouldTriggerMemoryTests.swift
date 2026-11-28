@@ -27,6 +27,7 @@ private actor Repositories: StorageRepository {
     func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int) async throws -> [EntityStorageItem] { touch(); return [] }
 
     func getAllEntityIds() async throws -> [EntityId] { touch(); return [] }
+    func recordLastReport(of entityId: EntityId, at date: Date) async throws {}
 }
 
 @Suite("shouldTrigger reads memory only")

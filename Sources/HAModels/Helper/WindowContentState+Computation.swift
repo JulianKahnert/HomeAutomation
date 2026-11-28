@@ -81,9 +81,8 @@ public extension HomeManagable {
 public extension StorageRepository {
     /// The content state of the open windows from the stored states, for the API (no running core needed).
     func windowContentState() async throws -> WindowContentState {
-        let current = try await getAllCurrent()
-        let deadlines = current.filter { $0.entityId.characteristicType == .deadline }
-        let outdoor = current.first { $0.entityId == .outdoorTemperature }?.temperatureInC?.value
+        let deadlines = try await getAllCurrent(of: .deadline)
+        let outdoor = try await getCurrent(.outdoorTemperature)?.temperatureInC?.value
         return await WindowContentState(deadlines: deadlines,
                                         history: { (try? await self.getHistory(for: $0, startDate: nil, endDate: nil, cursor: nil, limit: 50)) ?? [] },
                                         outdoorTemperature: outdoor)

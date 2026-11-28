@@ -111,19 +111,22 @@ final class EntityChangeDbItem: Model, @unchecked Sendable {
 extension EntityStorageItem {
     /// The typed form of a stored change. A value the typed form cannot hold (a future HAP heating mode)
     /// leaves the item without a value instead of failing the row.
-    /// - Parameter withLastReport: Whether the item carries the entity's time of the last report. That time belongs to
-    ///   the newest change only, so only the readers of the current state set it.
+    /// - Parameter withLastReport: Whether the item carries the entity's time of the last report: the later of
+    ///   `entities.lastReport` and the change's own timestamp. That time belongs to the newest change only, so only the
+    ///   readers of the current state set it.
     init?(entity: EntityDbItem, change: EntityChangeDbItem, withLastReport: Bool = false) {
         guard let type = CharacteristicsType(rawValue: entity.characteristicType) else { return nil }
         let entityId = EntityId(placeId: entity.placeId, name: entity.serviceName,
                                 characteristicsName: entity.characteristicsName, characteristic: type)
         let origin = Origin(rawValue: change.origin)
         let shape = ValueDescriptor.descriptor(for: type).shape
-        if var item = change.value(shape: shape).flatMap({ EntityStorageItem(entityId: entityId, timestamp: change.timestamp, value: $0, origin: origin) }) {
-            item.lastReport = withLastReport ? entity.lastReport : nil
+        // The stored time of the last report is throttled, so a newer change counts through its own timestamp.
+        let lastReport = withLastReport ? max(entity.lastReport ?? change.timestamp, change.timestamp) : nil
+        if let value = change.value(shape: shape), let item = EntityStorageItem(entityId: entityId, timestamp: change.timestamp, value: value, origin: origin) {
             self = item
         } else {
-            self = EntityStorageItem(entityId: entityId, timestamp: change.timestamp, origin: origin, lastReport: withLastReport ? entity.lastReport : nil)
+            self = EntityStorageItem(entityId: entityId, timestamp: change.timestamp, origin: origin)
         }
+        self.lastReport = lastReport
     }
 }

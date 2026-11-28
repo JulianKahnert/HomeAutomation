@@ -20,8 +20,6 @@ struct OpenAPIController: APIProtocol {
     /// declared on the `limit` parameters in `openapi.yaml`.
     static let maxLimit = 1000
     static let defaultLimit = 100
-    /// What a write answers when the event loop does not get to it in time (503, not in the OpenAPI spec).
-    static let coreBusyStatus = 503
 
     /// Enforces the `minimum`/`maximum` bounds from `openapi.yaml` server-side.
     ///
@@ -70,11 +68,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        do {
-            try await request.application.commandPort.setAutomationActive(name: name, to: true)
-        } catch CoreCommandError.timedOut {
-            return .undocumented(statusCode: Self.coreBusyStatus, .init())
-        }
+        try await request.application.commandPort.setAutomationActive(name: name, to: true)
         return .ok
     }
 
@@ -84,11 +78,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        do {
-            try await request.application.commandPort.setAutomationActive(name: name, to: false)
-        } catch CoreCommandError.timedOut {
-            return .undocumented(statusCode: Self.coreBusyStatus, .init())
-        }
+        try await request.application.commandPort.setAutomationActive(name: name, to: false)
         return .ok
     }
 
@@ -98,11 +88,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        do {
-            try await request.application.commandPort.stopAutomation(name: name)
-        } catch CoreCommandError.timedOut {
-            return .undocumented(statusCode: Self.coreBusyStatus, .init())
-        }
+        try await request.application.commandPort.stopAutomation(name: name)
         return .ok
     }
 
@@ -199,23 +185,13 @@ struct OpenAPIController: APIProtocol {
         let change: StateChange
         do {
             change = try await request.application.commandPort.setState(entityId, value: value)
-        } catch CoreCommandError.valueDoesNotFit {
+        } catch ReportError.valueDoesNotFit {
             return .badRequest
-        } catch CoreCommandError.notSettable {
-            return .forbidden
-        } catch CoreCommandError.timedOut {
-            return .undocumented(statusCode: Self.coreBusyStatus, .init())
-        } catch CoreCommandError.stateUnreadable {
-            request.logger.error("Failed to read the state that was just set", metadata: ["entityId": "\(entityId)"])
-            throw Abort(.internalServerError)
         }
         let item = change.item
-        guard let state = item.value else {
-            throw Abort(.internalServerError)
-        }
         return .ok(.init(body: .json(.init(entityId: .init(entityId),
                                            valueKind: type.rawValue,
-                                           value: .init(state),
+                                           value: .init(change.value),
                                            changed: change.changed,
                                            origin: item.origin.rawValue,
                                            timestamp: item.timestamp))))

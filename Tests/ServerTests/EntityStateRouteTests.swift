@@ -28,7 +28,7 @@ final class EntityStateRouteTests: XCTestCase {
         app.starActorSystem = StarActorSystem(name: "entity-state-tests")
         app.databases.use(InMemoryDatabaseConfiguration(), as: DatabaseID(string: "in-memory"), isDefault: true)
         app.homeManager = await HomeManager(getAdapter: { nil },
-                                            storageRepo: EmptyStorage(),
+                                            storageRepo: MemoryStorage(),
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 52.52, longitude: 13.405),
                                             onReportedChange: { [app] in app?.homeEventSink.yield(.change(entity: $0)) })

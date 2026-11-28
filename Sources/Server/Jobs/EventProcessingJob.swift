@@ -69,9 +69,10 @@ struct HomeEventSink: Sendable {
         yield(.event(event))
     }
 
-    func yield(_ input: HomeInput) {
+    @discardableResult
+    func yield(_ input: HomeInput) -> AsyncStream<HomeInput>.Continuation.YieldResult {
         gauge.stamp()
-        continuation.yield(input)
+        return continuation.yield(input)
     }
 }
 
@@ -96,39 +97,42 @@ struct HomeEventProcessingJob: Job, Log {
     }
 
     /// Runs a write of the API in its turn and answers the caller. A command that only starts or cancels work
-    /// (`stopAutomation` cancels a run, it does not wait for it or for its lane) never holds the loop.
+    /// (`stopAutomation` cancels a run, it does not wait for it or for its lane) never holds the loop, and neither does a
+    /// config save: the change is applied in memory here, in order, and the caller is answered when the save ends.
     private func handle(_ command: WriteCommand) async {
         log.debug("Handle write", metadata: ["command": "\(command.kind.name)"])
         do {
             switch command.kind {
             case .setState(let entityId, let value):
-                // The report sets the state at once and yields the change into this stream, already checked.
-                let changed: Bool
-                do {
-                    changed = try await homeManager.report(entityId, value: value, origin: .app)
-                } catch ReportError.valueDoesNotFit {
-                    throw CoreCommandError.valueDoesNotFit(entityId)
-                } catch ReportError.notServerOwned {
-                    throw CoreCommandError.notSettable(entityId)
-                }
-                // The report just set it: a state that cannot be read back is a failure of the server, not of the request.
-                guard let item = try? await homeManager.getCurrentEntity(with: entityId), item.value != nil else {
+                // The report sets the state at once, yields the change into this stream (already checked) and answers
+                // the state it left. A refusal by a precondition cannot happen: there is none.
+                guard let change = try await homeManager.reportState(entityId, value: value, origin: .app, ifCurrent: { _ in true }) else {
                     throw CoreCommandError.stateUnreadable(entityId)
                 }
-                command.complete(.success(StateChange(item: item, changed: changed)))
+                command.complete(.success(change))
                 return
             case .setAutomationActive(let name, let isActive):
-                try await automationService.setAutomationActive(with: name, to: isActive)
+                complete(command, after: await automationService.startSettingActive(with: name, to: isActive))
+                return
             case .stopAutomation(let name):
                 await automationService.stopAutomation(with: name)
             case .deploy(let automations, let location):
-                try await automationService.deploy(automations, location: location)
-                // After the config is stored, so automations that react see the new one.
+                let saved = await automationService.startDeploy(automations, location: location)
+                // The automations are swapped in memory, so automations that react see the new ones.
                 await automationService.trigger(with: .configDeployed)
+                complete(command, after: saved)
+                return
             }
             command.complete(.success(nil))
         } catch {
             command.complete(.failure(error))
+        }
+    }
+
+    /// Answers the caller when `saved` ends, off the loop: a slow database holds the caller (up to its timeout), not the loop.
+    private func complete(_ command: WriteCommand, after saved: Task<Void, any Error>) {
+        Task {
+            command.complete(await saved.result.map { _ -> StateChange? in nil })
         }
     }
 

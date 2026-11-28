@@ -30,11 +30,10 @@ struct LastReportPersistenceTests {
     private func flush(_ manager: HomeManager, storage: MockStorageRepository) async {
         let marker = EntityStorageItem(entityId: other, timestamp: .now, isDeviceOn: storage.items.count.isMultiple(of: 2))
         await manager.addEntityHistory(marker)
-        let count = storage.items.count
-        await eventually("the marker is stored") { storage.items.count > count || storage.items.contains { $0.entityId == other && $0.timestamp == marker.timestamp } }
+        await eventually("the marker is stored") { storage.items.contains { $0.entityId == other && $0.timestamp == marker.timestamp } }
     }
 
-    @Test("A change is stored with the time of its report; an unchanged report within five minutes writes nothing")
+    @Test("A change is stored with the time of its report; the first report writes the time once, a replay within five minutes nothing more")
     func changeCarriesTheReportAndReplaysAreThrottled() async throws {
         let storage = MockStorageRepository()
         let clock = TestClock(start)
@@ -49,7 +48,7 @@ struct LastReportPersistenceTests {
         await flush(manager, storage: storage)
 
         #expect(storage.items.first { $0.entityId == lamp }?.lastReport == start)
-        #expect(storage.lastReportWrites.isEmpty)
+        #expect(storage.lastReportWrites.filter { $0.entityId == lamp }.map(\.date) == [start])
     }
 
     @Test("The first unchanged report after five minutes is written, then the interval starts again")
@@ -66,8 +65,8 @@ struct LastReportPersistenceTests {
         }
         await flush(manager, storage: storage)
 
-        // 301 s writes; 400 and 600 are within five minutes of it; 602 writes; 700 is within
-        #expect(storage.lastReportWrites.map(\.date) == [start.addingTimeInterval(301), start.addingTimeInterval(602)])
+        // the change writes at the start; 301 s writes; 400 and 600 are within five minutes of it; 602 writes; 700 is within
+        #expect(storage.lastReportWrites.filter { $0.entityId == lamp }.map(\.date) == [start, start.addingTimeInterval(301), start.addingTimeInterval(602)])
         #expect(await manager.lastReport(of: lamp) == start.addingTimeInterval(700))
     }
 
@@ -85,7 +84,7 @@ struct LastReportPersistenceTests {
         await manager.addEntityHistory(EntityStorageItem(entityId: lamp, timestamp: clock.date, isDeviceOn: true))
         await flush(manager, storage: storage)
         #expect(await manager.lastReport(of: lamp) == start.addingTimeInterval(200))
-        #expect(storage.lastReportWrites.isEmpty)
+        #expect(storage.lastReportWrites.filter { $0.entityId == lamp }.isEmpty)
     }
 }
 

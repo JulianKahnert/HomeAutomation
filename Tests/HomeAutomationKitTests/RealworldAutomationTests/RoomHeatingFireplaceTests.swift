@@ -418,7 +418,7 @@ struct FireplaceTimeoutTests {
         setQuestion(.overdue(since: start.addingTimeInterval(maxDuration)), at: start.addingTimeInterval(maxDuration))
         setFireplace(on: false, at: start.addingTimeInterval(maxDuration + 60))
         let timeout = FireplaceTimeout()
-        let change = HomeEvent.change(try #require(homeManager.storageItems.last { $0.entityId == Fireplace.stateId }))
+        let change = HomeEvent.change(entity: try #require(homeManager.storageItems.last { $0.entityId == Fireplace.stateId }))
 
         #expect(try await timeout.shouldTrigger(with: change, using: homeManager))
         try await timeout.execute(using: homeManager, on: change, now: start.addingTimeInterval(maxDuration + 60))
@@ -436,7 +436,7 @@ struct FireplaceTimeoutTests {
         // what `POST /heating/fireplace/answer` writes for "Ja"
         setQuestion(.running(until: answeredAt.addingTimeInterval(maxDuration)), at: answeredAt)
         let timeout = FireplaceTimeout()
-        let change = HomeEvent.change(try #require(homeManager.storageItems.last { $0.entityId == Fireplace.questionId }))
+        let change = HomeEvent.change(entity: try #require(homeManager.storageItems.last { $0.entityId == Fireplace.questionId }))
 
         #expect(try await timeout.shouldTrigger(with: change, using: homeManager))
         try await timeout.execute(using: homeManager, on: change, now: answeredAt)
@@ -461,7 +461,7 @@ struct FireplaceTimeoutTests {
         let timeout = FireplaceTimeout()
         let now = start.addingTimeInterval(maxDuration)
         try await tick(timeout, at: now)
-        let change = HomeEvent.change(try #require(homeManager.storageItems.last { $0.entityId == Fireplace.questionId }))
+        let change = HomeEvent.change(entity: try #require(homeManager.storageItems.last { $0.entityId == Fireplace.questionId }))
 
         try await timeout.execute(using: homeManager, on: change, now: now)
 
@@ -534,7 +534,7 @@ struct FireplaceTimeoutTests {
         #expect(try await !FireplaceTimeout().shouldTrigger(with: .sunrise, using: homeManager))
         let other = EntityStorageItem(entityId: EntityId(placeId: "Cellar", name: "Window", characteristicsName: nil, characteristic: .contactSensor),
                                       isContactOpen: true)
-        #expect(try await !FireplaceTimeout().shouldTrigger(with: .change(other), using: homeManager))
+        #expect(try await !FireplaceTimeout().shouldTrigger(with: .change(entity: other), using: homeManager))
     }
 
     @Test("The question is a deadline, but the window Live Activity does not take it for a window")
@@ -543,7 +543,7 @@ struct FireplaceTimeoutTests {
         homeManager.storageItems.append(item)
 
         #expect(WindowContentState.window(of: Fireplace.questionId) == nil)
-        #expect(try await !WindowProjection().shouldTrigger(with: .change(item), using: homeManager))
+        #expect(try await !WindowProjection().shouldTrigger(with: .change(entity: item), using: homeManager))
         #expect(await homeManager.getWindowContentState().windows.isEmpty)
     }
 

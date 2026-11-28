@@ -30,8 +30,18 @@ public struct AnswerFireplaceQuestionIntent: LiveActivityIntent {
     }
 
     public func perform() async throws -> some IntentResult {
-        @Dependency(\.serverClient) var serverClient
-        @Dependency(\.liveActivity) var liveActivity
+        try await FireplaceQuestionAnswerer().answer(stillOn: stillOn)
+        return .result()
+    }
+}
+
+/// Sends the answer and ends the question on this device. A type of its own, because a local `@Dependency`
+/// inside `perform()` crashes the compiler's diagnostics.
+private struct FireplaceQuestionAnswerer {
+    @Dependency(\.serverClient) var serverClient
+    @Dependency(\.liveActivity) var liveActivity
+
+    func answer(stillOn: Bool) async throws {
         logger.info("Answering the fireplace question", metadata: ["stillOn": "\(stillOn)"])
         do {
             _ = try await serverClient.answerFireplaceQuestion(stillOn)
@@ -42,7 +52,6 @@ public struct AnswerFireplaceQuestionIntent: LiveActivityIntent {
         }
         // The server ends it everywhere; ending it here as well removes it before that push arrives.
         await liveActivity.endFireplaceQuestion()
-        return .result()
     }
 }
 #endif

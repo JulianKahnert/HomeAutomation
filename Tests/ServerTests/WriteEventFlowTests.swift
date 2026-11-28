@@ -8,6 +8,7 @@ import HAApplicationLayer
 @testable import HAImplementations
 @testable import HAModels
 @testable import Server
+import Shared
 import StarActorSystem
 import Synchronization
 import XCTVapor
@@ -287,7 +288,17 @@ actor Signal {
         waiters = []
     }
 
-    func wait() async {
+    /// Returns once opened; fails the test after `timeout` instead of hanging.
+    func wait(timeout: Duration = .seconds(10), file: StaticString = #filePath, line: UInt = #line) async {
+        guard !isOpen else { return }
+        do {
+            try await raceTimeout(timeout, timeoutError: { TestWaitTimeout() }) { await self.park() }
+        } catch {
+            XCTFail("A signal was not opened within \(timeout)", file: file, line: line)
+        }
+    }
+
+    private func park() async {
         guard !isOpen else { return }
         await withCheckedContinuation { waiters.append($0) }
     }

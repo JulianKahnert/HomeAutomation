@@ -415,7 +415,12 @@ final class EntityStorageMySQLTests: XCTestCase {
         let id = EntityId(placeId: "Kitchen", name: "Sensor", characteristicsName: nil, characteristic: .temperatureSensor)
         let timestamp = Date(timeIntervalSince1970: 1_800_000_000.123_456_789)  // more digits than DATETIME(6) keeps
         await homeManager.addEntityHistory(EntityStorageItem(entityId: id, timestamp: timestamp, temperatureInC: Measurement(value: 20, unit: .celsius)))
-        try await Task.sleep(for: .milliseconds(200))  // the persist queue writes asynchronously
+        // the persist queue writes asynchronously: poll the database, bounded
+        var stored: [EntityStorageItem] = []
+        for _ in 0..<500 where stored.isEmpty {
+            stored = try await repository.getHistory(for: id, startDate: nil, endDate: nil, cursor: nil, limit: 10)
+            if stored.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        }
 
         let history = await homeManager.getFullEntityHistory(with: id, limit: 10)
 

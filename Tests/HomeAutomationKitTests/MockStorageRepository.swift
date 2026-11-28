@@ -58,7 +58,7 @@ final class MockStorageRepository: StorageRepository, @unchecked Sendable {
         return Array(filtered.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 
-    /// The reports that changed nothing and were handed to the storage, in order.
+    /// The times of the last report that were handed to the storage, in order.
     var lastReportWrites: [(entityId: EntityId, date: Date)] {
         lock.withLock { writtenLastReports }
     }

@@ -9,7 +9,9 @@ import Foundation
 /// and the radiators' targets ("observed").
 struct HeatingEventBuilder {
     let room: HeatingRoomSources
-    let writes: [HeatingWrite]
+    let writes: [ActionLogItem]
+    /// Stored states of the room's plan target entity, oldest first, including the one before the range.
+    let planTargetItems: [EntityStorageItem]
     /// Stored states of each contact, oldest first, including the one before the range.
     let contactItems: [EntityId: [EntityStorageItem]]
     /// Stored targets of each radiator (by name), oldest first, including the one before the range.
@@ -88,8 +90,8 @@ struct HeatingEventBuilder {
 
     // MARK: Writes
 
-    private static func clusters(_ writes: [HeatingWrite]) -> [[HeatingWrite]] {
-        var result: [[HeatingWrite]] = []
+    private static func clusters(_ writes: [ActionLogItem]) -> [[ActionLogItem]] {
+        var result: [[ActionLogItem]] = []
         for write in writes.sorted(by: { $0.timestamp < $1.timestamp }) {
             if let first = result.last?.first, write.timestamp.timeIntervalSince(first.timestamp) <= cluster {
                 result[result.count - 1].append(write)
@@ -100,9 +102,15 @@ struct HeatingEventBuilder {
         return result
     }
 
-    private func pointEvent(_ reason: HeatingWriteReason, _ cluster: [HeatingWrite]) -> HeatingEvent? {
+    /// The plan target the room had when a cluster began: the last stored plan-target state at that time.
+    /// The plan write reports the target a moment before it writes the radiators, hence the small margin.
+    private func planTarget(at date: Date) -> Double? {
+        planTargetItems.last { $0.timestamp <= date.addingTimeInterval(Self.echo) && $0.targetTemperatureInC != nil }?.targetTemperatureInC
+    }
+
+    private func pointEvent(_ reason: HeatingWriteReason, _ cluster: [ActionLogItem]) -> HeatingEvent? {
         guard let first = cluster.first else { return nil }
-        let planTarget = cluster.compactMap(\.planTargetInC).first ?? cluster.compactMap(\.targetTemperatureInC).first
+        let planTarget = planTarget(at: first.timestamp) ?? cluster.compactMap(\.targetTemperatureInC).first
         let off = cluster.contains { $0.isActive == false }
         let names = Set(cluster.map(\.entityId.name)).sorted().joined(separator: ", ")
         let target = planTarget.map { Self.degrees($0) }
@@ -130,7 +138,7 @@ struct HeatingEventBuilder {
         let targetWrites = writes.filter { $0.targetTemperatureInC != nil }
         for radiator in room.radiators {
             let own = targetWrites.filter { $0.entityId.name == radiator.name }
-            var lastWrite: HeatingWrite?
+            var lastWrite: ActionLogItem?
             var reported: Double?
             for item in (targetItems[radiator.name] ?? []).sorted(by: { $0.timestamp < $1.timestamp }) {
                 guard let value = item.targetTemperatureInC else { continue }

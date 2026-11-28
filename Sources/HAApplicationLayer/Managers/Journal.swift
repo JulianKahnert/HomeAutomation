@@ -80,9 +80,9 @@ public final class Journal: Sendable {
     }
 
     /// The newest executed command of every radiator; empty when the database fails.
-    public func lastHeatingWrites() async -> [HeatingWrite] {
+    public func lastHeatingWrites() async -> [ActionLogItem] {
         do {
-            return try await store.lastHeatingCommands().compactMap(HeatingWrite.init(command:))
+            return try await store.lastHeatingCommands().filter(\.isExecutedHeatingWrite)
         } catch {
             Self.logger.error("Failed to read the last heating commands of the journal", metadata: ["error": "\(error)"])
             return []
@@ -141,9 +141,9 @@ public final class Journal: Sendable {
 
 extension Journal: HeatingCommandSource {
     /// Oldest first; empty when the database fails.
-    public func writes(placeId: String, startDate: Date?, endDate: Date?) async -> [HeatingWrite] {
+    public func writes(placeId: String, startDate: Date?, endDate: Date?) async -> [ActionLogItem] {
         do {
-            return try await store.heatingCommands(placeId: placeId, startDate: startDate, endDate: endDate).compactMap(HeatingWrite.init(command:))
+            return try await store.heatingCommands(placeId: placeId, startDate: startDate, endDate: endDate).filter(\.isExecutedHeatingWrite)
         } catch {
             Self.logger.error("Failed to read the heating commands of the journal", metadata: ["error": "\(error)"])
             return []

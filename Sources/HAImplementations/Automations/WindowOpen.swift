@@ -98,10 +98,13 @@ public struct WindowOpen: Automatable {
         // The stored deadline went through its text form, which can move the end by a fraction of a microsecond;
         // compare in that form so the same end counts as the same deadline.
         let deadline = Deadline(text: deadline.text) ?? deadline
-        let current = try? await homeManager.getCurrentEntity(with: deadlineId).deadline
-        guard current != deadline else { return }
-        if case .running(let until) = deadline, current == .overdue(since: until) { return }
-        try await homeManager.report(deadlineId, value: .text(deadline.text))
+        // Decided where the state is set, so a report of another writer in between cannot be overwritten blindly.
+        try await homeManager.report(deadlineId, value: .text(deadline.text), origin: .server, ifCurrent: { item in
+            let current = item?.deadline
+            guard current != deadline else { return false }
+            if case .running(let until) = deadline, current == .overdue(since: until) { return false }
+            return true
+        })
     }
 
     /// The deadline this window holds, `nil` when none is stored or it is `none`.

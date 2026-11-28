@@ -18,7 +18,7 @@ import HAModels
 /// | `detail` | trigger summary | action description | push message |
 /// | `entity*` | trigger entity | commanded entity | |
 /// | `triggerKind`, `outcome`, `endedAt`, `errorDescription` | yes | | |
-/// | `status`, `reason`, `planTargetInC`, `commandValue` | | yes | |
+/// | `status`, `reason`, `commandValue` | | yes | |
 /// | `pushId` | | | yes |
 final class JournalDbItem: Model, @unchecked Sendable {
     static let schema = "journal"
@@ -71,8 +71,6 @@ final class JournalDbItem: Model, @unchecked Sendable {
     @OptionalField(key: "reason")
     var reason: String?
 
-    @OptionalField(key: "planTargetInC")
-    var planTargetInC: Double?
 
     @OptionalField(key: "commandValue")
     var commandValue: Double?
@@ -106,7 +104,6 @@ final class JournalDbItem: Model, @unchecked Sendable {
         setEntity(command.entityId)
         status = command.status.rawValue
         reason = command.reason?.rawValue
-        planTargetInC = command.planTargetInC
         commandValue = command.value
     }
 
@@ -162,7 +159,6 @@ final class JournalDbItem: Model, @unchecked Sendable {
                              status: status,
                              runId: runId,
                              reason: reason.flatMap(HeatingWriteReason.init(rawValue:)),
-                             planTargetInC: planTargetInC,
                              value: commandValue)
     }
 

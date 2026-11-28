@@ -31,7 +31,7 @@ struct HeatingRoomDetailTests {
         EntityStorageItem(entityId: id, timestamp: now.addingTimeInterval(-minutesAgo * 60), valvePositionPercent: percent)
     }
 
-    private func builder(_ items: [EntityStorageItem], writes: [HeatingWrite] = []) -> HeatingRoomDetailBuilder {
+    private func builder(_ items: [EntityStorageItem], writes: [HeatingFixture] = []) -> HeatingRoomDetailBuilder {
         HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items + writes.compactMap { $0.planTargetItem() }), writes: InMemoryHeatingCommands(writes), now: { now })
     }
 
@@ -133,7 +133,7 @@ struct HeatingRoomDetailTests {
     @Test("the plan target comes from the write log and falls back to the plan")
     func planTarget() async throws {
         let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)
-        let write = HeatingWrite(timestamp: now.addingTimeInterval(-3_600), entityId: radiator, reason: .plan, actionName: "setTargetTemperature",
+        let write = HeatingFixture(timestamp: now.addingTimeInterval(-3_600), entityId: radiator, reason: .plan, actionName: "setTargetTemperature",
                                  targetTemperatureInC: 21, planTargetInC: 21)
         let detail = try await builder([temp(thermoA, 30, 20)], writes: [write]).detail(for: sources, range: .twoHours)
         #expect(detail.samples.last?.sollPlan == 21)
@@ -149,7 +149,7 @@ struct HeatingRoomDetailTests {
     @Test("the room detail never loads the whole write history, yet the plan target before the range still holds")
     func boundedWriteHistory() async throws {
         let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)
-        let old = HeatingWrite(timestamp: now.addingTimeInterval(-30 * 86_400), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 19, planTargetInC: 19)
+        let old = HeatingFixture(timestamp: now.addingTimeInterval(-30 * 86_400), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 19, planTargetInC: 19)
         let repository = InMemoryHeatingCommands([old])
         let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: [temp(thermoA, 30, 20)] + [old.planTargetItem()].compactMap { $0 }), writes: repository, now: { now })
 
@@ -162,7 +162,7 @@ struct HeatingRoomDetailTests {
     @Test("a plan target reported while the room was off still moves the plan line")
     func unsentPlanWriteMovesPlan() async throws {
         let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .targetTemperature)
-        let off = HeatingWrite(timestamp: now.addingTimeInterval(-7_200), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 21, planTargetInC: 21)
+        let off = HeatingFixture(timestamp: now.addingTimeInterval(-7_200), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 21, planTargetInC: 21)
         let unsent = EntityStorageItem(entityId: sources.planTargetId, timestamp: now.addingTimeInterval(-3_600), targetTemperatureInC: 17, origin: .server)
 
         let detail = try await builder([temp(thermoA, 30, 20), unsent], writes: [off]).detail(for: sources, range: .day)
@@ -174,8 +174,8 @@ struct HeatingRoomDetailTests {
     @Test("a write without a plan target does not change the plan history")
     func nonPlanWrites() async throws {
         let radiator = EntityId(placeId: "Bad", name: "Thermo A", characteristicsName: nil, characteristic: .heating)
-        let plan = HeatingWrite(timestamp: now.addingTimeInterval(-3_600), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 21, planTargetInC: 21)
-        let window = HeatingWrite(timestamp: now.addingTimeInterval(-600), entityId: radiator, reason: .window, actionName: "setHeating", isActive: false)
+        let plan = HeatingFixture(timestamp: now.addingTimeInterval(-3_600), entityId: radiator, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 21, planTargetInC: 21)
+        let window = HeatingFixture(timestamp: now.addingTimeInterval(-600), entityId: radiator, reason: .window, actionName: "setHeating", isActive: false)
         let detail = try await builder([temp(thermoA, 30, 20)], writes: [plan, window]).detail(for: sources, range: .twoHours)
         #expect(detail.samples.last?.sollPlan == 21)
     }

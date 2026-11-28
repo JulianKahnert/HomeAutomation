@@ -34,7 +34,7 @@ public protocol HomeManagable: EntityValidator, Sendable {
     func lastNotificationDate(id: String) async -> Date?
     /// The newest write that reached `radiator` (matched by room and name, whatever the characteristic),
     /// `nil` when there is none or the server does not record them.
-    func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite?
+    func lastHeatingWrite(of radiator: EntityId) async -> ActionLogItem?
     /// The command queued to be sent again for `entityId` after it failed, `nil` when none waits.
     func queuedRetry(of entityId: EntityId) async -> HomeManagableAction?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
@@ -57,11 +57,15 @@ public protocol HomeManagable: EntityValidator, Sendable {
     ///   - entityId: A server-owned entity: `entityId.isServerOwned`.
     ///   - value: Must fit the shape of the entity's value kind.
     ///   - origin: `server` (default) or `app`.
-    /// - Returns: `true` when the state changed, `false` when the value was the one it already had.
+    ///   - ifCurrent: A precondition on the entity's current state (`nil` while unknown). It is checked in the same
+    ///     synchronous section that sets the state, so no other writer can change the entity between the check and
+    ///     the write; read, decide and report in two calls and one can. When it returns `false` nothing is reported.
+    /// - Returns: `true` when the state changed, `false` when the value was the one it already had or `ifCurrent`
+    ///   refused the report.
     /// - Throws: ``ReportError`` for a report that is refused: an entity that is not server-owned, a value that does
     ///   not fit the kind. That is a programmer error of the caller, not an outcome.
     @discardableResult
-    func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool
+    func report(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> Bool
     /// The current states of all entities of one characteristic type, in no particular order; from memory.
     func states(of type: CharacteristicsType) async -> [EntityStorageItem]
 
@@ -84,6 +88,12 @@ public enum ReportError: Error, Equatable {
 }
 
 public extension HomeManagable {
+    /// Reports unconditionally.
+    @discardableResult
+    func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
+        try await report(entityId, value: value, origin: origin, ifCurrent: { _ in true })
+    }
+
     /// Reports with origin `server`.
     @discardableResult
     func report(_ entityId: EntityId, value: Value) async throws -> Bool {
@@ -160,6 +170,10 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equ
         }
     }
 
+    /// The `actionName` of the two radiator commands; the journal row of one is read back by these names.
+    public static let setHeatingName = "setHeating"
+    public static let setTargetTemperatureName = "setTargetTemperature"
+
     public var actionName: String {
         switch self {
         case .turnOn:
@@ -177,11 +191,11 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equ
         case .addEntityToScene:
             return "addEntityToScene"
         case .setHeating:
-            return "setHeating"
+            return Self.setHeatingName
         case .setValve:
             return "setValve"
         case .setTargetTemperature:
-            return "setTargetTemperature"
+            return Self.setTargetTemperatureName
         }
     }
 }

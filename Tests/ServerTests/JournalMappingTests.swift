@@ -41,8 +41,7 @@ struct JournalMappingTests {
                                     action: .setTargetTemperature(entityId, celsius: 21),
                                     status: status,
                                     runId: runId,
-                                    reason: .plan,
-                                    planTargetInC: 21)
+                                    reason: .plan)
 
         let row = JournalDbItem(command)
 

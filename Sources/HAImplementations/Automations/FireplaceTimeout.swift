@@ -33,8 +33,12 @@ public struct FireplaceTimeout: Automatable {
 
     func execute(using hm: HomeManagable, now: Date) async throws {
         // look again: the fireplace may have gone off since the trigger
-        guard try await hasExpired(at: now, using: hm),
-              try await hm.report(Fireplace.stateId, value: .bool(false), origin: .server) else { return }
+        guard try await hasExpired(at: now, using: hm) else { return }
+        // ... and once more where the state is set: the app may have switched it off and on again (a new start)
+        // since that read, and that start must not be ended by this run.
+        guard try await hm.report(Fireplace.stateId, value: .bool(false), origin: .server, ifCurrent: { item in
+            Fireplace.state(of: item).endsAt.map { now >= $0 } ?? false
+        }) else { return }
         await hm.deliver(.push(title: "Kamin aus",
                                message: "Der Kamin war \(Self.durationText(Fireplace.maxDuration)) an und wurde ausgeschaltet. Die Heizkörper folgen wieder dem Plan.",
                                id: Fireplace.notificationId))

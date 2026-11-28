@@ -53,7 +53,12 @@ public enum Fireplace {
         } catch OptionalError.notFound {
             return .off
         }
-        guard item.isDeviceOn == true else { return .off }
+        return state(of: item)
+    }
+
+    /// The state a stored fireplace item stands for; `nil` (never held) is off.
+    public static func state(of item: EntityStorageItem?) -> FireplaceState {
+        guard let item, item.isDeviceOn == true else { return .off }
         return FireplaceState(isOn: true, since: item.timestamp)
     }
 }

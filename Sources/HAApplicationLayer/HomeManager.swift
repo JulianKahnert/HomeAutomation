@@ -28,7 +28,7 @@ public final class HomeManager: HomeManagable {
     private let onReportedChange: @Sendable (EntityStorageItem) -> Void
     /// The last command that reached each radiator, keyed by room and radiator name; loaded from the journal at
     /// start and kept current by `perform`, so a decision never reads the database.
-    private var lastCommands: [String: HeatingWrite] = [:]
+    private var lastCommands: [String: ActionLogItem] = [:]
     /// The changes of every entity of the last `readingRetention`, newest first; what a decision compares
     /// (the rise `FireplaceReminder` looks for). Fills from the changes since the start.
     private var recentReadings: [EntityId: [EntityStorageItem]] = [:]
@@ -47,7 +47,7 @@ public final class HomeManager: HomeManagable {
     /// intent wins. `EntityId` carries the characteristic, so a lamp's brightness and color
     /// temperature occupy separate slots; `turnOn` and `turnOff` share the switcher slot on purpose —
     /// replaying both would be contradictory.
-    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?, intent: UInt64)] = [:]
+    private var failedActions: [EntityId: (action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteReason?, intent: UInt64)] = [:]
     /// The number of the newest intent per entity. A command that finishes after a newer one for its entity
     /// started is stale: it neither queues a retry nor becomes the last heating write.
     private var newestIntent: [EntityId: UInt64] = [:]
@@ -227,7 +227,7 @@ public final class HomeManager: HomeManagable {
         currentStates[entityId]?.lastReport
     }
 
-    public func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
+    public func lastHeatingWrite(of radiator: EntityId) async -> ActionLogItem? {
         lastCommands[Self.key(of: radiator)]
     }
 
@@ -263,7 +263,7 @@ public final class HomeManager: HomeManagable {
 
     /// - Parameter runId: Passed explicitly because the retry loop runs detached, without the
     ///   `AutomationRunContext` task local of the original run; `heating` likewise for `HeatingWriteContext`.
-    private func perform(_ action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?, intent: UInt64) async {
+    private func perform(_ action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteReason?, intent: UInt64) async {
         // Cancellation is honoured at command boundaries only: a superseded automation run must not
         // start further commands, but a command that already started always runs to completion (see
         // the shield below). Checked before logging so a skipped command produces no log entry.
@@ -284,13 +284,12 @@ public final class HomeManager: HomeManagable {
         let entry = ActionLogItem(action: action,
                                   status: hasCacheHit ? .cacheHit : .executed,
                                   runId: runId,
-                                  reason: heating?.reason,
-                                  planTargetInC: heating?.planTargetInC)
+                                  reason: heating)
         journal.recordCommand(entry)
         log.info("Command", metadata: [
             "entity": "\(action.entityId)",
             "action": "\(action.actionName)",
-            "reason": "\(heating?.reason.rawValue ?? "none")",
+            "reason": "\(heating?.rawValue ?? "none")",
             "run": "\(runId?.uuidString ?? "none")",
             "cacheHit": "\(hasCacheHit)"
         ])
@@ -315,8 +314,8 @@ public final class HomeManager: HomeManagable {
             // Only a command that reached the device may deduplicate its successors.
             await commandCache.markExecuted(action)
             liveness.recordCommandSuccess(at: Date())
-            if newestIntent[action.entityId] == intent, let heating, let write = HeatingWrite(action: action, context: heating) {
-                lastCommands[Self.key(of: write.entityId)] = write
+            if newestIntent[action.entityId] == intent, entry.isExecutedHeatingWrite {
+                lastCommands[Self.key(of: entry.entityId)] = entry
             }
         } catch {
             liveness.recordCommandFailure(error, at: Date())
@@ -364,7 +363,7 @@ public final class HomeManager: HomeManagable {
     }
 
     @discardableResult
-    public func report(_ entityId: EntityId, value: Value, origin: Origin) async throws -> Bool {
+    public func report(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> Bool {
         // Like `perform`: a run that was superseded must not change state any more. Checked on this actor, so it is
         // atomic with the write: the lane cancels the old run before the new one starts.
         try Task.checkCancellation()
@@ -372,6 +371,8 @@ public final class HomeManager: HomeManagable {
         guard let item = EntityStorageItem(entityId: entityId, value: value, origin: origin) else {
             throw ReportError.valueDoesNotFit(entityId)
         }
+        // The caller's precondition is part of that section: it sees the state this report replaces.
+        guard ifCurrent(currentStates[entityId]) else { return false }
         // No suspension point between the check, the state, the persist and the emit: the state holds before the
         // event reaches the stream, and two reports of one entity cannot interleave.
         let changed = record(item)
@@ -538,7 +539,7 @@ public final class HomeManager: HomeManagable {
         try await storageUpkeep?.perform(step, now: now)
     }
 
-    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteContext.Context?, intent: UInt64)] {
+    private func popAllFailedActions() -> [(action: HomeManagableAction, attempt: Int, runId: UUID?, heating: HeatingWriteReason?, intent: UInt64)] {
         let queued = Array(failedActions.values)
         failedActions.removeAll()
         return queued

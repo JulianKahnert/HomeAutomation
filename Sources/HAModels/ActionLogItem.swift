@@ -27,8 +27,6 @@ public struct ActionLogItem: Identifiable, Sendable, Codable, Equatable {
     public var status: Status
     /// Why the server wrote a radiator; `nil` for every other command.
     public let reason: HeatingWriteReason?
-    /// The plan target at the time of a `plan` write; `nil` otherwise.
-    public let planTargetInC: Double?
     /// The value a radiator command wrote: 1 or 0 for `setHeating`, the °C of `setTargetTemperature`; `nil` for every other command.
     public let value: Double?
 
@@ -38,8 +36,7 @@ public struct ActionLogItem: Identifiable, Sendable, Codable, Equatable {
         action: HomeManagableAction,
         status: Status = .executed,
         runId: UUID? = nil,
-        reason: HeatingWriteReason? = nil,
-        planTargetInC: Double? = nil
+        reason: HeatingWriteReason? = nil
     ) {
         switch action {
         case .setHeating(_, let active): self.value = active ? 1 : 0
@@ -54,10 +51,9 @@ public struct ActionLogItem: Identifiable, Sendable, Codable, Equatable {
         self.runId = runId
         self.status = status
         self.reason = reason
-        self.planTargetInC = planTargetInC
     }
 
-    public init(id: UUID, timestamp: Date, entityId: EntityId, actionName: String, detailDescription: String, status: Status, runId: UUID? = nil, reason: HeatingWriteReason? = nil, planTargetInC: Double? = nil, value: Double? = nil) {
+    public init(id: UUID, timestamp: Date, entityId: EntityId, actionName: String, detailDescription: String, status: Status, runId: UUID? = nil, reason: HeatingWriteReason? = nil, value: Double? = nil) {
         self.value = value
         self.id = id
         self.timestamp = timestamp
@@ -67,7 +63,6 @@ public struct ActionLogItem: Identifiable, Sendable, Codable, Equatable {
         self.runId = runId
         self.status = status
         self.reason = reason
-        self.planTargetInC = planTargetInC
     }
 
 }

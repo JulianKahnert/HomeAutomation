@@ -169,7 +169,7 @@ public struct RoomHeating: Automatable {
             } else {
                 continue
             }
-            await HeatingWriteContext.withReason(reason, planTargetInC: target) {
+            await HeatingWriteContext.withReason(reason) {
                 await radiator.setTarget(target, with: hm)
             }
         }

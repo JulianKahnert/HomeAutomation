@@ -90,9 +90,7 @@ private actor AdapterProbe {
     }
 
     func waitForHeldTurnOn() async {
-        while heldTurnOn == nil {
-            await Task.yield()
-        }
+        await eventually("the failing turn-on is held") { heldTurnOn != nil }
     }
 
     func releaseHeldTurnOn() {
@@ -101,16 +99,11 @@ private actor AdapterProbe {
     }
 
     func waitForStart() async {
-        while startedPerforms == 0 {
-            await Task.yield()
-        }
+        await eventually("a perform started") { startedPerforms > 0 }
     }
 
     func waitForPerforms(_ count: Int, timeout: Duration = .seconds(1)) async {
-        let deadline = ContinuousClock.now + timeout
-        while startedPerforms < count, ContinuousClock.now < deadline {
-            try? await Task.sleep(for: .milliseconds(5))
-        }
+        await eventually(timeout: timeout, "\(count) performs started") { startedPerforms >= count }
     }
 }
 
@@ -172,21 +165,6 @@ private final class RecordingLogHandler: LogHandler, @unchecked Sendable {
     }
 }
 
-/// Polls until `condition` holds and records an issue when it does not within `timeout`.
-private func eventually(
-    timeout: Duration = .seconds(5),
-    _ comment: Comment,
-    sourceLocation: SourceLocation = #_sourceLocation,
-    _ condition: () async -> Bool
-) async {
-    let deadline = ContinuousClock.now + timeout
-    while ContinuousClock.now < deadline {
-        if await condition() { return }
-        try? await Task.sleep(for: .milliseconds(2))
-    }
-    Issue.record("Did not happen within \(timeout): \(comment)", sourceLocation: sourceLocation)
-}
-
 struct HomeManagerTests {
 
     private let switchId = EntityId(placeId: "room", name: "light", characteristicsName: nil, characteristic: .switcher)
@@ -230,7 +208,8 @@ struct HomeManagerTests {
 
         #expect(try await homeManager.report(holidayId, value: .bool(true)))
         let first = try await homeManager.getCurrentEntity(with: holidayId)
-        try await Task.sleep(for: .milliseconds(20))
+        // a repeat would be stamped later than the first report
+        await eventually("the clock moved past the first report") { Date() > first.timestamp }
 
         #expect(try await homeManager.report(holidayId, value: .bool(true)) == false)
         #expect(try await homeManager.getCurrentEntity(with: holidayId).timestamp == first.timestamp)
@@ -267,22 +246,25 @@ struct HomeManagerTests {
         #expect(try await homeManager.getCurrentEntity(with: holidayId).isDeviceOn == true)
     }
 
-    @Test("Two reports of one entity at once emit their own states in order")
+    @Test("Two reports of one entity at once emit their own states in order, in every one of 100 rounds")
     func concurrentReportsEmitTheirOwnState() async throws {
-        let seen = Mutex<[Bool?]>([])
-        let homeManager = await makeHomeManager(probe: AdapterProbe(), onReportedChange: { item in seen.withLock { $0.append(item.isDeviceOn) } })
-        let id = holidayId
+        // The two tasks may run one after the other in a round; over many rounds they interleave, so a regression of
+        // the emit order shows up in at least one of them.
+        for round in 0..<100 {
+            let seen = Mutex<[Bool?]>([])
+            let homeManager = await makeHomeManager(probe: AdapterProbe(), onReportedChange: { item in seen.withLock { $0.append(item.isDeviceOn) } })
+            let id = holidayId
 
-        // Both tasks queue on the manager at once; the first suspends at the command cache, the second runs then.
-        let turnedOn = Task { try await homeManager.report(id, value: .bool(true)) }
-        let turnedOff = Task { try await homeManager.report(id, value: .bool(false)) }
-        _ = try await (turnedOn.value, turnedOff.value)
+            let turnedOn = Task { try await homeManager.report(id, value: .bool(true)) }
+            let turnedOff = Task { try await homeManager.report(id, value: .bool(false)) }
+            _ = try await (turnedOn.value, turnedOff.value)
 
-        // Whichever report ran first, each event carries the state its own report set, and the last one is the state that holds.
-        let events = seen.withLock { $0 }
-        #expect(events.count == 2)
-        #expect(Set(events) == [true, false])
-        #expect(try await homeManager.getCurrentEntity(with: id).isDeviceOn == events.last)
+            // Whichever report ran first, each event carries the state its own report set, and the last one is the state that holds.
+            let events = seen.withLock { $0 }
+            #expect(events.count == 2, "round \(round)")
+            #expect(Set(events) == [true, false], "round \(round)")
+            #expect(try await homeManager.getCurrentEntity(with: id).isDeviceOn == events.last, "round \(round)")
+        }
     }
 
     @Test("A report of a cancelled run changes nothing")
@@ -631,9 +613,11 @@ struct HomeManagerTests {
             tickContinuation.yield(())
         }
         await probe.waitForPerforms(3)
-        await eventually("all three attempts are journaled") {
+        // an entry is added first and marked failed by a later write, so wait for both
+        await eventually("all three attempts are journaled as failed") {
             await journal.flush()
-            return await journal.commands(limit: nil, runId: runId).count == 3
+            let log = await journal.commands(limit: nil, runId: runId)
+            return log.count == 3 && log.allSatisfy { $0.status == .failed }
         }
 
         let log = await journal.commands(limit: nil, runId: runId)
@@ -737,7 +721,7 @@ struct HomeManagerTests {
 
         #expect(try await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app))
         let since = try #require(try await Fireplace.state(with: homeManager).since)
-        try await Task.sleep(for: .milliseconds(20))
+        await eventually("the clock moved past the start") { Date() > since }
         #expect(try await homeManager.report(Fireplace.stateId, value: .bool(true), origin: .app) == false)
 
         #expect(try await Fireplace.state(with: homeManager) == FireplaceState(isOn: true, since: since))
@@ -835,7 +819,7 @@ struct HomeManagerTests {
         await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: changed, isDeviceOn: true))
         let first = try #require(await homeManager.lastReport(of: switchId))
 
-        try await Task.sleep(for: .milliseconds(20))
+        await eventually("the clock moved past the first report") { Date() > first }
         #expect(await homeManager.addEntityHistory(EntityStorageItem(entityId: switchId, timestamp: Date(), isDeviceOn: true)) == false)
 
         let state = try await homeManager.getCurrentEntity(with: switchId)

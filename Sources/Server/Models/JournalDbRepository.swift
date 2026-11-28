@@ -6,6 +6,8 @@
 import Fluent
 import Foundation
 import HAModels
+import SQLKit
+import Vapor
 
 struct JournalDbRepository: JournalStore {
     /// Resolved per query, see `EntityStorageDbRepository.database`.
@@ -152,14 +154,32 @@ struct JournalDbRepository: JournalStore {
     // MARK: - cleanup
 
     /// Command entries with a heating reason stay for good (the last command of every radiator survives).
+    /// One batched delete per kind, each an exact range on `idx_journal_kind_timestamp`: a statement locks only its
+    /// batch, and no statement scans the whole table.
     func deleteEntries(olderThan date: Date) async throws {
-        try await JournalDbItem.query(on: database())
-            .filter(\.$timestamp < date)
-            .group(.or) { notHeatingCommand in
-                notHeatingCommand
-                    .filter(\.$kind != JournalKind.command.rawValue)
-                    .filter(\.$reason == nil)
+        guard let sql = database() as? any SQLDatabase else {
+            throw Abort(.internalServerError, reason: "Database does not support SQL queries")
+        }
+        let kinds: [(kind: JournalKind, onlyWithoutReason: Bool)] = [(.run, false), (.push, false), (.command, true)]
+        for (kind, onlyWithoutReason) in kinds {
+            // The probe carries the same filter, so the heating commands that stay do not keep the loop running.
+            let reasonFilter: SQLQueryString = onlyWithoutReason ? " AND \(ident: "reason") IS NULL" : ""
+            while true {
+                try await sql.raw("""
+                    DELETE FROM \(ident: JournalDbItem.schema)
+                    WHERE \(ident: "kind") = \(bind: kind.rawValue) AND \(ident: "timestamp") < \(bind: date)\(reasonFilter)
+                    ORDER BY \(ident: "timestamp") LIMIT \(literal: Self.deleteBatchSize)
+                    """)
+                    .run()
+                let left = try await sql.raw("""
+                    SELECT 1 AS \(ident: "found") FROM \(ident: JournalDbItem.schema)
+                    WHERE \(ident: "kind") = \(bind: kind.rawValue) AND \(ident: "timestamp") < \(bind: date)\(reasonFilter) LIMIT 1
+                    """)
+                    .first()
+                if left == nil { break }
             }
-            .delete()
+        }
     }
+
+    static let deleteBatchSize = 5_000
 }

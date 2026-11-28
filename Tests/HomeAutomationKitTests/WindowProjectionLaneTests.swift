@@ -23,7 +23,7 @@ private actor SlowSender: NotificationSender {
     }
 
     func waitUntilFirstSendStarted() async {
-        while sendsStarted == 0 { try? await Task.sleep(for: .milliseconds(1)) }
+        await eventually("the first send started") { sendsStarted > 0 }
     }
 
     func sendNotification(title: String, message: String, id: String, category: String?) async throws {}

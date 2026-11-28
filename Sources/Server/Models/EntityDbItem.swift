@@ -42,8 +42,9 @@ final class EntityDbItem: Model, @unchecked Sendable {
 final class EntityChangeDbItem: Model, @unchecked Sendable {
     static let schema = "entityChanges"
 
-    @ID(key: .id)
-    var id: UUID?
+    /// A database-generated BIGINT: rows append at the end of the clustered index, and equal timestamps order by write.
+    @ID(custom: .id, generatedBy: .database)
+    var id: Int?
 
     @Parent(key: "entityId")
     var entity: EntityDbItem
@@ -59,6 +60,9 @@ final class EntityChangeDbItem: Model, @unchecked Sendable {
 
     @Field(key: "origin")
     var origin: String
+
+    /// The width of the `text` column.
+    static let textLimit = 255
 
     init() { }
 
@@ -78,7 +82,7 @@ final class EntityChangeDbItem: Model, @unchecked Sendable {
                 text = deadline.caseName
                 number = deadline.end?.timeIntervalSince1970
             } else {
-                text = string
+                text = string.fitted(toScalars: Self.textLimit)
             }
         }
     }

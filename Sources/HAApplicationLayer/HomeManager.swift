@@ -198,12 +198,17 @@ public final class HomeManager: HomeManagable {
             do {
                 let history = try await storageRepo.getHistory(for: item.entityId, startDate: cutoff, endDate: nil, cursor: nil, limit: Self.readingLimit)
                 // changes reported while the load ran are newer and already in front
-                let known = Set((recentReadings[item.entityId] ?? []).map(\.timestamp))
-                recentReadings[item.entityId, default: []] += history.filter { !known.contains($0.timestamp) }
+                let known = Set((recentReadings[item.entityId] ?? []).map { Self.microseconds($0.timestamp) })
+                recentReadings[item.entityId, default: []] += history.filter { !known.contains(Self.microseconds($0.timestamp)) }
             } catch {
                 log.error("Failed to load the recent readings", metadata: ["entityId": "\(item.entityId)", "error": "\(error)"])
             }
         }
+    }
+
+    /// A timestamp at the precision of the database (`DATETIME(6)`): a change read back from it equals the one held in memory.
+    nonisolated private static func microseconds(_ date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 * 1_000_000).rounded())
     }
 
     nonisolated private static func key(of radiator: EntityId) -> String {
@@ -523,8 +528,8 @@ public final class HomeManager: HomeManagable {
         } catch {
             log.error("Failed to read the entity history", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
         }
-        let known = Set(recent.map(\.timestamp))
-        let merged = recent + stored.filter { !known.contains($0.timestamp) }
+        let known = Set(recent.map { Self.microseconds($0.timestamp) })
+        let merged = recent + stored.filter { !known.contains(Self.microseconds($0.timestamp)) }
         return Array(merged.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 

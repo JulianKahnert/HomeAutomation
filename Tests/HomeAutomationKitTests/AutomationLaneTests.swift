@@ -27,7 +27,7 @@ private actor LaneProbe {
         }
     }
     func waitForSeen(_ count: Int) async {
-        while seen.count < count { try? await Task.sleep(for: .milliseconds(1)) }
+        await eventually("\(count) events were seen") { seen.count >= count }
     }
 }
 

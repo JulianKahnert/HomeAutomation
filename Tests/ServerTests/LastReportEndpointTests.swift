@@ -33,7 +33,7 @@ final class LastReportEndpointTests: XCTestCase {
         let entityRow: [String: any Sendable] = ["id": entityKey, "placeId": switchId.placeId, "serviceName": switchId.name,
                                                  "characteristicType": switchId.characteristicType.rawValue,
                                                  "characteristicsName": String?.none]
-        let changeRow: [String: any Sendable] = ["id": UUID(), "entityId": entityKey, "timestamp": changedAt,
+        let changeRow: [String: any Sendable] = ["id": 1, "entityId": entityKey, "timestamp": changedAt,
                                                  "number": Double?.some(1), "text": String?.none, "origin": Origin.homekit.rawValue]
         app.databases.use(InMemoryDatabaseConfiguration(rows: [EntityDbItem.schema: [entityRow],
                                                                EntityChangeDbItem.schema: [changeRow]]),

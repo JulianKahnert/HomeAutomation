@@ -46,7 +46,7 @@ if [[ "$(uname)" == "Darwin" ]] && command -v swift >/dev/null 2>&1; then
         -e MYSQL_DATABASE=t -e MYSQL_USER=u -e MYSQL_PASSWORD=p \
         "$mysql_image" >/dev/null
     wait_for_mysql
-    (cd "$repo_root" && HA_TEST_MYSQL_PORT="$host_port" swift test --filter EntityStorageMySQLTests) \
+    (cd "$repo_root" && HA_TEST_MYSQL_PORT="$host_port" swift test --filter 'EntityStorageMySQLTests|HomekitInventoryMySQLTests') \
         2>&1 | tee -a "$repo_root/mysql-tests.log"
 else
     echo "This script needs a Mac with a Swift toolchain: the package also holds app targets (SwiftUI, TCA) that do not build on Linux." >&2

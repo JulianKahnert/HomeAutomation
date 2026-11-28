@@ -228,6 +228,27 @@ final class EntityStorageMySQLTests: XCTestCase {
         XCTAssertEqual(items.map(\.carbonDioxideSensorId), [10, 0, 830, 800])
     }
 
+    /// A change stores the time of its report with it; a report that changed nothing writes only that time, and an
+    /// older time never replaces a newer one. Only the current state carries it, the history does not.
+    func testLastReportIsStoredWithAChangeAndByAnUnchangedReport() async throws {
+        let repository = app.entityStorageDbRepository
+        let lamp = EntityId(placeId: "Kueche", name: "Lamp", characteristicsName: nil, characteristic: .switcher)
+        let reported = hour.addingTimeInterval(120)
+        try await repository.add(EntityStorageItem(entityId: lamp, timestamp: hour, isDeviceOn: true, lastReport: reported))
+        var current = try await repository.getCurrent(lamp)
+        XCTAssertEqual(current?.lastReport, reported)
+
+        try await repository.recordLastReport(of: lamp, at: reported.addingTimeInterval(400))
+        try await repository.recordLastReport(of: lamp, at: reported.addingTimeInterval(100))
+        current = try await repository.getCurrent(lamp)
+        XCTAssertEqual(current?.lastReport, reported.addingTimeInterval(400))
+        let all = try await repository.getAllCurrent()
+        XCTAssertEqual(all.first { $0.entityId == lamp }?.lastReport, reported.addingTimeInterval(400))
+
+        let history = try await repository.getHistory(for: lamp, startDate: nil, endDate: nil, cursor: nil, limit: 10)
+        XCTAssertEqual(history.map(\.lastReport), [nil])
+    }
+
     func testRollupAggregatesPerHourWithoutZeroPPMAndDeletesRawRows() async throws {
         let repository = app.entityStorageDbRepository
         let lamp = EntityId(placeId: "Kueche", name: "Lamp", characteristicsName: nil, characteristic: .switcher)

@@ -15,7 +15,7 @@ import Shared
 
 /// Holds the location and stores the configuration; the automations themselves live in the `AutomationService`.
 actor HomeAutomationConfigService: Log, AutomationRepository {
-    private static let defaultLocation = Location(latitude: 53.14194, longitude: 8.21292)
+    static let defaultLocation = Location(latitude: 53.14194, longitude: 8.21292)
     // TODO: remove the one-time import one release after the config moved into the database
     private static let legacyFileURL = URL(fileURLWithPath: "/tmp/HomeAutomation-config.json")
 

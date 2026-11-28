@@ -78,6 +78,7 @@ struct InitialSchema: AsyncMigration {
             .field("serviceName", .string, .required)
             .field("characteristicType", .string, .required)
             .field("characteristicsName", .string)
+            .field("lastReport", .datetime)
             .unique(on: "placeId", "serviceName", "characteristicType")
             .create()
 

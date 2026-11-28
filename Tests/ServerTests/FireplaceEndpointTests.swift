@@ -15,6 +15,8 @@ final class FireplaceEndpointTests: XCTestCase {
     var app: Application!
     private let token = "fireplace-test-token"
     private var events: EventLog!
+    private var storage: MemoryStorage!
+    private var loop: Task<Void, Never>!
 
     override func setUp() async throws {
         app = try await Application.make(.testing)
@@ -25,16 +27,23 @@ final class FireplaceEndpointTests: XCTestCase {
         app.automationService = try await makeAutomationService(automations: [])
         app.starActorSystem = StarActorSystem(name: "fireplace-tests")
         events = EventLog()
+        storage = MemoryStorage()
+        app.storageReader = storage
         // no adapter: the fireplace is the server's own state and needs none
         app.homeManager = await HomeManager(getAdapter: { nil },
-                                            storageRepo: EmptyStorage(),
+                                            storageRepo: storage,
                                             notificationSender: SilentSender(),
                                             location: Location(latitude: 52.52, longitude: 13.405),
-                                            onReportedChange: { [events] in events?.append($0) })
+                                            onReportedChange: { [events, app] in
+            events?.append($0)
+            app?.homeEventSink.yield(.change(entity: $0))
+        })
+        loop = app.startEventLoop()
         try routes(app)
     }
 
     override func tearDown() async throws {
+        loop.cancel()
         try await app.asyncShutdown()
         app = nil
     }
@@ -91,6 +100,8 @@ final class FireplaceEndpointTests: XCTestCase {
         let before = Date()
         let putStatus = try await switchFireplace(true)
         XCTAssertEqual(putStatus, .ok)
+        // the read side answers from the database, which the background queue fills
+        await storage.waitForChanges(1)
 
         let (status, state) = try await request(.GET, token: token)
         XCTAssertEqual(status, .ok)
@@ -106,6 +117,7 @@ final class FireplaceEndpointTests: XCTestCase {
     func testSwitchOffHoldsAtOnce() async throws {
         try await switchFireplace(true)
         try await switchFireplace(false)
+        await storage.waitForChanges(2)
 
         let (_, read) = try await request(.GET, token: token)
         XCTAssertEqual(read?.isOn, false)
@@ -114,15 +126,15 @@ final class FireplaceEndpointTests: XCTestCase {
 
     func testRepeatedOnKeepsTheStartAndTellsNobody() async throws {
         try await switchFireplace(true)
-        let homeManager = app.homeManager
-        let first = try await Fireplace.state(with: homeManager)
+        await storage.waitForChanges(1)
+        let first = try await Fireplace.state(from: storage)
         let since = try XCTUnwrap(first.since)
         // the clock moves on, so a repeat that restarted the fireplace would carry a later start
         while Date() <= since { try await Task.sleep(for: .milliseconds(1)) }
 
         try await switchFireplace(true)
 
-        let second = try await Fireplace.state(with: homeManager)
+        let second = try await Fireplace.state(from: storage)
         XCTAssertEqual(second.since, since)
         XCTAssertEqual(events.all.count, 1)
     }

@@ -20,6 +20,8 @@ struct OpenAPIController: APIProtocol {
     /// declared on the `limit` parameters in `openapi.yaml`.
     static let maxLimit = 1000
     static let defaultLimit = 100
+    /// What a write answers when the event loop does not get to it in time (503, not in the OpenAPI spec).
+    static let coreBusyStatus = 503
 
     /// Enforces the `minimum`/`maximum` bounds from `openapi.yaml` server-side.
     ///
@@ -33,13 +35,13 @@ struct OpenAPIController: APIProtocol {
     // MARK: - /config/automations
 
     func getAutomations(_ input: Operations.GetAutomations.Input) async throws -> Operations.GetAutomations.Output {
-        let automationNames = await request.application.automationService.getActiveAutomationNames()
-        let lastRuns = try await request.application.journalRepository.latestRunPerAutomation()
-        let automations = await request.application.automationService.automations
+        let lastRuns = try await request.application.journalReader.latestRunPerAutomation()
+        let automations = try await request.application.configReader.load().automations.map(\.automation)
             .map { tmp in
                 Components.Schemas.Automation(name: tmp.name,
                                               isActive: tmp.isActive,
-                                              isRunning: automationNames.contains(tmp.name),
+                                              // a run that is recorded and not finished; a restart marks the leftovers interrupted
+                                              isRunning: lastRuns[tmp.name]?.outcome == .running,
                                               _type: String(describing: type(of: tmp)),
                                               recordsRuns: tmp.recordsRuns,
                                               lastRun: lastRuns[tmp.name].map(Components.Schemas.AutomationRun.init),
@@ -49,7 +51,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getAutomationRuns(_ input: Operations.GetAutomationRuns.Input) async throws -> Operations.GetAutomationRuns.Output {
-        let runs = try await request.application.journalRepository.runs(for: input.path.name,
+        let runs = try await request.application.journalReader.runs(for: input.path.name,
                                                                               startDate: input.query.startDate,
                                                                               endDate: input.query.endDate,
                                                                               limit: Self.clampedLimit(input.query.limit))
@@ -57,7 +59,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getRecentRuns(_ input: Operations.GetRecentRuns.Input) async throws -> Operations.GetRecentRuns.Output {
-        let runs = try await request.application.journalRepository.latestRuns(since: input.query.since,
+        let runs = try await request.application.journalReader.latestRuns(since: input.query.since,
                                                                                     limit: Self.clampedLimit(input.query.limit))
         return .ok(.init(body: .json(runs.map(Components.Schemas.AutomationRun.init))))
     }
@@ -68,7 +70,11 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        try await request.application.automationService.setAutomationActive(with: name, to: true)
+        do {
+            try await request.application.commandPort.setAutomationActive(name: name, to: true)
+        } catch CoreCommandError.timedOut {
+            return .undocumented(statusCode: Self.coreBusyStatus, .init())
+        }
         return .ok
     }
 
@@ -78,7 +84,11 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        try await request.application.automationService.setAutomationActive(with: name, to: false)
+        do {
+            try await request.application.commandPort.setAutomationActive(name: name, to: false)
+        } catch CoreCommandError.timedOut {
+            return .undocumented(statusCode: Self.coreBusyStatus, .init())
+        }
         return .ok
     }
 
@@ -88,7 +98,11 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        await request.application.automationService.stopAutomation(with: name)
+        do {
+            try await request.application.commandPort.stopAutomation(name: name)
+        } catch CoreCommandError.timedOut {
+            return .undocumented(statusCode: Self.coreBusyStatus, .init())
+        }
         return .ok
     }
 
@@ -153,7 +167,7 @@ struct OpenAPIController: APIProtocol {
 
     // MARK: - /windowopenstates
     func getWindowStates(_ input: Operations.GetWindowStates.Input) async throws -> Operations.GetWindowStates.Output {
-        let contentState = await request.application.homeManager.getWindowContentState()
+        let contentState = try await request.application.storageReader.windowContentState()
         let windows = contentState.windows.map { window in
             Components.Schemas.WindowState(id: window.id,
                                            name: window.name,
@@ -182,29 +196,27 @@ struct OpenAPIController: APIProtocol {
         // Only a server-owned entity of a kind the descriptor lets the app set; any other one stays unchanged.
         guard entityId.isServerOwned, ValueDescriptor.descriptor(for: type).isSettableFromApp else { return .forbidden }
         let value = Value(body.value)
-        let homeManager = request.application.homeManager
-        let changed: Bool
+        let change: StateChange
         do {
-            changed = try await homeManager.report(entityId, value: value, origin: .app)
-        } catch ReportError.valueDoesNotFit {
+            change = try await request.application.commandPort.setState(entityId, value: value)
+        } catch CoreCommandError.valueDoesNotFit {
             return .badRequest
-        }
-        // The report just set it: a state that cannot be read back is a failure of the server, not of the request.
-        let item: EntityStorageItem
-        do {
-            item = try await homeManager.getCurrentEntity(with: entityId)
-        } catch {
-            request.logger.error("Failed to read the state that was just set", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
+        } catch CoreCommandError.notSettable {
+            return .forbidden
+        } catch CoreCommandError.timedOut {
+            return .undocumented(statusCode: Self.coreBusyStatus, .init())
+        } catch CoreCommandError.stateUnreadable {
+            request.logger.error("Failed to read the state that was just set", metadata: ["entityId": "\(entityId)"])
             throw Abort(.internalServerError)
         }
+        let item = change.item
         guard let state = item.value else {
-            request.logger.error("The state that was just set has no value", metadata: ["entityId": "\(entityId)"])
             throw Abort(.internalServerError)
         }
         return .ok(.init(body: .json(.init(entityId: .init(entityId),
                                            valueKind: type.rawValue,
                                            value: .init(state),
-                                           changed: changed,
+                                           changed: change.changed,
                                            origin: item.origin.rawValue,
                                            timestamp: item.timestamp))))
     }
@@ -230,7 +242,7 @@ struct OpenAPIController: APIProtocol {
         let cursor = input.query.cursor
         let limit = Self.clampedLimit(input.query.limit)
 
-        let historyItems = try await request.application.entityStorageDbRepository.getHistory(
+        let historyItems = try await request.application.storageReader.getHistory(
             for: entityId,
             startDate: startDate,
             endDate: endDate,
@@ -240,8 +252,8 @@ struct OpenAPIController: APIProtocol {
         )
         var schemaItems = historyItems.map(Components.Schemas.EntityHistoryItem.init)
 
-        // The last report lives in memory next to the current state: it belongs to the newest change only.
-        if cursor == nil, !schemaItems.isEmpty, let current = await currentState(of: entityId),
+        // The last report is stored with the entity and belongs to the newest change only.
+        if cursor == nil, !schemaItems.isEmpty, let current = try await request.application.storageReader.getCurrent(entityId),
            let lastReport = current.lastReport,
            abs(current.timestamp.timeIntervalSince(schemaItems[0].timestamp)) < 1 {
             schemaItems[0].lastReport = lastReport
@@ -258,20 +270,8 @@ struct OpenAPIController: APIProtocol {
         return .ok(.init(body: .json(response)))
     }
 
-    /// The current state the server holds; `nil` for an entity it never held. Any other failure is logged.
-    private func currentState(of entityId: EntityId) async -> EntityStorageItem? {
-        do {
-            return try await request.application.homeManager.getCurrentEntity(with: entityId)
-        } catch OptionalError.notFound {
-            return nil
-        } catch {
-            request.logger.error("Failed to read the current state", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
-            return nil
-        }
-    }
-
     func getRoomHistory(_ input: Operations.GetRoomHistory.Input) async throws -> Operations.GetRoomHistory.Output {
-        let histories = try await request.application.entityStorageDbRepository.getRoomHistory(placeId: input.query.placeId,
+        let histories = try await request.application.storageReader.getRoomHistory(placeId: input.query.placeId,
                                                                                                startDate: input.query.startDate,
                                                                                                endDate: input.query.endDate,
                                                                                                includePrevious: input.query.includePrevious ?? false)
@@ -283,7 +283,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getHeatingOverview(_ input: Operations.GetHeatingOverview.Input) async throws -> Operations.GetHeatingOverview.Output {
-        let rooms = await heatingRooms().map(\.heatingSources)
+        let rooms = try await heatingRooms().map(\.heatingSources)
         let overview = try await HeatingOverviewBuilder(detail: heatingDetailBuilder()).overview(for: rooms)
         return .ok(.init(body: .json(.init(overview))))
     }
@@ -293,7 +293,7 @@ struct OpenAPIController: APIProtocol {
             return .badRequest(.init())
         }
         let placeId = input.path.placeId
-        guard let room = await heatingRooms().first(where: { $0.placeId == placeId }) else {
+        guard let room = try await heatingRooms().first(where: { $0.placeId == placeId }) else {
             return .notFound(.init())
         }
         let detail = try await heatingDetailBuilder().detail(for: room.heatingSources, range: range)
@@ -301,23 +301,23 @@ struct OpenAPIController: APIProtocol {
     }
 
     /// The heating automations of the deployed configuration.
-    private func heatingRooms() async -> [RoomHeating] {
-        await request.application.automationService.automations.compactMap { $0 as? RoomHeating }
+    private func heatingRooms() async throws -> [RoomHeating] {
+        try await request.application.configReader.load().automations.compactMap { $0.automation as? RoomHeating }
     }
 
     /// Both heating endpoints cut the days by the local clock of the house, Europe/Berlin.
     private func heatingDetailBuilder() -> HeatingRoomDetailBuilder {
-        let homeManager = request.application.homeManager
-        return HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
-                                        journal: request.application.journalRepository,
-                                        lastReport: { await homeManager.lastReport(of: $0) },
+        let storage = request.application.storageReader
+        return HeatingRoomDetailBuilder(storage: storage,
+                                        journal: request.application.journalReader,
+                                        lastReport: { try? await storage.getCurrent($0)?.lastReport },
                                         calendar: HeatingOverviewBuilder.berlin)
     }
 
     // MARK: - /heating/fireplace
 
     func getFireplace(_ input: Operations.GetFireplace.Input) async throws -> Operations.GetFireplace.Output {
-        let state = try await Fireplace.state(with: request.application.homeManager)
+        let state = try await Fireplace.state(from: request.application.storageReader)
         return .ok(.init(body: .json(.init(state))))
     }
 }

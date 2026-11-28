@@ -30,12 +30,19 @@ public protocol StorageRepository: Sendable {
         limit: Int
     ) async throws -> [EntityStorageItem]
 
+    /// Stores when the entity last reported (an unchanged report included). A change stores it with the row itself (`add`
+    /// reads ``EntityStorageItem/lastReport``); this is the write for a report that changed nothing.
+    func recordLastReport(of entityId: EntityId, at date: Date) async throws
+
     /// Get all unique entity IDs that have historical data
     /// - Returns: Array of unique EntityIds
     func getAllEntityIds() async throws -> [EntityId]
 }
 
 extension StorageRepository {
+    /// For a store that keeps no time of the last report.
+    public func recordLastReport(of entityId: EntityId, at date: Date) async throws {}
+
     /// Like `getHistory`, but with `includePrevious` the last state before `startDate` is appended as
     /// the oldest item, so a state that began before the window is not lost. Only on the last page.
     public func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int, includePrevious: Bool) async throws -> [EntityStorageItem] {

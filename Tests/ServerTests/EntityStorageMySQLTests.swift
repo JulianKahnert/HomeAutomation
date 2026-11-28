@@ -537,9 +537,9 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     // MARK: - query plans
 
-    /// The `EXPLAIN FORMAT=JSON` text of a statement. The tests below assert that an index is among the plan's
-    /// `possible_keys` or used, so a later schema edit cannot silently drop one; on tables this small the optimizer may
-    /// still pick another index, so "used" cannot be asserted for every query. It goes through the driver's text
+    /// The `EXPLAIN FORMAT=JSON` text of a statement. The tests below assert that an index serves a query without a
+    /// sort, so a later schema edit cannot silently drop one. On tables this small the optimizer picks any index, so the
+    /// journal queries force the index under test: a missing or unfitting index then fails the plan. It goes through the driver's text
     /// protocol: over the prepared-statement path `sql.raw` uses, MySQLNIO returns no rows for an EXPLAIN.
     private func plan(_ statement: String) async throws -> String {
         let mysql = try XCTUnwrap(app.db as? MySQLDatabase)
@@ -554,15 +554,18 @@ final class EntityStorageMySQLTests: XCTestCase {
         try await app.journalRepository.addCommand(ActionLogItem(timestamp: Date(timeIntervalSince1970: 1), action: .setTargetTemperature(id, celsius: 21), reason: .plan))
         let history = try await plan("SELECT * FROM entityChanges WHERE entityId = UNHEX(REPEAT('00', 16)) AND timestamp < '2030-01-01' ORDER BY timestamp DESC, id DESC LIMIT 10")
         XCTAssertTrue(history.contains("idx_entityChanges_entity_timestamp"), history)
-        XCTAssertTrue(history.contains("\"using_filesort\": false"), history)
+        XCTAssertFalse(history.contains("\"Sort"), history)
         let newest = try await plan("SELECT newest.id FROM entities e, LATERAL (SELECT c.id FROM entityChanges c WHERE c.entityId = e.id ORDER BY c.timestamp DESC, c.id DESC LIMIT 1) AS newest")
         XCTAssertTrue(newest.contains("idx_entityChanges_entity_timestamp"), newest)
-        let heating = try await plan("SELECT * FROM journal WHERE kind = 'command' AND entityPlaceId = 'Hall' AND timestamp >= '2020-01-01' ORDER BY timestamp")
+        let heating = try await plan("SELECT * FROM journal FORCE INDEX (idx_journal_kind_place_timestamp) WHERE kind = 'command' AND entityPlaceId = 'Hall' AND timestamp >= '2020-01-01' ORDER BY timestamp")
         XCTAssertTrue(heating.contains("idx_journal_kind_place_timestamp"), heating)
-        let cleanup = try await plan("SELECT * FROM journal WHERE kind = 'push' AND timestamp < '2020-01-01' ORDER BY timestamp LIMIT 5000")
+        XCTAssertFalse(heating.contains("\"Sort"), heating)
+        let cleanup = try await plan("SELECT * FROM journal FORCE INDEX (idx_journal_kind_timestamp) WHERE kind = 'push' AND timestamp < '2020-01-01' ORDER BY timestamp LIMIT 5000")
         XCTAssertTrue(cleanup.contains("idx_journal_kind_timestamp"), cleanup)
-        let runs = try await plan("SELECT * FROM journal WHERE kind = 'run' AND title = 'x' ORDER BY timestamp DESC LIMIT 1")
+        XCTAssertFalse(cleanup.contains("\"Sort"), cleanup)
+        let runs = try await plan("SELECT * FROM journal FORCE INDEX (idx_journal_kind_title_timestamp) WHERE kind = 'run' AND title = 'x' ORDER BY timestamp DESC LIMIT 1")
         XCTAssertTrue(runs.contains("idx_journal_kind_title_timestamp"), runs)
+        XCTAssertFalse(runs.contains("\"Sort"), runs)
     }
 
     // MARK: - weather

@@ -13,7 +13,7 @@
 		A3F1C0042E9A1B0000C0FFEE /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A3F1C0032E9A1B0000C0FFEE /* AppIcon.icon */; };
 		A3BA515C2D798A69002DD924 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515B2D798A69002DD924 /* WidgetKit.framework */; };
 		A3BA515E2D798A69002DD924 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3BA515D2D798A69002DD924 /* SwiftUI.framework */; };
-		A3BA516C2D798A6A002DD924 /* FlowKit Controller WidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A3BA516C2D798A6A002DD924 /* FlowKit Controller WidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A3BA51592D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A3DEADC42EDC67F200AC511A /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEADC32EDC67F200AC511A /* ControllerKit */; };
 		A3DEADC62EDC67F200AC511A /* HomeAutomationKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEADC52EDC67F200AC511A /* HomeAutomationKit */; };
 		A3DEADC82EDC67F900AC511A /* ControllerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A3DEADC72EDC67F900AC511A /* ControllerKit */; };
@@ -281,6 +281,7 @@
 /* Begin PBXTargetDependency section */
 		A3BA516B2D798A6A002DD924 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = A3BA51582D798A69002DD924 /* FlowKit Controller WidgetExtensionExtension */;
 			targetProxy = A3BA516A2D798A6A002DD924 /* PBXContainerItemProxy */;
 		};
@@ -291,7 +292,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = "FlowKit Controller WidgetExtension/FlowKit_Controller_WidgetExtension.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -312,9 +312,9 @@
 				PRODUCT_BUNDLE_IDENTIFIER = de.juliankahnert.HomeAutomation.WidgetExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				SDKROOT = macosx;
+				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -326,7 +326,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = "FlowKit Controller WidgetExtension/FlowKit_Controller_WidgetExtension.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -347,9 +346,9 @@
 				PRODUCT_BUNDLE_IDENTIFIER = de.juliankahnert.HomeAutomation.WidgetExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				SDKROOT = macosx;
+				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

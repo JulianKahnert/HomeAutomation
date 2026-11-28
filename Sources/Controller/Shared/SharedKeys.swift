@@ -30,20 +30,20 @@ extension SharedKey where Self == KeychainKey<String>.Default {
 extension SharedKey where Self == AppStorageKey<Bool>.Default {
     /// Whether Live Activities are enabled
     static var liveActivitiesEnabled: Self {
-        Self[.appStorage("liveActivitiesEnabled", store: .standard), default: true]
+        Self[.appStorage("liveActivitiesEnabled"), default: true]
     }
 }
 
 extension SharedKey where Self == AppStorageKey<AutomationsFeature.Grouping>.Default {
     static var automationGrouping: Self {
-        Self[.appStorage("automationGrouping", store: .standard), default: .status]
+        Self[.appStorage("automationGrouping"), default: .status]
     }
 }
 
 extension SharedKey where Self == AppStorageKey<Location?>.Default {
     /// Server location from `GET /config`, for night bands in charts
     static var serverLocation: Self {
-        Self[.appStorage("serverLocation", store: .standard), default: nil]
+        Self[.appStorage("serverLocation"), default: nil]
     }
 }
 

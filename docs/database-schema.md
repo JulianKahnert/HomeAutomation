@@ -57,7 +57,7 @@ What changed in the schema that the script moving the old data must respect:
 
 Run them on the Mac mini, e.g. `docker exec -i <db container> mysql -u vapor_username -p vapor_database`.
 
-Contact sensors that HomeKit has and no stored automation references (the config is a JSON blob; a sensor counts as referenced when a `contactSensorId` with its accessory name and its room is somewhere in it; `REPLACE` keeps `_` and `%` in names from acting as wildcards of `JSON_SEARCH`):
+Contact sensors that HomeKit has and no stored automation references (the config is a JSON blob; a sensor counts as referenced when a `contactSensorId` with its accessory name and its room is somewhere in it; `REPLACE` with the escape character `|` keeps `_` and `%` in names from acting as wildcards of `JSON_SEARCH`):
 
 ```sql
 SELECT CONCAT(i.roomName, ' / ', i.accessoryName) AS missing
@@ -66,9 +66,9 @@ WHERE i.mappedType = 'contactSensor'
   AND NOT EXISTS (
     SELECT 1 FROM config c
     WHERE JSON_SEARCH(CAST(CONVERT(c.json USING utf8mb4) AS JSON), 'one',
-            REPLACE(REPLACE(REPLACE(i.accessoryName, '\\', '\\\\'), '%', '\\%'), '_', '\\_'), NULL, '$**.contactSensorId.name') IS NOT NULL
+            REPLACE(REPLACE(REPLACE(i.accessoryName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.name') IS NOT NULL
       AND JSON_SEARCH(CAST(CONVERT(c.json USING utf8mb4) AS JSON), 'one',
-            REPLACE(REPLACE(REPLACE(i.roomName, '\\', '\\\\'), '%', '\\%'), '_', '\\_'), NULL, '$**.contactSensorId.placeId') IS NOT NULL)
+            REPLACE(REPLACE(REPLACE(i.roomName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.placeId') IS NOT NULL)
 GROUP BY i.roomName, i.accessoryName
 ORDER BY i.roomName, i.accessoryName;
 ```

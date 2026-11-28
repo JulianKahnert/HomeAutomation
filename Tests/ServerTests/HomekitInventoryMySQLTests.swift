@@ -117,9 +117,9 @@ final class HomekitInventoryMySQLTests: XCTestCase {
           AND NOT EXISTS (
             SELECT 1 FROM config c
             WHERE JSON_SEARCH(CAST(CONVERT(c.json USING utf8mb4) AS JSON), 'one',
-                    REPLACE(REPLACE(REPLACE(i.accessoryName, '\\\\', '\\\\\\\\'), '%', '\\\\%'), '_', '\\\\_'), NULL, '$**.contactSensorId.name') IS NOT NULL
+                    REPLACE(REPLACE(REPLACE(i.accessoryName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.name') IS NOT NULL
               AND JSON_SEARCH(CAST(CONVERT(c.json USING utf8mb4) AS JSON), 'one',
-                    REPLACE(REPLACE(REPLACE(i.roomName, '\\\\', '\\\\\\\\'), '%', '\\\\%'), '_', '\\\\_'), NULL, '$**.contactSensorId.placeId') IS NOT NULL)
+                    REPLACE(REPLACE(REPLACE(i.roomName, '|', '||'), '%', '|%'), '_', '|_'), '|', '$**.contactSensorId.placeId') IS NOT NULL)
         GROUP BY i.roomName, i.accessoryName
         ORDER BY i.roomName, i.accessoryName
         """

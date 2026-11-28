@@ -19,7 +19,7 @@ struct DeliveryQueueTests {
         await sender.waitUntilFirstSendStarted()
         let second = Task { await queue.deliver(.push(title: "second", message: "", id: "b")) }
         // the second hand-over reaches the queue while the first send is still blocked
-        while await queue.handedOver < 2 { await Task.yield() }
+        await eventually("the second delivery was handed over") { await queue.handedOver >= 2 }
         await sender.openGate()
         await first.value
         await second.value
@@ -38,6 +38,20 @@ struct DeliveryQueueTests {
 
         #expect(await sender.titles == ["fails", "works"])
         #expect(await queue.lastPushDate(id: "a") == nil)
+        #expect(await queue.lastPushDate(id: "b") != nil)
+    }
+
+    @Test("a send that never returns does not block the next delivery")
+    func hungSendDoesNotBlockQueue() async {
+        let sender = GatedSender()
+        let queue = DeliveryQueue(sender: sender, sendTimeout: .milliseconds(50))
+
+        // the gate stays closed: the first send hangs until the timeout gives it up
+        await queue.deliver(.push(title: "hangs", message: "", id: "a"))
+        await sender.openGate()
+        await queue.deliver(.push(title: "arrives", message: "", id: "b"))
+
+        #expect(await sender.titles == ["hangs", "arrives"])
         #expect(await queue.lastPushDate(id: "b") != nil)
     }
 

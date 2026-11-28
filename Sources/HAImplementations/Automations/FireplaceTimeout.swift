@@ -16,8 +16,6 @@ public struct FireplaceTimeout: Automatable {
     public var isActive = true
     public let name: String
 
-    public var triggerEntityIds: Set<EntityId> { [] }
-
     public init(_ name: String = "fireplace-timeout") {
         self.name = name
     }
@@ -32,10 +30,8 @@ public struct FireplaceTimeout: Automatable {
     }
 
     func execute(using hm: HomeManagable, now: Date) async throws {
-        // look again: the fireplace may have gone off since the trigger
-        guard try await hasExpired(at: now, using: hm) else { return }
-        // ... and once more where the state is set: the app may have switched it off and on again (a new start)
-        // since that read, and that start must not be ended by this run.
+        // Decided where the state is set: the fireplace may have gone off, or the app switched it off and on again
+        // (a new start), since the trigger, and that start must not be ended by this run.
         guard try await hm.report(Fireplace.stateId, value: .bool(false), origin: .server, ifCurrent: { item in
             Fireplace.state(of: item).endsAt.map { now >= $0 } ?? false
         }) else { return }

@@ -15,7 +15,8 @@ struct RoomHistoryTests {
     private let start = Date(timeIntervalSince1970: 10_000)
 
     private func item(_ entityId: EntityId, at offset: TimeInterval, isOn: Bool = true) -> EntityStorageItem {
-        EntityStorageItem(entityId: entityId, timestamp: start.addingTimeInterval(offset), isDeviceOn: isOn)
+        // a bool value fits the switch and the contact sensor alike
+        EntityStorageItem(entityId: entityId, timestamp: start.addingTimeInterval(offset), value: .bool(isOn)) ?? EntityStorageItem(entityId: entityId)
     }
 
     @Test func returnsEveryEntityOfThePlaceOnly() async throws {

@@ -28,10 +28,6 @@ public struct Origin: RawRepresentable, Hashable, Sendable, Codable, Expressible
     /// A state the app set through the general route (T18); the server checked and stored it like a server report.
     public static let app = Origin(rawValue: "app")
 
-    /// Whether the server checked the change itself, when it reported it (`HomeManagable.report`), so the event
-    /// loop must not check it a second time.
-    public var isCheckedAtSource: Bool { self == .server || self == .app }
-
     /// The origin of a polling job; the job's name is the origin.
     public static func job(_ name: String) -> Origin {
         Origin(rawValue: name)

@@ -15,25 +15,6 @@ import Testing
 @Suite("LiveActivity Dependency Tests")
 struct LiveActivityDependencyTests {
 
-    @Test("Test value completes immediately")
-    func testTestValue() async throws {
-        try await withDependencies {
-            $0.liveActivity = .testValue
-        } operation: {
-            @Dependency(\.liveActivity) var liveActivity
-
-            // Callback-based: testValue closure body is empty, returns immediately
-            let tokenCount = LockIsolated(0)
-            await liveActivity.pushTokenUpdates { _ in
-                tokenCount.withValue { $0 += 1 }
-            }
-            #expect(tokenCount.value == 0)
-
-            let hasActive = await liveActivity.hasActiveActivities()
-            #expect(hasActive == false)
-        }
-    }
-
     @Test("Preview value returns mock data")
     func testPreviewValue() async throws {
         try await withDependencies {

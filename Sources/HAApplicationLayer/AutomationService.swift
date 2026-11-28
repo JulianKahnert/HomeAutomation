@@ -40,7 +40,7 @@ public actor AutomationService {
     /// The token of each running task by automation name, to tell a stop of this very run from an older one.
     private var runTokens: [String: UUID] = [:]
     /// Tokens of the runs `stopAutomation` cancelled, so such a run ends as `stopped` rather than `superseded`.
-    /// Every run removes its own token when it ends, however it ends, so none goes stale.
+    /// Every run removes its own token in `ended`, however it ends, so none goes stale.
     private var stopRequested: Set<UUID> = []
 
     public init(using homeManager: HomeManagable,
@@ -55,8 +55,25 @@ public actor AutomationService {
         self.repository = repository
     }
 
-    /// Replaces the deployed automations and stores them. An automation that was deployed before keeps its active state.
-    public func deploy(_ newAutomations: [any Automatable]) async throws {
+    /// The save that was handed over last; the next one waits for it, so an older snapshot never lands after a newer one.
+    private var saveTail: Task<Void, any Error>?
+
+    /// Stores the current automations. The snapshot is taken and the tail is set in the same synchronous section,
+    /// so the saves leave in the order the changes were made, however the callers' tasks are scheduled.
+    private func save(location: Location? = nil) async throws {
+        let snapshot = automations
+        let previous = saveTail
+        let task = Task { [repository] in
+            _ = await previous?.result
+            try await repository.save(snapshot, location: location)
+        }
+        saveTail = task
+        try await task.value
+    }
+
+    /// Replaces the deployed automations and stores them, with the config's location in the same snapshot.
+    /// An automation that was deployed before keeps its active state.
+    public func deploy(_ newAutomations: [any Automatable], location: Location? = nil) async throws {
         let previous = automations
         automations = Self.adding(builtIns, to: newAutomations).map { automation in
             var automation = automation
@@ -65,7 +82,7 @@ public actor AutomationService {
             }
             return automation
         }
-        try await repository.save(automations)
+        try await save(location: location)
     }
 
     private static func adding(_ builtIns: [any Automatable], to automations: [any Automatable]) -> [any Automatable] {
@@ -80,7 +97,7 @@ public actor AutomationService {
             }
             return automation
         }
-        try await repository.save(automations)
+        try await save()
     }
 
     /// Hands the event to the lane of every active automation and returns without waiting for any `shouldTrigger`.
@@ -169,21 +186,16 @@ public actor AutomationService {
                             try await automation.execute(using: self.homeManager)
                         }
                     }
-                    _ = await self.consumeStopRequest(token)
                     await self.finish(await recording.value, outcome: .completed)
                 } catch is CancellationError {
-                    let stopped = await self.consumeStopRequest(token)
+                    // read before `ended` removes the token; a stop that arrives later finds the run gone
+                    let stopped = await self.hasStopRequest(token)
                     await self.finish(await recording.value, outcome: stopped ? .stopped : .superseded)
                 } catch {
-                    _ = await self.consumeStopRequest(token)
                     self.log.error("Automation failed", metadata: ["automation": "\(automation.name)", "error": "\(error)"])
                     await self.finish(await recording.value, outcome: .failed, error: String(describing: error))
                 }
-
-                // cancel the current task after completion to get correct results of getActiveAutomationNames
-                withUnsafeCurrentTask { currentTask in
-                    currentTask?.cancel()
-                }
+                await self.ended(token: token, name: automation.name)
             }
             self.set(task: task, token: token, with: automation.name)
             if automation.lanePolicy == .runEach {
@@ -195,9 +207,7 @@ public actor AutomationService {
     }
 
     public func getActiveAutomationNames() async -> Set<String> {
-        let keys = runningTasks
-            .filter { !$0.value.isCancelled }
-            .map(\.key)
+        let keys = Array(runningTasks.keys)
 
         log.debug("Found currently active automations", metadata: ["automations": "\(keys)"])
         return Set(keys)
@@ -205,27 +215,34 @@ public actor AutomationService {
 
     public func stopAutomation(with name: String) async {
         log.debug("Cancel automation", metadata: ["automation": "\(name)"])
-        guard let task = runningTasks[name], !task.isCancelled, let token = runTokens[name] else { return }
+        guard let task = runningTasks[name], let token = runTokens[name] else { return }
         stopRequested.insert(token)
         task.cancel()
     }
 
     private func isRunning(_ name: String) -> Bool {
-        runningTasks[name].map { !$0.isCancelled } ?? false
+        runningTasks[name] != nil
     }
 
     private func set(task: Task<Void, Never>, token: UUID, with id: String) {
-        if let runningTask = runningTasks[id],
-           !runningTask.isCancelled {
-            runningTask.cancel()
-        }
+        runningTasks[id]?.cancel()
 
         runningTasks[id] = task
         runTokens[id] = token
     }
 
-    private func consumeStopRequest(_ token: UUID) -> Bool {
-        stopRequested.remove(token) != nil
+    private func hasStopRequest(_ token: UUID) -> Bool {
+        stopRequested.contains(token)
+    }
+
+    /// The last thing every run does, with no suspension point in it: drops the run's stop token and, when no newer
+    /// run replaced it, the run itself. So no token goes stale, however the run ended.
+    private func ended(token: UUID, name: String) {
+        stopRequested.remove(token)
+        if runTokens[name] == token {
+            runningTasks[name] = nil
+            runTokens[name] = nil
+        }
     }
 
     /// - Returns: `runId` once the run is stored, `nil` when nothing was (or could be) recorded.

@@ -11,7 +11,6 @@ import HAModels
 public struct MaintenanceAutomation: Automatable {
     public var isActive = true
     public let name: String
-    public private(set) var triggerEntityIds = Set<EntityId>()
     public let time: Time
     public var recordsRuns: Bool { false }
 

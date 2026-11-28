@@ -24,12 +24,21 @@ struct EntityHistoryDetailFeature: Sendable {
         var timeRange: TimeRange = .hour
         @Presents var alert: AlertState<Action.Alert>?
 
-        var chartData: [EntityHistoryItem] {
-            historyItems
+        /// When the shown range ended: the moment of the last refresh.
+        var rangeEnd: Date?
+
+        /// Whether any point of the history can be drawn: a state for the timeline, a number for the value chart.
+        /// A text value (a window deadline) has history but nothing to plot.
+        var canPlot: Bool {
+            historyItems.contains { $0.primaryValue != nil }
+        }
+
+        var isBoolean: Bool {
+            historyItems.contains { $0.stateValue != nil }
         }
 
         var dateRange: (start: Date, end: Date) {
-            let now = Date()
+            let now = rangeEnd ?? Date()
             let start: Date
             switch timeRange {
             case .hour:
@@ -63,7 +72,6 @@ struct EntityHistoryDetailFeature: Sendable {
         case onAppear
         case refresh
         case historyResponse(Result<EntityHistoryResponse, Error>)
-        case timeRangeChanged(TimeRange)
         case binding(BindingAction<State>)
         case alert(PresentationAction<Alert>)
 
@@ -74,6 +82,7 @@ struct EntityHistoryDetailFeature: Sendable {
 
     // MARK: - Dependencies
 
+    @Dependency(\.date.now) var now
     @Dependency(\.serverClient) var serverClient
 
     private enum CancelID { case history }
@@ -90,33 +99,7 @@ struct EntityHistoryDetailFeature: Sendable {
                 }
 
             case .refresh:
-                state.isLoading = true
-                state.alert = nil
-                state.historyItems = []
-
-                let entityId = state.entity.entityId
-                let dateRange = state.dateRange
-
-                // All pages in one effect: it is cancelled as a whole when the screen is popped or
-                // the range changes, so no late page reaches a removed element or a new range.
-                return .run { send in
-                    var cursor: Date?
-                    repeat {
-                        let response = try await serverClient.getEntityHistory(
-                            entityId,
-                            dateRange.start,
-                            dateRange.end,
-                            cursor,
-                            1000,
-                            cursor == nil
-                        )
-                        await send(.historyResponse(.success(response)))
-                        cursor = response.nextCursor
-                    } while cursor != nil
-                } catch: { error, send in
-                    await send(.historyResponse(.failure(error)))
-                }
-                .cancellable(id: CancelID.history, cancelInFlight: true)
+                return refresh(&state)
 
             case let .historyResponse(.success(response)):
                 state.isLoading = false
@@ -142,11 +125,8 @@ struct EntityHistoryDetailFeature: Sendable {
                 }
                 return .none
 
-            case let .timeRangeChanged(newRange):
-                state.timeRange = newRange
-                return .run { send in
-                    await send(.refresh)
-                }
+            case .binding(\.timeRange):
+                return refresh(&state)
 
             case .binding:
                 return .none
@@ -156,6 +136,37 @@ struct EntityHistoryDetailFeature: Sendable {
             }
         }
         .ifLet(\.$alert, action: \.alert)
+    }
+
+    private func refresh(_ state: inout State) -> Effect<Action> {
+        state.isLoading = true
+        state.rangeEnd = now
+        state.alert = nil
+        state.historyItems = []
+
+        let entityId = state.entity.entityId
+        let dateRange = state.dateRange
+
+        // All pages in one effect: it is cancelled as a whole when the screen is popped or
+        // the range changes, so no late page reaches a removed element or a new range.
+        return .run { send in
+            var cursor: Date?
+            repeat {
+                let response = try await serverClient.getEntityHistory(
+                    entityId,
+                    dateRange.start,
+                    dateRange.end,
+                    cursor,
+                    1000,
+                    cursor == nil
+                )
+                await send(.historyResponse(.success(response)))
+                cursor = response.nextCursor
+            } while cursor != nil
+        } catch: { error, send in
+            await send(.historyResponse(.failure(error)))
+        }
+        .cancellable(id: CancelID.history, cancelInFlight: true)
     }
 }
 
@@ -171,16 +182,13 @@ struct EntityHistoryDetailView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: store.timeRange) { _, newValue in
-                    store.send(.timeRangeChanged(newValue))
-                }
 
-                if hasChart {
+                if store.canPlot {
                     chartView
                 } else if store.isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
-                } else if store.chartData.isEmpty {
+                } else if store.historyItems.isEmpty {
                     Text("No history in this time range.")
                         .foregroundStyle(.secondary)
                 } else {
@@ -205,17 +213,12 @@ struct EntityHistoryDetailView: View {
             }
         }
         .refreshable {
-            store.send(.refresh)
+            await store.send(.refresh).finish()
         }
         .onAppear {
             store.send(.onAppear)
         }
         .alert($store.scope(\.$alert, action: \.alert))
-    }
-
-    /// Whether any point of the history can be drawn: a state for the timeline, a number for the value chart.
-    private var hasChart: Bool {
-        store.chartData.contains { $0.stateValue != nil || $0.primaryValue != nil }
     }
 
     private var laneLabel: String {
@@ -230,7 +233,7 @@ struct EntityHistoryDetailView: View {
     private var chartView: some View {
         let dateRange = store.state.dateRange
         let range = dateRange.start...dateRange.end
-        let isBoolean = store.chartData.contains { $0.stateValue != nil }
+        let isBoolean = store.isBoolean
         let isLux = store.entity.entityId.characteristicType == .lightSensor
 
         if isBoolean {
@@ -238,13 +241,13 @@ struct EntityHistoryDetailView: View {
                 lanes: [.init(
                     label: laneLabel,
                     color: ChartPalette.color(for: store.entity.entityId.characteristicType),
-                    intervals: StateIntervals.intervals(items: store.chartData, isActive: \.stateValue, from: dateRange.start, to: dateRange.end)
+                    intervals: StateIntervals.intervals(items: store.historyItems, isActive: \.stateValue, from: dateRange.start, to: dateRange.end)
                 )],
                 domain: range
             )
         } else {
             ValueChart(
-                points: store.chartData.compactMap { item in item.primaryValue.map { (item.timestamp, $0) } },
+                points: store.historyItems.compactMap { item in item.primaryValue.map { (item.timestamp, $0) } },
                 domain: range,
                 color: ChartPalette.color(for: store.entity.entityId.characteristicType),
                 unit: store.entity.entityId.characteristicType == .lightSensor ? "lx" : "",
@@ -261,14 +264,14 @@ struct EntityHistoryDetailView: View {
         let type = store.entity.entityId.characteristicType
         let days = DailyTotals.days(count: 7, endingAt: dateRange.end, calendar: .current)
         if type == .switcher {
-            let intervals = StateIntervals.intervals(items: store.chartData, isActive: \.isDeviceOn, from: dateRange.start, to: dateRange.end)
+            let intervals = StateIntervals.intervals(items: store.historyItems, isActive: \.isDeviceOn, from: dateRange.start, to: dateRange.end)
             DailyBarChart(
                 bars: DailyTotals.dailyTotals(intervals, days: days, calendar: .current).map { ($0.day, $0.duration / 3_600) },
                 color: ChartPalette.color(for: type),
                 unit: "h"
             )
         } else if type == .lightSensor || type == .carbonDioxideSensorId {
-            let samples = store.chartData.compactMap { item in item.primaryValue.map { (date: item.timestamp, value: $0) } }
+            let samples = store.historyItems.compactMap { item in item.primaryValue.map { (date: item.timestamp, value: $0) } }
             let stats = DailyTotals.dailyStats(samples, days: days, end: dateRange.end, calendar: .current)
             DailyBarChart(
                 bars: stats.map { ($0.day, $0.max) },

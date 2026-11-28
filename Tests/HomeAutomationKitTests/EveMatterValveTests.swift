@@ -8,7 +8,6 @@ import HAModels
 import Testing
 
 struct EveMatterValveTests {
-    private let bathroom = EntityId(placeId: "Bad OG", name: "Eve Thermo Bad OG", characteristicsName: "Heizung", characteristic: .valvePosition)
     private let livingRoom = EntityId(placeId: "Kaminzimmer", name: "Eve Thermo Kaminzimmer", characteristicsName: "Heizung", characteristic: .valvePosition)
 
     @Test("Raw values within 0...100 are the valve position in percent", arguments: [

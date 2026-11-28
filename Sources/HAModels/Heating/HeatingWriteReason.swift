@@ -1,5 +1,5 @@
 //
-//  HeatingWrite.swift
+//  HeatingWriteReason.swift
 //  HAModels
 //
 
@@ -44,11 +44,4 @@ public extension ActionLogItem {
 
     /// The °C written by `setTargetTemperature`; `nil` for every other command.
     var targetTemperatureInC: Double? { actionName == HomeManagableAction.setTargetTemperatureName ? value : nil }
-}
-
-/// Where the room detail reads the radiator commands of a room: the journal's command rows.
-public protocol HeatingCommandSource: Sendable {
-    /// The commands that reached the radiators of room `placeId` in `startDate ..< endDate` (open ends allowed),
-    /// oldest first.
-    func writes(placeId: String, startDate: Date?, endDate: Date?) async -> [ActionLogItem]
 }

@@ -114,13 +114,16 @@ final class FireplaceEndpointTests: XCTestCase {
 
     func testRepeatedOnKeepsTheStartAndTellsNobody() async throws {
         try await switchFireplace(true)
-        let (_, first) = try await request(.GET, token: token)
-        try await Task.sleep(for: .milliseconds(1100))
+        let homeManager = app.homeManager
+        let first = try await Fireplace.state(with: homeManager)
+        let since = try XCTUnwrap(first.since)
+        // the clock moves on, so a repeat that restarted the fireplace would carry a later start
+        while Date() <= since { try await Task.sleep(for: .milliseconds(1)) }
 
         try await switchFireplace(true)
 
-        let (_, second) = try await request(.GET, token: token)
-        XCTAssertEqual(second?.since, first?.since)
+        let second = try await Fireplace.state(with: homeManager)
+        XCTAssertEqual(second.since, since)
         XCTAssertEqual(events.all.count, 1)
     }
 }

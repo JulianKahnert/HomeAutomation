@@ -33,10 +33,6 @@ public struct SetLightProperties: Automatable {
     /// Defaults to 300ms to prevent flickering.
     public let delayBetweenProperties: Duration
 
-    public var triggerEntityIds: Set<EntityId> {
-        []
-    }
-
     public init(
         _ name: String,
         at triggerTime: Time,

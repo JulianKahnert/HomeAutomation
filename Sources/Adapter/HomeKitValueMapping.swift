@@ -12,60 +12,18 @@ import HAModels
 /// without HomeKit. The HomeKit constants it compares with are written out as their HAP UUIDs and checked
 /// against the HomeKit symbols in `HomeKitValueMappingTests`.
 enum HomeKitValueMapping {
-    // Services
-    static let occupancySensorService = "00000086-0000-1000-8000-0026BB765291"
-    static let motionSensorService = "00000085-0000-1000-8000-0026BB765291"
-    static let lightSensorService = "00000084-0000-1000-8000-0026BB765291"
-    static let contactSensorService = "00000080-0000-1000-8000-0026BB765291"
-    static let lockMechanismService = "00000045-0000-1000-8000-0026BB765291"
-    static let batteryService = "00000096-0000-1000-8000-0026BB765291"
-    static let heaterCoolerService = "000000BC-0000-1000-8000-0026BB765291"
-    static let valveService = "000000D0-0000-1000-8000-0026BB765291"
     // Characteristics
     static let occupancyDetectedCharacteristic = "00000071-0000-1000-8000-0026BB765291"
     static let motionDetectedCharacteristic = "00000022-0000-1000-8000-0026BB765291"
 
     /// What the mapping needs to know about the characteristic besides the value.
     struct Context {
-        var serviceType: String?
         var characteristicType: String
-        /// Whether the characteristic's metadata says its format is Bool (`PowerState` is only a switch then).
-        var isBoolFormat = false
         var minimumValue: Double?
         var maximumValue: Double?
         /// The values of the `Saturation` and `Brightness` characteristics of the same service, read for a colour.
         var saturation: Any?
         var brightness: Any?
-    }
-
-    /// Whether HomeKit has to be asked for the value of `type` on this characteristic at all: the service and
-    /// format checks that come before the read. `false` leaves the item without a value, as before.
-    static func needsRead(_ type: CharacteristicsType, context: Context) -> Bool {
-        let service = context.serviceType
-        switch type {
-        case .motionSensor:
-            return (service == occupancySensorService && context.characteristicType == occupancyDetectedCharacteristic)
-                || (service == motionSensorService && context.characteristicType == motionDetectedCharacteristic)
-        case .lightSensor:
-            return service == lightSensorService
-        case .switcher:
-            return context.isBoolFormat
-        case .contactSensor:
-            return service == contactSensorService
-        case .lock:
-            return service == lockMechanismService
-        case .batterySensor:
-            return service == batteryService
-        case .heating:
-            return service == heaterCoolerService
-        case .valve:
-            return service == valveService
-        case .brightness, .colorTemperature, .color, .temperatureSensor, .relativeHumiditySensor, .carbonDioxideSensorId,
-             .pmDensitySensor, .airQualitySensor, .targetTemperature, .heatingMode, .valvePosition:
-            return true
-        case .temperatureCalibration, .energyPrice, .deadline:
-            return false
-        }
     }
 
     /// The value for `raw`, as HomeKit reported it; `nil` when it is not what the characteristic promises.

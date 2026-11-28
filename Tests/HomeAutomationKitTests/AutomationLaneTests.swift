@@ -27,7 +27,7 @@ private actor LaneProbe {
         }
     }
     func waitForSeen(_ count: Int) async {
-        while seen.count < count { try? await Task.sleep(for: .milliseconds(1)) }
+        await eventually("\(count) events were seen") { seen.count >= count }
     }
 }
 
@@ -35,7 +35,6 @@ private struct LaneAutomation: Automatable {
     var isActive = true
     let name: String
     var lanePolicy = LanePolicy.supersede
-    var triggerEntityIds: Set<EntityId> { [] }
     var probe: LaneProbe?
     var recordsRuns: Bool { false }
 

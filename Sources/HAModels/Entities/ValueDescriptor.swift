@@ -6,7 +6,7 @@
 import Foundation
 import Shared
 
-/// What one value kind is: the shape of its value, display and storage rule.
+/// What one value kind is: the shape of its value, its constraint and storage rule.
 ///
 /// ``descriptor(for:)`` is the only table and is exhaustive on purpose: a new `CharacteristicsType`
 /// does not compile until it has a descriptor.
@@ -15,14 +15,6 @@ public struct ValueDescriptor: Sendable, Equatable {
         case bool, number, text
         /// A text for the case and a number for the end, kept in one row (``Deadline``).
         case textWithNumber
-    }
-
-    public enum Display: Sendable, Equatable {
-        case boolean
-        case number
-        case color
-        case enumeration
-        case deadline
     }
 
     /// How a kind is written, kept and condensed (the rules behind `StoragePolicy`).
@@ -68,7 +60,6 @@ public struct ValueDescriptor: Sendable, Equatable {
     }
 
     public let shape: Shape
-    public let display: Display
     public let storage: StorageRule
     public let constraint: Constraint
     /// Whether the app may set a state of this kind through `PUT /entities/state` (the route still accepts only
@@ -128,7 +119,6 @@ public struct ValueDescriptor: Sendable, Equatable {
     private static func bool(isSettableFromApp: Bool = false) -> ValueDescriptor {
         ValueDescriptor(
             shape: .bool,
-            display: .boolean,
             storage: .keepRaw,
             constraint: .none,
             isSettableFromApp: isSettableFromApp
@@ -142,17 +132,15 @@ public struct ValueDescriptor: Sendable, Equatable {
     ) -> ValueDescriptor {
         ValueDescriptor(
             shape: .number,
-            display: .number,
             storage: storage,
             constraint: constraint,
             isSettableFromApp: isSettableFromApp
         )
     }
 
-    private static func structured(shape: Shape, display: Display, constraint: Constraint) -> ValueDescriptor {
+    private static func structured(shape: Shape, constraint: Constraint) -> ValueDescriptor {
         ValueDescriptor(
             shape: shape,
-            display: display,
             storage: .keepRaw,
             constraint: constraint,
             isSettableFromApp: false
@@ -202,9 +190,9 @@ public struct ValueDescriptor: Sendable, Equatable {
         case .energyPrice:
             return number()
         case .deadline:
-            return structured(shape: .textWithNumber, display: .deadline, constraint: .deadlineText)
+            return structured(shape: .textWithNumber, constraint: .deadlineText)
         case .color:
-            return structured(shape: .text, display: .color, constraint: .colorText)
+            return structured(shape: .text, constraint: .colorText)
         }
     }
 }

@@ -78,17 +78,21 @@ enum HomeKitCharacteristic {
         }
     }
 
-    /// Maps to domain model CharacteristicsType, considering service type for context-dependent mappings
-    func toCharacteristicsType(serviceType: String?) -> CharacteristicsType? {
+    /// Maps to domain model CharacteristicsType. The one place that decides whether a characteristic is an entity:
+    /// the service (and for a switch the Bool format) it sits on has to be the one the kind belongs to, otherwise it is
+    /// none, instead of an entity that never gets a value.
+    func toCharacteristicsType(serviceType: String?, isBoolFormat: Bool) -> CharacteristicsType? {
         switch self {
         case .batteryLevel:
-            return .batterySensor
+            return serviceType == HMServiceTypeBattery ? .batterySensor : nil
         case .contactState:
-            return .contactSensor
+            return serviceType == HMServiceTypeContactSensor ? .contactSensor : nil
         case .currentLightLevel:
-            return .lightSensor
-        case .motionDetected, .occupancyDetected:
-            return .motionSensor
+            return serviceType == HMServiceTypeLightSensor ? .lightSensor : nil
+        case .motionDetected:
+            return serviceType == HMServiceTypeMotionSensor ? .motionSensor : nil
+        case .occupancyDetected:
+            return serviceType == HMServiceTypeOccupancySensor ? .motionSensor : nil
         case .brightness:
             return .brightness
         case .colorTemperature:
@@ -96,9 +100,9 @@ enum HomeKitCharacteristic {
         case .hue:
             return .color
         case .powerState:
-            return .switcher
+            return isBoolFormat ? .switcher : nil
         case .targetLockMechanismState:
-            return .lock
+            return serviceType == HMServiceTypeLockMechanism ? .lock : nil
         case .currentTemperature:
             return .temperatureSensor
         case .currentRelativeHumidity:

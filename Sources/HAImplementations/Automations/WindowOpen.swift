@@ -14,10 +14,6 @@ public struct WindowOpen: Automatable {
     public let name: String
     public let windowContact: ContactSensorDevice
     public let notificationWait: Duration
-    public var triggerEntityIds: Set<EntityId> {
-        [windowContact.contactSensorId]
-    }
-
     public init(_ name: String, windowContact: ContactSensorDevice, notificationWait: Duration = .minutes(15)) {
         self.name = name
         self.windowContact = windowContact
@@ -99,10 +95,9 @@ public struct WindowOpen: Automatable {
         // compare in that form so the same end counts as the same deadline.
         let deadline = Deadline(text: deadline.text) ?? deadline
         // Decided where the state is set, so a report of another writer in between cannot be overwritten blindly.
+        // (`report` itself leaves a value-identical replay alone.)
         try await homeManager.report(deadlineId, value: .text(deadline.text), origin: .server, ifCurrent: { item in
-            let current = item?.deadline
-            guard current != deadline else { return false }
-            if case .running(let until) = deadline, current == .overdue(since: until) { return false }
+            if case .running(let until) = deadline { return item?.deadline != .overdue(since: until) }
             return true
         })
     }

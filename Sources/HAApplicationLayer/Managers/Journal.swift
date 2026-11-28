@@ -82,7 +82,7 @@ public final class Journal: Sendable {
     /// The newest executed command of every radiator; empty when the database fails.
     public func lastHeatingWrites() async -> [ActionLogItem] {
         do {
-            return try await store.lastHeatingCommands().filter(\.isExecutedHeatingWrite)
+            return try await store.lastHeatingWrites()
         } catch {
             Self.logger.error("Failed to read the last heating commands of the journal", metadata: ["error": "\(error)"])
             return []
@@ -139,25 +139,16 @@ public final class Journal: Sendable {
     }
 }
 
-extension Journal: HeatingCommandSource {
-    /// Oldest first; empty when the database fails.
-    public func writes(placeId: String, startDate: Date?, endDate: Date?) async -> [ActionLogItem] {
-        do {
-            return try await store.heatingCommands(placeId: placeId, startDate: startDate, endDate: endDate).filter(\.isExecutedHeatingWrite)
-        } catch {
-            Self.logger.error("Failed to read the heating commands of the journal", metadata: ["error": "\(error)"])
-            return []
-        }
-    }
-}
-
 /// Keeps the journal in memory; for tests and previews.
 public actor InMemoryJournalStore: JournalStore {
     private var runStore: [UUID: AutomationRun] = [:]
     private var commandStore: [ActionLogItem] = []
     private var pushStore: [JournalPush] = []
 
-    public init() {}
+    /// - Parameter commands: Rows that are in the store from the start, e.g. seeded radiator commands.
+    public init(commands: [ActionLogItem] = []) {
+        commandStore = commands
+    }
 
     public func add(_ run: AutomationRun) async throws { runStore[run.id] = run }
 
@@ -200,16 +191,16 @@ public actor InMemoryJournalStore: JournalStore {
         return limit.map { Array(matching.prefix($0)) } ?? matching
     }
 
-    public func heatingCommands(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem] {
+    public func heatingWrites(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem] {
         commandStore
-            .filter { $0.reason != nil && $0.status == .executed && $0.entityId.placeId == placeId
+            .filter { $0.isExecutedHeatingWrite && $0.entityId.placeId == placeId
                 && $0.timestamp >= (startDate ?? .distantPast) && $0.timestamp < (endDate ?? .distantFuture)
             }
             .sorted { $0.timestamp < $1.timestamp }
     }
 
-    public func lastHeatingCommands() async throws -> [ActionLogItem] {
-        Dictionary(grouping: commandStore.filter { $0.reason != nil && $0.status == .executed }) { "\($0.entityId.placeId)/\($0.entityId.name)" }
+    public func lastHeatingWrites() async throws -> [ActionLogItem] {
+        Dictionary(grouping: commandStore.filter(\.isExecutedHeatingWrite)) { "\($0.entityId.placeId)/\($0.entityId.name)" }
             .compactMap { $0.value.max { $0.timestamp < $1.timestamp } }
     }
 

@@ -159,6 +159,9 @@ public extension EntityStorageItem {
             (.energyPrice, energyPriceInEURPerKWh.map { .number($0) }),
             (.deadline, deadline.map { .text($0.text) })
         ]
+        // A caller passes the one value of the entity's kind; a value of another kind is a mistake of the test that wrote it.
+        assert(candidates.filter { $0.1 != nil }.allSatisfy { $0.0 == entityId.characteristicType } && candidates.count { $0.1 != nil } <= 1,
+               "EntityStorageItem(entityId:…) takes one value, of the kind \(entityId.characteristicType)")
         // Only the value of the entity's own kind counts: the kind of an item is the characteristic type of its entity.
         let first = candidates.first { $0.0 == entityId.characteristicType && $0.1 != nil }
         self.init(entityId: entityId, timestamp: timestamp, uncheckedValue: first?.1, origin: origin, lastReport: lastReport)

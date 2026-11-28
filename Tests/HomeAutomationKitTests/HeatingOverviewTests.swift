@@ -26,12 +26,11 @@ struct HeatingOverviewTests {
     }
 
     private func plan(_ place: String, _ target: Double) -> HeatingFixture {
-        HeatingFixture(timestamp: now.addingTimeInterval(-3 * 3_600), entityId: id(place, "Thermo", .heating), reason: .plan,
-                     actionName: "setTargetTemperature", targetTemperatureInC: target, planTargetInC: target)
+        HeatingFixture(timestamp: now.addingTimeInterval(-3 * 3_600), action: .setTargetTemperature(id(place, "Thermo", .heating), celsius: target), reason: .plan, planTargetInC: target)
     }
 
     private func overview(_ rooms: [HeatingRoomSources], items: [EntityStorageItem], writes: [HeatingFixture]) async throws -> HeatingOverview {
-        let detail = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items + writes.compactMap { $0.planTargetItem() }), writes: InMemoryHeatingCommands(writes), now: { now })
+        let detail = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items + writes.compactMap { $0.planTargetItem() }), journal: seededJournal(writes), now: { now })
         return try await HeatingOverviewBuilder(detail: detail).overview(for: rooms)
     }
 
@@ -123,9 +122,9 @@ struct HeatingOverviewTests {
     }
 
     private func heatmap(now: Date, sensor: EntityId, items: [EntityStorageItem], plan target: Double = 21) async throws -> [HeatingHeatmapCell] {
-        let old = HeatingFixture(timestamp: now.addingTimeInterval(-8 * 86_400), entityId: id("Bad", "Thermo", .heating), reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: target, planTargetInC: target)
+        let old = HeatingFixture(timestamp: now.addingTimeInterval(-8 * 86_400), action: .setTargetTemperature(id("Bad", "Thermo", .heating), celsius: target), reason: .plan, planTargetInC: target)
         let detail = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items + [old.planTargetItem()].compactMap { $0 }),
-                                              writes: InMemoryHeatingCommands([old]),
+                                              journal: seededJournal([old]),
                                               now: { now }, calendar: berlin)
         let result = try await HeatingOverviewBuilder(detail: detail, calendar: berlin).overview(for: [room("Bad", sensor: sensor)])
         return result.heatmap

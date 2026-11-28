@@ -173,14 +173,14 @@ struct RoomHeatingTests {
     /// The server switched both radiators off for `reason` at `date`.
     private func seedOffWrites(reason: HeatingWriteReason = .window, at date: Date) {
         for radiator in [left, right] {
-            homeManager.heatingWrites.append(seededWrite(timestamp: date, entityId: radiator.heatingId, reason: reason, actionName: "setHeating", isActive: false))
+            homeManager.heatingWrites.append(seededWrite(timestamp: date, action: .setHeating(radiator.heatingId, active: false), reason: reason))
         }
     }
 
     /// The server returned both radiators to the plan target at `date`.
     private func seedPlanWrites(reason: HeatingWriteReason = .window, at date: Date, target: Double = 21) {
         for radiator in [left, right] {
-            homeManager.heatingWrites.append(seededWrite(timestamp: date, entityId: radiator.targetTemperatureId, reason: reason, actionName: "setTargetTemperature", targetTemperatureInC: target))
+            homeManager.heatingWrites.append(seededWrite(timestamp: date, action: .setTargetTemperature(radiator.targetTemperatureId, celsius: target), reason: reason))
         }
     }
 
@@ -378,7 +378,7 @@ struct RoomHeatingTests {
         setWindow(windowA, open: false, at: noon.addingTimeInterval(-7000))
         seedOffWrites(at: noon.addingTimeInterval(-7190))
         seedPlanWrites(at: noon.addingTimeInterval(-7000))   // the room went back to the plan then
-        homeManager.heatingWrites += [seededWrite(timestamp: noon.addingTimeInterval(-600), entityId: left.targetTemperatureId, reason: .system, actionName: "setTargetTemperature", targetTemperatureInC: 25)]
+        homeManager.heatingWrites += [seededWrite(timestamp: noon.addingTimeInterval(-600), action: .setTargetTemperature(left.targetTemperatureId, celsius: 25), reason: .system)]
         // the adapter's resync after the restart: the state did not change, so it is not stored, but it is an event
         let resync = HomeEvent.change(entity: EntityStorageItem(entityId: windowA.contactSensorId, timestamp: noon, isContactOpen: false))
 
@@ -433,7 +433,6 @@ struct RoomHeatingTests {
         let decoded = try JSONDecoder().decode(AnyAutomation.self, from: JSONEncoder().encode(AnyAutomation.create(from: room())))
 
         let decodedRoom = try #require(decoded.automation as? RoomHeating)
-        #expect(decodedRoom.triggerEntityIds == [windowA.contactSensorId, windowB.contactSensorId])
         #expect(Set(decodedRoom.getEntityIds()).isSuperset(of: [windowA.contactSensorId, windowB.contactSensorId]))
     }
 }

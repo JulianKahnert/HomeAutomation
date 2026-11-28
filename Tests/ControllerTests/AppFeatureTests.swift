@@ -18,15 +18,34 @@ struct AppFeatureTests {
     @Test("activation from inactive or background sends refreshAll", arguments: [ScenePhase.inactive, .background])
     @MainActor
     func activationRefreshesAll(oldPhase: ScenePhase) async {
+        let opened = Date(timeIntervalSince1970: 0)
+        let window = WindowContentState.Window(
+            id: WindowContentState.Window.id(room: "Kitchen", name: "Window"),
+            name: "Window",
+            room: "Kitchen",
+            opened: opened,
+            closeBy: opened.addingTimeInterval(3600),
+            isOverdue: false
+        )
+        let windows = WindowContentState(windows: [window], openCount: 1, overdueCount: 0)
         let store = TestStore(initialState: AppFeature.State()) {
             AppFeature()
         } withDependencies: {
-            $0.serverClient = .previewValue
-            $0.date.now = Date(timeIntervalSince1970: 0)
-            $0.liveActivity = .testValue
-            $0.pushNotification = .testValue
+            $0.date.now = opened
+            $0.serverClient.isHealthy = { true }
+            $0.serverClient.getAutomations = { [AutomationInfo(name: "Night Light", isActive: true, isRunning: false)] }
+            $0.serverClient.getRecentRuns = { _, _ in [] }
+            $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: []) }
+            $0.serverClient.getFireplace = { .off }
+            $0.serverClient.getWindowContentState = { windows }
+            $0.liveActivity.hasActiveActivities = { false }
+            $0.liveActivity.startActivity = { _ in }
+            $0.liveActivity.pushToStartTokenUpdates = { _ in }
+            $0.liveActivity.pushTokenUpdates = { _ in }
+            $0.pushNotification.clearDeliveredNotifications = { }
         }
-        // Each child owns its refresh; this test only pins that activation reaches them.
+        // Four children refresh at once, so the order of their answers is not fixed; each child tests its own
+        // refresh. This test pins that activation reaches all of them.
         store.exhaustivity = .off
 
         await store.send(.scenePhaseChanged(old: oldPhase, new: .active))
@@ -34,8 +53,8 @@ struct AppFeatureTests {
         await store.finish()
         await store.skipReceivedActions()
 
-        #expect(store.state.automations.automations.count == 3)
-        #expect(store.state.settings.windowContentState?.windows.first?.room == "Living Room")
+        #expect(store.state.automations.automations.map(\.name) == ["Night Light"])
+        #expect(store.state.settings.windowContentState?.windows.first?.room == "Kitchen")
     }
 
     @Test("scenePhaseChanged ignores non-active transitions")
@@ -43,10 +62,6 @@ struct AppFeatureTests {
     func testScenePhaseChangedIgnoresNonActiveTransitions() async {
         let store = TestStore(initialState: AppFeature.State()) {
             AppFeature()
-        } withDependencies: {
-            $0.serverClient = .testValue
-            $0.liveActivity = .testValue
-            $0.pushNotification = .testValue
         }
 
         // Send the scene change action for active -> background transition
@@ -61,10 +76,6 @@ struct AppFeatureTests {
     func testScenePhaseChangedIgnoresActiveToInactive() async {
         let store = TestStore(initialState: AppFeature.State()) {
             AppFeature()
-        } withDependencies: {
-            $0.serverClient = .testValue
-            $0.liveActivity = .testValue
-            $0.pushNotification = .testValue
         }
 
         // Send the scene change action for active -> inactive transition
@@ -72,29 +83,5 @@ struct AppFeatureTests {
         await store.send(.scenePhaseChanged(old: .active, new: .inactive))
 
         // No refresh actions should be dispatched
-    }
-
-    @Test("refreshWindowStates delegates to settings feature")
-    @MainActor
-    func testRefreshWindowStates() async {
-        let store = TestStore(initialState: AppFeature.State()) {
-            AppFeature()
-        } withDependencies: {
-            $0.serverClient.getWindowContentState = { .empty }
-            $0.liveActivity = .testValue
-            $0.pushNotification = .testValue
-        }
-
-        await store.send(.refreshWindowStates)
-
-        await store.receive(\.settings.refreshWindowStates) { state in
-            state.settings.isLoadingWindowStates = true
-            state.settings.error = nil
-        }
-
-        await store.receive(\.settings.windowStatesResponse) { state in
-            state.settings.isLoadingWindowStates = false
-            state.settings.windowContentState = .empty
-        }
     }
 }

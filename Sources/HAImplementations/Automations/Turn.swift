@@ -19,10 +19,6 @@ public struct Turn: Automatable {
     public let onlyBeforeSunrise: Bool
     public let switches: [SwitchDevice]
     public let heatSwitches: [HeatSwitch]
-    public var triggerEntityIds: Set<EntityId> {
-        []
-    }
-
     public init(_ state: State, _ name: String, at time: Time, onlyBeforeSunrise: Bool = false, switches: [SwitchDevice], heatSwitches: [HeatSwitch] = []) {
         self.name = name
         self.state = state

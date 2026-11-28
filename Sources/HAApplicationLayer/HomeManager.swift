@@ -28,7 +28,7 @@ public final class HomeManager: HomeManagable {
     private let onReportedChange: @Sendable (EntityStorageItem) -> Void
     /// The last command that reached each radiator, keyed by room and radiator name; loaded from the journal at
     /// start and kept current by `perform`, so a decision never reads the database.
-    private var lastCommands: [String: ActionLogItem] = [:]
+    private var lastWrites: [String: ActionLogItem] = [:]
     /// The changes of every entity of the last `readingRetention`, newest first; what a decision compares
     /// (the rise `FireplaceReminder` looks for). Fills from the changes since the start.
     private var recentReadings: [EntityId: [EntityStorageItem]] = [:]
@@ -185,8 +185,8 @@ public final class HomeManager: HomeManagable {
 
     /// Loads what the automations decide on and the database alone holds: the last command per radiator. A failed read leaves it empty and logs; the decision then runs without it.
     private func loadDecisionState() async {
-        for write in await journal.lastHeatingWrites() where lastCommands[Self.key(of: write.entityId)] == nil {
-            lastCommands[Self.key(of: write.entityId)] = write
+        for write in await journal.lastHeatingWrites() where lastWrites[Self.key(of: write.entityId)] == nil {
+            lastWrites[Self.key(of: write.entityId)] = write
         }
     }
 
@@ -198,12 +198,17 @@ public final class HomeManager: HomeManagable {
             do {
                 let history = try await storageRepo.getHistory(for: item.entityId, startDate: cutoff, endDate: nil, cursor: nil, limit: Self.readingLimit)
                 // changes reported while the load ran are newer and already in front
-                let known = Set((recentReadings[item.entityId] ?? []).map(\.timestamp))
-                recentReadings[item.entityId, default: []] += history.filter { !known.contains($0.timestamp) }
+                let known = Set((recentReadings[item.entityId] ?? []).map { Self.microseconds($0.timestamp) })
+                recentReadings[item.entityId, default: []] += history.filter { !known.contains(Self.microseconds($0.timestamp)) }
             } catch {
                 log.error("Failed to load the recent readings", metadata: ["entityId": "\(item.entityId)", "error": "\(error)"])
             }
         }
+    }
+
+    /// A timestamp at the precision of the database (`DATETIME(6)`): a change read back from it equals the one held in memory.
+    nonisolated private static func microseconds(_ date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 * 1_000_000).rounded())
     }
 
     nonisolated private static func key(of radiator: EntityId) -> String {
@@ -228,7 +233,7 @@ public final class HomeManager: HomeManagable {
     }
 
     public func lastHeatingWrite(of radiator: EntityId) async -> ActionLogItem? {
-        lastCommands[Self.key(of: radiator)]
+        lastWrites[Self.key(of: radiator)]
     }
 
     public func getAllEntitiesLive() async throws -> [EntityStorageItem] {
@@ -254,6 +259,12 @@ public final class HomeManager: HomeManagable {
     }
 
     public func perform(_ action: HomeManagableAction) async {
+        // Only a command that is really attempted supersedes anything: a cancelled run's skipped command must not
+        // count as the newest intent, or it would drop a queued retry and a still running command's bookkeeping.
+        guard !Task.isCancelled else {
+            log.debug("Skipping action of a cancelled run: [\(action)]")
+            return
+        }
         // Round values to prevent excessive HomeKit updates
         let roundedAction = action.rounded()
         let intent = (newestIntent[roundedAction.entityId] ?? 0) &+ 1
@@ -297,6 +308,9 @@ public final class HomeManager: HomeManagable {
         if hasCacheHit {
             return
         }
+        // The command in flight makes the cached state of the entity unknown: an opposite command that follows
+        // before this one is echoed must not be skipped as a duplicate.
+        await commandCache.forget(action.entityId)
 
         // Not a cache hit - execute the action
         log.debug("Executing action: [\(action)]")
@@ -311,11 +325,15 @@ public final class HomeManager: HomeManagable {
             let command = Task { try await adapter.perform(action) }
             try await command.value
 
-            // Only a command that reached the device may deduplicate its successors.
-            await commandCache.markExecuted(action)
             liveness.recordCommandSuccess(at: Date())
-            if newestIntent[action.entityId] == intent, entry.isExecutedHeatingWrite {
-                lastCommands[Self.key(of: entry.entityId)] = entry
+            if newestIntent[action.entityId] == intent {
+                // Only the newest command that reached the device may deduplicate its successors.
+                await commandCache.markExecuted(action)
+                // `lastWrites` is keyed per radiator, the intent per characteristic: only move forward in time.
+                let radiatorKey = Self.key(of: entry.entityId)
+                if entry.isExecutedHeatingWrite, (lastWrites[radiatorKey]?.timestamp ?? .distantPast) <= entry.timestamp {
+                    lastWrites[radiatorKey] = entry
+                }
             }
         } catch {
             liveness.recordCommandFailure(error, at: Date())
@@ -510,8 +528,8 @@ public final class HomeManager: HomeManagable {
         } catch {
             log.error("Failed to read the entity history", metadata: ["entityId": "\(entityId)", "error": "\(error)"])
         }
-        let known = Set(recent.map(\.timestamp))
-        let merged = recent + stored.filter { !known.contains($0.timestamp) }
+        let known = Set(recent.map { Self.microseconds($0.timestamp) })
+        let merged = recent + stored.filter { !known.contains(Self.microseconds($0.timestamp)) }
         return Array(merged.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 

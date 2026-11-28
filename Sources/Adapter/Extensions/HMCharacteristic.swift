@@ -51,31 +51,26 @@ extension HMCharacteristic: @retroactive Comparable {
         }
         let type = entityId.characteristicType
         let context = HomeKitValueMapping.Context(
-            serviceType: service?.serviceType,
             characteristicType: characteristicType,
-            isBoolFormat: metadata?.format == HMCharacteristicMetadataFormatBool,
             minimumValue: metadata?.minimumValue?.doubleValue,
             maximumValue: metadata?.maximumValue?.doubleValue
         )
-        guard HomeKitValueMapping.needsRead(type, context: context) else {
-            return EntityStorageItem(entityId: entityId, timestamp: timestamp)
-        }
         do {
             try await readValue()
+            // Taken right after the read: the sibling reads below must not mix a later hue with an earlier saturation.
+            let raw = value
             var context = context
             if type == .color {
                 (context.saturation, context.brightness) = try await colorSiblingValues()
             }
-            guard let mapped = HomeKitValueMapping.value(type, raw: value, context: context) else {
+            // The checked init only refuses a value its descriptor rejects, which the mapping tests rule out.
+            guard let mapped = HomeKitValueMapping.value(type, raw: raw, context: context),
+                  let item = EntityStorageItem(entityId: entityId, timestamp: timestamp, value: mapped) else {
                 if type == .heatingMode || type == .valvePosition {
-                    homeKitLogger.warning("Unusable heating characteristic value, stored as nil", metadata: logMetadata.merging(["rawValue": "\(String(describing: value))"]) { _, new in new })
+                    homeKitLogger.warning("Unusable heating characteristic value, stored as nil", metadata: logMetadata.merging(["rawValue": "\(String(describing: raw))"]) { _, new in new })
                 } else {
-                    assertionFailure("\(type) characteristic value is not valid - value: \(String(describing: value)), min: \(String(describing: metadata?.minimumValue)), max: \(String(describing: metadata?.maximumValue))")
+                    assertionFailure("\(type) characteristic value is not valid - value: \(String(describing: raw)), min: \(String(describing: metadata?.minimumValue)), max: \(String(describing: metadata?.maximumValue))")
                 }
-                return EntityStorageItem(entityId: entityId, timestamp: timestamp)
-            }
-            guard let item = EntityStorageItem(entityId: entityId, timestamp: timestamp, value: mapped) else {
-                assertionFailure("\(type) characteristic value does not fit its kind - value: \(mapped)")
                 return EntityStorageItem(entityId: entityId, timestamp: timestamp)
             }
             if type.isHeatingRelated {
@@ -141,7 +136,7 @@ extension HMCharacteristic: @retroactive Comparable {
             assertionFailure()
             return nil
         }
-        return homeKitCharacteristic.toCharacteristicsType(serviceType: service?.serviceType)
+        return homeKitCharacteristic.toCharacteristicsType(serviceType: service?.serviceType, isBoolFormat: metadata?.format == HMCharacteristicMetadataFormatBool)
     }
 }
 #endif

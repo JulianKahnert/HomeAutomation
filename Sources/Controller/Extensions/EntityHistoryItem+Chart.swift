@@ -35,7 +35,7 @@ extension EntityHistoryItem {
         case .number(let number):
             return number
         case .text:
-            return descriptor?.display == .color ? hue : nil
+            return descriptor?.constraint == .colorText ? hue : nil
         case nil:
             return nil
         }

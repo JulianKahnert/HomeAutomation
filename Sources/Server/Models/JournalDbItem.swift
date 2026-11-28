@@ -71,12 +71,15 @@ final class JournalDbItem: Model, @unchecked Sendable {
     @OptionalField(key: "reason")
     var reason: String?
 
-
     @OptionalField(key: "commandValue")
     var commandValue: Double?
 
     @OptionalField(key: "pushId")
     var pushId: String?
+
+    /// The widths of the `title` and `detail` columns; a longer text is cut, because a too long value would fail the insert.
+    static let titleLimit = 255
+    static let detailLimit = 1000
 
     init() { }
 
@@ -85,8 +88,8 @@ final class JournalDbItem: Model, @unchecked Sendable {
         kind = JournalKind.run.rawValue
         timestamp = run.startedAt
         runId = run.id
-        title = run.automationName
-        detail = run.trigger.summary
+        title = run.automationName.fitted(toScalars: Self.titleLimit)
+        detail = run.trigger.summary.fitted(toScalars: Self.detailLimit)
         setEntity(run.trigger.entityId)
         triggerKind = run.trigger.kind.rawValue
         outcome = run.outcome.rawValue
@@ -99,8 +102,8 @@ final class JournalDbItem: Model, @unchecked Sendable {
         kind = JournalKind.command.rawValue
         timestamp = command.timestamp
         runId = command.runId
-        title = command.actionName
-        detail = command.detailDescription
+        title = command.actionName.fitted(toScalars: Self.titleLimit)
+        detail = command.detailDescription.fitted(toScalars: Self.detailLimit)
         setEntity(command.entityId)
         status = command.status.rawValue
         reason = command.reason?.rawValue
@@ -112,8 +115,8 @@ final class JournalDbItem: Model, @unchecked Sendable {
         kind = JournalKind.push.rawValue
         timestamp = push.timestamp
         runId = push.runId
-        title = push.title
-        detail = push.message
+        title = push.title.fitted(toScalars: Self.titleLimit)
+        detail = push.message.fitted(toScalars: Self.detailLimit)
         pushId = push.pushId
     }
 

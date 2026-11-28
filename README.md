@@ -101,7 +101,6 @@ Implement the `Automatable` protocol:
 ```swift
 public protocol Automatable {
     var name: String { get }
-    var triggerEntityIds: Set<EntityId> { get }  // Sensors/devices that trigger this
     func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool
     func execute(using hm: HomeManagable) async throws
 }

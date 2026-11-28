@@ -352,7 +352,6 @@ private struct HeatingPreview: View {
             .frame(width: layout == .compact ? 402 : 1_120, height: layout == .compact ? 900 : 760)
             .background(Color(white: scheme == .dark ? 0.08 : 0.96))
             .environment(\.colorScheme, scheme)
-            .environment(\.locale, HeatingFormat.locale)
     }
 }
 

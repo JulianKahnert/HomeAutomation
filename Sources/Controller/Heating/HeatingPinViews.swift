@@ -61,6 +61,7 @@ struct HeatingPinCard: View {
     var inPopover = false
 
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.locale) private var locale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -87,8 +88,8 @@ struct HeatingPinCard: View {
     }
 
     private func header(_ event: HeatingEvent) -> String {
-        var text = "\(event.source.label) · \(HeatingFormat.time(event.start, includingDay: true))"
-        if let end = event.end { text += " – \(HeatingFormat.time(end, includingDay: false))" } else if event.hasDuration { text = String(localized: "\(text) – until now", bundle: .module) }
+        var text = "\(event.source.label) · \(HeatingFormat.time(event.start, includingDay: true, locale: locale))"
+        if let end = event.end { text += " – \(HeatingFormat.time(end, includingDay: false, locale: locale))" } else if event.hasDuration { text = String(localized: "\(text) – until now", bundle: .module) }
         return text
     }
 }

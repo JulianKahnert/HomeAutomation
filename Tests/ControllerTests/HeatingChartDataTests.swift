@@ -87,12 +87,13 @@ struct HeatingChartDataTests {
         #expect(HeatingChartData.barExtent(forDelta: -1.2) == -1.2...0)
     }
 
-    @Test("weekday labels are short German names")
+    @Test("weekday labels are short names in the given locale")
     func weekday() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
         let monday = calendar.date(from: DateComponents(year: 2026, month: 11, day: 16, hour: 0))!
-        #expect(HeatingFormat.weekday(monday, calendar: calendar) == "Mo.")
+        #expect(HeatingFormat.weekday(monday, calendar: calendar, locale: Locale(identifier: "de_DE")) == "Mo.")
+        #expect(HeatingFormat.weekday(monday, calendar: calendar, locale: Locale(identifier: "en_US")) == "Mon")
     }
 
     @Test("the crosshair snaps to the nearest sample")
@@ -115,11 +116,22 @@ struct HeatingChartDataTests {
         #expect(HeatingComfort(delta: 0.51) == .tooWarm)
     }
 
-    @Test("numbers use the decimal comma and a real minus")
-    func formatting() {
-        #expect(HeatingFormat.degrees(21.5) == "21,5°")
-        #expect(HeatingFormat.kelvin(1.24) == "+1,2 K")
-        #expect(HeatingFormat.kelvin(-0.8) == "−0,8 K")
-        #expect(HeatingFormat.kelvin(0.02) == "±0,0 K")
+    @Test("German numbers use the decimal comma and a real minus")
+    func formattingGerman() {
+        let de = Locale(identifier: "de_DE")
+        #expect(HeatingFormat.degrees(21.5, locale: de) == "21,5°")
+        #expect(HeatingFormat.kelvin(1.24, locale: de) == "+1,2 K")
+        #expect(HeatingFormat.kelvin(-0.8, locale: de) == "−0,8 K")
+        #expect(HeatingFormat.kelvin(0.02, locale: de) == "±0,0 K")
+    }
+
+    @Test("English numbers use the decimal point")
+    func formattingEnglish() {
+        let en = Locale(identifier: "en_US")
+        #expect(HeatingFormat.degrees(21.5, locale: en) == "21.5°")
+        #expect(HeatingFormat.kelvin(1.24, locale: en) == "+1.2 K")
+        #expect(HeatingFormat.kelvin(-0.8, locale: en) == "−0.8 K")
+        #expect(HeatingFormat.kelvin(0.02, locale: en) == "±0.0 K")
+        #expect(HeatingFormat.percent(45.4, locale: en) == "45%")
     }
 }

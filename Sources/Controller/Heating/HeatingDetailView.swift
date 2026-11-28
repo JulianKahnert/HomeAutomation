@@ -48,6 +48,7 @@ struct HeatingSection<Content: View, Header: View, Footer: View>: View {
 }
 
 struct HeatingRoomDetailView: View {
+    @Environment(\.locale) private var locale
     let detail: HeatingRoomDetail
     @Binding var range: HeatingRange
     /// The pin (or "+n" group) whose reason is shown.
@@ -141,7 +142,7 @@ struct HeatingRoomDetailView: View {
             ZStack(alignment: .leading) {
                 Text("Now", bundle: .module)
                     .opacity(crosshair == nil ? 1 : 0)
-                Text(shown.map { HeatingFormat.time($0.date, includingDay: includesDay) } ?? "")
+                Text(shown.map { HeatingFormat.time($0.date, includingDay: includesDay, locale: locale) } ?? "")
                     .opacity(crosshair == nil ? 0 : 1)
             }
             .font(.subheadline.monospacedDigit())
@@ -152,7 +153,7 @@ struct HeatingRoomDetailView: View {
                 Text("0").font(.largeTitle.weight(.semibold)).hidden()
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     if let ist = shown?.ist {
-                        Text(HeatingFormat.degrees(ist))
+                        Text(HeatingFormat.degrees(ist, locale: locale))
                             .font(.largeTitle.weight(.semibold).monospacedDigit())
                     } else {
                         Text("No actual value", bundle: .module)
@@ -167,12 +168,12 @@ struct HeatingRoomDetailView: View {
                             .lineLimit(1)
                     } else {
                         if let plan = shown?.sollPlan {
-                            Text("Plan \(HeatingFormat.degrees(plan))", bundle: .module)
+                            Text("Plan \(HeatingFormat.degrees(plan, locale: locale))", bundle: .module)
                                 .font(.title3.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
                         if let delta = shown?.delta {
-                            Text(HeatingFormat.kelvin(delta))
+                            Text(HeatingFormat.kelvin(delta, locale: locale))
                                 .font(.title3.weight(.semibold).monospacedDigit())
                                 .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
                         }
@@ -203,7 +204,7 @@ struct HeatingRoomDetailView: View {
 
     private var lastIstText: String {
         guard let last = detail.lastIst else { return String(localized: "no actual value so far", bundle: .module) }
-        return String(localized: "no actual value since \(HeatingFormat.time(last, includingDay: true))", bundle: .module)
+        return String(localized: "no actual value since \(HeatingFormat.time(last, includingDay: true, locale: locale))", bundle: .module)
     }
 
     private var sourceSymbol: String {
@@ -226,7 +227,7 @@ struct HeatingRoomDetailView: View {
             if crosshair != nil, let sample = shown {
                 let parts = detail.radiators.enumerated().map { index, name -> String in
                     let value = sample.valves.indices.contains(index) ? sample.valves[index] : nil
-                    return "\(name) \(value.map(HeatingFormat.percent) ?? "–")"
+                    return "\(name) \(value.map { HeatingFormat.percent($0, locale: locale) } ?? "–")"
                 }
                 Text("Valve · \(parts.joined(separator: " · "))", bundle: .module)
             } else {
@@ -256,6 +257,7 @@ private let heatingGrid = Color.secondary.opacity(0.12)
 
 /// Soft grey actual line, dashed plan line, colour only in the gap between them.
 struct HeatingSollIstChart: View {
+    @Environment(\.locale) private var locale
     let samples: [HeatingSample]
     var events: [HeatingEvent] = []
     @Binding var crosshair: Date?
@@ -354,7 +356,7 @@ struct HeatingSollIstChart: View {
                 }
             }
         }
-        .chartXAxis { HeatingTimeAxis.marks(range: range) }
+        .chartXAxis { HeatingTimeAxis.marks(range: range, locale: locale) }
         .chartPlotStyle { $0.clipped() }
         // Swift Charts' own selection: drag or hover moves the crosshair, a vertical swipe still scrolls the page.
         .chartXSelection(value: $crosshair)
@@ -486,13 +488,13 @@ enum HeatingTimeAxis {
     }
 
     @AxisContentBuilder
-    static func marks(range: HeatingRange) -> some AxisContent {
+    static func marks(range: HeatingRange, locale: Locale) -> some AxisContent {
         let step = stride(for: range)
         AxisMarks(values: .stride(by: step.component, count: step.count)) { value in
             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(heatingGrid)
             AxisValueLabel(centered: range == .week) {
                 if let date = value.as(Date.self) {
-                    Text(range == .week ? HeatingFormat.weekday(date) : HeatingFormat.time(date, includingDay: false))
+                    Text(range == .week ? HeatingFormat.weekday(date, locale: locale) : HeatingFormat.time(date, includingDay: false, locale: locale))
                         .font(.caption2.monospacedDigit())
                 }
             }

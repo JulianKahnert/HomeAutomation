@@ -11,6 +11,7 @@ import SwiftUI
 
 /// The bars of all rooms. Selecting a room is reported through `onSelect`.
 struct HeatingOverviewView: View {
+    @Environment(\.locale) private var locale
     let rooms: [HeatingOverviewRoom]
     let selectedPlaceId: String?
     /// The fireplace burns: the rooms that follow it show the flame and a soft orange area.
@@ -42,7 +43,7 @@ struct HeatingOverviewView: View {
         } header: {
             Text("Rooms", bundle: .module)
         } footer: {
-            Text("Deviation from plan, coldest first. Grey: within ±\(HeatingFormat.kelvinAmount(HeatingComfort.band)).", bundle: .module)
+            Text("Deviation from plan, coldest first. Grey: within ±\(HeatingFormat.kelvinAmount(HeatingComfort.band, locale: locale)).", bundle: .module)
         }
     }
 
@@ -182,6 +183,7 @@ struct HeatingOverviewView: View {
 
 /// Health-style info bubble: no border, numbers only for the hovered or dragged room.
 struct HeatingInfoBubble: View {
+    @Environment(\.locale) private var locale
     @Environment(\.colorScheme) private var scheme
     let room: HeatingOverviewRoom
 
@@ -189,13 +191,13 @@ struct HeatingInfoBubble: View {
         VStack(alignment: .leading, spacing: 1) {
             Text(room.name).font(.caption).foregroundStyle(.secondary)
             if let delta = room.delta {
-                Text(HeatingFormat.kelvin(delta))
+                Text(HeatingFormat.kelvin(delta, locale: locale))
                     .font(.title3.weight(.semibold).monospacedDigit())
                     .foregroundStyle(HeatingPalette.color(forDelta: delta, scheme: scheme))
             } else {
                 Text("No value available", bundle: .module).font(.title3.weight(.semibold))
             }
-            Text("Actual \(room.ist.map(HeatingFormat.degrees) ?? "–") · Plan \(room.sollPlan.map(HeatingFormat.degrees) ?? "–")", bundle: .module)
+            Text("Actual \(room.ist.map { HeatingFormat.degrees($0, locale: locale) } ?? "–") · Plan \(room.sollPlan.map { HeatingFormat.degrees($0, locale: locale) } ?? "–")", bundle: .module)
                 .font(.caption.monospacedDigit())
             Label(sourceText, systemImage: sourceSymbol)
                 .font(.caption2)

@@ -179,7 +179,13 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     /// The notifications `deliver` was asked to send.
     private(set) var sentNotifications: [(title: String, message: String, id: String, category: String?)] = []
 
+    /// The alerts of the Live Activity updates `deliver` was asked to send.
+    private(set) var liveActivityAlerts: [LiveActivityOptions.Alert] = []
+
     func deliver(_ delivery: Delivery) async {
+        if case let .liveActivity(_, _, options) = delivery, let alert = options.alert {
+            liveActivityAlerts.append(alert)
+        }
         guard case let .push(title, message, id, category) = delivery else { return }
         sentNotificationTitles.append(title)
         sentNotifications.append((title, message, id, category))

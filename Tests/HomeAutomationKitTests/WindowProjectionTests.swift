@@ -230,6 +230,37 @@ struct WindowProjectionTests {
         #expect(await sender.updates.compactMap(\.options.alert).isEmpty)
     }
 
+    @Test("a reminder for a window still überschritten sends the alert again with the current content state")
+    func reminderRepeatsTheAlert() async throws {
+        try await open("Fenster", in: "Küche", minutesAfterStart: 0)
+        try await open("Tür", in: "Flur", minutesAfterStart: 1)
+        try await markOverdue("Fenster", in: "Küche")
+        let updatesBefore = await sender.updates.count
+
+        #expect(try await WindowProjection.remind(of: Self.deadlineId("Fenster", in: "Küche"), using: manager))
+
+        let updates = await sender.updates
+        #expect(updates.count == updatesBefore + 1)
+        let update = try #require(updates.last)
+        #expect(update.options.priority == .high)
+        #expect(update.options.alert == LiveActivityOptions.Alert(title: "Fenster schließen", body: "Küche: Fenster"))
+        #expect(update.contentState == updates[updates.count - 2].contentState)
+    }
+
+    @Test("a reminder for a window that is not überschritten (still running or closed) sends nothing")
+    func reminderForAWindowNotOverdueSendsNothing() async throws {
+        try await open("Fenster", in: "Küche", minutesAfterStart: 0)
+        try await open("Tür", in: "Flur", minutesAfterStart: 1)
+        try await markOverdue("Tür", in: "Flur")
+        try await close("Tür", in: "Flur")
+        let eventsBefore = await sender.events.count
+
+        #expect(try await WindowProjection.remind(of: Self.deadlineId("Fenster", in: "Küche"), using: manager) == false)
+        #expect(try await WindowProjection.remind(of: Self.deadlineId("Tür", in: "Flur"), using: manager) == false)
+
+        #expect(await sender.events.count == eventsBefore)
+    }
+
     @Test("opening and closing a window send priority-10 updates without an alert")
     func openAndCloseSendHighPriorityWithoutAlert() async throws {
         try await open("Fenster", in: "Küche", minutesAfterStart: 0)

@@ -42,7 +42,8 @@ public struct WindowOpen: Automatable {
         try await execute(using: hm, on: AutomationRunContext.event, now: Date(), sleep: { try await Task.sleep(for: $0) })
     }
 
-    /// Reports the open window's deadline and its überschritten state at the Fensterschließzeit.
+    /// Reports the open window's deadline and its überschritten state at the Fensterschließzeit, then repeats the
+    /// alert once per Lüftungslimit while the window stays open.
     ///
     /// - On a report (`event`) the window opened `now`. On a server start it has been open since the timestamp
     ///   of its contact's current state, so the Live Activity keeps its real opening time and the run waits
@@ -80,6 +81,41 @@ public struct WindowOpen: Automatable {
         // The window projection shows the window überschritten and alerts the resident.
         log.debug("Fensterschließzeit reached, reporting the window überschritten")
         try await reportDeadline(.overdue(since: closeBy), using: hm)
+
+        // After the wait it is the Fensterschließzeit, unless it had passed before the run began.
+        try await remindWhileOpen(closeBy: closeBy, now: max(now, closeBy), using: hm, sleep: sleep)
+    }
+
+    /// Repeats the alert "Fenster schließen" once per Lüftungslimit after the Fensterschließzeit, as long as the window
+    /// stays open: with a Lüftungslimit of 10 minutes the resident is alerted at 10, 20, 30 … minutes.
+    ///
+    /// The run that reports the window closed supersedes this one and so ends the reminders. The reminders keep the
+    /// rhythm of the Fensterschließzeit, also when a server start or a replay of "open" starts the run again, so no
+    /// restart sends an extra alert.
+    private func remindWhileOpen(closeBy: Date, now: Date, using hm: HomeManagable, sleep: @Sendable (Duration) async throws -> Void) async throws {
+        let interval = notificationWait.timeInterval
+        // A Lüftungslimit of zero has no rhythm to repeat in.
+        guard interval > 0 else { return }
+
+        // The first reminder still to come: the alert at the Fensterschließzeit itself went with the überschritten report.
+        let elapsed = max(0, now.timeIntervalSince(closeBy))
+        var reminder = closeBy.addingTimeInterval(interval * ((elapsed / interval).rounded(.down) + 1))
+        var wait = reminder.timeIntervalSince(now)
+        while true {
+            log.debug("Waiting for the next reminder", metadata: ["remaining": "\(wait)"])
+            try await sleep(.seconds(wait))
+
+            let contact = try await hm.getCurrentEntity(with: windowContact.contactSensorId)
+            guard try contact.isContactOpen.get(with: log) else {
+                log.debug("Window closed, no further reminder")
+                return
+            }
+            log.debug("Window still open, repeating the alert", metadata: ["reminder": "\(reminder)"])
+            guard try await WindowProjection.remind(of: deadlineId, using: hm) else { return }
+
+            reminder = reminder.addingTimeInterval(interval)
+            wait = interval
+        }
     }
 
     /// The server-owned entity that holds this window's deadline, one per window.

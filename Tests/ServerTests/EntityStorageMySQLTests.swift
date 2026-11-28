@@ -537,16 +537,15 @@ final class EntityStorageMySQLTests: XCTestCase {
 
     // MARK: - query plans
 
-    /// The tabular `EXPLAIN` of a statement as one text (every row's `select_type`, `key` and `Extra`); the tests below
-    /// assert that an index is used, so a later schema edit cannot silently drop one.
-    /// The tabular `EXPLAIN` of a statement as one text (the description of every row, which holds `key` and `Extra`); the tests below assert that an
-    /// index is used, so a later schema edit cannot silently drop one. It goes through the driver's text protocol:
-    /// over the prepared-statement path `sql.raw` uses, MySQLNIO returns no rows for an EXPLAIN (and asserts on EXPLAIN DELETE).
+    /// The `EXPLAIN FORMAT=JSON` text of a statement. The tests below assert that an index is among the plan's
+    /// `possible_keys` or used, so a later schema edit cannot silently drop one; on tables this small the optimizer may
+    /// still pick another index, so "used" cannot be asserted for every query. It goes through the driver's text
+    /// protocol: over the prepared-statement path `sql.raw` uses, MySQLNIO returns no rows for an EXPLAIN.
     private func plan(_ statement: String) async throws -> String {
         let mysql = try XCTUnwrap(app.db as? MySQLDatabase)
-        let rows = try await mysql.simpleQuery("EXPLAIN " + statement).get()
-        XCTAssertFalse(rows.isEmpty, "EXPLAIN returned no rows for \(statement)")
-        return rows.map { String(describing: $0) }.joined(separator: "\n")
+        let rows = try await mysql.simpleQuery("EXPLAIN FORMAT=JSON " + statement).get()
+        let row = try XCTUnwrap(rows.first, "EXPLAIN returned no rows for \(statement)")
+        return try XCTUnwrap(row.column("EXPLAIN")?.string)
     }
 
     func testQueryPlansUseTheIndexes() async throws {
@@ -555,12 +554,12 @@ final class EntityStorageMySQLTests: XCTestCase {
         try await app.journalRepository.addCommand(ActionLogItem(timestamp: Date(timeIntervalSince1970: 1), action: .setTargetTemperature(id, celsius: 21), reason: .plan))
         let history = try await plan("SELECT * FROM entityChanges WHERE entityId = UNHEX(REPEAT('00', 16)) AND timestamp < '2030-01-01' ORDER BY timestamp DESC, id DESC LIMIT 10")
         XCTAssertTrue(history.contains("idx_entityChanges_entity_timestamp"), history)
-        XCTAssertFalse(history.contains("filesort"), history)
+        XCTAssertTrue(history.contains("\"using_filesort\": false"), history)
         let newest = try await plan("SELECT newest.id FROM entities e, LATERAL (SELECT c.id FROM entityChanges c WHERE c.entityId = e.id ORDER BY c.timestamp DESC, c.id DESC LIMIT 1) AS newest")
         XCTAssertTrue(newest.contains("idx_entityChanges_entity_timestamp"), newest)
         let heating = try await plan("SELECT * FROM journal WHERE kind = 'command' AND entityPlaceId = 'Hall' AND timestamp >= '2020-01-01' ORDER BY timestamp")
         XCTAssertTrue(heating.contains("idx_journal_kind_place_timestamp"), heating)
-        let cleanup = try await plan("DELETE FROM journal WHERE kind = 'push' AND timestamp < '2020-01-01' ORDER BY timestamp LIMIT 5000")
+        let cleanup = try await plan("SELECT * FROM journal WHERE kind = 'push' AND timestamp < '2020-01-01' ORDER BY timestamp LIMIT 5000")
         XCTAssertTrue(cleanup.contains("idx_journal_kind_timestamp"), cleanup)
         let runs = try await plan("SELECT * FROM journal WHERE kind = 'run' AND title = 'x' ORDER BY timestamp DESC LIMIT 1")
         XCTAssertTrue(runs.contains("idx_journal_kind_title_timestamp"), runs)

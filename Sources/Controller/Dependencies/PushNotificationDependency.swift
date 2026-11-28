@@ -24,10 +24,8 @@ struct PushNotificationDependency: Sendable {
 // MARK: - Dependency Key Implementation
 
 extension PushNotificationDependency: TestDependencyKey {
-    static let testValue = Self(
-        requestAuthorization: { },
-        clearDeliveredNotifications: { }
-    )
+    /// Every call that a test did not override reports an issue.
+    static let testValue = Self()
 
     static let previewValue = Self(
         requestAuthorization: { },

@@ -33,11 +33,11 @@ struct LiveActivityDependency: Sendable {
 
     /// Observe push token updates for all activities.
     /// Runs in the caller's structured concurrency context — cancellation propagates automatically.
-    var pushTokenUpdates: @Sendable (_ onToken: @escaping @Sendable (PushToken) async -> Void) async -> Void = { _ in }
+    var pushTokenUpdates: @Sendable (_ onToken: @escaping @Sendable (PushToken) async -> Void) async -> Void
 
     /// Observe push-to-start token updates.
     /// Runs in the caller's structured concurrency context — cancellation propagates automatically.
-    var pushToStartTokenUpdates: @Sendable (_ onToken: @Sendable (PushToken) async -> Void) async -> Void = { _ in }
+    var pushToStartTokenUpdates: @Sendable (_ onToken: @Sendable (PushToken) async -> Void) async -> Void
 
     /// Check if Live Activities are currently running
     var hasActiveActivities: @Sendable () async -> Bool = { false }
@@ -46,14 +46,8 @@ struct LiveActivityDependency: Sendable {
 // MARK: - Dependency Key Implementation
 
 extension LiveActivityDependency: TestDependencyKey {
-    static let testValue = Self(
-        startActivity: { _ in },
-        updateActivity: { _ in },
-        stopActivity: { },
-        pushTokenUpdates: { _ in },
-        pushToStartTokenUpdates: { _ in },
-        hasActiveActivities: { false }
-    )
+    /// Every call that a test did not override reports an issue.
+    static let testValue = Self()
 
     static let previewValue = Self(
         startActivity: { _ in },
@@ -167,7 +161,15 @@ extension LiveActivityDependency: DependencyKey {
 }
 #else
 extension LiveActivityDependency: DependencyKey {
-    static let liveValue = Self.testValue
+    /// Live Activities exist on iOS only: every call does nothing.
+    static let liveValue = Self(
+        startActivity: { _ in },
+        updateActivity: { _ in },
+        stopActivity: { },
+        pushTokenUpdates: { _ in },
+        pushToStartTokenUpdates: { _ in },
+        hasActiveActivities: { false }
+    )
 }
 #endif
 

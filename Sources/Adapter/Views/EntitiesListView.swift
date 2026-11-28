@@ -21,9 +21,7 @@ struct EntitiesListView: View {
                         .foregroundColor(.gray)
 
                     Text(item.entityId.description)
-                    ForEach(CharacteristicsType.allCases, id: \.self) { type in
-                        EntityCharacteristicView(item: item, type: type)
-                    }
+                    EntityCharacteristicView(item: item)
                 }
                 Text(item.entityId.placeId)
                     .foregroundColor(.gray)

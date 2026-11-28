@@ -34,7 +34,7 @@ public struct ContentView: View {
             #endif
             .navigationDestination(isPresented: $showSettings) {
                 SettingsView(serverAddress: $serverAddress)
-                    .navigationTitle("Settings")
+                    .navigationTitle(String(localized: "Settings", bundle: .module))
             }
             .toolbar {
                 ToolbarItem(placement: .automatic) {

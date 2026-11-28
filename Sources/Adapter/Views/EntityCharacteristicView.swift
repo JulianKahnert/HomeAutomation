@@ -32,12 +32,12 @@ struct EntityCharacteristicView: View {
         case .contactSensor:
             if let isContactOpen = item.isContactOpen {
                 Spacer()
-                Label(isContactOpen ? "open" : "closed", systemImage: "contact.sensor")
+                Label(isContactOpen ? String(localized: "open", bundle: .module) : String(localized: "closed", bundle: .module), systemImage: "contact.sensor")
             }
         case .lock:
             if let isDoorLocked = item.isDoorLocked {
                 Spacer()
-                Label(!isDoorLocked ? "open" : "closed", systemImage: !isDoorLocked ? "lock.open" : "lock")
+                Label(!isDoorLocked ? String(localized: "open", bundle: .module) : String(localized: "closed", bundle: .module), systemImage: !isDoorLocked ? "lock.open" : "lock")
             }
         case .batterySensor:
             if let stateOfCharge = item.stateOfCharge {
@@ -51,7 +51,7 @@ struct EntityCharacteristicView: View {
             if let isHeaterActive = item.isHeaterActive {
                 Spacer()
                 HStack {
-                    Text("\(isHeaterActive ? "active" : "inactive")")
+                    Text(isHeaterActive ? String(localized: "active", bundle: .module) : String(localized: "inactive", bundle: .module))
                     Image(systemName: "windshield.rear.and.heat.waves")
                 }
             }
@@ -110,7 +110,7 @@ struct EntityCharacteristicView: View {
         case .heatingMode:
             if let mode = item.heatingMode {
                 Spacer()
-                Label("mode \(mode.name)", systemImage: "thermostat")
+                Label(String(localized: "mode \(mode.name)", bundle: .module), systemImage: "thermostat")
             }
         case .valvePosition:
             if let percent = item.valvePositionPercent {
@@ -135,7 +135,7 @@ struct EntityCharacteristicView: View {
         case .valve:
             if let valveOpen = item.valveOpen {
                 Spacer()
-                Label(valveOpen ? "open" : "closed", systemImage: valveOpen ? "spigot" : "spigot.fill")
+                Label(valveOpen ? String(localized: "open", bundle: .module) : String(localized: "closed", bundle: .module), systemImage: valveOpen ? "spigot" : "spigot.fill")
             }
         }
     }

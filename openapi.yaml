@@ -41,7 +41,7 @@ paths:
         "200":
           description: The automation was activated.
         "503":
-          description: The server core did not handle the write within five seconds. It is queued and will still run; the answer only says it has not run yet.
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /config/automations/{name}/deactivate:
     post:
@@ -59,7 +59,7 @@ paths:
         "200":
           description: The automation was deactivated.
         "503":
-          description: The server core did not handle the write within five seconds. It is queued and will still run; the answer only says it has not run yet.
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /config/automations/{name}/stop:
     post:
@@ -77,7 +77,7 @@ paths:
         "200":
           description: The currently running automation was stopped or the automation is not running.
         "503":
-          description: The server core did not handle the write within five seconds. It is queued and will still run; the answer only says it has not run yet.
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /config/automations/{name}/runs:
     get:
@@ -241,7 +241,7 @@ paths:
         "403":
           description: The entity is not server-owned or its value kind is not settable from the app.
         "503":
-          description: The server core did not handle the write within five seconds. It is queued and will still run; the answer only says it has not run yet.
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /entities/history:
     get:

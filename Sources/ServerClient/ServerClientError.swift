@@ -7,7 +7,7 @@ import Foundation
 
 /// Why a write to the server did not come back as `200`.
 public enum ServerClientError: Error, Equatable, LocalizedError, Sendable {
-    /// The server did not get to the change in time (503). The change is queued and will still run.
+    /// The server did not get to the change in time (503). The change is queued in memory and runs unless the server restarts first.
     case busy
     /// The server answered with another status than the route documents.
     case unexpected(status: Int)

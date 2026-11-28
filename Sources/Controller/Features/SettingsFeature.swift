@@ -144,6 +144,8 @@ struct SettingsFeature: Sendable {
                             Self.logger.info("No active Live Activity, starting a new one", metadata: ["openCount": "\(contentState.openCount)"])
                             try await liveActivity.startActivity(contentState)
                         }
+                    } catch: { error, _ in
+                        Self.logger.error("Failed to update the Live Activity", metadata: ["error": "\(error)"])
                     }
                 } else {
                     Self.logger.debug("Live Activities disabled, skipping activity update")
@@ -155,13 +157,18 @@ struct SettingsFeature: Sendable {
                 state.error = "Failed to load window states: \(error.localizedDescription)"
                 Self.logger.error("Failed to load window states", metadata: ["error": "\(error)"])
 
+                guard state.liveActivitiesEnabled else { return .none }
                 return .run { _ in
-                    await liveActivity.updateActivity(.empty)
+                    if await liveActivity.hasActiveActivities() {
+                        await liveActivity.updateActivity(.empty)
+                    }
                 }
 
             case .requestPushAuthorization:
                 return .run { _ in
                     try await pushNotification.requestAuthorization()
+                } catch: { error, _ in
+                    Self.logger.error("Push authorization failed", metadata: ["error": "\(error)"])
                 }
 
             case .dismissError:

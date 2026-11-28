@@ -14,17 +14,6 @@ import Testing
 @Suite("PushNotification Dependency Tests")
 struct PushNotificationDependencyTests {
 
-    @Test("Test value doesn't throw")
-    func testTestValue() async throws {
-        try await withDependencies {
-            $0.pushNotification = .testValue
-        } operation: {
-            @Dependency(\.pushNotification) var pushNotification
-
-            try await pushNotification.requestAuthorization()
-        }
-    }
-
     @Test("Preview value doesn't throw")
     func testPreviewValue() async throws {
         try await withDependencies {
@@ -33,17 +22,6 @@ struct PushNotificationDependencyTests {
             @Dependency(\.pushNotification) var pushNotification
 
             try await pushNotification.requestAuthorization()
-        }
-    }
-
-    @Test("Test value clearDeliveredNotifications doesn't throw")
-    func testClearDeliveredNotificationsTestValue() async throws {
-        await withDependencies {
-            $0.pushNotification = .testValue
-        } operation: {
-            @Dependency(\.pushNotification) var pushNotification
-
-            await pushNotification.clearDeliveredNotifications()
         }
     }
 

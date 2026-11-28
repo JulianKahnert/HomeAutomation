@@ -154,7 +154,7 @@ struct SettingsFeature: Sendable {
 
             case let .windowStatesResponse(.failure(error)):
                 state.isLoadingWindowStates = false
-                state.error = "Failed to load window states: \(error.localizedDescription)"
+                state.error = String(localized: "Failed to load window states: \(error.localizedDescription)", bundle: .module)
                 Self.logger.error("Failed to load window states", metadata: ["error": "\(error)"])
 
                 guard state.liveActivitiesEnabled else { return .none }
@@ -195,28 +195,28 @@ struct SettingsView: View {
                 Section {
                     serverConfigSection
                 } header: {
-                    Text("Server Configuration")
+                    Text("Server Configuration", bundle: .module)
                 } footer: {
-                    Text("FlowKit server endpoint")
+                    Text("FlowKit server endpoint", bundle: .module)
                 }
 
                 #if os(iOS)
                 Section {
                     liveActivitiesSection
                 } header: {
-                    Text("Live Activities")
+                    Text("Live Activities", bundle: .module)
                 } footer: {
-                    Text("Show window states in Dynamic Island and Lock Screen")
+                    Text("Show window states in Dynamic Island and Lock Screen", bundle: .module)
                 }
                 #endif
 
-                Section("Diagnostics") {
+                Section(String(localized: "Diagnostics", bundle: .module)) {
                     NavigationLink(state: SettingsPath.State.logs(LogViewerFeature.State())) {
-                        Label("App Logs", systemImage: "doc.text.magnifyingglass")
+                        Label(String(localized: "App Logs", bundle: .module), systemImage: "doc.text.magnifyingglass")
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle(String(localized: "Settings", bundle: .module))
             .refreshable {
                 store.send(.refreshWindowStates)
             }
@@ -235,13 +235,13 @@ struct SettingsView: View {
     private var serverConfigSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Server URL")
+                Text("Server URL", bundle: .module)
                     .font(.headline)
                 Spacer()
                 Button {
                     store.send(.editServerURL)
                 } label: {
-                    Text("Edit")
+                    Text("Edit", bundle: .module)
                 }
             }
 
@@ -251,25 +251,25 @@ struct SettingsView: View {
         }
 
         if store.isEditingServerURL {
-            TextField("Server URL (e.g. http://localhost:8080)", text: $store.serverURLString)
+            TextField(String(localized: "Server URL (e.g. http://localhost:8080)", bundle: .module), text: $store.serverURLString)
                 .autocorrectionDisabled()
                 #if os(iOS)
                 .textInputAutocapitalization(.never)
                 .keyboardType(.URL)
                 #endif
 
-            SecureField("Auth Token", text: $store.serverAuthToken)
+            SecureField(String(localized: "Auth Token", bundle: .module), text: $store.serverAuthToken)
                 .autocorrectionDisabled()
                 #if os(iOS)
                 .textInputAutocapitalization(.never)
                 #endif
 
-            Button("Save") {
+            Button(String(localized: "Save", bundle: .module)) {
                 store.send(.saveServerURL)
             }
             .buttonStyle(.borderedProminent)
 
-            Button("Cancel") {
+            Button(String(localized: "Cancel", bundle: .module)) {
                 store.send(.cancelEditServerURL)
             }
         }
@@ -278,7 +278,7 @@ struct SettingsView: View {
     #if os(iOS)
     @ViewBuilder
     private var liveActivitiesSection: some View {
-        Toggle("Enable Live Activities", isOn: Binding(
+        Toggle(String(localized: "Enable Live Activities", bundle: .module), isOn: Binding(
             get: { store.liveActivitiesEnabled },
             set: { store.send(.toggleLiveActivities($0)) }
         ))

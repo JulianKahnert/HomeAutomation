@@ -13,49 +13,49 @@ extension CharacteristicsType {
     public var displayName: String {
         switch self {
         case .motionSensor:
-            return "Motion Sensor"
+            return String(localized: "Motion Sensor", bundle: .module)
         case .lightSensor:
-            return "Light Sensor"
+            return String(localized: "Light Sensor", bundle: .module)
         case .batterySensor:
-            return "Battery Sensor"
+            return String(localized: "Battery Sensor", bundle: .module)
         case .contactSensor:
-            return "Contact Sensor"
+            return String(localized: "Contact Sensor", bundle: .module)
         case .temperatureSensor:
-            return "Temperature Sensor"
+            return String(localized: "Temperature Sensor", bundle: .module)
         case .relativeHumiditySensor:
-            return "Humidity Sensor"
+            return String(localized: "Humidity Sensor", bundle: .module)
         case .carbonDioxideSensorId:
-            return "CO₂ Sensor"
+            return String(localized: "CO₂ Sensor", bundle: .module)
         case .pmDensitySensor:
-            return "PM Density Sensor"
+            return String(localized: "PM Density Sensor", bundle: .module)
         case .airQualitySensor:
-            return "Air Quality Sensor"
+            return String(localized: "Air Quality Sensor", bundle: .module)
         case .switcher:
-            return "Switch"
+            return String(localized: "Switch", bundle: .module)
         case .brightness:
-            return "Brightness"
+            return String(localized: "Brightness", bundle: .module)
         case .colorTemperature:
-            return "Color Temperature"
+            return String(localized: "Color Temperature", bundle: .module)
         case .color:
-            return "Color"
+            return String(localized: "Color", bundle: .module)
         case .valve:
-            return "Valve"
+            return String(localized: "Valve", bundle: .module)
         case .lock:
-            return "Lock"
+            return String(localized: "Lock", bundle: .module)
         case .heating:
-            return "Heating"
+            return String(localized: "Heating", bundle: .module)
         case .targetTemperature:
-            return "Target Temperature"
+            return String(localized: "Target Temperature", bundle: .module)
         case .heatingMode:
-            return "Heating Mode"
+            return String(localized: "Heating Mode", bundle: .module)
         case .valvePosition:
-            return "Valve Position"
+            return String(localized: "Valve Position", bundle: .module)
         case .temperatureCalibration:
-            return "Temperature Offset"
+            return String(localized: "Temperature Offset", bundle: .module)
         case .energyPrice:
-            return "Electricity Price"
+            return String(localized: "Electricity price", bundle: .module)
         case .deadline:
-            return "Deadline"
+            return String(localized: "Deadline", bundle: .module)
         }
     }
 

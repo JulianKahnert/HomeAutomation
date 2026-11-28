@@ -164,13 +164,13 @@ struct OverviewView: View {
                 }
 
                 if !openWindows.isEmpty {
-                    Section("Open Windows") {
+                    Section(String(localized: "Open Windows", bundle: .module)) {
                         ForEach(openWindows) { window in
                             ProgressView(timerInterval: window.opened...window.closeBy, countsDown: false) {
                                 LabeledContent("\(window.name) (\(window.room))",
-                                               value: "Limit \(Int(window.closeBy.timeIntervalSince(window.opened) / 60)) min")
+                                               value: String(localized: "Limit \(Int(window.closeBy.timeIntervalSince(window.opened) / 60)) min", bundle: .module))
                             } currentValueLabel: {
-                                Text("Open for \(Text(window.opened, style: .relative))")
+                                Text("Open for \(Text(window.opened, style: .relative))", bundle: .module)
                             }
                             .tint(Date() <= window.closeBy ? Color.accentColor : Color.red)
                         }
@@ -204,16 +204,16 @@ struct OverviewView: View {
                             .tint(.primary)
                             // A button inside the row's button would not be its own control for VoiceOver.
                             .swipeActions {
-                                Button("Stop", role: .destructive) {
+                                Button(String(localized: "Stop", bundle: .module), role: .destructive) {
                                     store.send(.stopButtonTapped(automation.name))
                                 }
                             }
-                            .accessibilityAction(named: "Stop") {
+                            .accessibilityAction(named: Text("Stop", bundle: .module)) {
                                 store.send(.stopButtonTapped(automation.name))
                             }
                         }
                     } header: {
-                        Text("Running")
+                        Text("Running", bundle: .module)
                     } footer: {
                         if let stopError = store.stopError {
                             Text(stopError)
@@ -222,9 +222,9 @@ struct OverviewView: View {
                     }
                 }
 
-                Section("Recent Runs") {
+                Section(String(localized: "Recent Runs", bundle: .module)) {
                     if store.recentRuns.isEmpty {
-                        Text("No runs in the last 24 hours.")
+                        Text("No runs in the last 24 hours.", bundle: .module)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(store.recentRuns.prefix(5)) { run in
@@ -232,14 +232,13 @@ struct OverviewView: View {
                                 RunRow(run: run)
                             }
                         }
-                        NavigationLink(
-                            "Show All",
-                            state: OverviewPath.State.feed(ActivityFeedFeature.State(runs: store.recentRuns))
-                        )
+                        NavigationLink(state: OverviewPath.State.feed(ActivityFeedFeature.State(runs: store.recentRuns))) {
+                            Text("Show All", bundle: .module)
+                        }
                     }
                 }
             }
-            .navigationTitle("Overview")
+            .navigationTitle(String(localized: "Overview", bundle: .module))
             .refreshable { await store.send(.refresh).finish() }
             .task { await store.send(.task).finish() }
         } destination: { pathStore in
@@ -266,20 +265,20 @@ struct OverviewView: View {
             switch (store.error, store.isHealthy) {
             case (.some, _):
                 dot(.red)
-                Text("Server unreachable")
+                Text("Server unreachable", bundle: .module)
             case (nil, true?):
                 dot(.green)
-                Text("Adapter connected")
+                Text("Adapter connected", bundle: .module)
             case (nil, false?):
                 dot(.red)
-                Text("Adapter disconnected")
+                Text("Adapter disconnected", bundle: .module)
             case (nil, nil):
                 ProgressView()
-                Text("Connecting…")
+                Text("Connecting…", bundle: .module)
             }
             Spacer()
             if let lastUpdated = store.lastUpdated {
-                Text("Updated \(Text(lastUpdated, style: .relative)) ago")
+                Text("Updated \(Text(lastUpdated, style: .relative)) ago", bundle: .module)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

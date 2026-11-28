@@ -12,18 +12,18 @@ struct DailyBarChart: View {
     let color: Color
     let unit: String
     var points: [(day: Date, value: Double)] = []
-    var barLabel = "Total"
-    var pointLabel = "Mean"
+    var barLabel = String(localized: "Total", bundle: .module)
+    var pointLabel = String(localized: "Mean", bundle: .module)
 
     var body: some View {
         Chart {
             ForEach(bars.indices, id: \.self) { index in
-                BarMark(x: .value("Day", bars[index].day, unit: .day), y: .value(unit, bars[index].value))
-                    .foregroundStyle(by: .value("Series", barLabel))
+                BarMark(x: .value(ChartLabel.day, bars[index].day, unit: .day), y: .value(unit, bars[index].value))
+                    .foregroundStyle(by: .value(ChartLabel.series, barLabel))
             }
             ForEach(points.indices, id: \.self) { index in
-                PointMark(x: .value("Day", points[index].day, unit: .day), y: .value(unit, points[index].value))
-                    .foregroundStyle(by: .value("Series", pointLabel))
+                PointMark(x: .value(ChartLabel.day, points[index].day, unit: .day), y: .value(unit, points[index].value))
+                    .foregroundStyle(by: .value(ChartLabel.series, pointLabel))
             }
         }
         .chartYAxisLabel(unit)

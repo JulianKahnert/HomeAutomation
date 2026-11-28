@@ -38,8 +38,8 @@ struct LogViewerView: View {
                 logRow(entry)
             }
         }
-        .searchable(text: $searchText, prompt: "Filter logs...")
-        .navigationTitle("Logs")
+        .searchable(text: $searchText, prompt: Text("Filter logs...", bundle: .module))
+        .navigationTitle(String(localized: "Logs", bundle: .module))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 ShareLink(
@@ -56,7 +56,7 @@ struct LogViewerView: View {
                 Button {
                     onRefresh()
                 } label: {
-                    Label("Reload", systemImage: "arrow.clockwise")
+                    Label(String(localized: "Reload", bundle: .module), systemImage: "arrow.clockwise")
                 }
                 .disabled(isLoading)
             }
@@ -68,11 +68,11 @@ struct LogViewerView: View {
             if isLoading && entries.isEmpty {
                 ProgressView()
             } else if entries.isEmpty && !isLoading {
-                ContentUnavailableView(
-                    "No Log Entries",
-                    systemImage: "doc.text",
-                    description: Text("Logs from the last 24 hours will appear here")
-                )
+                ContentUnavailableView {
+                    Label(String(localized: "No Log Entries", bundle: .module), systemImage: "doc.text")
+                } description: {
+                    Text("Logs from the last 24 hours will appear here", bundle: .module)
+                }
             }
         }
     }

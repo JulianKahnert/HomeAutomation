@@ -16,7 +16,7 @@ public struct WindowActivityPresentation: Equatable, Sendable {
     /// The one window in the Watch Smart Stack (`.small` supplemental family).
     public static let watchRowBudget = 1
 
-    /// A line of text, red when it stands for an überschritten window.
+    /// A line of text, red when it stands for an overdue window.
     public struct Caption: Equatable, Sendable {
         public let text: String
         public let isOverdue: Bool
@@ -26,12 +26,12 @@ public struct WindowActivityPresentation: Equatable, Sendable {
         }
     }
 
-    /// "<n> offen · <m> überschritten"
+    /// "<n> open · <m> overdue"
     public let header: String
-    /// "<n> offen", leading in the expanded Dynamic Island.
+    /// "<n> open", leading in the expanded Dynamic Island.
     public let openSummary: String
-    /// The number of überschrittenen Fenster beside the warning symbol, trailing in the expanded
-    /// Dynamic Island; `nil` when no window is überschritten.
+    /// The number of overdue windows beside the warning symbol, trailing in the expanded
+    /// Dynamic Island; `nil` when no window is overdue.
     public let overdueBadge: Int?
     /// The outdoor temperature in whole degrees ("7°"), right in the Lock Screen header and trailing
     /// in the expanded Dynamic Island; `nil` without a reading.
@@ -40,15 +40,15 @@ public struct WindowActivityPresentation: Equatable, Sendable {
     public let rows: [WindowContentState.Window]
     /// The first window in server order, whose countdown or overtime the compact Dynamic Island shows.
     public let mostUrgent: WindowContentState.Window?
-    /// The "+X weitere: Raum, Raum, …" line; red when a window without a row is überschritten or
-    /// possibly überschritten. `nil` when every offene Fenster has a row.
+    /// The "+X more: room, room, …" line; red when a window without a row is overdue or
+    /// possibly overdue. `nil` when every open window has a row.
     public let more: Caption?
-    /// The line below the Watch's window: "überschritten?", else "+X weitere offen" coloured like
+    /// The line below the Watch's window: "overdue?", else "+X more open" coloured like
     /// ``more``, else the window name. `nil` without a window.
     public let watchCaption: Caption?
     public let isAnyOverdue: Bool
-    /// The window shown as "überschritten?" in a stale activity: the first window not yet überschritten,
-    /// whose Fensterschließzeit is the stale date.
+    /// The window shown as "overdue?" in a stale activity: the first window not yet overdue,
+    /// whose closing time is the stale date.
     public let possiblyOverdueWindowId: String?
 
     /// Tints the compact and minimal presentations.
@@ -61,8 +61,8 @@ public struct WindowActivityPresentation: Equatable, Sendable {
         let hidden = contentState.windows.dropFirst(rows.count)
         let hiddenCount = contentState.openCount - rows.count
 
-        header = "\(contentState.openCount) offen · \(contentState.overdueCount) überschritten"
-        openSummary = "\(contentState.openCount) offen"
+        header = String(localized: "\(contentState.openCount) open · \(contentState.overdueCount) overdue", bundle: .module)
+        openSummary = String(localized: "\(contentState.openCount) open", bundle: .module)
         overdueBadge = contentState.overdueCount > 0 ? contentState.overdueCount : nil
         outdoorTemperature = contentState.outdoorTemperature.map { "\(Int($0.rounded()))°" }
         self.rows = rows
@@ -91,10 +91,10 @@ public struct WindowActivityPresentation: Equatable, Sendable {
                                                  contentState: contentState,
                                                  possiblyOverdueWindowId: possiblyOverdueWindowId,
                                                  isStale: isStale)
-        more = Caption(text: "+\(hiddenCount) weitere: \(rooms.joined(separator: ", "))", isOverdue: isMoreOverdue)
+        more = Caption(text: String(localized: "+\(hiddenCount) more: \(rooms.joined(separator: ", "))", bundle: .module), isOverdue: isMoreOverdue)
     }
 
-    /// Whether a window without a row is überschritten, or possibly überschritten in a stale activity.
+    /// Whether a window without a row is overdue, or possibly overdue in a stale activity.
     private static func isHiddenOverdue(rows: [WindowContentState.Window],
                                         contentState: WindowContentState,
                                         possiblyOverdueWindowId: String?,
@@ -108,7 +108,7 @@ public struct WindowActivityPresentation: Equatable, Sendable {
                                      possiblyOverdueWindowId: String?,
                                      isStale: Bool) -> Caption {
         if window.id == possiblyOverdueWindowId {
-            return Caption(text: "überschritten?", isOverdue: true)
+            return Caption(text: String(localized: "overdue?", bundle: .module), isOverdue: true)
         }
         guard contentState.openCount > 1 else {
             return Caption(text: window.name, isOverdue: false)
@@ -117,6 +117,6 @@ public struct WindowActivityPresentation: Equatable, Sendable {
                                         contentState: contentState,
                                         possiblyOverdueWindowId: possiblyOverdueWindowId,
                                         isStale: isStale)
-        return Caption(text: "+\(contentState.openCount - 1) weitere offen", isOverdue: isOverdue)
+        return Caption(text: String(localized: "+\(contentState.openCount - 1) more open", bundle: .module), isOverdue: isOverdue)
     }
 }

@@ -38,14 +38,14 @@ struct ActivityFeedView: View {
         }
         .overlay {
             if store.runs.isEmpty {
-                ContentUnavailableView(
-                    "No Runs",
-                    systemImage: "clock.arrow.circlepath",
-                    description: Text("No automation ran in the last 24 hours.")
-                )
+                ContentUnavailableView {
+                    Label(String(localized: "No Runs", bundle: .module), systemImage: "clock.arrow.circlepath")
+                } description: {
+                    Text("No automation ran in the last 24 hours.", bundle: .module)
+                }
             }
         }
-        .navigationTitle("Activity")
+        .navigationTitle(String(localized: "Activity", bundle: .module))
     }
 }
 

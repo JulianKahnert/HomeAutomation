@@ -73,7 +73,7 @@ struct AutomationDetails: Sendable {
                 return .none
 
             case let .historiesResponse(.failure(error)), let .locationResponse(.failure(error)):
-                state.error = "Failed to load chart data: \(error.localizedDescription)"
+                state.error = String(localized: "Failed to load chart data: \(error.localizedDescription)", bundle: .module)
                 return .none
 
             case let .runsResponse(.success(runs)):
@@ -81,7 +81,7 @@ struct AutomationDetails: Sendable {
                 return .none
 
             case let .runsResponse(.failure(error)):
-                state.error = "Failed to load runs: \(error.localizedDescription)"
+                state.error = String(localized: "Failed to load runs: \(error.localizedDescription)", bundle: .module)
                 return .none
 
             case .task:
@@ -125,7 +125,7 @@ struct AutomationDetails: Sendable {
 
             case let .isActiveOperationResponse(_, .failure(error)):
                 state.isLoading = false
-                state.error = "Failed to change \(state.automation.name): \(error.localizedDescription)"
+                state.error = String(localized: "Failed to change \(state.automation.name): \(error.localizedDescription)", bundle: .module)
                 return .none
 
             case .stopOperationResponse(.success):
@@ -140,7 +140,7 @@ struct AutomationDetails: Sendable {
 
             case let .stopOperationResponse(.failure(error)):
                 state.isLoading = false
-                state.error = "Failed to stop \(state.automation.name): \(error.localizedDescription)"
+                state.error = String(localized: "Failed to stop \(state.automation.name): \(error.localizedDescription)", bundle: .module)
                 return .none
             }
         }
@@ -191,15 +191,15 @@ struct AutomationDetailView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Type", value: store.automation.typeLabel)
-                LabeledContent("Trigger", value: store.automation.triggerDescription)
-                Toggle("Active", isOn: Binding(
+                LabeledContent(String(localized: "Automation type", bundle: .module), value: store.automation.typeLabel)
+                LabeledContent(String(localized: "Trigger", bundle: .module), value: store.automation.triggerDescription)
+                Toggle(String(localized: "Active", bundle: .module), isOn: Binding(
                     get: { store.automation.isActive },
                     set: { store.send(.updateIsActive($0)) }
                 ))
                 .disabled(store.isLoading)
                 if store.automation.isRunning {
-                    Button("Stop", role: .destructive) {
+                    Button(String(localized: "Stop", bundle: .module), role: .destructive) {
                         store.send(.stopAutomation)
                     }
                     .disabled(store.isLoading)
@@ -212,7 +212,7 @@ struct AutomationDetailView: View {
             }
 
             if !store.automation.entities.isEmpty {
-                Section("Devices") {
+                Section(String(localized: "Devices", bundle: .module)) {
                     ForEach(store.automation.entities, id: \.self) { entityId in
                         NavigationLink(state: AutomationsPath.State.entity(EntityHistoryDetailFeature.State(entity: EntityInfo(entityId: entityId)))) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -233,14 +233,14 @@ struct AutomationDetailView: View {
                     }
                 }
             } header: {
-                Text("Runs")
+                Text("Runs", bundle: .module)
             } footer: {
                 if !store.automation.recordsRuns {
-                    Text("Runs are not recorded for this automation.")
+                    Text("Runs are not recorded for this automation.", bundle: .module)
                 } else if store.runs.isEmpty {
-                    Text("No runs in the last 24 hours.")
+                    Text("No runs in the last 24 hours.", bundle: .module)
                 } else {
-                    Text("Last 24 hours.")
+                    Text("Shows the last 24 hours.", bundle: .module)
                 }
             }
 
@@ -280,13 +280,13 @@ extension AutomationDetailView {
                 color: ChartPalette.color(for: .lightSensor),
                 unit: "lx",
                 isLogarithmic: true,
-                threshold: (MotionAtNightConstants.thresholdInLux, "Threshold \(Int(MotionAtNightConstants.thresholdInLux)) lx"),
+                threshold: (MotionAtNightConstants.thresholdInLux, String(localized: "Threshold \(Int(MotionAtNightConstants.thresholdInLux)) lx", bundle: .module)),
                 bands: nights
             )
         } header: {
-            Text("Trigger Conditions")
+            Text("Trigger Conditions", bundle: .module)
         } footer: {
-            Text("Last 24 hours. Grey: sun below the horizon. Motion below the threshold turns the lights on.")
+            Text("Last 24 hours. Grey: sun below the horizon. Motion below the threshold turns the lights on.", bundle: .module)
         }
     }
 }

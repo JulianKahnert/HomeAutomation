@@ -12,13 +12,13 @@ import SwiftUI
 import UserNotifications
 
 extension HeatingFormat {
-    /// "Kamin an · endet in 1 h" while the fireplace burns, `nil` while it is off.
+    /// "Fireplace on · ends in 1 h" while the fireplace burns, `nil` while it is off.
     static func fireplaceHint(_ state: FireplaceState, now: Date) -> String? {
         guard state.isOn, let end = state.endsAt else { return nil }
         let hours = end.timeIntervalSince(now) / 3_600
-        if hours <= 0 { return "Kamin an · endet gleich" }
-        if hours < 1 { return "Kamin an · endet in < 1 h" }
-        return "Kamin an · endet in \(Int(hours.rounded())) h"
+        if hours <= 0 { return String(localized: "Fireplace on · ends soon", bundle: .module) }
+        if hours < 1 { return String(localized: "Fireplace on · ends in < 1 h", bundle: .module) }
+        return String(localized: "Fireplace on · ends in \(Int(hours.rounded())) h", bundle: .module)
     }
 }
 
@@ -29,10 +29,10 @@ struct FireplaceToolbarButton: View {
 
     var body: some View {
         Button(action: action) {
-            Label("Kamin", systemImage: isOn ? "flame.fill" : "flame")
+            Label(String(localized: "Fireplace", bundle: .module), systemImage: isOn ? "flame.fill" : "flame")
                 .foregroundStyle(isOn ? Color.orange : Color.primary)
         }
-        .accessibilityValue(isOn ? "an" : "aus")
+        .accessibilityValue(isOn ? String(localized: "on", bundle: .module) : String(localized: "off", bundle: .module))
     }
 }
 
@@ -58,7 +58,7 @@ enum FireplaceNotification {
     static var category: UNNotificationCategory {
         UNNotificationCategory(
             identifier: Fireplace.notificationCategory,
-            actions: [UNNotificationAction(identifier: Fireplace.switchOnActionId, title: "Heizkörper ausschalten", options: [])],
+            actions: [UNNotificationAction(identifier: Fireplace.switchOnActionId, title: String(localized: "Turn off radiators", bundle: .module), options: [])],
             intentIdentifiers: [],
             options: []
         )
@@ -71,7 +71,7 @@ enum FireplaceNotification {
     }
 }
 
-#Preview("Kamin-Knopf") {
+#Preview("Fireplace button") {
     HStack(spacing: 24) {
         FireplaceToolbarButton(isOn: false) {}
         FireplaceToolbarButton(isOn: true) {}

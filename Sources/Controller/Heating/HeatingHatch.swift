@@ -32,7 +32,7 @@ struct HeatingHatch: View {
     }
 }
 
-#Preview("Schraffur") {
+#Preview("Hatching") {
     HStack(spacing: 16) {
         HeatingHatch().frame(width: 60, height: 80)
         HeatingHatch(isSelected: true, showsMark: false).frame(width: 60, height: 80)

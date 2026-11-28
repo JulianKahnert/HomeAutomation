@@ -16,7 +16,9 @@ import SwiftUI
 struct HeatingFeature: Sendable {
 
     /// Shown when the server knows no heating room.
-    static let noRoomsHint = "Es ist keine Heizungsautomatik eingerichtet. Lege in der Konfiguration eine RoomHeating-Automation an."
+    static var noRoomsHint: String {
+        String(localized: "No heating automation is set up. Create a RoomHeating automation in the configuration.", bundle: .module)
+    }
 
     private enum CancelID {
         case detail
@@ -222,7 +224,7 @@ struct HeatingView: View {
         NavigationStack {
             HeatingScreen(store: store, layout: layout)
                 .background(HeatingPalette.screen)
-                .navigationTitle("Heating")
+                .navigationTitle(String(localized: "Heating", bundle: .module))
                 .heatingSubtitle(HeatingFormat.fireplaceHint(store.fireplace, now: now) ?? "")
             .task(id: store.fireplace.isOn) {
                 now = Date()
@@ -237,9 +239,9 @@ struct HeatingView: View {
                     FireplaceToolbarButton(isOn: store.fireplace.isOn) { store.send(.setFireplace(!store.fireplace.isOn)) }
                 }
             }
-            .alert("Kamin nicht geschaltet", isPresented: Binding(get: { store.fireplaceError != nil },
+            .alert(String(localized: "Fireplace not switched", bundle: .module), isPresented: Binding(get: { store.fireplaceError != nil },
                                                                    set: { if !$0 { store.send(.dismissFireplaceError) } })) {
-                Button("OK") {}
+                Button(String(localized: "OK", bundle: .module)) {}
             } message: {
                 Text(store.fireplaceError ?? "")
             }
@@ -256,15 +258,18 @@ struct HeatingScreen: View {
     var body: some View {
         // Decided by what was loaded, never by a reload in flight: the content stays until the answer arrives.
         if store.rooms.isEmpty, store.updatedAt != nil {
-            ContentUnavailableView("Keine Räume", systemImage: "heater.vertical",
-                                   description: Text(HeatingFeature.noRoomsHint))
+            ContentUnavailableView {
+                Label(String(localized: "No Rooms", bundle: .module), systemImage: "heater.vertical")
+            } description: {
+                Text(HeatingFeature.noRoomsHint)
+            }
         } else if store.rooms.isEmpty, store.error != nil {
             ContentUnavailableView {
-                Label("Server nicht erreichbar", systemImage: "wifi.slash")
+                Label(String(localized: "Server unreachable", bundle: .module), systemImage: "wifi.slash")
             } description: {
-                Text("Die Heizung kann nicht geladen werden.")
+                Text("The heating cannot be loaded.", bundle: .module)
             } actions: {
-                Button("Erneut versuchen") { store.send(.refresh) }
+                Button(String(localized: "Try Again", bundle: .module)) { store.send(.refresh) }
             }
         } else if store.rooms.isEmpty {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -293,7 +298,7 @@ struct HeatingScreen: View {
                 ScrollView {
                     Group {
                         if store.selectedPlaceId == nil {
-                            Text("Wähle links einen Raum.")
+                            Text("Select a room on the left.", bundle: .module)
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, minHeight: 200)
                         } else {
@@ -324,8 +329,11 @@ struct HeatingScreen: View {
                                   onSelectPin: { store.send(.selectPin($0)) }, layout: layout,
                                   onClose: layout == .compact ? { store.send(.selectRoom(nil)) } : nil)
         } else if store.detailError != nil {
-            ContentUnavailableView("Raum nicht ladbar", systemImage: "exclamationmark.triangle",
-                                   description: Text("Der Server hat keine Daten für diesen Raum geliefert."))
+            ContentUnavailableView {
+                Label(String(localized: "Room cannot be loaded", bundle: .module), systemImage: "exclamationmark.triangle")
+            } description: {
+                Text("The server returned no data for this room.", bundle: .module)
+            }
         } else {
             ProgressView().frame(maxWidth: .infinity, minHeight: 200)
         }
@@ -365,24 +373,24 @@ private enum HeatingPreviewState {
     }
 }
 
-#Preview("iPhone hell Übersicht") { HeatingPreview(state: HeatingPreviewState.overview, layout: .compact, scheme: .light) }
-#Preview("iPhone dunkel Übersicht") { HeatingPreview(state: HeatingPreviewState.overview, layout: .compact, scheme: .dark) }
-#Preview("Mac hell Übersicht") { HeatingPreview(state: HeatingPreviewState.overview, layout: .regular, scheme: .light) }
-#Preview("Mac dunkel Übersicht") { HeatingPreview(state: HeatingPreviewState.overview, layout: .regular, scheme: .dark) }
-#Preview("iPhone hell 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .compact, scheme: .light) }
-#Preview("iPhone dunkel 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .compact, scheme: .dark) }
-#Preview("iPhone hell 7 T") { HeatingPreview(state: HeatingPreviewState.week, layout: .compact, scheme: .light) }
-#Preview("iPhone dunkel 7 T") { HeatingPreview(state: HeatingPreviewState.week, layout: .compact, scheme: .dark) }
-#Preview("iPhone hell ohne Daten") { HeatingPreview(state: HeatingPreviewState.noData, layout: .compact, scheme: .light) }
-#Preview("iPhone dunkel ohne Daten") { HeatingPreview(state: HeatingPreviewState.noData, layout: .compact, scheme: .dark) }
-#Preview("iPhone hell Server nicht erreichbar") { HeatingPreview(state: HeatingPreviewState.offline, layout: .compact, scheme: .light) }
-#Preview("iPhone dunkel Server nicht erreichbar") { HeatingPreview(state: HeatingPreviewState.offline, layout: .compact, scheme: .dark) }
-#Preview("iPhone hell keine Räume") { HeatingPreview(state: HeatingPreviewState.noRooms, layout: .compact, scheme: .light) }
-#Preview("Mac hell 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .regular, scheme: .light) }
-#Preview("Mac dunkel 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .regular, scheme: .dark) }
-#Preview("Mac hell 7 T") { HeatingPreview(state: HeatingPreviewState.week, layout: .regular, scheme: .light) }
-#Preview("Mac dunkel 7 T") { HeatingPreview(state: HeatingPreviewState.week, layout: .regular, scheme: .dark) }
-#Preview("Mac hell ohne Daten") { HeatingPreview(state: HeatingPreviewState.noData, layout: .regular, scheme: .light) }
-#Preview("Mac dunkel ohne Daten") { HeatingPreview(state: HeatingPreviewState.noData, layout: .regular, scheme: .dark) }
-#Preview("Mac hell Server nicht erreichbar") { HeatingPreview(state: HeatingPreviewState.offline, layout: .regular, scheme: .light) }
-#Preview("Mac dunkel Server nicht erreichbar") { HeatingPreview(state: HeatingPreviewState.offline, layout: .regular, scheme: .dark) }
+#Preview("iPhone light overview") { HeatingPreview(state: HeatingPreviewState.overview, layout: .compact, scheme: .light) }
+#Preview("iPhone dark overview") { HeatingPreview(state: HeatingPreviewState.overview, layout: .compact, scheme: .dark) }
+#Preview("Mac light overview") { HeatingPreview(state: HeatingPreviewState.overview, layout: .regular, scheme: .light) }
+#Preview("Mac dark overview") { HeatingPreview(state: HeatingPreviewState.overview, layout: .regular, scheme: .dark) }
+#Preview("iPhone light 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .compact, scheme: .light) }
+#Preview("iPhone dark 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .compact, scheme: .dark) }
+#Preview("iPhone light 7 d") { HeatingPreview(state: HeatingPreviewState.week, layout: .compact, scheme: .light) }
+#Preview("iPhone dark 7 d") { HeatingPreview(state: HeatingPreviewState.week, layout: .compact, scheme: .dark) }
+#Preview("iPhone light no data") { HeatingPreview(state: HeatingPreviewState.noData, layout: .compact, scheme: .light) }
+#Preview("iPhone dark no data") { HeatingPreview(state: HeatingPreviewState.noData, layout: .compact, scheme: .dark) }
+#Preview("iPhone light server unreachable") { HeatingPreview(state: HeatingPreviewState.offline, layout: .compact, scheme: .light) }
+#Preview("iPhone dark server unreachable") { HeatingPreview(state: HeatingPreviewState.offline, layout: .compact, scheme: .dark) }
+#Preview("iPhone light no rooms") { HeatingPreview(state: HeatingPreviewState.noRooms, layout: .compact, scheme: .light) }
+#Preview("Mac light 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .regular, scheme: .light) }
+#Preview("Mac dark 24 h") { HeatingPreview(state: HeatingPreviewState.day, layout: .regular, scheme: .dark) }
+#Preview("Mac light 7 d") { HeatingPreview(state: HeatingPreviewState.week, layout: .regular, scheme: .light) }
+#Preview("Mac dark 7 d") { HeatingPreview(state: HeatingPreviewState.week, layout: .regular, scheme: .dark) }
+#Preview("Mac light no data") { HeatingPreview(state: HeatingPreviewState.noData, layout: .regular, scheme: .light) }
+#Preview("Mac dark no data") { HeatingPreview(state: HeatingPreviewState.noData, layout: .regular, scheme: .dark) }
+#Preview("Mac light server unreachable") { HeatingPreview(state: HeatingPreviewState.offline, layout: .regular, scheme: .light) }
+#Preview("Mac dark server unreachable") { HeatingPreview(state: HeatingPreviewState.offline, layout: .regular, scheme: .dark) }

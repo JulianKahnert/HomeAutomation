@@ -21,19 +21,19 @@ struct ValueChart: View {
     var body: some View {
         Chart {
             ForEach(bands, id: \.start) { band in
-                RectangleMark(xStart: .value("Start", band.start), xEnd: .value("End", band.end))
+                RectangleMark(xStart: .value(ChartLabel.start, band.start), xEnd: .value(ChartLabel.end, band.end))
                     .foregroundStyle(bandColor)
             }
             ForEach(points.indices, id: \.self) { index in
                 LineMark(
-                    x: .value("Time", points[index].date),
+                    x: .value(ChartLabel.time, points[index].date),
                     // The log scale cannot place 0.
                     y: .value(unit, isLogarithmic ? max(points[index].value, 0.1) : points[index].value)
                 )
                 .foregroundStyle(color)
             }
             if let threshold {
-                RuleMark(y: .value("Threshold", threshold.value))
+                RuleMark(y: .value(ChartLabel.threshold, threshold.value))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     .foregroundStyle(.secondary)
                     // Leading keeps the label over the night end of the curve instead of across the daylight peak.

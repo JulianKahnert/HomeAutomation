@@ -8,7 +8,7 @@ import HAModels
 
 extension AutomationInfo {
     /// Label, symbol and trigger configuration per automation type; keys match the server's type names.
-    private static let typeDisplay: [String: (label: String, systemImage: String, trigger: String)] = [
+    private static let typeDisplay: [String: (label: String.LocalizationValue, systemImage: String, trigger: String.LocalizationValue)] = [
         "CreateScene": ("Scene", "sparkles", "Manual"),
         "DatabaseCleanup": ("System", "externaldrive.badge.checkmark", "Hourly"),
         "EnergyLowPrice": ("Energy Price", "bolt", "Electricity price"),
@@ -16,7 +16,7 @@ extension AutomationInfo {
         "GardenWatering": ("Garden", "drop", "Schedule"),
         "HealthCheck": ("System", "stethoscope", "Every minute"),
         "MaintenanceAutomation": ("System", "wrench.and.screwdriver", "Schedule"),
-        "MotionAtNight": ("Motion", "figure.walk", "Motion sensor"),
+        "MotionAtNight": ("Motion", "figure.walk", "Motion Sensor"),
         "RestartSystem": ("System", "arrow.clockwise", "Schedule"),
         "RoomHeating": ("Heating", "thermometer.medium", "Plan"),
         "SetLightProperties": ("Light", "lightbulb", "Light change"),
@@ -29,7 +29,7 @@ extension AutomationInfo {
     ]
 
     var typeLabel: String {
-        type.flatMap { Self.typeDisplay[$0]?.label } ?? "Other"
+        String(localized: type.flatMap { Self.typeDisplay[$0]?.label } ?? "Other", bundle: .module)
     }
 
     var systemImage: String {
@@ -37,25 +37,25 @@ extension AutomationInfo {
     }
 
     var triggerDescription: String {
-        type.flatMap { Self.typeDisplay[$0]?.trigger } ?? "Unknown trigger"
+        String(localized: type.flatMap { Self.typeDisplay[$0]?.trigger } ?? "Unknown trigger", bundle: .module)
     }
 
     /// "last 21:05 · Motion · Eve Motion (Hallway)", or the trigger configuration before the first run.
     var subtitle: String {
         guard let lastRun else { return triggerDescription }
-        return "last \(lastRun.startedAt.formatted(date: .omitted, time: .shortened)) · \(lastRun.trigger.summary)"
+        return String(localized: "last \(lastRun.startedAt.formatted(date: .omitted, time: .shortened)) · \(lastRun.trigger.summary)", bundle: .module)
     }
 }
 
 extension AutomationRun.Outcome {
     var label: String {
         switch self {
-        case .running: return "Running"
-        case .completed: return "Completed"
-        case .superseded: return "Superseded"
-        case .stopped: return "Stopped"
-        case .failed: return "Failed"
-        case .interrupted: return "Interrupted"
+        case .running: return String(localized: "Running", bundle: .module)
+        case .completed: return String(localized: "Completed", bundle: .module)
+        case .superseded: return String(localized: "Superseded", bundle: .module)
+        case .stopped: return String(localized: "Stopped", bundle: .module)
+        case .failed: return String(localized: "Failed", bundle: .module)
+        case .interrupted: return String(localized: "Interrupted", bundle: .module)
         }
     }
 }

@@ -72,7 +72,7 @@ struct HeatingHeatmapView: View {
             .frame(maxWidth: .infinity)
         } header: {
             HStack(alignment: .firstTextBaseline) {
-                Text("Woche")
+                Text("Week", bundle: .module)
                 Spacer()
                 // Reserves its line so the section does not jump when a value appears.
                 Text(selectionText ?? " ")
@@ -81,7 +81,7 @@ struct HeatingHeatmapView: View {
                     .lineLimit(1)
             }
         } footer: {
-            Text("Abweichung vom Plan je sechs Stunden. Schraffiert: kein Ist-Wert.")
+            Text("Deviation from plan per six hours. Hatched: no actual value.", bundle: .module)
         }
     }
 
@@ -125,7 +125,7 @@ struct HeatingHeatmapView: View {
     }
 
     private static func accessibilityLabel(_ name: String, _ day: Date, _ segment: Int, _ value: Double?) -> String {
-        "\(name) · \(weekday(day)) \(segmentTitles[segment]) Uhr · \(value.map(HeatingFormat.kelvin) ?? "keine Daten")"
+        String(localized: "\(name) · \(weekday(day)) \(segmentTitles[segment]) · \(value.map(HeatingFormat.kelvin) ?? String(localized: "no data", bundle: .module))", bundle: .module)
     }
 
     private static func weekday(_ day: Date) -> String {
@@ -133,7 +133,7 @@ struct HeatingHeatmapView: View {
     }
 }
 
-#Preview("Wochen-Heatmap") {
+#Preview("Week heatmap") {
     HeatingHeatmapView(rooms: HeatingFeature.sorted(HeatingPreviewData.overviewRooms), cells: HeatingPreviewData.heatmap, selectedPlaceId: nil)
         .padding(16)
         .frame(width: 402)

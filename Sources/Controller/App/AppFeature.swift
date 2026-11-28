@@ -45,10 +45,10 @@ struct AppFeature: Sendable {
 
         var title: String {
             switch self {
-            case .overview: return "Overview"
-            case .automations: return "Automations"
-            case .heating: return "Heating"
-            case .settings: return "Settings"
+            case .overview: return String(localized: "Overview", bundle: .module)
+            case .automations: return String(localized: "Automations", bundle: .module)
+            case .heating: return String(localized: "Heating", bundle: .module)
+            case .settings: return String(localized: "Settings", bundle: .module)
             }
         }
 

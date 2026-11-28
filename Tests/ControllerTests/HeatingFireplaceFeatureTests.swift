@@ -133,9 +133,9 @@ struct HeatingFireplaceFeatureTests {
         let burning = FireplaceState(isOn: true, since: start)
         let end = start.addingTimeInterval(Fireplace.maxDuration)
 
-        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(-3_600)) == "Kamin an · endet in 1 h")
-        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(-1_800)) == "Kamin an · endet in < 1 h")
-        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(3_600)) == "Kamin an · endet gleich")
+        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(-3_600)) == "Fireplace on · ends in 1 h")
+        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(-1_800)) == "Fireplace on · ends in < 1 h")
+        #expect(HeatingFormat.fireplaceHint(burning, now: end.addingTimeInterval(3_600)) == "Fireplace on · ends soon")
         #expect(HeatingFormat.fireplaceHint(.off, now: start) == nil)
     }
 

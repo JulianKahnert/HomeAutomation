@@ -174,7 +174,7 @@ struct HeatingFeatureTests {
     @Test("the empty state points to the configuration")
     func noRoomsHint() {
         #expect(HeatingFeature.noRoomsHint.contains("RoomHeating"))
-        #expect(HeatingFeature.noRoomsHint.contains("Konfiguration"))
+        #expect(HeatingFeature.noRoomsHint.contains("configuration"))
     }
 
     @Test("an unreachable server is an error state without rooms")

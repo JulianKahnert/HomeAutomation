@@ -110,7 +110,7 @@ struct EntityCharacteristicView: View {
         case .heatingMode:
             if let mode = item.heatingMode {
                 Spacer()
-                Label(String(localized: "mode \(mode.name)", bundle: .module), systemImage: "thermostat")
+                Label(String(localized: "mode \(mode.localizedName)", bundle: .module), systemImage: "thermostat")
             }
         case .valvePosition:
             if let percent = item.valvePositionPercent {
@@ -130,7 +130,7 @@ struct EntityCharacteristicView: View {
         case .deadline:
             if let deadline = item.deadline {
                 Spacer()
-                Label(deadline.displayText, systemImage: "timer")
+                Label(deadline.localizedDisplayText(), systemImage: "timer")
             }
         case .valve:
             if let valveOpen = item.valveOpen {

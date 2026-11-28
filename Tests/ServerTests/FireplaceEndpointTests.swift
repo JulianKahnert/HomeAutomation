@@ -147,7 +147,8 @@ final class FireplaceEndpointTests: XCTestCase {
         XCTAssertEqual(status, .ok)
         XCTAssertEqual(state?.isOn, false)
         await storage.waitForChanges(2)
-        XCTAssertEqual(try await Fireplace.state(from: storage), .off)
+        let stored = try await Fireplace.state(from: storage)
+        XCTAssertEqual(stored, .off)
         XCTAssertEqual(events.all.last?.entityId, Fireplace.stateId)
         XCTAssertEqual(events.all.last?.origin, .app)
     }

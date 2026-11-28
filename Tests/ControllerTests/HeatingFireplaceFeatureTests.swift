@@ -7,6 +7,7 @@ import ComposableArchitecture
 @testable import Controller
 import Foundation
 import HAModels
+import ServerClient
 import Testing
 import UserNotifications
 
@@ -35,6 +36,7 @@ struct HeatingFireplaceFeatureTests {
             HeatingFeature()
         } withDependencies: {
             $0.date = .constant(now)
+            $0.serverClient.getHeatingOverview = { HeatingOverview(rooms: []) }
             $0.serverClient.getFireplace = { loaded }
             $0.serverClient.setFireplace = { isOn in
                 calls.append(isOn)
@@ -98,16 +100,32 @@ struct HeatingFireplaceFeatureTests {
     func failure() async {
         let truth = FireplaceState.off
         let store = store(loaded: truth, switching: { _ in throw Failure() })
-        store.exhaustivity = .off
 
-        await store.send(.setFireplace(true))
+        await store.send(.setFireplace(true)) {
+            $0.fireplace = FireplaceState(isOn: true, since: start)
+        }
+        await store.receive(\.fireplaceSwitched.failure) {
+            $0.fireplaceError = Failure().localizedDescription
+        }
+        await store.receive(\.fireplaceLoaded.success) { $0.fireplace = truth }
+        await store.send(.dismissFireplaceError) { $0.fireplaceError = nil }
+    }
+
+    @Test("a busy server keeps the shown state and reloads after a short delay")
+    func busy() async {
+        let clock = TestClock()
+        let applied = FireplaceState(isOn: true, since: start.addingTimeInterval(3))
+        let store = store(loaded: applied, switching: { _ in throw ServerClientError.busy })
+        store.dependencies.continuousClock = clock
+
+        await store.send(.setFireplace(true)) {
+            $0.fireplace = FireplaceState(isOn: true, since: start)
+        }
         await store.receive(\.fireplaceSwitched.failure)
-        await store.receive(\.fireplaceLoaded.success)
-
-        #expect(store.state.fireplace == truth)
-        #expect(store.state.fireplaceError != nil)
-        await store.send(.dismissFireplaceError)
-        #expect(store.state.fireplaceError == nil)
+        await clock.advance(by: .seconds(5))
+        await store.receive(\.fireplaceLoaded.success) {
+            $0.fireplace = applied
+        }
     }
 
     @Test("the subtitle says when the fireplace ends, and is empty while it is off")

@@ -20,8 +20,6 @@ public struct FireplaceReminder: Automatable {
     /// No second reminder before this much time has passed since the last one.
     public let minInterval: TimeInterval
 
-    public var triggerEntityIds: Set<EntityId> { [roomSensor] }
-
     public init(_ name: String = "fireplace-reminder", roomSensor: EntityId, riseInC: Double = 1.0, window: TimeInterval = 30 * 60, minInterval: TimeInterval = 2 * 3600) {
         self.name = name
         self.roomSensor = roomSensor
@@ -33,7 +31,7 @@ public struct FireplaceReminder: Automatable {
     public func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool {
         guard case .change(let item) = event, item.entityId == roomSensor,
               let current = item.temperatureInC?.value else { return false }
-        guard !(await Fireplace.state(with: hm).isOn) else { return false }
+        guard try await !Fireplace.state(with: hm).isOn else { return false }
         if let last = await hm.lastNotificationDate(id: Fireplace.reminderNotificationId),
            item.timestamp.timeIntervalSince(last) < minInterval { return false }
 
@@ -43,9 +41,9 @@ public struct FireplaceReminder: Automatable {
     }
 
     public func execute(using hm: HomeManagable) async throws {
-        await hm.sendNotification(title: "Kamin an?",
-                                  message: "Heizkörper ausschalten",
-                                  id: Fireplace.reminderNotificationId,
-                                  category: Fireplace.notificationCategory)
+        await hm.deliver(.push(title: "Kamin an?",
+                               message: "Heizkörper ausschalten",
+                               id: Fireplace.reminderNotificationId,
+                               category: Fireplace.notificationCategory))
     }
 }

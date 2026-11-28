@@ -61,7 +61,4 @@ actor InMemoryAutomationRunRepository: AutomationRunRepository {
         }
     }
 
-    func deleteRuns(olderThan date: Date) {
-        runs = runs.filter { $0.value.startedAt >= date }
-    }
 }

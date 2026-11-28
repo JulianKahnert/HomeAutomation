@@ -12,59 +12,89 @@ public actor HomeManagerActor: GlobalActor {
     public static let shared = HomeManagerActor()
 }
 
-public protocol EntityValidator {
-    func findEntity(_ entity: EntityId) async throws
-}
-
 @HomeManagerActor
-public protocol HomeManagable: EntityValidator, Sendable {
+public protocol HomeManagable: Sendable {
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem
-    func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem?
-    /// The last state of the entity the database holds, past the in-memory cache. After a restart the
-    /// adapter's resync refreshes the cache with a new timestamp; only the database still knows since
-    /// when the state really holds. `nil` when the database has none.
-    func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem?
-    /// The stored states of the entity since `since`, newest first; empty when the database has none.
+    /// When each reporting source (an origin: `homekit`, `server` or a job name) last reported, a replay included.
+    /// Memory only, so a source is missing after a restart until its first report.
+    func lastReports() async -> [String: Date]
+    /// When the entity last reported, a replay included; `nil` while unknown (after a restart until its first report).
+    func lastReport(of entityId: EntityId) async -> Date?
+    /// The changes of the entity the server holds in memory since `since` (the last 3 hours), newest first; a decision
+    /// reads this, never the database. A longer history is ``getFullEntityHistory(with:limit:)``.
     func getEntityHistory(with entityId: EntityId, since: Date) async -> [EntityStorageItem]
+    /// The last `limit` changes of the entity, newest first: the database's, joined with the memory's that may not be
+    /// stored yet. Reads the database, so only a run that may wait for it (not `shouldTrigger`) calls it.
+    func getFullEntityHistory(with entityId: EntityId, limit: Int) async -> [EntityStorageItem]
     /// When a notification with this id was last sent by this server process; `nil` if none was since the start.
     func lastNotificationDate(id: String) async -> Date?
     /// The newest write that reached `radiator` (matched by room and name, whatever the characteristic),
     /// `nil` when there is none or the server does not record them.
-    func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite?
-    /// Records a write of the plan history that sends nothing (`HeatingWrite.sentToDevice` is `false`).
-    func record(_ write: HeatingWrite) async
+    func lastHeatingWrite(of radiator: EntityId) async -> ActionLogItem?
     /// The command queued to be sent again for `entityId` after it failed, `nil` when none waits.
     func queuedRetry(of entityId: EntityId) async -> HomeManagableAction?
-    /// The newest switch of the fireplace (glossary: fireplace mode), `nil` when it was never switched.
-    func lastFireplaceSwitch() async -> FireplaceSwitch?
-    /// Switches the fireplace and tells the automations (`HomeEvent.fireplaceChanged`). Returns the new switch,
-    /// `nil` when the fireplace already had that state.
-    func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch?
     func getAllEntitiesLive() async throws -> [EntityStorageItem]
+    /// Asks the adapter which thermostats it can read; throws while the adapter is not connected.
+    func listThermostats() async throws -> [Thermostat]
+    /// Asks the adapter to read one thermostat: its valve position and offset as items. Does not store them.
+    func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem]
     /// - Returns: Whether the item carries new information, i.e. differs in value — not just in
     ///   timestamp — from the last known state of that entity.
     @discardableResult
     func addEntityHistory(_ item: EntityStorageItem) async -> Bool
 
+    /// Reports a state the server keeps itself (a server-owned entity, glossary). Checks the value against the
+    /// current state and sets it at once, so it holds before the event stream distributes it; stores it (history,
+    /// API, restart) and, when it changed, yields an already checked `HomeEvent.change` with `origin`. A repeated
+    /// value changes nothing and keeps the timestamp. A failing database does not undo the state. It is a report,
+    /// not a command (ADR-003): devices stay with `perform`. Only counts as a sign of life for HomeKit with origin
+    /// `homekit`, which it never has.
+    /// - Parameters:
+    ///   - entityId: A server-owned entity: `entityId.isServerOwned`.
+    ///   - value: Must fit the shape of the entity's value kind.
+    ///   - origin: `server` (default), `app` or the name of a polling job (`Origin.job(_:)`).
+    ///   - ifCurrent: A precondition on the entity's current state (`nil` while unknown). It is checked in the same
+    ///     synchronous section that sets the state, so no other writer can change the entity between the check and
+    ///     the write; read, decide and report in two calls and one can. When it returns `false` nothing is reported.
+    /// - Returns: The state after the report, read in the same synchronous section that set it, with whether it
+    ///   changed; `nil` when `ifCurrent` refused the report. The ``report(_:value:origin:ifCurrent:)`` extension
+    ///   reduces it to the `changed` flag.
+    /// - Throws: ``ReportError`` for a report that is refused: an entity that is not server-owned, a value that does
+    ///   not fit the kind. That is a programmer error of the caller, not an outcome.
+    func reportState(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> StateChange?
+    /// The current states of all entities of one characteristic type, in no particular order; from memory.
+    func states(of type: CharacteristicsType) async -> [EntityStorageItem]
+
     func perform(_ action: HomeManagableAction) async
     func trigger(scene sceneName: String) async
     func getLocation() async -> Location
-    /// - Parameter category: The notification category of the app, which gives the push its actions; `nil` for none.
-    func sendNotification(title: String, message: String, id: String, category: String?) async
-    /// Marks an offenes Fenster überschritten once its Fensterschließzeit has passed; the Live Activity alerts once.
-    func markWindowOverdue(entityId: EntityId) async
-    /// The window Live Activity's content state, as the server last built it.
-    func getWindowContentState() async -> WindowContentState
-    func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async
-    func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem]
-    func clearActionLog() async
+    /// Hands a push or Live Activity update over to the notification adapter. Deliveries leave in the order
+    /// they were handed over, also when one send is slow; a failed send is logged, not thrown.
+    func deliver(_ delivery: Delivery) async
     /// Whether HomeKit works end to end; shared by `/health` and the `HealthCheck` automation.
     func homeKitHealth() async -> HomeKitHealth
+    /// Runs one step of the database upkeep (cleanup, rollup). A no-op where the host has no database upkeep.
+    func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws
 }
 
-extension HomeManagable {
-    public func sendNotification(title: String, message: String, id: String) async {
-        await sendNotification(title: title, message: message, id: id, category: nil)
+/// Why a report was refused.
+public enum ReportError: Error, Equatable {
+    case notServerOwned(EntityId)
+    case valueDoesNotFit(EntityId)
+}
+
+public extension HomeManagable {
+    /// Like ``reportState(_:value:origin:ifCurrent:)``, reduced to whether the state changed (`false` for a replay or a
+    /// refusal by `ifCurrent`).
+    @discardableResult
+    func report(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> Bool {
+        try await reportState(entityId, value: value, origin: origin, ifCurrent: ifCurrent)?.changed ?? false
+    }
+
+    /// Reports unconditionally, with origin `server` unless given.
+    @discardableResult
+    func report(_ entityId: EntityId, value: Value, origin: Origin = .server) async throws -> Bool {
+        try await report(entityId, value: value, origin: origin, ifCurrent: { _ in true })
     }
 }
 
@@ -137,6 +167,10 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equ
         }
     }
 
+    /// The `actionName` of the two radiator commands; the journal row of one is read back by these names.
+    public static let setHeatingName = "setHeating"
+    public static let setTargetTemperatureName = "setTargetTemperature"
+
     public var actionName: String {
         switch self {
         case .turnOn:
@@ -154,11 +188,11 @@ public enum HomeManagableAction: CustomStringConvertible, Sendable, Codable, Equ
         case .addEntityToScene:
             return "addEntityToScene"
         case .setHeating:
-            return "setHeating"
+            return Self.setHeatingName
         case .setValve:
             return "setValve"
         case .setTargetTemperature:
-            return "setTargetTemperature"
+            return Self.setTargetTemperatureName
         }
     }
 }

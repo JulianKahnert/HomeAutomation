@@ -21,10 +21,6 @@ public struct EnergyLowPrice: Automatable {
 
     /// the devices will only be triggered, if the price is lower or equal to this threshold
     public let thresholdInEUR: Double?
-    public var triggerEntityIds: Set<EntityId> {
-        []
-    }
-
     public init(_ name: String, switches: [SwitchDevice], dailyActivationDuration: Duration = .hours(2), thresholdInEUR: Double?) {
         self.name = name
         self.switches = switches
@@ -40,29 +36,53 @@ public struct EnergyLowPrice: Automatable {
         return Calendar.current.component(.minute, from: date) == 3
     }
 
+    /// The price job reports every 15 minutes; a price older than two reports is no longer current.
+    static let maximumPriceAge: TimeInterval = 30 * 60
+    private static let missingPrice = Disturbances<String>()
+
     public func execute(using hm: HomeManagable) async throws {
         log.debug("Get price infos")
+        guard let current = await currentPrice(using: hm, now: Date()) else { return }
         guard let tibber = TibberService() else { return }
 
-        var prices = try await tibber.getCheapestPricesToday(for: dailyActivationDuration)
+        let slots = try await tibber.getCheapestPricesToday(for: dailyActivationDuration)
+        await apply(cheapestSlots: slots, currentPrice: current, now: Date(), using: hm)
+    }
 
-        // if there is a threshold set, we must filter the prices first
+    /// The current price (state reported by the server's EnergyPriceJob), `nil` while none is known or the last report is
+    /// too old: after a restart before the job ran, or while the source is down. Logs once per disturbance.
+    func currentPrice(using homeManager: HomeManagable, now: Date) async -> Double? {
+        let price = try? await homeManager.getCurrentEntity(with: .electricityPrice).energyPriceInEURPerKWh
+        if let price, let reported = await homeManager.lastReport(of: .electricityPrice), now.timeIntervalSince(reported) <= Self.maximumPriceAge {
+            if await Self.missingPrice.recovered(name) {
+                log.info("The electricity price is known again", metadata: ["automation": "\(name)"])
+            }
+            return price
+        }
+        if await Self.missingPrice.began(name) {
+            log.warning("No current electricity price known, leaving the switches as they are", metadata: ["automation": "\(name)"])
+        }
+        return nil
+    }
+
+    /// Switches on when the current time slot is one of the cheapest slots (those under the threshold, if one is set),
+    /// off otherwise. Tibber's ranking decides, so a tie in price never extends beyond `dailyActivationDuration`.
+    func apply(cheapestSlots: [TibberService.TodayPrice], currentPrice: Double, now: Date, using homeManager: HomeManagable) async {
+        var slots = cheapestSlots
         if let thresholdInEUR {
-            prices = prices.filter { $0.price <= thresholdInEUR }
+            slots = slots.filter { $0.price <= thresholdInEUR }
         }
-
-        let shouldTurnOnSwitches: Bool
-        if let price = prices.first(where: { $0.time.contains(Date()) }) {
-            log.info("Starting switches as current price is \(price.price)€/kWh")
-            shouldTurnOnSwitches = true
-        } else {
-            shouldTurnOnSwitches = false
+        let shouldTurnOnSwitches = slots.contains { $0.time.contains(now) }
+        if shouldTurnOnSwitches {
+            log.info("Starting switches in a cheapest slot", metadata: ["priceInEURPerKWh": "\(currentPrice)"])
         }
+        await setSwitches(on: shouldTurnOnSwitches, using: homeManager)
+    }
 
+    private func setSwitches(on: Bool, using hm: HomeManagable) async {
         for enerySwitch in switches {
-            if shouldTurnOnSwitches {
+            if on {
                 await enerySwitch.turnOn(with: hm)
-//                await tibber?.sendNotification(title: "Low energy price", message: "\(Date().formatted())")
             } else {
                 await enerySwitch.turnOff(with: hm)
             }

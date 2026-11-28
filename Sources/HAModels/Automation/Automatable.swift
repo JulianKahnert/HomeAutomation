@@ -7,6 +7,18 @@
 
 import Logging
 
+/// How an automation's lane treats a trigger while a run is going.
+public enum LanePolicy: Sendable {
+    /// The new run cancels the one still going (the newest intent wins); waiting changes of one entity collapse
+    /// to the newest. The default.
+    case supersede
+    /// A trigger during a run is dropped, because the run must not be cut (the database upkeep); changes collapse.
+    case skipWhileRunning
+    /// The lane waits for each run to end before it checks the next event, so every trigger runs to its end in
+    /// order and no change collapses (projections).
+    case runEach
+}
+
 /// A protocol that describes an automated process.
 /// Any object conforming to this protocol can execute actions based on specific triggers,
 /// such as sensors or other entities.
@@ -19,9 +31,6 @@ public protocol Automatable: Sendable, Codable {
 
     /// The unique name of the automation.
     var name: String { get }
-
-    /// A set of entity IDs that act as triggers for the automation process.
-    var triggerEntityIds: Set<EntityId> { get }
 
     /// Determines if the given event should trigger this automation.
     ///
@@ -42,12 +51,17 @@ public protocol Automatable: Sendable, Codable {
     /// that trigger every minute, which would flood the run history.
     var recordsRuns: Bool { get }
 
+    /// How the automation's lane treats a trigger while a run is going, and whether its changes collapse.
+    var lanePolicy: LanePolicy { get }
+
     /// Extra detail appended to the generic trigger summary, e.g. the sensor value that decided it.
     func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String?
 }
 
 public extension Automatable {
     var recordsRuns: Bool { true }
+
+    var lanePolicy: LanePolicy { .supersede }
 
     func triggerSummary(for event: HomeEvent, using hm: HomeManagable) async -> String? { nil }
 

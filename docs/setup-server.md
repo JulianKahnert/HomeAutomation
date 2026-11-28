@@ -46,7 +46,7 @@ LOG_LEVEL=trace docker-compose up app
 # debug logs on top of the configured level
 HA_DEBUG_LOGGING=1 docker-compose up app
 
-# run migration
+# run migration (the server also migrates on start; a new, empty database gets the one initial schema)
 docker-compose run migrate
 
 # show logs
@@ -60,3 +60,7 @@ swift build
 TZ=Europe/Berlin swift run Server serve
 TZ=Europe/Berlin swift run Server serve
 ```
+
+## MySQL tests
+
+`EntityStorageMySQLTests` and `HomekitInventoryMySQLTests` run only against a throwaway MySQL (`HA_TEST_MYSQL_PORT` set); without it they are skipped, so `swift test` does not cover the MySQL-only queries (the journal cleanup, the narrow storage). `scripts/run-mysql-tests.sh [git-ref]` runs them on a Mac with Xcode and Docker: it starts a throwaway `mysql:9` in Docker with its port published on `127.0.0.1:33306` and runs `swift test --filter 'EntityStorageMySQLTests|HomekitInventoryMySQLTests'` natively on the host (the package holds app targets that do not build on Linux, so other hosts are refused). The log goes to `mysql-tests.log`. Never point the tests at a real database: they create and fill the tables.

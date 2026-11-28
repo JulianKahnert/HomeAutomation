@@ -18,13 +18,6 @@ public enum DailyTotals {
         }
     }
 
-    /// Number of `dates` falling on each of `days`.
-    public static func countsPerDay(_ dates: [Date], days: [Date], calendar: Calendar) -> [(day: Date, count: Int)] {
-        days.map { day in
-            (day, dates.count { calendar.isDate($0, inSameDayAs: day) })
-        }
-    }
-
     /// Time-weighted mean and maximum per day; each sample holds until the next one, the newest until `end`.
     /// Days without any covered time are left out.
     public static func dailyStats(_ samples: [(date: Date, value: Double)], days: [Date], end: Date, calendar: Calendar) -> [(day: Date, max: Double, mean: Double)] {

@@ -11,7 +11,7 @@ import Testing
 
 struct StatusStreamTests {
 
-    private func helloFrame(version: Int = 1) throws -> Data {
+    private func helloFrame(version: Int = StarActorSystem.protocolVersion) throws -> Data {
         try JSONEncoder().encode(WireEnvelope.hello(Hello(protocolVersion: version)))
     }
 
@@ -112,21 +112,5 @@ struct StatusStreamTests {
             return first
         }
         #expect(!received)
-    }
-
-    @Test("isReconnect truth table", arguments: [
-        (ConnectionStatus.up, ConnectionStatus?.none, true),
-        (.up, .connecting, true),
-        (.up, .error, true),
-        (.up, .up, false),
-        (.connecting, .none, false),
-        (.connecting, .up, false),
-        (.connecting, .error, false),
-        (.error, .none, false),
-        (.error, .up, false),
-        (.error, .connecting, false)
-    ])
-    func isReconnect(status: ConnectionStatus, previous: ConnectionStatus?, expected: Bool) {
-        #expect(status.isReconnect(from: previous) == expected)
     }
 }

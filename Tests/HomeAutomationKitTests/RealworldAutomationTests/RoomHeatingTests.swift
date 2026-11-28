@@ -62,7 +62,7 @@ struct RoomHeatingTests {
             .setHeating(left.heatingId, active: true), .setTargetTemperature(left.targetTemperatureId, celsius: 21),
             .setHeating(right.heatingId, active: true), .setTargetTemperature(right.targetTemperatureId, celsius: 21)
         ])
-        #expect(writes.allSatisfy { $0.heating == .init(reason: .plan, planTargetInC: 21) })
+        #expect(writes.allSatisfy { $0.heating == .plan })
     }
 
     @Test("The weekend group writes the weekend target")
@@ -111,7 +111,7 @@ struct RoomHeatingTests {
         try await room.execute(using: homeManager, now: date(day: 18, hour: 12, minute: 17), isDeploy: true)
 
         #expect(targets() == [21, 21])
-        #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .system, planTargetInC: 21) })
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .system })
     }
 
     @Test("After midnight a deploy writes the last target of the day before")
@@ -143,8 +143,8 @@ struct RoomHeatingTests {
             .setHeating(right.heatingId, active: true), .setTargetTemperature(right.targetTemperatureId, celsius: 21)
         ])
         #expect(writes.map(\.heating) == [
-            .init(reason: .fireplace),
-            .init(reason: .system, planTargetInC: 21), .init(reason: .system, planTargetInC: 21)
+            .fireplace,
+            .system, .system
         ])
     }
 
@@ -173,14 +173,14 @@ struct RoomHeatingTests {
     /// The server switched both radiators off for `reason` at `date`.
     private func seedOffWrites(reason: HeatingWriteReason = .window, at date: Date) {
         for radiator in [left, right] {
-            homeManager.heatingWrites.append(HeatingWrite(timestamp: date, entityId: radiator.heatingId, reason: reason, actionName: "setHeating", isActive: false))
+            homeManager.heatingWrites.append(seededWrite(timestamp: date, action: .setHeating(radiator.heatingId, active: false), reason: reason))
         }
     }
 
     /// The server returned both radiators to the plan target at `date`.
     private func seedPlanWrites(reason: HeatingWriteReason = .window, at date: Date, target: Double = 21) {
         for radiator in [left, right] {
-            homeManager.heatingWrites.append(HeatingWrite(timestamp: date, entityId: radiator.targetTemperatureId, reason: reason, actionName: "setTargetTemperature", targetTemperatureInC: target, planTargetInC: target))
+            homeManager.heatingWrites.append(seededWrite(timestamp: date, action: .setTargetTemperature(radiator.targetTemperatureId, celsius: target), reason: reason))
         }
     }
 
@@ -193,7 +193,7 @@ struct RoomHeatingTests {
         return Task { @HomeManagerActor in try await room.execute(using: homeManager, now: now, sleep: { try await sleeper.sleep(for: $0) }) }
     }
 
-    private func heatingWrites() -> [(HomeManagableAction, HeatingWriteContext.Context?)] {
+    private func heatingWrites() -> [(HomeManagableAction, HeatingWriteReason?)] {
         homeManager.performedActions.map { ($0.action, $0.heating) }
     }
 
@@ -210,7 +210,7 @@ struct RoomHeatingTests {
         try await task.value
 
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false), .setHeating(right.heatingId, active: false)])
-        #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .window) })
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .window })
     }
 
     @Test("A run that starts after part of the delay waits only the rest")
@@ -260,7 +260,7 @@ struct RoomHeatingTests {
         try await room.execute(using: homeManager, now: afterB, sleep: { _ in })
 
         #expect(targets() == [room.effectivePlan.planTarget(at: afterB)!, room.effectivePlan.planTarget(at: afterB)!])
-        #expect(homeManager.performedActions.allSatisfy { $0.heating?.reason == .window && $0.heating?.planTargetInC != nil })
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .window })
     }
 
     @Test("Closing returns to the plan target, not to an old manual value")
@@ -289,17 +289,16 @@ struct RoomHeatingTests {
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false), .setHeating(right.heatingId, active: false)])
     }
 
-    @Test("A switch point while the room is off records the new plan target for the history without sending it")
+    @Test("A switch point while the room is off reports the new plan target without sending it")
     func switchPointWhileOffRecordsPlan() async throws {
         let switchPoint = date(day: 18, hour: 22)
         setWindow(windowA, open: true, at: switchPoint.addingTimeInterval(-3600))
 
         try await room().execute(using: homeManager, now: switchPoint, sleep: { _ in })
 
-        let recorded = homeManager.heatingWrites.filter { !$0.sentToDevice }
-        #expect(recorded.count == 2)
-        #expect(recorded.allSatisfy { $0.reason == .plan && $0.planTargetInC == 17 && $0.timestamp == switchPoint })
-        #expect(Set(recorded.map(\.entityId.name)) == ["Left", "Right"])
+        let planTargets = homeManager.storageItems.filter { $0.entityId == HeatingRoomSources.planTargetId(placeId: "Kitchen") }
+        #expect(planTargets.map(\.targetTemperatureInC) == [17])
+        #expect(planTargets.first?.origin == .server)
         // nothing but the off writes went to the adapter, and the last write that reached a radiator is still the off write
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false), .setHeating(right.heatingId, active: false)])
         #expect(await homeManager.lastHeatingWrite(of: left.heatingId)?.isActive == false)
@@ -317,7 +316,7 @@ struct RoomHeatingTests {
         try await task.value
 
         #expect(targets() == [17, 17])
-        #expect(homeManager.heatingWrites.allSatisfy { $0.sentToDevice }, "the radiators never went off")
+        #expect(homeManager.heatingWrites.allSatisfy { $0.isActive != false }, "the radiators never went off")
     }
 
     @Test("A time event processed after its minute still writes its switch point")
@@ -329,13 +328,15 @@ struct RoomHeatingTests {
         #expect(targets() == [21, 21])
     }
 
-    @Test("A deploy or a window change while the room is off records no plan target")
+    @Test("A window change while the room is off sends nothing and reports the unchanged plan target once")
     func onlySwitchPointsRecordPlan() async throws {
         setWindow(windowA, open: true, at: noon.addingTimeInterval(-3600))
 
         try await room().execute(using: homeManager, now: noon, sleep: { _ in })
 
-        #expect(homeManager.heatingWrites.allSatisfy { $0.sentToDevice })
+        #expect(targets().isEmpty)
+        let planTargets = homeManager.storageItems.filter { $0.entityId == HeatingRoomSources.planTargetId(placeId: "Kitchen") }
+        #expect(planTargets.count == 1)
     }
 
     @Test("Another room's window does not trigger the room")
@@ -356,7 +357,7 @@ struct RoomHeatingTests {
         try await room.execute(using: homeManager, now: noon, sleep: { _ in Issue.record("must not wait"); })
 
         #expect(homeManager.performedActions.map(\.action) == [.setHeating(left.heatingId, active: false), .setHeating(right.heatingId, active: false)])
-        #expect(homeManager.performedActions.allSatisfy { $0.heating == .init(reason: .window) })
+        #expect(homeManager.performedActions.allSatisfy { $0.heating == .window })
         #expect(targets().isEmpty)
     }
 
@@ -377,7 +378,7 @@ struct RoomHeatingTests {
         setWindow(windowA, open: false, at: noon.addingTimeInterval(-7000))
         seedOffWrites(at: noon.addingTimeInterval(-7190))
         seedPlanWrites(at: noon.addingTimeInterval(-7000))   // the room went back to the plan then
-        homeManager.heatingWrites += [HeatingWrite(timestamp: noon.addingTimeInterval(-600), entityId: left.targetTemperatureId, reason: .system, actionName: "setTargetTemperature", targetTemperatureInC: 25)]
+        homeManager.heatingWrites += [seededWrite(timestamp: noon.addingTimeInterval(-600), action: .setTargetTemperature(left.targetTemperatureId, celsius: 25), reason: .system)]
         // the adapter's resync after the restart: the state did not change, so it is not stored, but it is an event
         let resync = HomeEvent.change(entity: EntityStorageItem(entityId: windowA.contactSensorId, timestamp: noon, isContactOpen: false))
 
@@ -432,7 +433,6 @@ struct RoomHeatingTests {
         let decoded = try JSONDecoder().decode(AnyAutomation.self, from: JSONEncoder().encode(AnyAutomation.create(from: room())))
 
         let decodedRoom = try #require(decoded.automation as? RoomHeating)
-        #expect(decodedRoom.triggerEntityIds == [windowA.contactSensorId, windowB.contactSensorId])
         #expect(Set(decodedRoom.getEntityIds()).isSuperset(of: [windowA.contactSensorId, windowB.contactSensorId]))
     }
 }

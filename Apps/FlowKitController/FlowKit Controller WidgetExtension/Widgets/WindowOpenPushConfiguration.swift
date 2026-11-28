@@ -5,7 +5,6 @@
 //  Created by Julian Kahnert on 06.03.25.
 //
 
-#if os(iOS)
 import Controller
 import SwiftUI
 import WidgetKit
@@ -62,4 +61,3 @@ private struct WindowOpenActivityContent: View {
         }
     }
 }
-#endif

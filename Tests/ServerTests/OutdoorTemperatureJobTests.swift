@@ -33,6 +33,22 @@ struct OutdoorTemperatureJobTests {
         #expect(rows[0].fetchedAt == Date(timeIntervalSince1970: 100))
     }
 
+    @Test func reportsTheCurrentHoursTemperatureAsServerOwnedEntity() async throws {
+        let reports = Reports()
+        var job = OutdoorTemperatureJob(location: location, hours: InMemoryHours(), report: { await reports.add($0, $1, $2) })
+        let data = response
+        job.fetch = { _ in data }
+
+        try await job.run(plannedAt: Date(timeIntervalSince1970: 1_794_654_000 + 1800)) // 11:30Z
+
+        let all = await reports.all
+        #expect(all.count == 1)
+        #expect(all[0].0 == OutdoorTemperatureJob.entityId)
+        #expect(all[0].0 == .serverOwned(name: "outdoor", characteristic: .temperatureSensor))
+        #expect(all[0].1 == .number(7.9))
+        #expect(all[0].2 == .job("OutdoorTemperatureJob"))
+    }
+
     @Test func rejectsResponseWithoutHourlyBlock() async {
         let store = InMemoryHours()
         var job = OutdoorTemperatureJob(location: location, hours: store)
@@ -54,36 +70,30 @@ struct OutdoorTemperatureJobTests {
     }
 
     @Test func historyItemExposesHeatingFields() {
-        let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .valvePosition)
-        let history = EntityHistoryItem(EntityStorageItem(entityId: id, targetTemperatureInC: 20.5, heatingMode: .heat, valvePositionPercent: 35))
-        #expect(history.targetTemperatureInC == 20.5)
-        #expect(history.heatingMode == .heat)
-        #expect(history.valvePositionPercent == 35)
+        func id(_ type: CharacteristicsType) -> EntityId {
+            EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: type)
+        }
+        #expect(EntityHistoryItem(EntityStorageItem(entityId: id(.targetTemperature), targetTemperatureInC: 20.5)).targetTemperatureInC == 20.5)
+        #expect(EntityHistoryItem(EntityStorageItem(entityId: id(.heatingMode), heatingMode: .heat)).heatingMode == .heat)
+        #expect(EntityHistoryItem(EntityStorageItem(entityId: id(.valvePosition), valvePositionPercent: 35)).valvePositionPercent == 35)
     }
 
     @Test(arguments: HeatingMode.allCases)
-    func heatingModeKeepsHAPRawValueAndApiName(_ mode: HeatingMode) {
+    func heatingModeKeepsHAPRawValueAndApiValue(_ mode: HeatingMode) {
         #expect(HeatingMode(name: mode.name) == mode)
         let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .heatingMode)
         let api = Components.Schemas.EntityHistoryItem(EntityStorageItem(entityId: id, heatingMode: mode))
-        #expect(api.heatingMode?.rawValue == mode.name)
+        #expect(api.valueKind == "heatingMode")
+        #expect(api.value == .case2(Double(mode.rawValue)))
         #expect(HeatingMode(rawValue: 4) == nil)
         #expect([HeatingMode.off, .heat, .cool, .auto].map(\.rawValue) == [0, 1, 2, 3])
     }
 
-    @Test func apiItemExposesHeatingFields() {
-        let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .valvePosition)
-        let api = Components.Schemas.EntityHistoryItem(EntityStorageItem(entityId: id, targetTemperatureInC: 20.5, heatingMode: .auto, valvePositionPercent: 35))
-        #expect(api.targetTemperatureInC == 20.5)
-        #expect(api.heatingMode?.rawValue == "auto")
-        #expect(api.valvePositionPercent == 35)
-    }
-
-    @Test func historyAndApiItemsExposeTemperatureCalibration() {
+    @Test func historyItemExposesTemperatureCalibration() {
         let id = EntityId(placeId: "Kitchen", name: "Thermo", characteristicsName: nil, characteristic: .temperatureCalibration)
         let item = EntityStorageItem(entityId: id, temperatureCalibrationInC: -0.5)
         #expect(EntityHistoryItem(item).temperatureCalibrationInC == -0.5)
-        #expect(Components.Schemas.EntityHistoryItem(item).temperatureCalibrationInC == -0.5)
+        #expect(Components.Schemas.EntityHistoryItem(item).value == .case2(-0.5))
     }
 }
 
@@ -91,5 +101,13 @@ private actor InMemoryHours: WeatherHourStoring {
     private(set) var rows: [WeatherHour] = []
     func upsert(_ hours: [WeatherHour]) async throws {
         rows.append(contentsOf: hours)
+    }
+}
+
+actor Reports {
+    private(set) var all: [(EntityId, Value, Origin)] = []
+    func add(_ id: EntityId, _ value: Value, _ origin: Origin) -> Bool {
+        all.append((id, value, origin))
+        return true
     }
 }

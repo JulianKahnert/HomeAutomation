@@ -15,74 +15,20 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
     /// Timestamp when this state was recorded
     public var timestamp: Date
 
-    /// Motion detection state (true if motion detected)
-    public let motionDetected: Bool?
+    /// The one value of the item; its shape follows the characteristic type of ``entityId``, the one table is
+    /// ``ValueDescriptor/descriptor(for:)``. The typed accessors (`temperatureInC`, `isDeviceOn`, ...)
+    /// are derived from it, see `EntityStorageItem+TypedAccess.swift`.
+    public let value: Value?
 
-    let _illuminanceInLux: Double?
-    /// Light level measurement in lux
-    public var illuminance: Measurement<UnitIlluminance>? {
-        guard let _illuminanceInLux else { return nil }
-        return Measurement(value: _illuminanceInLux, unit: .lux)
-    }
+    /// Where this change came from. It is no part of the value: two items that differ only in
+    /// timestamp and origin carry the same information (see `HomeManager.addEntityHistory`).
+    public var origin: Origin
 
-    /// Device power state (true if on, false if off)
-    public let isDeviceOn: Bool?
-
-    /// Light brightness level (0-100)
-    public let brightness: Int?
-
-    /// Color temperature normalized to 0...1 (warm...cold)
-    /// Normalized from HomeKit's mired value using device min/max capabilities
-    public let colorTemperature: Float?
-
-    /// RGB color value
-    public let color: RGB?
-
-    /// Contact sensor state (true if open, false if closed)
-    public let isContactOpen: Bool?
-
-    /// Door lock state (true if locked, false if unlocked)
-    public let isDoorLocked: Bool?
-
-    /// Battery state of charge percentage (0-100)
-    public let stateOfCharge: Int?
-
-    /// Heater active state (true if heating)
-    public let isHeaterActive: Bool?
-
-    let _temperatureInC: Double?
-    /// Temperature measurement in Celsius
-    public var temperatureInC: Measurement<UnitTemperature>? {
-        guard let _temperatureInC else { return nil }
-        return Measurement(value: _temperatureInC, unit: .celsius)
-    }
-
-    /// Relative humidity percentage (0-100)
-    public let relativeHumidity: Double?
-
-    /// Carbon dioxide level in ppm
-    public let carbonDioxideSensorId: Int?
-
-    /// Particulate matter density (PM2.5/PM10)
-    public let pmDensity: Double?
-
-    /// Air quality index
-    public let airQuality: Int?
-
-    /// Valve open state (true if open)
-    public let valveOpen: Bool?
-
-    /// Thermostat target temperature in Celsius
-    public let targetTemperatureInC: Double?
-
-    /// Thermostat target mode
-    public let heatingMode: HeatingMode?
-
-    /// Valve opening in percent (0-100), Eve custom characteristic
-    public let valvePositionPercent: Int?
-
-    /// Thermostat temperature offset in Celsius, already included in the temperature it reports
-    public let temperatureCalibrationInC: Double?
+    /// When the entity last reported, a replay included; `timestamp` stays the time of the last change.
+    /// Stored per entity, written at most every five minutes (`entities.lastReport`); a reader of the current state
+    /// returns the later of that and the newest change's timestamp. Like `origin` it is no part of
+    /// the value (see `HomeManager.addEntityHistory`).
+    public var lastReport: Date?
 
     public var description: String {
         let encoder = JSONEncoder()
@@ -94,53 +40,30 @@ public struct EntityStorageItem: Equatable, Sendable, Codable, CustomStringConve
         return string
     }
 
-    /// Creates a new entity storage item with all available properties
-    public init(
-        entityId: EntityId,
-        timestamp: Date = Date(),
-        motionDetected: Bool? = nil,
-        illuminance: Measurement<UnitIlluminance>? = nil,
-        isDeviceOn: Bool? = nil,
-        brightness: Int? = nil,
-        colorTemperature: Float? = nil,
-        color: RGB? = nil,
-        isContactOpen: Bool? = nil,
-        isDoorLocked: Bool? = nil,
-        stateOfCharge: Int? = nil,
-        isHeaterActive: Bool? = nil,
-        temperatureInC: Measurement<UnitTemperature>? = nil,
-        relativeHumidity: Double? = nil,
-        carbonDioxideSensorId: Int? = nil,
-        pmDensity: Double? = nil,
-        airQuality: Int? = nil,
-        valveOpen: Bool? = nil,
-        targetTemperatureInC: Double? = nil,
-        heatingMode: HeatingMode? = nil,
-        valvePositionPercent: Int? = nil,
-        temperatureCalibrationInC: Double? = nil
-    ) {
+    /// What kind of value the item carries, the characteristic type of its entity; `nil` for an item without a value.
+    public var kind: CharacteristicsType? {
+        value == nil ? nil : entityId.characteristicType
+    }
+
+    /// Creates an item from its value as it is, without checking that it fits; the checked way in is
+    /// ``init(entityId:timestamp:value:origin:)`` (failable).
+    init(entityId: EntityId, timestamp: Date, uncheckedValue value: Value?, origin: Origin, lastReport: Date? = nil) {
         self.entityId = entityId
         self.timestamp = timestamp
-        self.motionDetected = motionDetected
-        self._illuminanceInLux = illuminance?.converted(to: .lux).value
-        self.isDeviceOn = isDeviceOn
-        self.brightness = brightness
-        self.colorTemperature = colorTemperature
-        self.color = color
-        self.isContactOpen = isContactOpen
-        self.isDoorLocked = isDoorLocked
-        self.stateOfCharge = stateOfCharge
-        self.isHeaterActive = isHeaterActive
-        self._temperatureInC = temperatureInC?.converted(to: .celsius).value
-        self.relativeHumidity = relativeHumidity
-        self.carbonDioxideSensorId = carbonDioxideSensorId
-        self.pmDensity = pmDensity
-        self.airQuality = airQuality
-        self.valveOpen = valveOpen
-        self.targetTemperatureInC = targetTemperatureInC
-        self.heatingMode = heatingMode
-        self.valvePositionPercent = valvePositionPercent
-        self.temperatureCalibrationInC = temperatureCalibrationInC
+        self.value = value
+        self.origin = origin
+        self.lastReport = lastReport
+    }
+
+    /// Creates an item without a value, such as a report that only says the entity is alive.
+    public init(entityId: EntityId, timestamp: Date = Date(), origin: Origin = .homekit, lastReport: Date? = nil) {
+        self.init(entityId: entityId, timestamp: timestamp, uncheckedValue: nil, origin: origin, lastReport: lastReport)
+    }
+
+    /// Whether `other` carries the same information: same entity and value. Timestamp, origin and `lastReport`
+    /// are no part of the value, so every field added later stays out of this compare.
+    public func hasSameValue(as other: Self) -> Bool {
+        entityId == other.entityId && value == other.value
     }
 
     /// Retrieves a non-optional value for a given optional property key path

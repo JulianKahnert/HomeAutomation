@@ -43,7 +43,15 @@ public struct HeatingRoomSources: Sendable, Equatable {
     public var shortName: String?
     public let radiators: [Radiator]
     public var roomSensor: EntityId?
-    /// Fallback for plan targets before the first plan write in a range.
+    /// The plan target of the room as a server-owned entity: `RoomHeating` reports it at every switch point, its
+    /// history is the plan line.
+    public var planTargetId: EntityId { Self.planTargetId(placeId: placeId) }
+
+    public static func planTargetId(placeId: String) -> EntityId {
+        .serverOwned(name: placeId, characteristic: .targetTemperature)
+    }
+
+    /// Fallback for plan targets before the first plan target was reported.
     public var plan: HeatingPlan?
     /// Whether the room lists the fireplace as a contact (glossary: fireplace mode).
     public var followsFireplace: Bool
@@ -65,10 +73,10 @@ public struct HeatingRoomSources: Sendable, Equatable {
 /// resampled as "last value at or before the grid point".
 public struct HeatingRoomDetailBuilder: Sendable {
     private let storage: any StorageRepository
-    private let writes: any HeatingWriteRepository
-    private let fireplace: (any FireplaceRepository)?
+    private let journal: any JournalStore
     private let now: @Sendable () -> Date
     private let sensorFailureLimit: TimeInterval
+    private let lastReport: @Sendable (EntityId) async -> Date?
     private let calendar: Calendar
 
     /// The writes the events look at reach back at most this far before the range: an open window or a burning
@@ -76,20 +84,21 @@ public struct HeatingRoomDetailBuilder: Sendable {
     static let writeLookback: TimeInterval = 24 * 3_600
 
     /// - Parameters:
-    ///   - fireplace: The stored fireplace switches, the history of a room's fireplace contact; `nil` shows none.
     ///   - sensorFailureLimit: A reading older than this no longer counts: the grid shows a gap.
-    ///     Rows are only stored when a value changed, so this is the only way to see a silent sensor.
+    ///     Rows are only stored when a value changed, so the limit counts from the later of the last change and the
+    ///     last report: an unchanged value that still reports shows no gap, a silent sensor does.
+    ///   - lastReport: When an entity last reported (stored per entity, written at most every five minutes); `nil` until the entity has reported once.
     public init(storage: any StorageRepository,
-                writes: any HeatingWriteRepository,
-                fireplace: (any FireplaceRepository)? = nil,
+                journal: any JournalStore,
                 now: @escaping @Sendable () -> Date = { Date() },
                 sensorFailureLimit: TimeInterval = 6 * 3_600,
+                lastReport: @escaping @Sendable (EntityId) async -> Date? = { _ in nil },
                 calendar: Calendar = .current) {
         self.storage = storage
-        self.writes = writes
-        self.fireplace = fireplace
+        self.journal = journal
         self.now = now
         self.sensorFailureLimit = sensorFailureLimit
+        self.lastReport = lastReport
         self.calendar = calendar
     }
 
@@ -103,11 +112,12 @@ public struct HeatingRoomDetailBuilder: Sendable {
         let thermostatTemps = try await room.radiators.asyncMap { try await series($0.temperatureId, from: start, to: end) { $0.temperatureInC?.value } }
         let valves = try await room.radiators.asyncMap { try await series($0.valvePositionId, from: start, to: end) { $0.valvePositionPercent.map(Double.init) } }
         let sensorTemps = try await room.roomSensor.asyncFlatMap { try await series($0, from: start, to: end) { $0.temperatureInC?.value } }
+        let planItems = try await items(room.planTargetId, from: start, to: end).compactMap { item in item.targetTemperatureInC.map { (item.timestamp, $0) } }
         var contactItems: [EntityId: [EntityStorageItem]] = [:]
         var targetItems: [String: [EntityStorageItem]] = [:]
         if includeEvents {
             for contact in room.contacts {
-                contactItems[contact.entityId] = try await contactHistory(contact, from: start, to: end)
+                contactItems[contact.entityId] = try await items(contact.entityId, from: start, to: end)
             }
             for radiator in room.radiators {
                 if let id = radiator.targetTemperatureId { targetItems[radiator.name] = try await items(id, from: start, to: end) }
@@ -117,11 +127,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
         // starts with the stored state before it, but no further back than `writeLookback`.
         let earliest = (contactItems.values.flatMap { $0 } + targetItems.values.flatMap { $0 }).map(\.timestamp).min() ?? start
         let firstWrite = max(min(start, earliest), start.addingTimeInterval(-Self.writeLookback))
-        let allWrites = try await writes.writes(placeId: room.placeId, startDate: firstWrite, endDate: end)
-        // The plan target at the range start is the one of the latest plan write before it, so a target set
-        // yesterday holds without loading the whole history.
-        let before = try await writes.lastPlanWrite(placeId: room.placeId, before: start)
-        let planWrites = (before.map { [$0] } ?? []) + allWrites.filter { $0.planTargetInC != nil && $0.timestamp >= start }
+        let allWrites = try await journal.heatingWrites(placeId: room.placeId, startDate: firstWrite, endDate: end)
 
         let samples = grid.map { date -> HeatingSample in
             let ist: Double?
@@ -131,7 +137,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
                 let values = thermostatTemps.compactMap { $0.value(at: date, limit: sensorFailureLimit) }
                 ist = values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
             }
-            let planned = planWrites.last { $0.timestamp <= date }?.planTargetInC ?? room.plan?.planTarget(at: date, calendar: calendar)
+            let planned = planItems.planTarget(at: date) ?? room.plan?.planTarget(at: date, calendar: calendar)
             let valveValues = room.radiators.indices.map { index -> Double? in
                 // A radiator whose own temperature went silent shows no valve either.
                 if !thermostatTemps[index].isEmpty, thermostatTemps[index].value(at: date, limit: sensorFailureLimit) == nil { return nil }
@@ -140,9 +146,9 @@ public struct HeatingRoomDetailBuilder: Sendable {
             return HeatingSample(date: date, ist: ist, sollPlan: planned, valves: valveValues)
         }
 
-        // Only what reached a radiator is an event: a plan target recorded while the room was off is not.
+        // Only what reached a radiator is an event: the journal rows are the executed commands.
         let events = includeEvents
-            ? HeatingEventBuilder(room: room, writes: allWrites.filter(\.sentToDevice), contactItems: contactItems, targetItems: targetItems,
+            ? HeatingEventBuilder(room: room, writes: allWrites, planItems: planItems, contactItems: contactItems, targetItems: targetItems,
                                   start: start, end: end).events()
             : []
 
@@ -161,15 +167,7 @@ public struct HeatingRoomDetailBuilder: Sendable {
     /// because seven days of a temperature exceed one page.
     private func series(_ entityId: EntityId, from start: Date, to end: Date, value: (EntityStorageItem) -> Double?) async throws -> Series {
         let all = try await items(entityId, from: start, to: end)
-        return Series(points: all.compactMap { item in value(item).map { (item.timestamp, $0) } })
-    }
-
-    /// The states of a contact in the range plus the one before it, oldest first. The fireplace comes from the
-    /// server's own switches, as items of `Fireplace.stateId` that say on or off.
-    private func contactHistory(_ contact: HeatingRoomSources.Contact, from start: Date, to end: Date) async throws -> [EntityStorageItem] {
-        guard contact.source == .fireplace else { return try await items(contact.entityId, from: start, to: end) }
-        let switches = try await fireplace?.switches(from: start, to: end.addingTimeInterval(1)) ?? []
-        return switches.map { EntityStorageItem(entityId: contact.entityId, timestamp: $0.timestamp, isDeviceOn: $0.isOn) }
+        return Series(points: all.compactMap { item in value(item).map { (item.timestamp, $0) } }, lastReport: await lastReport(entityId))
     }
 
     /// The stored states of `entityId` in the range plus the one before it, oldest first.
@@ -192,6 +190,8 @@ public struct HeatingRoomDetailBuilder: Sendable {
 
 private struct Series {
     let points: [(date: Date, value: Double)]
+    /// When the entity last reported; keeps the last point alive while the value is unchanged.
+    var lastReport: Date?
 
     var isEmpty: Bool { points.isEmpty }
 
@@ -204,7 +204,11 @@ private struct Series {
         }
         guard low > 0 else { return nil }
         let point = points[low - 1]
-        if let limit, date.timeIntervalSince(point.date) > limit { return nil }
+        if let limit {
+            let isLast = low == points.count
+            let alive = isLast ? max(point.date, lastReport ?? point.date) : point.date
+            if date.timeIntervalSince(alive) > limit { return nil }
+        }
         return point.value
     }
 }
@@ -213,5 +217,12 @@ private extension Optional {
     func asyncFlatMap<T>(_ transform: (Wrapped) async throws -> T) async rethrows -> T? {
         guard let self else { return nil }
         return try await transform(self)
+    }
+}
+
+extension [(Date, Double)] {
+    /// The last stored plan target at `date`; `margin` lets a state that was stored a moment later still count.
+    func planTarget(at date: Date, margin: TimeInterval = 0) -> Double? {
+        last { $0.0 <= date.addingTimeInterval(margin) }?.1
     }
 }

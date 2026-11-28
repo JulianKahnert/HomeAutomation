@@ -80,17 +80,29 @@ public struct ServerClient {
 
     public func activate(automation name: String) async throws {
         let response = try await client.activateAutomation(path: .init(name: name))
-        _ = try response.ok
+        switch response {
+        case .ok: return
+        case .serviceUnavailable: throw ServerClientError.busy
+        case .undocumented(let status, _): throw ServerClientError(undocumentedStatus: status)
+        }
     }
 
     public func deactivate(automation name: String) async throws {
         let response = try await client.deactivateAutomation(path: .init(name: name))
-        _ = try response.ok
+        switch response {
+        case .ok: return
+        case .serviceUnavailable: throw ServerClientError.busy
+        case .undocumented(let status, _): throw ServerClientError(undocumentedStatus: status)
+        }
     }
 
     public func stop(automation name: String) async throws {
         let response = try await client.stopAutomation(path: .init(name: name))
-        _ = try response.ok
+        switch response {
+        case .ok: return
+        case .serviceUnavailable: throw ServerClientError.busy
+        case .undocumented(let status, _): throw ServerClientError(undocumentedStatus: status)
+        }
     }
 
     public func register(token: PushToken) async throws {
@@ -120,54 +132,6 @@ public struct ServerClient {
                                   overdueCount: body.overdueCount,
                                   outdoorTemperature: body.outdoorTemperature,
                                   staleDate: try body.staleDateIsoTimeStamp.map { try Date($0, strategy: .iso8601) })
-    }
-
-    public func getActions(limit: Int? = nil, runId: UUID? = nil) async throws -> [ActionLogItem] {
-        let response = try await client.getActions(query: .init(limit: limit, runId: runId?.uuidString))
-        return try response.ok.body.json.compactMap { item -> ActionLogItem? in
-            guard let id = UUID(uuidString: item.id),
-                  let characteristic = CharacteristicsType(rawValue: item.entityId.characteristicType) else {
-                print("Failed to parse characteristic")
-                assertionFailure("Failed to parse characteristic")
-                return nil
-            }
-            let entityId = EntityId(placeId: item.entityId.placeId,
-                                    name: item.entityId.name,
-                                    characteristicsName: item.entityId.characteristicsName,
-                                    characteristic: characteristic)
-            return ActionLogItem(id: id,
-                                 timestamp: item.timestamp,
-                                 entityId: entityId,
-                                 actionName: item.actionName,
-                                 detailDescription: item.detailDescription,
-                                 hasCacheHit: item.hasCacheHit,
-                                 runId: item.runId.flatMap(UUID.init(uuidString:)),
-                                 status: item.status.flatMap { ActionLogItem.Status(rawValue: $0.rawValue) },
-                                 reason: item.reason.flatMap { HeatingWriteReason(rawValue: $0.rawValue) },
-                                 planTargetInC: item.planTargetInC)
-        }
-    }
-
-    public func clearActions() async throws {
-        let response = try await client.clearActions()
-        _ = try response.ok
-    }
-
-    public func getEntityIdsWithHistory() async throws -> [EntityInfo] {
-        let response = try await client.getEntitiesWithHistory()
-        return try response.ok.body.json.compactMap { entity -> EntityInfo? in
-            guard let characteristic = CharacteristicsType(rawValue: entity.entityId.characteristicType) else {
-                print("Failed to parse characteristic type: \(entity.entityId.characteristicType)")
-                assertionFailure("Failed to parse characteristic type")
-                return nil
-            }
-            let characteristicsName = entity.entityId.characteristicsName?.isEmpty == false ? entity.entityId.characteristicsName : nil
-            let entityId = EntityId(placeId: entity.entityId.placeId,
-                                   name: entity.entityId.name,
-                                   characteristicsName: characteristicsName,
-                                   characteristic: characteristic)
-            return EntityInfo(entityId: entityId)
-        }
     }
 
     public func getEntityHistory(
@@ -228,9 +192,14 @@ public struct ServerClient {
         FireplaceState(try await client.getFireplace().ok.body.json)
     }
 
-    /// Switches the fireplace on or off; answers the state it will have.
+    /// Switches the fireplace on or off through the general route `PUT /entities/state`; answers the state it will
+    /// have. Asking for the state it already has changes nothing.
     public func setFireplace(isOn: Bool) async throws -> FireplaceState {
-        FireplaceState(try await client.setFireplace(body: .json(.init(isOn: isOn))).ok.body.json)
+        let entityId = Components.Schemas.EntityId(Fireplace.stateId)
+        let response = try await client.setEntityState(body: .json(.init(entityId: entityId, value: .init(.bool(isOn)))))
+        if case .serviceUnavailable = response { throw ServerClientError.busy }
+        if case .undocumented(let status, _) = response { throw ServerClientError(undocumentedStatus: status) }
+        return FireplaceState(try response.ok.body.json)
     }
 
     /// The time grid of a heating room (glossary: actual, plan target, Δ). Throws when the server answers
@@ -260,7 +229,37 @@ public struct ServerClient {
     }
 }
 
+extension Components.Schemas.EntityId {
+    /// The wire form of an entity id: no characteristics name is the empty string.
+    init(_ entityId: EntityId) {
+        self.init(placeId: entityId.placeId,
+                  name: entityId.name,
+                  characteristicsName: entityId.characteristicsName ?? "",
+                  characteristicType: entityId.characteristicType.rawValue)
+    }
+}
+
+extension Components.Schemas.Value {
+    init(_ value: Value) {
+        switch value {
+        case .bool(let bool): self = .case1(bool)
+        case .number(let number): self = .case2(number)
+        case .text(let text): self = .case3(text)
+        }
+    }
+}
+
 extension FireplaceState {
+    /// The state after `PUT /entities/state` for the fireplace: on since the answer's timestamp, off for every
+    /// other answer (also a value that is no boolean).
+    init(_ answer: Components.Schemas.EntityState) {
+        guard case .case1(true) = answer.value else {
+            self = .off
+            return
+        }
+        self.init(isOn: true, since: answer.timestamp)
+    }
+
     /// Takes the end the server named, so an app of another version shows when this server ends the fireplace.
     init(_ body: Components.Schemas.Fireplace) {
         self.init(isOn: body.isOn, since: body.since, endsAt: body.endsAt)
@@ -328,27 +327,19 @@ extension AutomationRun {
 extension EntityHistoryItem {
     init(_ item: Components.Schemas.EntityHistoryItem) {
         self.init(timestamp: item.timestamp,
-                  motionDetected: item.motionDetected,
-                  illuminanceInLux: item.illuminanceInLux,
-                  isDeviceOn: item.isDeviceOn,
-                  brightness: item.brightness,
-                  colorTemperature: item.colorTemperature,
-                  colorRed: item.colorRed,
-                  colorGreen: item.colorGreen,
-                  colorBlue: item.colorBlue,
-                  isContactOpen: item.isContactOpen,
-                  isDoorLocked: item.isDoorLocked,
-                  stateOfCharge: item.stateOfCharge,
-                  isHeaterActive: item.isHeaterActive,
-                  temperatureInC: item.temperatureInC,
-                  relativeHumidity: item.relativeHumidity,
-                  carbonDioxideSensorId: item.carbonDioxideSensorId,
-                  pmDensity: item.pmDensity,
-                  airQuality: item.airQuality,
-                  valveOpen: item.valveOpen,
-                  targetTemperatureInC: item.targetTemperatureInC,
-                  heatingMode: item.heatingMode.flatMap { HeatingMode(name: $0.rawValue) },
-                  valvePositionPercent: item.valvePositionPercent,
-                  temperatureCalibrationInC: item.temperatureCalibrationInC)
+                  origin: item.origin,
+                  lastReport: item.lastReport,
+                  valueKind: item.valueKind,
+                  value: item.value.map(Value.init))
+    }
+}
+
+extension Value {
+    init(_ payload: Components.Schemas.Value) {
+        switch payload {
+        case .case1(let bool): self = .bool(bool)
+        case .case2(let number): self = .number(number)
+        case .case3(let text): self = .text(text)
+        }
     }
 }

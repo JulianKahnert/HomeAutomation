@@ -17,16 +17,6 @@ public enum KeychainHelper {
         return writeData(account, data: data)
     }
 
-    public static func readURL(_ account: String) -> URL? {
-        guard let string = readString(account) else { return nil }
-        return URL(string: string)
-    }
-
-    @discardableResult
-    public static func writeURL(_ account: String, value: URL) -> Bool {
-        writeString(account, value: value.absoluteString)
-    }
-
     // MARK: - Private
 
     private static func readData(_ account: String) -> Data? {

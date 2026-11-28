@@ -6,6 +6,8 @@
 //
 
 @testable import Controller
+import Dependencies
+import Foundation
 import Sharing
 import Testing
 
@@ -20,7 +22,12 @@ struct SharedKeysTests {
 
     @Test("Live Activities enabled default value")
     func testLiveActivitiesEnabledDefault() async {
-        let enabled = Shared(.liveActivitiesEnabled).wrappedValue
+        // A store of its own: other tests flip this key, and `UserDefaults.standard` is shared by parallel tests.
+        let enabled = withDependencies {
+            $0.defaultAppStorage = UserDefaults(suiteName: "SharedKeysTests-\(UUID().uuidString)") ?? .standard
+        } operation: {
+            Shared(.liveActivitiesEnabled).wrappedValue
+        }
         #expect(enabled == true)
     }
 }

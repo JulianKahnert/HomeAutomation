@@ -13,7 +13,7 @@ public enum RoomContact: Codable, Sendable {
     /// radiators of the room it switches off; `nil` for all of them.
     case fireplace(radiators: [RadiatorDevice]? = nil)
 
-    /// The entity of the contact; the fireplace has none in HomeKit and stands in as `Fireplace.stateId`.
+    /// The entity of the contact; the fireplace is the server-owned `Fireplace.stateId`.
     public var entityId: EntityId {
         switch self {
         case .window(let sensor):
@@ -23,16 +23,8 @@ public enum RoomContact: Codable, Sendable {
         }
     }
 
-    /// The HomeKit entity whose changes report this contact; `nil` for the fireplace, whose changes come as
-    /// `HomeEvent.fireplaceChanged`.
-    public var triggerEntityId: EntityId? {
-        switch self {
-        case .window(let sensor):
-            return sensor.contactSensorId
-        case .fireplace:
-            return nil
-        }
-    }
+    /// The entity whose changes report this contact.
+    public var triggerEntityId: EntityId { entityId }
 
     /// Whether this contact switches `radiator` off while it is open: a window all radiators of the room,
     /// the fireplace the radiators it lists (all when it lists none).
@@ -79,13 +71,9 @@ public enum RoomContact: Codable, Sendable {
     }
 
     /// The current state of the contact, or `nil` when it is unreachable or unknown. The caller treats
-    /// `nil` as closed ("unreachable = closed"). The fireplace counts since its last switch the server stored;
-    /// never switched, it is off.
+    /// `nil` as closed ("unreachable = closed"). The fireplace counts since its last change;
+    /// never switched, it is unknown, so off.
     public func currentState(with hm: HomeManagable) async -> (isOpen: Bool, since: Date)? {
-        if case .fireplace = self {
-            guard let last = await hm.lastFireplaceSwitch() else { return nil }
-            return (last.isOn, last.timestamp)
-        }
         guard let item = try? await hm.getCurrentEntity(with: entityId) else { return nil }
         return (isOpen(item), item.timestamp)
     }

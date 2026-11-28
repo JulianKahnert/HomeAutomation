@@ -13,30 +13,26 @@ import Shared
 import StarActorSystem
 import Vapor
 
-private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
+private let homeEvents = AsyncStream.makeStream(of: HomeInput.self)
 
  extension Application {
      var entityStorageDbRepository: EntityStorageDbRepository {
          EntityStorageDbRepository(database: { self.db })
      }
 
-     var automationRunRepository: AutomationRunDbRepository {
-         AutomationRunDbRepository(database: { self.db })
+     var homekitInventoryRepository: HomekitInventoryDbRepository {
+         HomekitInventoryDbRepository(database: { self.db })
      }
 
-     var heatingWriteRepository: HeatingWriteDbRepository {
-         HeatingWriteDbRepository(database: { self.db })
-     }
-
-     var fireplaceRepository: FireplaceSwitchDbRepository {
-         FireplaceSwitchDbRepository(database: { self.db })
+     var journalRepository: JournalDbRepository {
+         JournalDbRepository(database: { self.db })
      }
 
     private struct HomeEventsStreamKey: StorageKey {
-        typealias Value = AsyncStream<HomeEvent>
+        typealias Value = AsyncStream<HomeInput>
     }
 
-    var homeEventsStream: AsyncStream<HomeEvent> {
+    var homeEventsStream: AsyncStream<HomeInput> {
         get {
             self.storage[HomeEventsStreamKey.self] ?? homeEvents.stream
         }
@@ -46,10 +42,10 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
     }
 
      private struct HomeEventsContinuationKey: StorageKey {
-         typealias Value = AsyncStream<HomeEvent>.Continuation
+         typealias Value = AsyncStream<HomeInput>.Continuation
      }
 
-     var homeEventsContinuation: AsyncStream<HomeEvent>.Continuation {
+     var homeEventsContinuation: AsyncStream<HomeInput>.Continuation {
          get {
              self.storage[HomeEventsContinuationKey.self] ?? homeEvents.continuation
          }
@@ -94,6 +90,98 @@ private let homeEvents = AsyncStream.makeStream(of: HomeEvent.self)
          }
          set {
              self.storage[AutomationServiceKey.self] = newValue
+         }
+     }
+
+     private struct StorageReaderKey: StorageKey {
+         typealias Value = any StorageRepository
+     }
+
+     /// Where the API layer reads entity states and history: the database, unless a test brings its own.
+     var storageReader: any StorageRepository {
+         get {
+             self.storage[StorageReaderKey.self] ?? entityStorageDbRepository
+         }
+         set {
+             self.storage[StorageReaderKey.self] = newValue
+         }
+     }
+
+     private struct JournalReaderKey: StorageKey {
+         typealias Value = any JournalStore
+     }
+
+     /// Where the API layer reads runs, commands and pushes.
+     var journalReader: any JournalStore {
+         get {
+             self.storage[JournalReaderKey.self] ?? journalRepository
+         }
+         set {
+             self.storage[JournalReaderKey.self] = newValue
+         }
+     }
+
+     private struct CommandPortKey: StorageKey {
+         typealias Value = any CommandPort
+     }
+
+     /// The API layer's only way to write into the core: commands enter the event loop through the event stream.
+     var commandPort: any CommandPort {
+         get {
+             self.storage[CommandPortKey.self] ?? EventFlowCommandPort(sink: homeEventSink, unknownEntities: { [self] entityIds in
+                 // A server-owned entity is not in HomeKit, so the adapter cannot confirm it (ADR-009); with nothing
+                 // else to check the adapter need not be online either.
+                 let homeKitEntityIds = entityIds.filter { !$0.isServerOwned }
+                 guard !homeKitEntityIds.isEmpty else { return [] }
+                 let found = try await homeManager.getAllEntitiesLive()
+                 return homeKitEntityIds.subtracting(found.map(\.entityId))
+             })
+         }
+         set {
+             self.storage[CommandPortKey.self] = newValue
+         }
+     }
+
+     private struct ConfigReaderKey: StorageKey {
+         typealias Value = any ConfigReading
+     }
+
+     /// Where the API layer reads the deployed configuration.
+     var configReader: any ConfigReading {
+         get {
+             self.storage[ConfigReaderKey.self] ?? ConfigDbRepository(database: { self.db })
+         }
+         set {
+             self.storage[ConfigReaderKey.self] = newValue
+         }
+     }
+
+     private struct EventLoopGaugeKey: StorageKey {
+         typealias Value = EventLoopGauge
+     }
+
+     var eventLoopGauge: EventLoopGauge {
+         if let gauge = self.storage[EventLoopGaugeKey.self] { return gauge }
+         let gauge = EventLoopGauge()
+         self.storage[EventLoopGaugeKey.self] = gauge
+         return gauge
+     }
+
+     /// Where producers yield events, so the gauge sees how long they wait.
+     var homeEventSink: HomeEventSink {
+         HomeEventSink(continuation: homeEventsContinuation, gauge: eventLoopGauge)
+     }
+
+     private struct SchedulerKey: StorageKey {
+         typealias Value = Scheduler
+     }
+
+     var scheduler: Scheduler? {
+         get {
+             self.storage[SchedulerKey.self]
+         }
+         set {
+             self.storage[SchedulerKey.self] = newValue
          }
      }
 

@@ -12,7 +12,7 @@ struct StateIntervalsTests {
     private var end: Date { start.addingTimeInterval(1_000) }
 
     private func item(_ offset: TimeInterval, _ isOn: Bool?) -> EntityHistoryItem {
-        EntityHistoryItem(timestamp: start.addingTimeInterval(offset), isDeviceOn: isOn)
+        EntityHistoryItem(timestamp: start.addingTimeInterval(offset), valueKind: isOn == nil ? nil : "switcher", value: isOn.map { .bool($0) })
     }
 
     @Test func previousStateStartsAtLeftEdgeAndOpenEndClosesAtTo() {
@@ -73,49 +73,6 @@ struct DailyTotalsTests {
 
         #expect(totals.map(\.day) == [day1, day2])
         #expect(totals.map(\.duration) == [600, 300])
-    }
-
-    @Test func countsPerDayBucketsDates() {
-        let dates = [day1.addingTimeInterval(10), day1.addingTimeInterval(20), day2.addingTimeInterval(5), day2.addingTimeInterval(86_400)]
-
-        let counts = DailyTotals.countsPerDay(dates, days: [day1, day2], calendar: calendar)
-
-        #expect(counts.map(\.count) == [2, 1])
-    }
-}
-
-struct RunStatisticsTests {
-    private let motion = EntityId(placeId: "Hallway", name: "Eve Motion", characteristicsName: nil, characteristic: .motionSensor)
-    private let start = Date(timeIntervalSince1970: 86_400 * 10)
-
-    private func run(_ trigger: AutomationTrigger, _ outcome: AutomationRun.Outcome, at offset: TimeInterval = 0) -> AutomationRun {
-        AutomationRun(automationName: "Night", startedAt: start.addingTimeInterval(offset), trigger: trigger, outcome: outcome)
-    }
-
-    private var runs: [AutomationRun] {
-        let byMotion = AutomationTrigger(kind: .entityChange, entityId: motion, summary: "Motion · Eve Motion (Hallway)")
-        let bySunset = AutomationTrigger(kind: .sunset, entityId: nil, summary: "Sunset · Lights on")
-        return [run(byMotion, .completed), run(byMotion, .failed, at: 86_400), run(bySunset, .completed, at: 60)]
-    }
-
-    @Test func byTriggerGroupsByEntityOrSummaryPrefixMostFirst() {
-        let groups = RunStatistics.byTrigger(runs)
-
-        #expect(groups.map(\.trigger) == ["Eve Motion", "Sunset"])
-        #expect(groups.map(\.count) == [2, 1])
-    }
-
-    @Test func byOutcomeCountsEachOutcome() {
-        #expect(RunStatistics.byOutcome(runs) == [.completed: 2, .failed: 1])
-    }
-
-    @Test func perDayCountsRunStarts() {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .gmt
-
-        let counts = RunStatistics.perDay(runs, days: [start, start.addingTimeInterval(86_400)], calendar: calendar)
-
-        #expect(counts.map(\.count) == [2, 1])
     }
 }
 

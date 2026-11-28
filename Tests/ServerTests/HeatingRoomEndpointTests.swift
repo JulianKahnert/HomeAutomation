@@ -3,6 +3,7 @@
 //  HomeAutomationServer
 //
 
+import HAApplicationLayer
 @testable import HAImplementations
 @testable import HAModels
 @testable import Server
@@ -21,8 +22,10 @@ final class HeatingRoomEndpointTests: XCTestCase {
         let room = RoomHeating("Bad", placeId: "Bad - OG",
                                radiators: [Radiator(query: .init(placeId: "Bad - OG", name: "Thermo"))],
                                configuration: HeatingConfiguration(standardPlan: HeatingPlan([])))
-        app.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405),
-                                                                      automations: [room], persist: { _ in })
+        app.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405), persist: { _ in })
+        app.configReader = StoredConfig(config: ConfigDTO(location: Location(latitude: 52.52, longitude: 13.405), automations: [AnyAutomation.create(from: room)]))
+        app.storageReader = MemoryStorage()
+        app.journalReader = InMemoryJournalStore()
         app.starActorSystem = StarActorSystem(name: "heating-tests")
         try routes(app)
     }

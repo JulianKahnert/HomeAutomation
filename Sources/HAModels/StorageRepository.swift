@@ -9,9 +9,11 @@ import Foundation
 
 public protocol StorageRepository: Sendable {
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem?
-    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem?
     /// The last stored state of every entity, in one query; the server loads it once at start.
     func getAllCurrent() async throws -> [EntityStorageItem]
+
+    /// Like ``getAllCurrent()``, for the entities of one characteristic type only.
+    func getAllCurrent(of type: CharacteristicsType) async throws -> [EntityStorageItem]
 
     func add(_ item: EntityStorageItem) async throws
 
@@ -31,12 +33,21 @@ public protocol StorageRepository: Sendable {
         limit: Int
     ) async throws -> [EntityStorageItem]
 
+    /// Stores when the entity last reported, a change included. The home manager throttles it to one write per entity
+    /// and five minutes; the readers of the current state return the later of it and the newest change's timestamp.
+    /// The time only moves forward.
+    func recordLastReport(of entityId: EntityId, at date: Date) async throws
+
     /// Get all unique entity IDs that have historical data
     /// - Returns: Array of unique EntityIds
     func getAllEntityIds() async throws -> [EntityId]
 }
 
 extension StorageRepository {
+    public func getAllCurrent(of type: CharacteristicsType) async throws -> [EntityStorageItem] {
+        try await getAllCurrent().filter { $0.entityId.characteristicType == type }
+    }
+
     /// Like `getHistory`, but with `includePrevious` the last state before `startDate` is appended as
     /// the oldest item, so a state that began before the window is not lost. Only on the last page.
     public func getHistory(for entityId: EntityId, startDate: Date?, endDate: Date?, cursor: Date?, limit: Int, includePrevious: Bool) async throws -> [EntityStorageItem] {

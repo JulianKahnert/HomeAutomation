@@ -4,6 +4,7 @@
 //
 
 import Foundation
+@testable import HAApplicationLayer
 import HAModels
 
 /// Records what leaves the server through ``NotificationSender``, so window tests can assert
@@ -38,8 +39,6 @@ actor RecordingNotificationSender: NotificationSender {
     func sendNotification(title: String, message: String, id: String, category: String?) async throws {
         events.append(.notification(title: title, message: message, category: category))
     }
-
-    nonisolated func clearNotification(id: String) async throws {}
 
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState,
                                                                        activityName: String,

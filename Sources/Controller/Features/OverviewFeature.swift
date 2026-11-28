@@ -8,6 +8,7 @@
 import ComposableArchitecture
 import Foundation
 import HAModels
+import ServerClient
 import Sharing
 import SwiftUI
 
@@ -28,7 +29,6 @@ struct OverviewFeature: Sendable {
         var isHealthy: Bool
         var automations: [AutomationInfo]
         var runs: [AutomationRun]
-        var actions: [ActionLogItem]
     }
 
     @ObservableState
@@ -38,21 +38,11 @@ struct OverviewFeature: Sendable {
         var lastUpdated: Date?
         /// Last 24 hours, newest first.
         var recentRuns: [AutomationRun] = []
-        /// Last 24 hours, newest first.
-        var recentActions: [ActionLogItem] = []
+        /// Set when a refresh failed: the server is not reachable.
         var error: String?
+        /// Set when stopping an automation failed; the server itself is fine.
+        var stopError: String?
         var path = StackState<OverviewPath.State>()
-
-        /// Failed runs, then devices whose commands failed.
-        var hints: [String] {
-            let runs = recentRuns
-                .filter { $0.outcome == .failed }
-                .map { "\($0.automationName) failed: \($0.errorDescription ?? "unknown error")" }
-            let devices = Dictionary(grouping: recentActions.filter { $0.status == .failed }, by: \.entityId)
-                .map { "\($0.key.name) (\($0.key.placeId)): \($0.value.count) failed commands" }
-                .sorted()
-            return runs + devices
-        }
     }
 
     enum Action: Sendable {
@@ -62,6 +52,7 @@ struct OverviewFeature: Sendable {
         case refresh
         case refreshResponse(Result<Snapshot, Error>)
         case stopButtonTapped(String)
+        case stopResponse(Result<Void, Error>)
         case task
 
         enum Delegate: Sendable {
@@ -72,6 +63,8 @@ struct OverviewFeature: Sendable {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.date.now) var now
     @Dependency(\.serverClient) var serverClient
+
+    private enum CancelID { case refresh }
 
     var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -89,28 +82,13 @@ struct OverviewFeature: Sendable {
                 return .none
 
             case .refresh:
-                let since = now.addingTimeInterval(-86400)
-                return .run { send in
-                    await send(.refreshResponse(Result {
-                        async let isHealthy = serverClient.isHealthy()
-                        async let automations = serverClient.getAutomations()
-                        async let runs = serverClient.getRecentRuns(since, 200)
-                        async let actions = serverClient.getActions(1000, nil)
-                        return try await Snapshot(
-                            isHealthy: isHealthy,
-                            automations: automations,
-                            runs: runs,
-                            actions: actions.filter { $0.timestamp >= since }
-                        )
-                    }))
-                }
+                return refresh()
 
             case let .refreshResponse(.success(snapshot)):
                 state.error = nil
                 state.isHealthy = snapshot.isHealthy
                 state.lastUpdated = now
                 state.recentRuns = snapshot.runs
-                state.recentActions = snapshot.actions
                 state.$automations.withLock {
                     $0 = IdentifiedArrayOf(uniqueElements: snapshot.automations.sorted { $0.name < $1.name })
                 }
@@ -122,12 +100,21 @@ struct OverviewFeature: Sendable {
                 return .none
 
             case let .stopButtonTapped(name):
+                state.stopError = nil
                 return .run { send in
-                    try await serverClient.stop(name)
-                    await send(.refresh)
-                } catch: { error, send in
-                    await send(.refreshResponse(.failure(error)))
+                    await send(.stopResponse(Result { try await serverClient.stop(name) }))
                 }
+
+            case .stopResponse(.success):
+                return refresh()
+
+            case let .stopResponse(.failure(error)):
+                // The stop failed, not the server: `error` and its health stay as they were. A busy server queued
+                // the stop; the next poll shows the result.
+                if error as? ServerClientError != .busy {
+                    state.stopError = error.localizedDescription
+                }
+                return .none
 
             case .task:
                 // Ends with the view's task, so polling stops when the tab is left.
@@ -140,6 +127,24 @@ struct OverviewFeature: Sendable {
             }
         }
         .forEach(\.path, action: \.path)
+    }
+
+    private func refresh() -> Effect<Action> {
+        let since = now.addingTimeInterval(-86400)
+        return .run { send in
+            await send(.refreshResponse(Result {
+                async let isHealthy = serverClient.isHealthy()
+                async let automations = serverClient.getAutomations()
+                async let runs = serverClient.getRecentRuns(since, 200)
+                return try await Snapshot(
+                    isHealthy: isHealthy,
+                    automations: automations,
+                    runs: runs
+                )
+            }))
+        }
+        // The timer, pull-to-refresh and the other tabs all refresh: only the newest answer may land.
+        .cancellable(id: CancelID.refresh, cancelInFlight: true)
     }
 }
 
@@ -174,7 +179,7 @@ struct OverviewView: View {
 
                 let running = store.automations.filter(\.isRunning)
                 if !running.isEmpty {
-                    Section("Running") {
+                    Section {
                         ForEach(running) { automation in
                             Button {
                                 store.send(.automationTapped(automation.name))
@@ -188,11 +193,6 @@ struct OverviewView: View {
                                             .lineLimit(1)
                                     }
                                     Spacer()
-                                    Button("Stop") {
-                                        store.send(.stopButtonTapped(automation.name))
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .tint(.accentColor)
                                     // Reads like a navigation row: it leaves the tab, so it cannot be a NavigationLink.
                                     Image(systemName: "chevron.forward")
                                         .font(.footnote.weight(.semibold))
@@ -202,32 +202,40 @@ struct OverviewView: View {
                             // `.primary` and `.secondary` resolve relative to the button's tint, so the
                             // label stays accent-colored unless the tint itself is the label color.
                             .tint(.primary)
+                            // A button inside the row's button would not be its own control for VoiceOver.
+                            .swipeActions {
+                                Button("Stop", role: .destructive) {
+                                    store.send(.stopButtonTapped(automation.name))
+                                }
+                            }
+                            .accessibilityAction(named: "Stop") {
+                                store.send(.stopButtonTapped(automation.name))
+                            }
+                        }
+                    } header: {
+                        Text("Running")
+                    } footer: {
+                        if let stopError = store.stopError {
+                            Text(stopError)
+                                .foregroundStyle(Color.red)
                         }
                     }
                 }
 
                 Section("Recent Runs") {
-                    ForEach(store.recentRuns.prefix(5)) { run in
-                        NavigationLink(state: OverviewPath.State.run(RunDetailFeature.State(run: run))) {
-                            RunRow(run: run)
-                        }
-                    }
-                    NavigationLink(
-                        "Show All",
-                        state: OverviewPath.State.feed(ActivityFeedFeature.State(runs: store.recentRuns, actions: store.recentActions))
-                    )
-                }
-
-                if !store.hints.isEmpty {
-                    Section("Notices") {
-                        ForEach(store.hints, id: \.self) { hint in
-                            Label {
-                                Text(hint)
-                            } icon: {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundStyle(.red)
+                    if store.recentRuns.isEmpty {
+                        Text("No runs in the last 24 hours.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(store.recentRuns.prefix(5)) { run in
+                            NavigationLink(state: OverviewPath.State.run(RunDetailFeature.State(run: run))) {
+                                RunRow(run: run)
                             }
                         }
+                        NavigationLink(
+                            "Show All",
+                            state: OverviewPath.State.feed(ActivityFeedFeature.State(runs: store.recentRuns))
+                        )
                     }
                 }
             }
@@ -249,14 +257,25 @@ struct OverviewView: View {
         }
     }
 
+    private func dot(_ color: Color) -> some View {
+        Image(systemName: "circle.fill").foregroundStyle(color).accessibilityHidden(true)
+    }
+
     private var statusRow: some View {
         HStack {
-            Image(systemName: "circle.fill")
-                .foregroundStyle(store.isHealthy == true ? Color.green : Color.red)
-            if store.error != nil {
+            switch (store.error, store.isHealthy) {
+            case (.some, _):
+                dot(.red)
                 Text("Server unreachable")
-            } else {
-                Text(store.isHealthy == false ? "Adapter disconnected" : "Adapter connected")
+            case (nil, true?):
+                dot(.green)
+                Text("Adapter connected")
+            case (nil, false?):
+                dot(.red)
+                Text("Adapter disconnected")
+            case (nil, nil):
+                ProgressView()
+                Text("Connecting…")
             }
             Spacer()
             if let lastUpdated = store.lastUpdated {

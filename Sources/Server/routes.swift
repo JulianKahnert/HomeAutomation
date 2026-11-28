@@ -1,7 +1,9 @@
+import HAApplicationLayer
 import HAImplementations
 import HAModels
+import OpenAPIRuntime
 import OpenAPIVapor
-import SQLKit
+import Shared
 import Vapor
 
 func routes(_ app: Application) throws {
@@ -15,96 +17,22 @@ func routes(_ app: Application) throws {
     let authenticatedRoutes = app.grouped(authMiddleware)
 
     // Manual routes - now protected
-    authenticatedRoutes.get { _ async in
-        "It works!"
-    }
-
     // Adapter WebSocket transport for the StarActorSystem (see ADR-001 in the knowledge base)
     registerAdapterWebSocket(on: authenticatedRoutes, system: app.starActorSystem)
 
-    authenticatedRoutes.get("health") { req async throws -> HTTPStatus in
-        guard let sql = req.db as? any SQLDatabase else {
-            throw Abort(.internalServerError, reason: "Database does not support SQL queries")
-        }
-        let system = req.application.starActorSystem
-        let homeManager = req.application.homeManager
-
-        // Race the health checks against a hard timeout so the Docker healthcheck always gets a
-        // fast, definitive answer (503 peer-not-up / 504 timeout) instead of hanging.
-        return try await withThrowingTaskGroup(of: HTTPStatus.self) { group in
-            group.addTask {
-                try await sql.raw("SELECT 1").run()
-
-                let connectionStatus = system.latestConnectionStatus
-                guard connectionStatus == .up else {
-                    throw Abort(.serviceUnavailable, reason: "Adapter connection status: \(connectionStatus.rawValue)")
-                }
-
-                // The link can stay up while macOS has cut the adapter off from HomeKit.
-                if case .degraded(let reason) = await homeManager.homeKitHealth() {
-                    throw Abort(.serviceUnavailable, reason: "HomeKit degraded: \(reason)")
-                }
-                return .ok
-            }
-            group.addTask {
-                try await Task.sleep(for: .seconds(5))
-                throw Abort(.gatewayTimeout, reason: "Health check timed out")
-            }
-
-            defer { group.cancelAll() }
-            guard let result = try await group.next() else {
-                throw Abort(.internalServerError)
-            }
-            return result
-        }
-    }
+    registerHealthRoute(on: authenticatedRoutes)
 
     authenticatedRoutes.get("config") { req in
-        let location = await req.application.homeAutomationConfigService.location
-        let automations = await req.application.homeAutomationConfigService.automations.map(AnyAutomation.create(from:))
-
-        return ConfigDTO(location: location, automations: automations)
+        try await req.application.configReader.load()
     }
 
     authenticatedRoutes.on(.POST, "config", body: .collect(maxSize: "10mb")) { req in
         let configDTO = try req.content.decode(ConfigDTO.self)
         let skipValidation = req.query["skipValidation"] == "true"
 
-        // validate if all automations are correct, e.g. contain existing entities
-        let configEntityIds = configDTO.automations
-            .map(\.automation)
-            .flatMap { $0.getEntityIds() }
-            .reduce(into: Set<EntityId>()) { partialResult, entityId in
-                partialResult.insert(entityId)
-            }
-
-        if skipValidation {
-            // Deliberate escape hatch for deploying a config before all devices exist in
-            // HomeKit (or while the adapter is offline). It must never be silent: automations
-            // referencing unknown entities fail at runtime and flood the critical-log notifier.
-            req.logger.warning("⚠️ Accepting config with skipValidation=true - \(configEntityIds.count) referenced entities were NOT validated against HomeKit")
-        } else {
-            let foundEntityIds = try await req.application.homeManager.getAllEntitiesLive()
-
-            let missingEntityIds = configEntityIds.subtracting(foundEntityIds.map(\.entityId))
-            guard missingEntityIds.isEmpty else {
-                throw Abort(.unprocessableEntity, reason: "Validation failed - Could not find the following entities: \(missingEntityIds)")
-            }
-        }
-
-        let previousAutomations = await req.application.homeAutomationConfigService.automations
-        let automations = configDTO.automations
-            .map(\.automation)
-            .map { automation in
-                var automation = automation
-                guard let foundAutomation = previousAutomations.first(where: { $0.name == automation.name }) else { return automation }
-                automation.isActive = foundAutomation.isActive
-                return automation
-            }
-
-        try await req.application.homeAutomationConfigService.set(location: configDTO.location, automations: automations)
-        // After the config is stored, so automations that react see the new one.
-        req.application.homeEventsContinuation.yield(.configDeployed)
+        // The command port validates the entities (unless skipped) and deploys in its turn in the event loop; its
+        // errors answer as `CoreCommandError` says (422 unknown entities, 503 busy).
+        try await req.application.commandPort.deploy(configDTO.automations.map(\.automation), location: configDTO.location, skipValidation: skipValidation)
 
         return configDTO
     }
@@ -116,5 +44,5 @@ func routes(_ app: Application) throws {
     )
 
     let handler = OpenAPIController()
-    try handler.registerHandlers(on: transport)
+    try handler.registerHandlers(on: transport, middlewares: [ErrorHandlingMiddleware()])
 }

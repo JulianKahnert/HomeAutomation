@@ -134,18 +134,9 @@ public func configure(_ app: Application) async throws {
             connectionPoolTimeout: .seconds(10)
         ), as: .mysql)
 
-    app.migrations.add(CreateEntityStorageDbItem())
-    app.migrations.add(DeviceTokenItem())
-    app.migrations.add(AddSensorFields())
-    app.migrations.add(CreateConfigItem())
-    app.migrations.add(CreateAutomationRun())
-    app.migrations.add(AddLookupIndexes())
-    app.migrations.add(AddHeatingControlFields())
-    app.migrations.add(CreateWeatherHour())
-    app.migrations.add(CreateEntityHourlyAggregate())
-    app.migrations.add(AddTemperatureCalibration())
-    app.migrations.add(CreateHeatingWrite())
-    app.migrations.add(CreateFireplaceSwitch())
+    for migration in ServerMigrations.all {
+        app.migrations.add(migration)
+    }
 
     // Run migrations automatically
     try await app.autoMigrate()
@@ -233,16 +224,26 @@ public func configure(_ app: Application) async throws {
     let actorSystem = StarActorSystem(name: "server", logger: app.logger)
     app.starActorSystem = actorSystem
     let eventReceiver = actorSystem.makeActor(id: .homeEventReceiver) {
-        HomeEventReceiver(continuation: app.homeEventsContinuation, actorSystem: actorSystem)
+        HomeEventReceiver(emit: { [sink = app.homeEventSink] in sink.yield($0) }, actorSystem: actorSystem)
     }
     app.homeEventReceiver = eventReceiver
 
     // Resolve the adapter proxy once; HomeManager only gets it while the connection is up.
     let adapterProxy = try HomeKitCommandReceiver.resolve(id: .homeKitCommandReceiver, using: actorSystem)
 
+    // The HomeKit inventory is pulled from the adapter after each connect and once a day.
+    let inventorySync = HomekitInventorySync(fetch: { [adapterProxy] in
+        actorSystem.isConnected ? try await adapterProxy.homeKitInventory() : nil
+    }, store: { [repository = app.homekitInventoryRepository] inventory, syncedAt in
+        try await repository.replace(with: inventory, syncedAt: syncedAt)
+    })
+    let inventoryTask = Task { await inventorySync.run(handshakes: actorSystem.makeHandshakeCompletedStream()) }
+    app.lifecycle.use(CancelOnShutdown(task: inventoryTask))
+
     // MARK: - home automation setup
 
-    app.homeAutomationConfigService = await HomeAutomationConfigService.load(from: { app.db })
+    let loadedConfig = await HomeAutomationConfigService.load(from: { app.db })
+    app.homeAutomationConfigService = loadedConfig.service
     let notificationSender = PushNotifcationService(database: { app.db },
                                                     apnsClient: apnsClient,
                                                     notificationTopic: notificationTopic)
@@ -250,7 +251,7 @@ public func configure(_ app: Application) async throws {
     // Wire up push notifications for CRITICAL log events
     await CriticalLogNotifier.shared.configure(notificationSender: notificationSender)
 
-    let actionLogManager = ActionLogManager()
+    let journal = Journal(store: app.journalRepository)
     let location = await app.homeAutomationConfigService.location
     let weatherHours = WeatherHourDbRepository(database: { app.db })
     let homeManager = await HomeManager(getAdapter: {
@@ -258,48 +259,68 @@ public func configure(_ app: Application) async throws {
     },
                                         storageRepo: app.entityStorageDbRepository,
                                         notificationSender: notificationSender,
-                                        location: app.homeAutomationConfigService.location,
-                                        actionLogManager: actionLogManager,
-                                        heatingWrites: app.heatingWriteRepository,
-                                        fireplaceSwitches: app.fireplaceRepository,
-                                        onFireplaceSwitch: { [continuation = app.homeEventsContinuation] fireplaceSwitch in
-        continuation.yield(.fireplaceChanged(isOn: fireplaceSwitch.isOn))
-    },
-                                        outdoorTemperature: { [logger = app.logger] in
-        // The same rows the OutdoorTemperatureJob writes for this location.
-        do {
-            return try await weatherHours.latestTemperature(locationKey: OutdoorTemperatureJob.locationKey(for: location), at: Date())
-        } catch {
-            logger.error("Failed to read the outdoor temperature", metadata: ["error": "\(error)"])
-            return nil
-        }
+                                        location: location,
+                                        journal: journal,
+                                        storageUpkeep: DatabaseStorageUpkeep(entities: app.entityStorageDbRepository,
+                                                                             journal: journal,
+                                                                             noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
+                                        onReportedChange: { [sink = app.homeEventSink] item in
+        sink.yield(.change(entity: item))
     })
     app.homeManager = homeManager
     // Before the event processing job starts and before `.serverStarted`, which reads current states.
     await homeManager.loadCurrentStates(timeout: .seconds(10))
     // Runs still marked `running` belong to a previous server process that died mid-run.
-    try await app.automationRunRepository.markRunningAsInterrupted()
+    try await app.journalRepository.markRunningAsInterrupted()
+    let builtIns: [any Automatable] = [DatabaseCleanup(), WindowProjection()]
     let automationService = try AutomationService(using: homeManager,
-                                                  runs: app.automationRunRepository,
-                                                  getAutomations: {
-        await app.homeAutomationConfigService.automations
-    })
+                                                  runs: app.journalRepository,
+                                                  automations: loadedConfig.automations,
+                                                  builtIns: builtIns,
+                                                  repository: app.homeAutomationConfigService)
     app.automationService = automationService
+    // The read side (`GET /config`, `/config/automations`) shows the stored row: store the built-ins once when it lacks
+    // them, so the app sees and can deactivate them before the first deploy. Not after a failed load, which would
+    // overwrite a config that is only unreadable for now.
+    let storedNames = Set(loadedConfig.automations.map(\.name))
+    if loadedConfig.isReadable, !builtIns.allSatisfy({ storedNames.contains($0.name) }) {
+        do {
+            try await automationService.save()
+        } catch {
+            app.logger.error("Failed to store the built-in automations: \(error)")
+        }
+    }
 
     // MARK: - register jobs
 
+    let gauge = app.eventLoopGauge
     let jobs: [any Job] = [
-        ClockJob(location: location,
-                 homeEventsContinuation: app.homeEventsContinuation),
-        HomeEventProcessingJob(homeEventsStream: app.homeEventsStream,
+        HomeEventProcessingJob(gauge: gauge,
+                               homeEventsStream: app.homeEventsStream,
                                automationService: automationService,
-                               homeManager: app.homeManager),
-        OutdoorTemperatureJob(location: location, hours: weatherHours),
-        DatabaseCleanupJob(entities: app.entityStorageDbRepository,
-                           automationRuns: app.automationRunRepository,
-                           noisyEntityWarner: NoisyEntityWarner(notificationSender: notificationSender)),
-        EntityRollupJob(entities: app.entityStorageDbRepository)
+                               homeManager: app.homeManager)
     ]
+
+    let valveJob = ValveJob(listThermostats: { try await homeManager.listThermostats() },
+                            readThermostat: { try await homeManager.readThermostat($0) },
+                            feed: { [sink = app.homeEventSink] in sink.yield(.change(entity: $0)) })
+    let report: @Sendable (EntityId, Value, Origin) async throws -> Bool = { [homeManager] in
+        try await homeManager.report($0, value: $1, origin: $2)
+    }
+    var scheduledJobs: [any ScheduledJob] = [ClockJob(location: location, homeEventSink: app.homeEventSink),
+                                             OutdoorTemperatureJob(location: location, hours: weatherHours, report: report),
+                                             LaneBacklogJob(automationService: automationService, gauge: gauge),
+                                             valveJob]
+    if let tibber = TibberService() {
+        scheduledJobs.append(EnergyPriceJob(currentPrice: { date in
+            try await tibber.getPricesToday().first { $0.time.contains(date) }?.price
+        }, report: report))
+    }
+    let scheduler = Scheduler(jobs: scheduledJobs)
+    app.scheduler = scheduler
+    Task.detached {
+        await scheduler.run()
+    }
 
     Task.detached {
         await withTaskGroup(of: Void.self) { group in
@@ -313,7 +334,7 @@ public func configure(_ app: Application) async throws {
     }
 
     // Once per process start; the stream buffers it until the event processing job runs.
-    app.homeEventsContinuation.yield(.serverStarted)
+    app.homeEventSink.yield(.serverStarted)
 
     // MARK: - register routes
 

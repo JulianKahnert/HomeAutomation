@@ -23,11 +23,6 @@ final class ManualSleeper: Sendable {
 
     private let state = Mutex(State())
 
-    /// The sleeps currently suspended.
-    var pendingCount: Int {
-        state.withLock { $0.sleeps.count }
-    }
-
     func sleep(for duration: Duration) async throws {
         let id = state.withLock { state in
             defer { state.nextId += 1 }

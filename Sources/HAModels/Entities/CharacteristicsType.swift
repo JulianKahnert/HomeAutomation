@@ -21,14 +21,18 @@ public enum CharacteristicsType: String, Sendable, Codable, CaseIterable {
     /// Thermostat temperature offset in Celsius (Matter `LocalTemperatureCalibration`, the Eve app's
     /// "Temperaturabweichung"), stored in `temperatureCalibrationInC`.
     case temperatureCalibration
+    /// Electricity price in EUR per kWh, read through `energyPriceInEURPerKWh`.
+    case energyPrice
+    /// The deadline of a window (server-owned): none, running until a moment or overdue, read through `deadline`.
+    case deadline
 }
 
 public extension CharacteristicsType {
     /// Whether the adapter subscribes to HomeKit notifications for this type.
     ///
-    /// Only subscribed types reach the server's history: the adapter yields them on every refresh and
-    /// change, the others never. HomeKit drops notifications (contact sensors first) when there are too
-    /// many subscriptions, so sensors that change often or matter little stay unsubscribed.
+    /// HomeKit drops notifications (contact sensors first) when there are too many subscriptions, so sensors
+    /// that change often or matter little stay unsubscribed. A type reaches the server's history when it is
+    /// subscribed or polled, see ``isReported``.
     /// Temperature and humidity are subscribed: without it, a standalone room sensor (an air quality
     /// or temperature sensor) only reaches the history when another HomeKit client happens to read it.
     var isSubscribed: Bool {
@@ -37,10 +41,32 @@ public extension CharacteristicsType {
              .temperatureSensor, .relativeHumiditySensor,
              .heating, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration:
             return true
-        case .batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor:
+        case .energyPrice:
+            return false
+        case .batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor, .deadline:
             return false
         }
     }
+
+    /// Whether the adapter reads this type actively, on every full resync and every ``pollInterval``, instead of
+    /// relying on notifications: HomeKit notifications are unreliable for some standalone sensors, and the battery
+    /// level is not subscribed at all. The poll is additional to the subscription of temperature and humidity.
+    var isPolled: Bool {
+        switch self {
+        case .batterySensor, .temperatureSensor, .relativeHumiditySensor:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether the adapter sends reads of this type to the server (a resync yields them): subscribed or polled types.
+    var isReported: Bool {
+        isSubscribed || isPolled
+    }
+
+    /// The period of the adapter's poll of all ``isPolled`` types.
+    static var pollInterval: Duration { .seconds(3 * 3600) }
 
     /// Whether this type belongs to a thermostat (on/off, target temperature, mode, valve position, temperature offset).
     var isHeatingRelated: Bool {

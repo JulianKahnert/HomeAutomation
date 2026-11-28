@@ -147,7 +147,7 @@ struct ConnectionLifecycleTests {
         let connection = InMemoryWireConnection(blackhole: true)
         await server.attach(connection)
 
-        let clientHello = try JSONEncoder().encode(WireEnvelope.hello(Hello(protocolVersion: 1)))
+        let clientHello = try JSONEncoder().encode(WireEnvelope.hello(Hello(protocolVersion: StarActorSystem.protocolVersion)))
         await server.receive(clientHello, from: connection)
 
         let frames = connection.sentFrames
@@ -157,7 +157,7 @@ struct ConnectionLifecycleTests {
             Issue.record("expected hello reply, got \(reply)")
             return
         }
-        #expect(hello.protocolVersion == 1)
+        #expect(hello.protocolVersion == StarActorSystem.protocolVersion)
         #expect(server.isConnected)
     }
 

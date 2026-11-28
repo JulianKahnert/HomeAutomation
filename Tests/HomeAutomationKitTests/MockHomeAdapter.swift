@@ -18,10 +18,12 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     var storageItems: [EntityStorageItem] = []
     var health = HomeKitHealth.healthy
+    /// Every upkeep step the facade was asked to run.
+    var upkeepSteps: [StorageUpkeepStep] = []
     private let log = Logger(label: "MockHomeAdapter")
     private var traceMap: [String: Int] = [:]
     /// Every action `perform` ran, with the heating context it ran in.
-    var performedActions: [(action: HomeManagableAction, heating: HeatingWriteContext.Context?)] = []
+    var performedActions: [(action: HomeManagableAction, heating: HeatingWriteReason?)] = []
     /// Every action `perform` ran, in order, for a test that waits for one; it has a single reader.
     let performedActionStream: AsyncStream<HomeManagableAction>
     private let performedActionContinuation: AsyncStream<HomeManagableAction>.Continuation
@@ -38,19 +40,20 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         let item = storageItems.first(where: { $0.entityId == action.entityId })
         performedActions.append((action, HeatingWriteContext.current))
         performedActionContinuation.yield(action)
-        if let context = HeatingWriteContext.current, let write = HeatingWrite(action: action, context: context) {
-            heatingWrites.append(write)
+        if let reason = HeatingWriteContext.current {
+            let write = ActionLogItem(action: action, reason: reason)
+            if write.isExecutedHeatingWrite { heatingWrites.append(write) }
         }
 
         switch action {
         case .turnOn:
             guard let item = try? item.get(with: log) else { break }
-            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, motionDetected: nil, illuminance: nil, isDeviceOn: true, isContactOpen: nil, isDoorLocked: nil, stateOfCharge: nil, isHeaterActive: nil)
+            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, isDeviceOn: true)
             storageItems.append(newItem)
              entityStreamContinuation.yield(newItem)
         case .turnOff:
             guard let item = try? item.get(with: log) else { break }
-            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, motionDetected: nil, illuminance: nil, isDeviceOn: false, isContactOpen: nil, isDoorLocked: nil, stateOfCharge: nil, isHeaterActive: nil)
+            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, isDeviceOn: false)
             storageItems.append(newItem)
         case .setBrightness:
             break
@@ -60,7 +63,7 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
             break
         case .lockDoor:
             guard let item = try? item.get(with: log) else { break }
-            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, motionDetected: nil, illuminance: nil, isDeviceOn: nil, isContactOpen: nil, isDoorLocked: true, stateOfCharge: nil, isHeaterActive: nil)
+            let newItem = EntityStorageItem(entityId: item.entityId, timestamp: item.timestamp, isDoorLocked: true)
             storageItems.append(newItem)
         case .addEntityToScene:
             break
@@ -114,68 +117,40 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         return Set(items)
     }
 
-    func getEntityStream() async -> AsyncStream<EntityStorageItem> {
-        return entityStream
-    }
-
-    func findEntity(_ entity: EntityId) async throws {
-    }
-
     func trigger(scene sceneName: String) async {
     }
 
     func getCurrentEntity(with entityId: EntityId) async throws -> EntityStorageItem {
         guard let item = storageItems.last(where: { $0.entityId == entityId }) else {
-            struct EntityNotFoundError: Error {}
-            throw EntityNotFoundError()
+            throw OptionalError.notFound
         }
         return item
     }
 
-    func getPreviousEntity(with entityId: EntityId) async throws -> EntityStorageItem? {
-        let matching = storageItems.filter { $0.entityId == entityId }
-        return matching.count > 1 ? matching[matching.count - 2] : nil
-    }
-
-    /// What the database holds per entity, when it differs from the world in `storageItems` (the cache
-    /// after a restart carries the timestamp of the adapter's resync, the database the real one).
-    var storedItems: [EntityId: EntityStorageItem] = [:]
-
-    func getStoredEntity(with entityId: EntityId) async -> EntityStorageItem? {
-        storedItems[entityId] ?? storageItems.last(where: { $0.entityId == entityId })
-    }
-
     /// The writes the server made to radiators: seeded by a test, and every action `perform` ran in a heating context.
-    var heatingWrites: [HeatingWrite] = []
+    var heatingWrites: [ActionLogItem] = []
 
-    func lastHeatingWrite(of radiator: EntityId) async -> HeatingWrite? {
-        heatingWrites.last { $0.sentToDevice && $0.placeId == radiator.placeId && $0.entityId.name == radiator.name }
+    func lastHeatingWrite(of radiator: EntityId) async -> ActionLogItem? {
+        heatingWrites.last { $0.placeId == radiator.placeId && $0.entityId.name == radiator.name }
     }
 
-    func record(_ write: HeatingWrite) async {
-        heatingWrites.append(write)
+    /// The mock never fails a command, so nothing waits to be sent again.
+    func queuedRetry(of entityId: EntityId) async -> HomeManagableAction? { nil }
+
+    /// The fireplace as a test seeds and reads it: the states of `Fireplace.stateId`, oldest first.
+    var fireplaceSwitches: [FireplaceSwitch] {
+        get {
+            storageItems.filter { $0.entityId == Fireplace.stateId }.compactMap { item in item.isDeviceOn.map { FireplaceSwitch(timestamp: item.timestamp, isOn: $0) } }
+        }
+        set {
+            storageItems.removeAll { $0.entityId == Fireplace.stateId }
+            storageItems += newValue.map { EntityStorageItem(entityId: Fireplace.stateId, timestamp: $0.timestamp, isDeviceOn: $0.isOn) }
+        }
     }
 
-    /// Commands waiting to be sent again, by entity; a test seeds them.
-    var queuedRetries: [EntityId: HomeManagableAction] = [:]
+    func listThermostats() async throws -> [Thermostat] { [] }
 
-    func queuedRetry(of entityId: EntityId) async -> HomeManagableAction? {
-        queuedRetries[entityId]
-    }
-
-    /// The fireplace switches the server stored, oldest first; a test seeds them.
-    var fireplaceSwitches: [FireplaceSwitch] = []
-
-    func lastFireplaceSwitch() async -> FireplaceSwitch? {
-        fireplaceSwitches.last
-    }
-
-    func switchFireplace(isOn: Bool, at date: Date) async -> FireplaceSwitch? {
-        guard (fireplaceSwitches.last?.isOn ?? false) != isOn else { return nil }
-        let new = FireplaceSwitch(timestamp: date, isOn: isOn)
-        fireplaceSwitches.append(new)
-        return new
-    }
+    func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem] { [] }
 
     func getAllEntitiesLive() async throws -> [EntityStorageItem] {
         return storageItems
@@ -200,12 +175,12 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
     }
 
     private(set) var sentNotificationTitles: [String] = []
-    private(set) var overdueWindowIds: [EntityId] = []
 
-    /// The notifications `sendNotification` was asked to send.
+    /// The notifications `deliver` was asked to send.
     private(set) var sentNotifications: [(title: String, message: String, id: String, category: String?)] = []
 
-    func sendNotification(title: String, message: String, id: String, category: String?) async {
+    func deliver(_ delivery: Delivery) async {
+        guard case let .push(title, message, id, category) = delivery else { return }
         sentNotificationTitles.append(title)
         sentNotifications.append((title, message, id, category))
         notificationDates[id] = Date()
@@ -213,6 +188,35 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
 
     /// When a notification with this id was last sent; a test sets it to place a push in the past.
     var notificationDates: [String: Date] = [:]
+
+    func lastReports() async -> [String: Date] { [:] }
+
+    /// Server-owned states reported by an automation under test, with the origin they were reported with.
+    func reportState(_ entityId: EntityId, value: Value, origin: Origin, ifCurrent: @Sendable (EntityStorageItem?) -> Bool) async throws -> StateChange? {
+        // like `HomeManager`: a superseded (cancelled) run cannot report
+        try Task.checkCancellation()
+        guard entityId.isServerOwned else { throw ReportError.notServerOwned(entityId) }
+        guard let item = EntityStorageItem(entityId: entityId, value: value, origin: origin) else {
+            throw ReportError.valueDoesNotFit(entityId)
+        }
+        let current = storageItems.last { $0.entityId == entityId }
+        guard ifCurrent(current) else { return nil }
+        // like `HomeManager`: a value-identical replay changes nothing
+        guard current?.value != item.value else { return current.flatMap { StateChange(item: $0, changed: false) } }
+        let changed = await addEntityHistory(item)
+        return StateChange(item: item, changed: changed)
+    }
+
+    func states(of type: CharacteristicsType) async -> [EntityStorageItem] {
+        var latest: [EntityId: EntityStorageItem] = [:]
+        for item in storageItems { latest[item.entityId] = item }
+        return latest.values.filter { $0.entityId.characteristicType == type }
+    }
+
+    /// When each entity last reported, for a test that places a report in the past.
+    var lastReports: [EntityId: Date] = [:]
+
+    func lastReport(of entityId: EntityId) async -> Date? { lastReports[entityId] }
 
     func lastNotificationDate(id: String) async -> Date? {
         notificationDates[id]
@@ -222,38 +226,21 @@ final class MockHomeAdapter: @unchecked Sendable, HomeManagable {
         storageItems.filter { $0.entityId == entityId && $0.timestamp >= since }.sorted { $0.timestamp > $1.timestamp }
     }
 
-    func markWindowOverdue(entityId: EntityId) async {
-        overdueWindowIds.append(entityId)
+    func getFullEntityHistory(with entityId: EntityId, limit: Int) async -> [EntityStorageItem] {
+        Array(storageItems.filter { $0.entityId == entityId }.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 
-    /// The windows `setWindowOpenState` registered, überschritten as `markWindowOverdue` marked them.
-    func getWindowContentState() async -> WindowContentState {
-        let windows = windowOpenStates.map { entityId, state in
-            WindowContentState.Window(id: state.id,
-                                      name: state.name,
-                                      room: state.room,
-                                      opened: state.opened,
-                                      closeBy: state.closeBy,
-                                      isOverdue: overdueWindowIds.contains(entityId))
-        }
-        return WindowContentState(sortedWindows: windows)
-    }
-
-    /// The window state per window, as `setWindowOpenState` last set it; a cleared state is absent.
-    private(set) var windowOpenStates: [EntityId: WindowOpenState] = [:]
-
-    func setWindowOpenState(entityId: EntityId, to state: WindowOpenState?) async {
-        windowOpenStates[entityId] = state
-    }
-
-    func getActionLog(limit: Int?, runId: UUID?) async -> [ActionLogItem] {
-        return []
-    }
-
-    func clearActionLog() async {
+    func performStorageUpkeep(_ step: StorageUpkeepStep, now: Date) async throws {
+        upkeepSteps.append(step)
     }
 
     func homeKitHealth() async -> HomeKitHealth {
         health
     }
+}
+
+/// One state of the fireplace entity, for tests.
+struct FireplaceSwitch: Equatable {
+    let timestamp: Date
+    let isOn: Bool
 }

@@ -14,7 +14,6 @@ import SwiftUI
 
 @Reducer
 enum SettingsPath {
-    case commandLog(ActionsFeature)
     case logs(LogViewerFeature)
 }
 
@@ -42,10 +41,6 @@ struct SettingsFeature: Sendable {
         var serverURLString: String = ""
         var serverAuthToken: String = ""
 
-        // Push notification state
-        var isPushAuthorized: Bool = false
-        var deviceToken: Data?
-
         var path = StackState<SettingsPath.State>()
     }
 
@@ -53,7 +48,6 @@ struct SettingsFeature: Sendable {
 
     enum Action: Sendable, BindableAction {
         case onAppear
-        case setServerURL(URL)
         case editServerURL
         case saveServerURL
         case cancelEditServerURL
@@ -83,10 +77,6 @@ struct SettingsFeature: Sendable {
                     await send(.requestPushAuthorization)
                     await send(.refreshWindowStates)
                 }
-
-            case let .setServerURL(url):
-                state.$serverURL.withLock { $0 = url }
-                return .none
 
             case .editServerURL:
                 state.isEditingServerURL = true
@@ -154,6 +144,8 @@ struct SettingsFeature: Sendable {
                             Self.logger.info("No active Live Activity, starting a new one", metadata: ["openCount": "\(contentState.openCount)"])
                             try await liveActivity.startActivity(contentState)
                         }
+                    } catch: { error, _ in
+                        Self.logger.error("Failed to update the Live Activity", metadata: ["error": "\(error)"])
                     }
                 } else {
                     Self.logger.debug("Live Activities disabled, skipping activity update")
@@ -165,13 +157,18 @@ struct SettingsFeature: Sendable {
                 state.error = "Failed to load window states: \(error.localizedDescription)"
                 Self.logger.error("Failed to load window states", metadata: ["error": "\(error)"])
 
+                guard state.liveActivitiesEnabled else { return .none }
                 return .run { _ in
-                    await liveActivity.updateActivity(.empty)
+                    if await liveActivity.hasActiveActivities() {
+                        await liveActivity.updateActivity(.empty)
+                    }
                 }
 
             case .requestPushAuthorization:
                 return .run { _ in
                     try await pushNotification.requestAuthorization()
+                } catch: { error, _ in
+                    Self.logger.error("Push authorization failed", metadata: ["error": "\(error)"])
                 }
 
             case .dismissError:
@@ -214,9 +211,6 @@ struct SettingsView: View {
                 #endif
 
                 Section("Diagnostics") {
-                    NavigationLink(state: SettingsPath.State.commandLog(ActionsFeature.State())) {
-                        Label("Command Log", systemImage: "list.bullet.clipboard")
-                    }
                     NavigationLink(state: SettingsPath.State.logs(LogViewerFeature.State())) {
                         Label("App Logs", systemImage: "doc.text.magnifyingglass")
                     }
@@ -231,8 +225,6 @@ struct SettingsView: View {
             }
         } destination: { pathStore in
             switch pathStore.case {
-            case let .commandLog(commandLogStore):
-                ActionsView(store: commandLogStore)
             case let .logs(logStore):
                 LogViewerFeatureView(store: logStore)
             }

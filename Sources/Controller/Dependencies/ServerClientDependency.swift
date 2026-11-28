@@ -37,20 +37,11 @@ struct ServerClientDependency: Sendable {
     /// Runs of all automations since a date, newest first
     var getRecentRuns: @Sendable (_ since: Date, _ limit: Int?) async throws -> [AutomationRun]
 
-    /// Get action log items, optionally only those sent by one run
-    var getActions: @Sendable (_ limit: Int?, _ runId: UUID?) async throws -> [ActionLogItem]
-
-    /// Clear all action log items
-    var clearActions: @Sendable () async throws -> Void
-
     /// Get the offenen Fenster as the server's Live Activity content state, in server order
     var getWindowContentState: @Sendable () async throws -> WindowContentState
 
     /// Register device for push notifications
     var registerDevice: @Sendable (_ token: PushToken) async throws -> Void
-
-    /// Get all entity IDs that have historical data
-    var getEntityIdsWithHistory: @Sendable () async throws -> [EntityInfo]
 
     /// Get entity history with optional time range and pagination
     var getEntityHistory: @Sendable (
@@ -84,27 +75,8 @@ struct ServerClientDependency: Sendable {
 // MARK: - Dependency Key Implementation
 
 extension ServerClientDependency: TestDependencyKey {
-    static let testValue = Self(
-        getAutomations: { [] },
-        activate: { _ in },
-        deactivate: { _ in },
-        stop: { _ in },
-        isHealthy: { true },
-        getRuns: { _, _, _, _ in [] },
-        getRecentRuns: { _, _ in [] },
-        getActions: { _, _ in [] },
-        clearActions: { },
-        getWindowContentState: { .empty },
-        registerDevice: { _ in },
-        getEntityIdsWithHistory: { [] },
-        getEntityHistory: { _, _, _, _, _, _ in EntityHistoryResponse(items: [], nextCursor: nil) },
-        getRoomHistory: { _, _, _, _ in [] },
-        getHeatingOverview: { HeatingOverview(rooms: []) },
-        getHeatingRoom: { placeId, range in HeatingRoomDetail(placeId: placeId, name: placeId, range: range, istSource: .thermostats([]), radiators: [], samples: []) },
-        getFireplace: { .off },
-        setFireplace: { isOn in isOn ? FireplaceState(isOn: true, since: Date()) : .off },
-        getLocation: { Location(latitude: 52.5, longitude: 13.4) }
-    )
+    /// Every endpoint is unimplemented: a test fails on a call it did not override.
+    static let testValue = Self()
 
     static let previewValue = Self(
         getAutomations: {
@@ -120,19 +92,6 @@ extension ServerClientDependency: TestDependencyKey {
         isHealthy: { true },
         getRuns: { name, _, _, _ in previewRuns.filter { $0.automationName == name } },
         getRecentRuns: { _, _ in previewRuns },
-        getActions: { _, _ in
-            [
-                ActionLogItem(
-                    id: UUID(),
-                    timestamp: Date(),
-                    entityId: EntityId(placeId: "living-room", name: "Main Light", characteristicsName: "switcher", characteristic: .switcher),
-                    actionName: "Turn On",
-                    detailDescription: "Turned on living room light",
-                    hasCacheHit: false
-                )
-            ]
-        },
-        clearActions: { },
         getWindowContentState: {
             let opened = Date().addingTimeInterval(-3600)
             return WindowContentState(sortedWindows: [
@@ -147,16 +106,6 @@ extension ServerClientDependency: TestDependencyKey {
             ])
         },
         registerDevice: { _ in },
-        getEntityIdsWithHistory: {
-            [
-                EntityInfo(
-                    entityId: EntityId(placeId: "living-room", name: "Motion Sensor", characteristicsName: "motionSensor", characteristic: .motionSensor)
-                ),
-                EntityInfo(
-                    entityId: EntityId(placeId: "bedroom", name: "Light Sensor", characteristicsName: "lightSensor", characteristic: .lightSensor)
-                )
-            ]
-        },
         getEntityHistory: { entityId, _, _, _, _, _ in
             // Generate realistic data based on entity type
             let items: [EntityHistoryItem]
@@ -166,58 +115,58 @@ extension ServerClientDependency: TestDependencyKey {
                 let now = Date()
                 items = [
                     // Night (0:00 - 5:00) - very low light
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 0 * 3600), illuminanceInLux: 0.5),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 1 * 3600), illuminanceInLux: 0.3),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 2 * 3600), illuminanceInLux: 0.2),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 3 * 3600), illuminanceInLux: 0.1),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 4 * 3600), illuminanceInLux: 0.2),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 5 * 3600), illuminanceInLux: 1.0),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 0 * 3600), valueKind: "lightSensor", value: .number(0.5)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 1 * 3600), valueKind: "lightSensor", value: .number(0.3)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 2 * 3600), valueKind: "lightSensor", value: .number(0.2)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 3 * 3600), valueKind: "lightSensor", value: .number(0.1)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 4 * 3600), valueKind: "lightSensor", value: .number(0.2)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 5 * 3600), valueKind: "lightSensor", value: .number(1.0)),
 
                     // Sunrise (6:00 - 8:00) - rapidly increasing
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 6 * 3600), illuminanceInLux: 50),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 7 * 3600), illuminanceInLux: 250),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 8 * 3600), illuminanceInLux: 800),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 6 * 3600), valueKind: "lightSensor", value: .number(50)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 7 * 3600), valueKind: "lightSensor", value: .number(250)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 8 * 3600), valueKind: "lightSensor", value: .number(800)),
 
                     // Morning (9:00 - 11:00) - bright increasing
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 9 * 3600), illuminanceInLux: 2500),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 10 * 3600), illuminanceInLux: 5500),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 11 * 3600), illuminanceInLux: 8000),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 9 * 3600), valueKind: "lightSensor", value: .number(2500)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 10 * 3600), valueKind: "lightSensor", value: .number(5500)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 11 * 3600), valueKind: "lightSensor", value: .number(8000)),
 
                     // Midday (12:00 - 14:00) - peak brightness
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 12 * 3600), illuminanceInLux: 12000),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 13 * 3600), illuminanceInLux: 15000),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 14 * 3600), illuminanceInLux: 13500),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 12 * 3600), valueKind: "lightSensor", value: .number(12000)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 13 * 3600), valueKind: "lightSensor", value: .number(15000)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 14 * 3600), valueKind: "lightSensor", value: .number(13500)),
 
                     // Afternoon (15:00 - 17:00) - decreasing
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 15 * 3600), illuminanceInLux: 9000),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 16 * 3600), illuminanceInLux: 4500),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 17 * 3600), illuminanceInLux: 1800),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 15 * 3600), valueKind: "lightSensor", value: .number(9000)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 16 * 3600), valueKind: "lightSensor", value: .number(4500)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 17 * 3600), valueKind: "lightSensor", value: .number(1800)),
 
                     // Sunset (18:00 - 20:00) - rapidly decreasing
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 18 * 3600), illuminanceInLux: 450),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 19 * 3600), illuminanceInLux: 85),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 20 * 3600), illuminanceInLux: 12),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 18 * 3600), valueKind: "lightSensor", value: .number(450)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 19 * 3600), valueKind: "lightSensor", value: .number(85)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 20 * 3600), valueKind: "lightSensor", value: .number(12)),
 
                     // Evening (21:00 - 23:00) - low light
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 21 * 3600), illuminanceInLux: 3.5),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 22 * 3600), illuminanceInLux: 1.2),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 23 * 3600), illuminanceInLux: 0.8)
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 21 * 3600), valueKind: "lightSensor", value: .number(3.5)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 22 * 3600), valueKind: "lightSensor", value: .number(1.2)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 23 * 3600), valueKind: "lightSensor", value: .number(0.8))
                 ]
             } else if entityId.characteristicType == .batterySensor {
                 // Realistic battery percentage values (slowly decreasing)
                 let now = Date()
                 items = [
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 0 * 3600), stateOfCharge: 95),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 6 * 3600), stateOfCharge: 89),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 12 * 3600), stateOfCharge: 83),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 18 * 3600), stateOfCharge: 76),
-                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 24 * 3600), stateOfCharge: 71)
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 0 * 3600), valueKind: "batterySensor", value: .number(95)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 6 * 3600), valueKind: "batterySensor", value: .number(89)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 12 * 3600), valueKind: "batterySensor", value: .number(83)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 18 * 3600), valueKind: "batterySensor", value: .number(76)),
+                    EntityHistoryItem(timestamp: now.addingTimeInterval(-86400 + 24 * 3600), valueKind: "batterySensor", value: .number(71))
                 ]
             } else {
                 // Boolean sensor (motion, contact, etc.)
                 items = [
-                    EntityHistoryItem(timestamp: Date().addingTimeInterval(-3600), isDeviceOn: true),
-                    EntityHistoryItem(timestamp: Date().addingTimeInterval(-7200), isDeviceOn: false)
+                    EntityHistoryItem(timestamp: Date().addingTimeInterval(-3600), valueKind: "switcher", value: .bool(true)),
+                    EntityHistoryItem(timestamp: Date().addingTimeInterval(-7200), valueKind: "switcher", value: .bool(false))
                 ]
             }
 
@@ -283,20 +232,11 @@ extension ServerClientDependency: DependencyKey {
         getRecentRuns: { since, limit in
             try await client.getRecentRuns(since: since, limit: limit)
         },
-        getActions: { limit, runId in
-            try await client.getActions(limit: limit, runId: runId)
-        },
-        clearActions: {
-            try await client.clearActions()
-        },
         getWindowContentState: {
             try await client.getWindowContentState()
         },
         registerDevice: { token in
             try await client.register(token: token)
-        },
-        getEntityIdsWithHistory: {
-            try await client.getEntityIdsWithHistory()
         },
         getEntityHistory: { entityId, startDate, endDate, cursor, limit, includePrevious in
             try await client.getEntityHistory(

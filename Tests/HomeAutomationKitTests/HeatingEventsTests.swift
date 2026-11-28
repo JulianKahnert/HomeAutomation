@@ -28,19 +28,15 @@ struct HeatingEventsTests {
     private var windowContact: HeatingRoomSources.Contact { .init(source: .window, name: "Fenster", entityId: window) }
     private var fireplaceContact: HeatingRoomSources.Contact { .init(source: .fireplace, name: "Kamin", entityId: fireplace) }
 
-    private func write(_ reason: HeatingWriteReason, _ minutes: Double, target value: Double? = nil, active: Bool? = nil, plan: Double? = nil) -> HeatingWrite {
-        HeatingWrite(timestamp: ago(minutes), entityId: value != nil ? target : heating, reason: reason,
-                     actionName: value != nil ? "setTargetTemperature" : "setHeating", isActive: active,
-                     targetTemperatureInC: value, planTargetInC: plan)
+    private func write(_ reason: HeatingWriteReason, _ minutes: Double, target value: Double? = nil, active: Bool? = nil, plan: Double? = nil) -> HeatingFixture {
+        let action: HomeManagableAction = value.map { .setTargetTemperature(target, celsius: $0) } ?? .setHeating(heating, active: active ?? false)
+        return HeatingFixture(timestamp: ago(minutes), action: action, reason: reason, planTargetInC: plan)
     }
 
-    private func events(_ items: [EntityStorageItem] = [], writes: [HeatingWrite] = [], contacts: [HeatingRoomSources.Contact] = [],
+    private func events(_ items: [EntityStorageItem] = [], writes: [HeatingFixture] = [], contacts: [HeatingRoomSources.Contact] = [],
                         range: HeatingRange = .day) async throws -> [HeatingEvent] {
-        // the fireplace states are the server's own switches, the rest the stored entity states
-        let switches = items.filter { $0.entityId == fireplace }.compactMap { item in item.isDeviceOn.map { FireplaceSwitch(timestamp: item.timestamp, isOn: $0) } }
-        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items.filter { $0.entityId != fireplace }),
-                                               writes: InMemoryHeatingWriteRepository(writes),
-                                               fireplace: InMemoryFireplaceRepository(switches),
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items),
+                                               journal: seededJournal(writes),
                                                now: { now })
         return try await builder.detail(for: sources(contacts: contacts), range: range).events
     }
@@ -56,12 +52,30 @@ struct HeatingEventsTests {
         #expect(!found[0].reason.isEmpty)
     }
 
-    @Test("a plan target recorded without sending it is no event and no manual change")
-    func unsentPlanWrite() async throws {
-        let unsent = HeatingWrite(timestamp: ago(60), entityId: target, reason: .plan, actionName: "setTargetTemperature", targetTemperatureInC: 17, planTargetInC: 17, sentToDevice: false)
-        let items = [EntityStorageItem(entityId: target, timestamp: ago(120), targetTemperatureInC: 21)]   // the radiator was not told
+    @Test("a plan target reported without sending it is no event and no manual change")
+    func unsentPlanTarget() async throws {
+        let planTarget = EntityStorageItem(entityId: sources().planTargetId, timestamp: ago(60), targetTemperatureInC: 17, origin: .server)
+        let items = [EntityStorageItem(entityId: target, timestamp: ago(120), targetTemperatureInC: 21), planTarget]   // the radiator was not told
 
-        #expect(try await events(items, writes: [unsent]).isEmpty)
+        #expect(try await events(items).isEmpty)
+    }
+
+    @Test("the plan target of a plan event comes from the plan-target history, not from the written value")
+    func planTargetFromHistory() async throws {
+        let planTarget = EntityStorageItem(entityId: sources().planTargetId, timestamp: ago(60), targetTemperatureInC: 22, origin: .server)
+        let found = try await events([planTarget], writes: [write(.plan, 60, target: 21)])
+
+        #expect(found.map(\.source) == [.plan])
+        #expect(found[0].title == "Plan 22,0 °C")
+    }
+
+    @Test("a plan target reported after the cluster began does not count")
+    func laterPlanTargetIgnored() async throws {
+        let later = EntityStorageItem(entityId: sources().planTargetId, timestamp: ago(30), targetTemperatureInC: 25, origin: .server)
+        let earlier = EntityStorageItem(entityId: sources().planTargetId, timestamp: ago(120), targetTemperatureInC: 20, origin: .server)
+        let found = try await events([earlier, later], writes: [write(.window, 60, target: 19)] + [write(.system, 60, target: 19)])
+
+        #expect(found.first { $0.source == .system }?.reason.contains("20,0 °C") == true)
     }
 
     @Test("two events of one source in the same second do not share an id")
@@ -115,12 +129,17 @@ struct HeatingEventsTests {
         #expect(found[0].end == ago(80))
     }
 
-    @Test("a fireplace that ran its maximum duration says the timeout ended it")
+    @Test("a fireplace the server ended says the timeout ended it, one the app switched off does not")
     func fireplaceTimeout() async throws {
-        let items = [EntityStorageItem(entityId: fireplace, timestamp: ago(120 + Fireplace.maxDuration / 60), isDeviceOn: true),
-                     EntityStorageItem(entityId: fireplace, timestamp: ago(120), isDeviceOn: false)]
-        let found = try await events(items, contacts: [fireplaceContact], range: .week)
-        #expect(found.first?.reason.contains("Zeitablauf") == true)
+        func closed(by origin: Origin) -> [EntityStorageItem] {
+            var off = EntityStorageItem(entityId: fireplace, timestamp: ago(120), isDeviceOn: false)
+            off.origin = origin
+            return [EntityStorageItem(entityId: fireplace, timestamp: ago(120 + Fireplace.maxDuration / 60), isDeviceOn: true), off]
+        }
+        let byServer = try await events(closed(by: .server), contacts: [fireplaceContact], range: .week)
+        #expect(byServer.first?.reason.contains("Zeitablauf") == true)
+        let byApp = try await events(closed(by: .app), contacts: [fireplaceContact], range: .week)
+        #expect(byApp.first?.reason.contains("Zeitablauf") == false)
     }
 
     @Test("without contacts, window and fireplace writes still give pins")
@@ -182,37 +201,24 @@ struct HeatingEventsTests {
 
     @Test("the writes the events look at reach back at most a day before the range, however old the state before it is")
     func writeLookback() async throws {
-        let writes = WriteQueryLog()
+        let journal = StartSpyJournal(seededJournal())
         let items = [EntityStorageItem(entityId: window, timestamp: ago(60 * 24 * 90), isContactOpen: false)]   // a quiet contact, last changed months ago
-        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: writes, now: { now })
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), journal: journal, now: { now })
 
         _ = try await builder.detail(for: sources(contacts: [windowContact]), range: .day)
 
-        #expect(await writes.startDates == [now.addingTimeInterval(-HeatingRange.day.duration - 24 * 3_600)])
+        #expect(await journal.requestedStarts == [now.addingTimeInterval(-HeatingRange.day.duration - 24 * 3_600)])
     }
 
     @Test("without events the detail skips the contacts and loads the writes of the range only")
     func withoutEvents() async throws {
-        let writes = WriteQueryLog()
+        let journal = StartSpyJournal(seededJournal())
         let items = [EntityStorageItem(entityId: window, timestamp: ago(200), isContactOpen: true)]
-        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), writes: writes, now: { now })
+        let builder = HeatingRoomDetailBuilder(storage: MockStorageRepository(items: items), journal: journal, now: { now })
 
         let detail = try await builder.detail(for: sources(contacts: [windowContact]), range: .day, includeEvents: false)
 
         #expect(detail.events.isEmpty)
-        #expect(await writes.startDates == [now.addingTimeInterval(-HeatingRange.day.duration)])
+        #expect(await journal.requestedStarts == [now.addingTimeInterval(-HeatingRange.day.duration)])
     }
-}
-
-/// Answers no writes and remembers from when each query asked.
-private actor WriteQueryLog: HeatingWriteRepository {
-    private(set) var startDates: [Date?] = []
-
-    func add(_ write: HeatingWrite) async throws {}
-    func writes(placeId: String, startDate: Date?, endDate: Date?) async throws -> [HeatingWrite] {
-        startDates.append(startDate)
-        return []
-    }
-    func lastPlanWrite(placeId: String, before date: Date) async throws -> HeatingWrite? { nil }
-    func lastWrite(placeId: String, radiatorName: String) async throws -> HeatingWrite? { nil }
 }

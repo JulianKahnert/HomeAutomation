@@ -6,6 +6,7 @@
 //
 //  Integration tests for authentication with the full app configuration
 
+import HAApplicationLayer
 @testable import HAImplementations
 @testable import HAModels
 @testable import Server
@@ -14,6 +15,7 @@ import XCTVapor
 
 final class AuthenticationIntegrationTests: XCTestCase {
     var app: Application!
+    private var loop: Task<Void, Never>!
 
     override func setUp() async throws {
         app = try await Application.make(.testing)
@@ -27,7 +29,11 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
         // Mock homeAutomationConfigService for testing
         let mockLocation = Location(latitude: 52.52, longitude: 13.405)
-        app.homeAutomationConfigService = HomeAutomationConfigService(location: mockLocation, automations: [], persist: { _ in })
+        app.homeAutomationConfigService = HomeAutomationConfigService(location: mockLocation, persist: { _ in })
+        app.automationService = try await makeAutomationService(automations: [])
+        app.configReader = StoredConfig(config: ConfigDTO(location: mockLocation, automations: []))
+        app.homeManager = await HomeManager(getAdapter: { nil }, storageRepo: MemoryStorage(), notificationSender: SilentSender(), location: mockLocation)
+        loop = app.startEventLoop()
 
         // The WebSocket route registration needs an actor system present
         app.starActorSystem = StarActorSystem(name: "server-tests")
@@ -37,33 +43,33 @@ final class AuthenticationIntegrationTests: XCTestCase {
     }
 
     override func tearDown() async throws {
+        loop.cancel()
         try await app.asyncShutdown()
         app = nil
     }
 
-    // MARK: - Root Endpoint Tests
+    // MARK: - Config Endpoint Tests
 
-    func testRootEndpointRequiresAuthentication() async throws {
+    func testConfigEndpointRequiresAuthentication() async throws {
         // Test without token - should fail
-        try await app.test(.GET, "/", afterResponse: { res async in
+        try await app.test(.GET, "/config", afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
             XCTAssertTrue(res.body.string.contains("Invalid or missing authentication token"))
         })
     }
 
-    func testRootEndpointWithValidToken() async throws {
+    func testConfigEndpointWithValidToken() async throws {
         // Test with valid token - should succeed
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .ok)
-            XCTAssertEqual(res.body.string, "It works!")
         })
     }
 
-    func testRootEndpointWithInvalidToken() async throws {
+    func testConfigEndpointWithInvalidToken() async throws {
         // Test with wrong token - should fail
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer wrong-token")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
@@ -137,7 +143,6 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
     func testMultipleEndpointsAllProtected() async throws {
         let endpoints: [(HTTPMethod, String)] = [
-            (.GET, "/"),
             (.GET, "/config"),
             (.POST, "/config")
         ]
@@ -162,12 +167,14 @@ final class AuthenticationIntegrationTests: XCTestCase {
         testApp.authToken = "any-token"
         testApp.authDisabled = true
         testApp.starActorSystem = StarActorSystem(name: "server-tests")
+        testApp.homeAutomationConfigService = HomeAutomationConfigService(location: Location(latitude: 52.52, longitude: 13.405), persist: { _ in })
+        testApp.automationService = try await makeAutomationService(automations: [])
+        testApp.configReader = StoredConfig(config: ConfigDTO(location: Location(latitude: 52.52, longitude: 13.405), automations: []))
         try routes(testApp)
 
         // Should work without token when auth is disabled
-        try await testApp.test(.GET, "/", afterResponse: { res async in
+        try await testApp.test(.GET, "/config", afterResponse: { res async in
             XCTAssertEqual(res.status, .ok)
-            XCTAssertEqual(res.body.string, "It works!")
         })
 
         try await testApp.asyncShutdown()
@@ -176,7 +183,7 @@ final class AuthenticationIntegrationTests: XCTestCase {
     // MARK: - Error Message Tests
 
     func testUnauthorizedErrorMessageIsClear() async throws {
-        try await app.test(.GET, "/", afterResponse: { res async in
+        try await app.test(.GET, "/config", afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
             let errorMessage = res.body.string
             XCTAssertTrue(
@@ -194,14 +201,14 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
     func testTokenIsCaseSensitive() async throws {
         // Test with wrong case - should fail
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer TEST-INTEGRATION-TOKEN-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
         })
 
         // Test with correct case - should succeed
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .ok)
@@ -212,21 +219,21 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
     func testTokenWithWhitespaceIsRejected() async throws {
         // Test with leading whitespace
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer  test-integration-token-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
         })
 
         // Test with trailing whitespace
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123 ")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .unauthorized)
         })
 
         // Test exact token - should succeed
-        try await app.test(.GET, "/", beforeRequest: { req in
+        try await app.test(.GET, "/config", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123")
         }, afterResponse: { res async in
             XCTAssertEqual(res.status, .ok)
@@ -235,11 +242,22 @@ final class AuthenticationIntegrationTests: XCTestCase {
 
     // MARK: - Config deploy hook
 
-    func testPostingAConfigYieldsAConfigDeployedEvent() async throws {
-        let (stream, continuation) = AsyncStream.makeStream(of: HomeEvent.self)
+    func testPostingAConfigEntersTheEventLoopAsADeployCommand() async throws {
+        let (stream, continuation) = AsyncStream.makeStream(of: HomeInput.self)
         app.homeEventsStream = stream
         app.homeEventsContinuation = continuation
         let body = try JSONEncoder().encode(ConfigDTO(location: Location(latitude: 1, longitude: 2), automations: []))
+        // stands in for the event loop: takes the deploy command and answers it
+        let loop = Task { () -> [String] in
+            var names: [String] = []
+            for await input in stream {
+                guard case .write(let command) = input else { continue }
+                names.append(command.kind.name)
+                command.complete(.success(nil))
+                break
+            }
+            return names
+        }
 
         try await app.test(.POST, "/config?skipValidation=true", beforeRequest: { req in
             req.headers.add(name: .authorization, value: "Bearer test-integration-token-123")
@@ -249,11 +267,7 @@ final class AuthenticationIntegrationTests: XCTestCase {
             XCTAssertEqual(res.status, .ok)
         })
 
-        continuation.finish()
-        var events: [HomeEvent] = []
-        for await event in stream {
-            events.append(event)
-        }
-        XCTAssertEqual(events, [.configDeployed])
+        let names = await loop.value
+        XCTAssertEqual(names, ["deploy"])
     }
 }

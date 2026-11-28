@@ -88,7 +88,7 @@ struct HeatingControlCharacteristicTests {
     }
 
     @Test("Sensors left out to keep HomeKit's subscription count down stay unsubscribed", arguments: [
-        CharacteristicsType.batterySensor, .valve, .lock, .pmDensitySensor, .airQualitySensor
+        CharacteristicsType.valve, .lock, .pmDensitySensor, .airQualitySensor
     ])
     func otherTypesStayUnsubscribed(type: CharacteristicsType) {
         #expect(!type.isSubscribed)

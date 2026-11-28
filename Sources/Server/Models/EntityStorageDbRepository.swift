@@ -12,7 +12,7 @@ import Logging
 import SQLKit
 import Vapor
 
-final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
+final class EntityStorageDbRepository: StorageRepository, Sendable {
     /// Resolved per query: a captured `app.db` is bound to one event loop and so to that loop's
     /// connection pool, which would funnel every query of this long-lived repository through it.
     let database: @Sendable () -> any Database
@@ -23,101 +23,144 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
     }
 
     func getCurrent(_ entityId: EntityId) async throws -> EntityStorageItem? {
-        try await latestItems(of: entityId, limit: 1)
-            .first
-            .map(Self.mapDbItem)
+        try await latestChanges(of: entityId, limit: 1).first
     }
 
-    func getPrevious(_ entityId: EntityId) async throws -> EntityStorageItem? {
-        let items = try await latestItems(of: entityId, limit: 2)
-        guard items.count == 2 else {
-            return nil
-        }
-        return items.last
-            .map(Self.mapDbItem)
-    }
-
-    /// The newest row per entity, grouped like `getAllEntityIds`, with the tiebreak of `getCurrent`. A row of an
-    /// unknown characteristic type is skipped, so it cannot stand in for another entity.
+    /// The newest change per entity, with the tiebreak of `getCurrent`. An entity of an unknown
+    /// characteristic type is skipped.
     func getAllCurrent() async throws -> [EntityStorageItem] {
-        try await sqlDatabase().raw("""
-            SELECT * FROM (
-                SELECT e.*, ROW_NUMBER() OVER (PARTITION BY \(ident: "entityPlaceId"), \(ident: "entityServiceName"), \(ident: "entityCharacteristicType")
-                                               ORDER BY \(ident: "timestamp") DESC, \(ident: "id") DESC) AS \(ident: "rowNumber")
-                FROM \(ident: EntityStorageDbItem.schema) e
-            ) newest
-            WHERE \(ident: "rowNumber") = 1
-            """)
-            .all(decodingFluent: EntityStorageDbItem.self)
-            .filter { CharacteristicsType(rawValue: $0.entityCharacteristicType) != nil }
-            .map(Self.mapDbItem)
+        try await newestChanges(ofType: nil)
     }
 
-    /// The newest `limit` rows of an entity. Filters and limits in SQL, so a lookup reads a few
-    /// entries of `idx_entityItems_entity_timestamp` instead of loading the entity's whole history.
-    /// A row without `entityCharacteristicsName` matches any name, as before. Rows with equal timestamps are
+    /// Like `getAllCurrent`, for the entities of one characteristic type only.
+    func getAllCurrent(of type: CharacteristicsType) async throws -> [EntityStorageItem] {
+        try await newestChanges(ofType: type)
+    }
+
+    private func newestChanges(ofType type: CharacteristicsType?) async throws -> [EntityStorageItem] {
+        let typeFilter: SQLQueryString = type.map { "WHERE e.\(ident: "characteristicType") = \(bind: $0.rawValue)" } ?? ""
+        // One backward dive into `idx_entityChanges_entity_timestamp` per directory entry (the index carries the
+        // primary key), instead of a window over the whole table.
+        let rows = try await sqlDatabase().raw("""
+            SELECT newest.\(ident: "id") AS \(ident: "id")
+            FROM \(ident: EntityDbItem.schema) e,
+            LATERAL (SELECT c.\(ident: "id") FROM \(ident: EntityChangeDbItem.schema) c
+                     WHERE c.\(ident: "entityId") = e.\(ident: "id")
+                     ORDER BY c.\(ident: "timestamp") DESC, c.\(ident: "id") DESC
+                     LIMIT 1) AS newest
+            \(typeFilter)
+            """)
+            .all()
+        let ids = try rows.map { try $0.decode(column: "id", as: Int.self) }
+        guard !ids.isEmpty else { return [] }
+        var items: [EntityStorageItem] = []
+        // Chunked, so a large directory does not build one huge IN list.
+        for chunk in stride(from: 0, to: ids.count, by: 500).map({ Array(ids[$0..<min($0 + 500, ids.count)]) }) {
+            let changes = try await EntityChangeDbItem.query(on: database())
+                .filter(\.$id ~~ chunk)
+                .with(\.$entity)
+                .all()
+            items += changes.compactMap { EntityStorageItem(entity: $0.entity, change: $0, withLastReport: true) }
+        }
+        return items
+    }
+
+    /// The newest `limit` changes of an entity, resolved through the directory entry. Equal timestamps are
     /// ordered by `id`, so `getCurrent` and `getAllCurrent` pick the same row.
-    private func latestItems(of entityId: EntityId, limit: Int) async throws -> [EntityStorageDbItem] {
-        try await itemsQuery(of: entityId)
+    private func latestChanges(of entityId: EntityId, limit: Int) async throws -> [EntityStorageItem] {
+        guard let entity = try await findEntity(entityId) else { return [] }
+        let entityKey = try entity.requireID()
+        return try await EntityChangeDbItem.query(on: database())
+            .filter(\.$entity.$id == entityKey)
             .sort(\.$timestamp, .descending)
             .sort(\.$id, .descending)
             .limit(limit)
             .all()
+            .compactMap { EntityStorageItem(entity: entity, change: $0, withLastReport: true) }
     }
 
-    /// All rows of an entity. A row without `entityCharacteristicsName`, or an `entityId` without
-    /// one, matches any name.
-    private func itemsQuery(of entityId: EntityId) -> QueryBuilder<EntityStorageDbItem> {
-        let query = EntityStorageDbItem
-            .query(on: database())
-            .filter(\.$entityPlaceId == entityId.placeId)
-            .filter(\.$entityServiceName == entityId.name)
-            .filter(\.$entityCharacteristicType == entityId.characteristicType.rawValue)
-        guard let characteristicsName = entityId.characteristicsName else {
-            return query
+    private func findEntity(_ entityId: EntityId) async throws -> EntityDbItem? {
+        try await EntityDbItem.query(on: database())
+            .filter(\.$placeId == entityId.placeId)
+            .filter(\.$serviceName == entityId.name)
+            .filter(\.$characteristicType == entityId.characteristicType.rawValue)
+            .first()
+    }
+
+    /// The directory entry of an entity; created on first sight, and its name follows the newest one seen.
+    private func entity(for entityId: EntityId) async throws -> EntityDbItem {
+        if let existing = try await findEntity(entityId) {
+            if let name = entityId.characteristicsName, existing.characteristicsName != name {
+                existing.characteristicsName = name
+                try await existing.save(on: database())
+            }
+            return existing
         }
-        return query.group(.or) { group in
-            group.filter(\.$entityCharacteristicsName == nil)
-                .filter(\.$entityCharacteristicsName == characteristicsName)
+        let created = EntityDbItem(placeId: entityId.placeId, serviceName: entityId.name,
+                                   characteristicType: entityId.characteristicType.rawValue,
+                                   characteristicsName: entityId.characteristicsName)
+        do {
+            try await created.save(on: database())
+            return created
+        } catch {
+            // A concurrent write may have created it first (unique key).
+            if let existing = try await findEntity(entityId) { return existing }
+            throw error
         }
     }
 
     func add(_ item: EntityStorageItem) async throws {
-        let dbItem = Self.map(item)
-        guard try await passesDeadBand(dbItem, of: item.entityId) else { return }
-        try await dbItem.save(on: database())
+        guard let value = item.value else {
+            log.warning("Item without a value for its type is not stored", metadata: ["entityId": "\(item.entityId)"])
+            return
+        }
+        let entity = try await entity(for: item.entityId)
+        guard try await passesDeadBand(value, at: item.timestamp, of: entity) else { return }
+        try await EntityChangeDbItem(entityId: entity.requireID(), timestamp: item.timestamp, value: value, shape: ValueDescriptor.descriptor(for: item.entityId.characteristicType).shape, origin: item.origin.rawValue)
+            .save(on: database())
         if item.entityId.characteristicType.isHeatingRelated {
-            log.debug("Stored heating entity item", metadata: [
-                "entityId": "\(item.entityId)",
-                "isHeaterActive": "\(item.isHeaterActive.map { "\($0)" } ?? "nil")",
-                "targetTemperatureInC": "\(item.targetTemperatureInC.map { "\($0)" } ?? "nil")",
-                "heatingMode": "\(item.heatingMode?.name ?? "nil")",
-                "valvePositionPercent": "\(item.valvePositionPercent.map { "\($0)" } ?? "nil")",
-                "temperatureCalibrationInC": "\(item.temperatureCalibrationInC.map { "\($0)" } ?? "nil")"
-            ])
+            log.debug("Stored heating entity item", metadata: ["entityId": "\(item.entityId)", "value": "\(value)"])
         }
     }
 
-    /// Whether `item` moved out of its type's write dead band (`StoragePolicy`) around the last
-    /// stored row. Types without a dead band cost no extra query.
-    private func passesDeadBand(_ item: EntityStorageDbItem, of entityId: EntityId) async throws -> Bool {
-        let policy = StoragePolicy.policy(for: entityId.characteristicType)
-        guard let deadBand = policy.deadBand, let column = policy.valueColumn, let value = column.value(in: item) else {
+    /// One conditional UPDATE: the time only moves forward.
+    func recordLastReport(of entityId: EntityId, at date: Date) async throws {
+        try await EntityDbItem.query(on: database())
+            .filter(\.$placeId == entityId.placeId)
+            .filter(\.$serviceName == entityId.name)
+            .filter(\.$characteristicType == entityId.characteristicType.rawValue)
+            .group(.or) { group in
+                group.filter(\.$lastReport == nil)
+                group.filter(\.$lastReport < date)
+            }
+            .set(\.$lastReport, to: date)
+            .update()
+    }
+
+    /// Whether the value moved out of its type's write dead band (the descriptor's storage rule) around the last
+    /// stored change. Types without a dead band cost no extra query.
+    private func passesDeadBand(_ value: Value, at timestamp: Date, of entity: EntityDbItem) async throws -> Bool {
+        guard let type = CharacteristicsType(rawValue: entity.characteristicType),
+              let deadBand = ValueDescriptor.descriptor(for: type).storage.deadBand,
+              case .number(let number) = value else {
             return true
         }
-        let lastStored = try await latestItems(of: entityId, limit: 1).first.flatMap { row in
-            column.value(in: row).map { (value: $0, timestamp: row.timestamp) }
-        }
-        return deadBand.shouldStore(value, at: item.timestamp, lastStored: lastStored)
+        let entityKey = try entity.requireID()
+        let last = try await EntityChangeDbItem.query(on: database())
+            .filter(\.$entity.$id == entityKey)
+            .sort(\.$timestamp, .descending)
+            .sort(\.$id, .descending)
+            .first()
+        let lastStored = last.flatMap { row in row.number.map { (value: $0, timestamp: row.timestamp) } }
+        return deadBand.shouldStore(number, at: timestamp, lastStored: lastStored)
     }
 
     /// The rollup rows of an entity, oldest hour first.
     func hourlyAggregates(of entityId: EntityId) async throws -> [EntityHourlyAggregate] {
+        guard let entity = try await findEntity(entityId) else { return [] }
         let rows = try await sqlDatabase().raw("""
             SELECT * FROM \(ident: EntityHourlyAggregate.schema)
-            WHERE \(ident: "entityPlaceId") = \(bind: entityId.placeId)
-              AND \(ident: "entityServiceName") = \(bind: entityId.name)
-              AND \(ident: "entityCharacteristicType") = \(bind: entityId.characteristicType.rawValue)
+            WHERE \(ident: "entityId") = \(bind: entity.requireID())
             ORDER BY \(ident: "hourStart")
             """)
             .all()
@@ -146,221 +189,135 @@ final class EntityStorageDbRepository: StorageRepository, @unchecked Sendable {
         cursor: Date?,
         limit: Int
     ) async throws -> [EntityStorageItem] {
-        var query = itemsQuery(of: entityId)
-
-        // Apply time range filters
+        guard let entity = try await findEntity(entityId) else { return [] }
+        let entityKey = try entity.requireID()
+        var query = EntityChangeDbItem.query(on: database())
+            .filter(\.$entity.$id == entityKey)
         if let startDate {
             query = query.filter(\.$timestamp >= startDate)
         }
         if let endDate {
             query = query.filter(\.$timestamp < endDate)
         }
-
-        // Apply cursor-based pagination (fetch items older than cursor)
+        // Cursor-based pagination: fetch items older than the cursor.
         if let cursor {
             query = query.filter(\.$timestamp < cursor)
         }
-
-        // Order by timestamp descending and apply limit; the characteristicsName filter is part of
-        // the query, so a page is never cut short after the limit.
+        // The id breaks ties of equal timestamps (the index carries it, so no filesort). A page boundary on a tied
+        // timestamp can still skip rows: the cursor is a timestamp only.
         return try await query
             .sort(\.$timestamp, .descending)
+            .sort(\.$id, .descending)
             .limit(limit)
             .all()
-            .map(Self.mapDbItem)
+            .compactMap { EntityStorageItem(entity: entity, change: $0) }
     }
 
     func getAllEntityIds() async throws -> [EntityId] {
-        let sqlDatabase = try sqlDatabase()
-
-        // DISTINCT over the three indexed columns lets MySQL use a covering index skip scan
-        // (`idx_entityItems_entity_timestamp`) instead of scanning the whole table. The name comes from
-        // the newest row of each entity, one index lookup per entity.
-        let rows = try await sqlDatabase.raw("""
-            SELECT
-                d.\(ident: "entityPlaceId"),
-                d.\(ident: "entityServiceName"),
-                d.\(ident: "entityCharacteristicType"),
-                (SELECT n.\(ident: "entityCharacteristicsName")
-                 FROM \(ident: EntityStorageDbItem.schema) n
-                 WHERE n.\(ident: "entityPlaceId") = d.\(ident: "entityPlaceId")
-                   AND n.\(ident: "entityServiceName") = d.\(ident: "entityServiceName")
-                   AND n.\(ident: "entityCharacteristicType") = d.\(ident: "entityCharacteristicType")
-                 ORDER BY n.\(ident: "timestamp") DESC
-                 LIMIT 1) AS \(ident: "entityCharacteristicsName")
-            FROM (
-                SELECT DISTINCT \(ident: "entityPlaceId"), \(ident: "entityServiceName"), \(ident: "entityCharacteristicType")
-                FROM \(ident: EntityStorageDbItem.schema)
-            ) d
-            """)
-            .all()
-
-        return rows.compactMap { row -> EntityId? in
-            guard let placeId = try? row.decode(column: "entityPlaceId", as: String.self),
-                  let serviceName = try? row.decode(column: "entityServiceName", as: String.self),
-                  let characteristicTypeRaw = try? row.decode(column: "entityCharacteristicType", as: String.self),
-                  let characteristicType = CharacteristicsType(rawValue: characteristicTypeRaw) else {
-                log.error("Failed to decode entity ID from database row")
-                assertionFailure("Failed to decode entity ID from database row")
+        try await EntityDbItem.query(on: database()).all().compactMap { entity in
+            guard let type = CharacteristicsType(rawValue: entity.characteristicType) else {
+                log.warning("Entity of unknown characteristic type skipped", metadata: ["characteristicType": "\(entity.characteristicType)"])
                 return nil
             }
-
-            let characteristicsName = try? row.decode(column: "entityCharacteristicsName", as: String?.self)
-
-            return EntityId(
-                placeId: placeId,
-                name: serviceName,
-                characteristicsName: characteristicsName,
-                characteristic: characteristicType
-            )
+            return EntityId(placeId: entity.placeId, name: entity.serviceName,
+                            characteristicsName: entity.characteristicsName, characteristic: type)
         }
-    }
-
-    /// An unknown raw value (a future HAP mode) becomes `nil` instead of failing the whole row.
-    private static func heatingMode(of item: EntityStorageDbItem) -> HeatingMode? {
-        guard let raw = item.heatingMode else { return nil }
-        guard let mode = HeatingMode(rawValue: raw) else {
-            Logger(label: "EntityStorageDbRepository").warning("Unknown heatingMode \(raw) in entityItems, read as nil")
-            return nil
-        }
-        return mode
-    }
-
-    static func mapDbItem(_ item: EntityStorageDbItem) -> EntityStorageItem {
-        var illuminance: Measurement<UnitIlluminance>?
-        if let illuminanceInLux = item.illuminanceInLux {
-            illuminance = .init(value: illuminanceInLux, unit: .lux)
-        }
-
-        var temperatureInC: Measurement<UnitTemperature>?
-        if let tempC = item.temperatureInC {
-            temperatureInC = .init(value: tempC, unit: .celsius)
-        }
-
-        var color: RGB?
-        if let red = item.colorRed, let green = item.colorGreen, let blue = item.colorBlue {
-            color = RGB(red: red, green: green, blue: blue)
-        }
-
-        let entityId = EntityId(placeId: item.entityPlaceId,
-                                name: item.entityServiceName,
-                                characteristicsName: item.entityCharacteristicsName,
-                                characteristic: CharacteristicsType(rawValue: item.entityCharacteristicType) ?? .batterySensor)
-        return EntityStorageItem(entityId: entityId,
-                                 timestamp: item.timestamp,
-                                 motionDetected: item.motionDetected,
-                                 illuminance: illuminance,
-                                 isDeviceOn: item.isDeviceOn,
-                                 brightness: item.brightness,
-                                 colorTemperature: item.colorTemperature,
-                                 color: color,
-                                 isContactOpen: item.isContactOpen,
-                                 isDoorLocked: item.isDoorLocked,
-                                 stateOfCharge: item.stateOfCharge,
-                                 isHeaterActive: item.isHeaterActive,
-                                 temperatureInC: temperatureInC,
-                                 relativeHumidity: item.relativeHumidity,
-                                 carbonDioxideSensorId: item.carbonDioxideSensorId,
-                                 pmDensity: item.pmDensity,
-                                 airQuality: item.airQuality,
-                                 valveOpen: item.valveOpen,
-                                 targetTemperatureInC: item.targetTemperatureInC,
-                                 heatingMode: heatingMode(of: item),
-                                 valvePositionPercent: item.valvePositionPercent,
-                                 temperatureCalibrationInC: item.temperatureCalibrationInC)
-    }
-
-    static func map(_ item: EntityStorageItem) -> EntityStorageDbItem {
-        return EntityStorageDbItem(timestamp: item.timestamp,
-                                   entityPlaceId: item.entityId.placeId,
-                                   entityServiceName: item.entityId.name,
-                                   entityCharacteristicsName: item.entityId.characteristicsName,
-                                   entityCharacteristicType: item.entityId.characteristicType.rawValue,
-                                   motionDetected: item.motionDetected,
-                                   illuminanceInLux: item.illuminance?.converted(to: .lux).value,
-                                   isDeviceOn: item.isDeviceOn,
-                                   isContactOpen: item.isContactOpen,
-                                   isDoorLocked: item.isDoorLocked,
-                                   stateOfCharge: item.stateOfCharge,
-                                   isHeaterActive: item.isHeaterActive,
-                                   brightness: item.brightness,
-                                   colorTemperature: item.colorTemperature,
-                                   colorRed: item.color?.red,
-                                   colorGreen: item.color?.green,
-                                   colorBlue: item.color?.blue,
-                                   temperatureInC: item.temperatureInC?.converted(to: .celsius).value,
-                                   relativeHumidity: item.relativeHumidity,
-                                   carbonDioxideSensorId: item.carbonDioxideSensorId,
-                                   pmDensity: item.pmDensity,
-                                   airQuality: item.airQuality,
-                                   valveOpen: item.valveOpen,
-                                   targetTemperatureInC: item.targetTemperatureInC,
-                                   heatingMode: item.heatingMode?.rawValue,
-                                   valvePositionPercent: item.valvePositionPercent,
-                                   temperatureCalibrationInC: item.temperatureCalibrationInC)
     }
 }
 
 extension EntityStorageDbRepository: EntityRetentionStore {
+    static let deleteBatchSize = 10_000
+    /// A rollup transaction covers at most this long a span of one entity.
+    static let rollupSpan: TimeInterval = 86_400
+
+    private func entityKeys(ofType type: CharacteristicsType) async throws -> [UUID] {
+        try await EntityDbItem.query(on: database())
+            .filter(\.$characteristicType == type.rawValue)
+            .all()
+            .map { try $0.requireID() }
+    }
+
+    /// Deletes per entity and in batches, each an exact range on `(entityId, timestamp)`, so a statement locks only
+    /// its batch and a large backlog does not become one transaction.
     func deleteEntries(ofType type: CharacteristicsType, olderThan date: Date) async throws {
-        try await sqlDatabase().raw("""
-            DELETE FROM \(ident: EntityStorageDbItem.schema)
-            WHERE \(ident: "entityCharacteristicType") = \(bind: type.rawValue) AND \(ident: "timestamp") < \(bind: date)
+        let sql = try sqlDatabase()
+        for entityKey in try await entityKeys(ofType: type) {
+            try await sql.deleteInBatches(from: EntityChangeDbItem.schema,
+                                          where: "\(ident: "entityId") = \(bind: entityKey) AND \(ident: "timestamp") < \(bind: date)",
+                                          batchSize: Self.deleteBatchSize)
+        }
+    }
+
+    /// Rolls the raw rows older than `date` up into hourly rows, one entity and at most a day per transaction, so a
+    /// failed run resumes where it stopped and the first run over years of history is not one transaction.
+    func rollUpHourly(type: CharacteristicsType, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
+        let range = validRange ?? -Double.greatestFiniteMagnitude...Double.greatestFiniteMagnitude
+        for entityKey in try await entityKeys(ofType: type) {
+            while let oldest = try await EntityChangeDbItem.query(on: database())
+                .filter(\.$entity.$id == entityKey)
+                .filter(\.$timestamp < date)
+                .sort(\.$timestamp, .ascending)
+                .first()?.timestamp {
+                try Task.checkCancellation()
+                let from = Date(timeIntervalSince1970: (oldest.timeIntervalSince1970 / 3600).rounded(.down) * 3600)
+                let to = min(from.addingTimeInterval(Self.rollupSpan), date)
+                try await database().transaction { database in
+                    try await Self.rollUp(entityKey, from: from, to: to, range: range, on: database)
+                }
+            }
+        }
+    }
+
+    private static func rollUp(_ entityKey: UUID, from: Date, to: Date, range: ClosedRange<Double>, on database: any Database) async throws {
+        guard let sql = database as? SQLDatabase else {
+            throw Abort(.internalServerError, reason: "Database does not support SQL queries")
+        }
+        // An hour that already has a row (a late raw row) is merged; the update order matters
+        // because MySQL assigns left to right, so the mean reads the old count. `maxValue` is a
+        // reserved word, hence the backticks.
+        try await sql.raw("""
+            INSERT INTO \(ident: EntityHourlyAggregate.schema)
+                (entityId, hourStart, `minValue`, `meanValue`, `maxValue`, `lastValue`, `valueCount`)
+            SELECT * FROM (
+                SELECT entityId, hourStart,
+                       MIN(v) AS minV, AVG(v) AS meanV, MAX(v) AS maxV, MAX(CASE WHEN rn = 1 THEN v END) AS lastV, COUNT(*) AS countV
+                FROM (
+                    SELECT c.\(ident: "entityId") AS entityId,
+                           TIMESTAMP(DATE_FORMAT(c.\(ident: "timestamp"), '%Y-%m-%d %H:00:00')) AS hourStart,
+                           c.\(ident: "number") AS v,
+                           ROW_NUMBER() OVER (PARTITION BY DATE_FORMAT(c.\(ident: "timestamp"), '%Y-%m-%d %H')
+                                              ORDER BY c.\(ident: "timestamp") DESC, c.\(ident: "id") DESC) AS rn
+                    FROM \(ident: EntityChangeDbItem.schema) c
+                    WHERE c.\(ident: "entityId") = \(bind: entityKey)
+                      AND c.\(ident: "timestamp") >= \(bind: from) AND c.\(ident: "timestamp") < \(bind: to)
+                      AND c.\(ident: "number") BETWEEN \(bind: range.lowerBound) AND \(bind: range.upperBound)
+                ) raw
+                GROUP BY entityId, hourStart
+            ) AS hourly
+            ON DUPLICATE KEY UPDATE
+                `minValue` = LEAST(`minValue`, hourly.minV),
+                `maxValue` = GREATEST(`maxValue`, hourly.maxV),
+                `meanValue` = (`meanValue` * `valueCount` + hourly.meanV * hourly.countV) / (`valueCount` + hourly.countV),
+                `lastValue` = hourly.lastV,
+                `valueCount` = `valueCount` + hourly.countV
+            """)
+            .run()
+        try await sql.raw("""
+            DELETE FROM \(ident: EntityChangeDbItem.schema)
+            WHERE \(ident: "entityId") = \(bind: entityKey)
+              AND \(ident: "timestamp") >= \(bind: from) AND \(ident: "timestamp") < \(bind: to)
             """)
             .run()
     }
 
-    func rollUpHourly(type: CharacteristicsType, column: StoragePolicy.ValueColumn, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
-        let range = validRange ?? -Double.greatestFiniteMagnitude...Double.greatestFiniteMagnitude
-        try await database().transaction { database in
-            guard let sql = database as? SQLDatabase else {
-                throw Abort(.internalServerError, reason: "Database does not support SQL queries")
-            }
-            // An hour that already has a row (a late raw row) is merged; the update order matters
-            // because MySQL assigns left to right, so the mean reads the old count. `maxValue` is a
-            // reserved word, hence the backticks.
-            try await sql.raw("""
-                INSERT INTO \(ident: EntityHourlyAggregate.schema)
-                    (entityPlaceId, entityServiceName, entityCharacteristicType, hourStart, `minValue`, `meanValue`, `maxValue`, `lastValue`, `valueCount`)
-                SELECT * FROM (
-                    SELECT entityPlaceId, entityServiceName, entityCharacteristicType, hourStart,
-                           MIN(v) AS minV, AVG(v) AS meanV, MAX(v) AS maxV, MAX(CASE WHEN rn = 1 THEN v END) AS lastV, COUNT(*) AS countV
-                    FROM (
-                        SELECT entityPlaceId, entityServiceName, entityCharacteristicType,
-                               TIMESTAMP(DATE_FORMAT(\(ident: "timestamp"), '%Y-%m-%d %H:00:00')) AS hourStart,
-                               \(ident: column.rawValue) AS v,
-                               ROW_NUMBER() OVER (PARTITION BY entityPlaceId, entityServiceName, entityCharacteristicType,
-                                                               DATE_FORMAT(\(ident: "timestamp"), '%Y-%m-%d %H')
-                                                  ORDER BY \(ident: "timestamp") DESC) AS rn
-                        FROM \(ident: EntityStorageDbItem.schema)
-                        WHERE entityCharacteristicType = \(bind: type.rawValue)
-                          AND \(ident: "timestamp") < \(bind: date)
-                          AND \(ident: column.rawValue) BETWEEN \(bind: range.lowerBound) AND \(bind: range.upperBound)
-                    ) raw
-                    GROUP BY entityPlaceId, entityServiceName, entityCharacteristicType, hourStart
-                ) AS hourly
-                ON DUPLICATE KEY UPDATE
-                    `minValue` = LEAST(`minValue`, hourly.minV),
-                    `maxValue` = GREATEST(`maxValue`, hourly.maxV),
-                    `meanValue` = (`meanValue` * `valueCount` + hourly.meanV * hourly.countV) / (`valueCount` + hourly.countV),
-                    `lastValue` = hourly.lastV,
-                    `valueCount` = `valueCount` + hourly.countV
-                """)
-                .run()
-            try await sql.raw("""
-                DELETE FROM \(ident: EntityStorageDbItem.schema)
-                WHERE \(ident: "entityCharacteristicType") = \(bind: type.rawValue) AND \(ident: "timestamp") < \(bind: date)
-                """)
-                .run()
-        }
-    }
-
     func entitiesWithRowCount(above limit: Int, since date: Date) async throws -> [EntityRowCount] {
         try await sqlDatabase().raw("""
-            SELECT entityPlaceId, entityServiceName, entityCharacteristicType, COUNT(*) AS \(ident: "rowCount")
-            FROM \(ident: EntityStorageDbItem.schema)
-            WHERE \(ident: "timestamp") >= \(bind: date)
-            GROUP BY entityPlaceId, entityServiceName, entityCharacteristicType
+            SELECT e.\(ident: "placeId") AS entityPlaceId, e.\(ident: "serviceName") AS entityServiceName,
+                   e.\(ident: "characteristicType") AS entityCharacteristicType, COUNT(*) AS \(ident: "rowCount")
+            FROM \(ident: EntityChangeDbItem.schema) c
+            JOIN \(ident: EntityDbItem.schema) e ON e.\(ident: "id") = c.\(ident: "entityId")
+            WHERE c.\(ident: "timestamp") >= \(bind: date)
+            GROUP BY e.\(ident: "id"), e.\(ident: "placeId"), e.\(ident: "serviceName"), e.\(ident: "characteristicType")
             HAVING COUNT(*) > \(bind: limit)
             """)
             .all()

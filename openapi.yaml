@@ -40,6 +40,8 @@ paths:
       responses:
         "200":
           description: The automation was activated.
+        "503":
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /config/automations/{name}/deactivate:
     post:
@@ -56,6 +58,8 @@ paths:
       responses:
         "200":
           description: The automation was deactivated.
+        "503":
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /config/automations/{name}/stop:
     post:
@@ -72,6 +76,8 @@ paths:
       responses:
         "200":
           description: The currently running automation was stopped or the automation is not running.
+        "503":
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /config/automations/{name}/runs:
     get:
@@ -208,77 +214,34 @@ paths:
                   - openCount
                   - overdueCount
 
-  /actions:
-    get:
-      summary: Get action logs
-      description: Retrieve logged HomeKit actions.
-      operationId: getActions
-      parameters:
-        - name: limit
-          in: query
-          description: Maximum number of actions to return (default 1000, max 1000)
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 1000
-            default: 1000
-        - name: runId
-          in: query
-          description: Only return the actions sent by this automation run
-          required: false
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: A success response with action logs.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ActionLogItem"
-
-    delete:
-      summary: Clear action logs
-      description: Remove all logged actions.
-      operationId: clearActions
-      responses:
-        "200":
-          description: Action logs cleared successfully.
-
-  /lights/set:
-    post:
-      summary: Set light properties
-      description: Set color and/or brightness of a light by placeId and name.
-      operationId: setLightProperties
+  /entities/state:
+    put:
+      summary: Set the state of a server-owned entity
+      description: |
+        The one general route for the app to set a state the server owns (placeId `server`). Whether the app may
+        set a state is decided per value kind: a switch, a heating mode and a target temperature may be set. Any
+        other kind, and any entity that is not server-owned, is refused and stays unchanged. The answer holds the new state; reads (which come from the database) follow it within the persist delay. Asking for the value the
+        entity already has changes nothing (`changed` is false). The change counts with origin `app`.
+      operationId: setEntityState
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SetLightRequest"
+              $ref: "#/components/schemas/SetEntityStateRequest"
       responses:
         "200":
-          description: Light properties were set successfully.
-        "400":
-          description: Bad request - invalid parameters.
-
-  /entities:
-    get:
-      summary: Get entities with history
-      description: Retrieve a list of all entities that have historical data available.
-      operationId: getEntitiesWithHistory
-      responses:
-        "200":
-          description: A success response with all entities that have history.
+          description: The state of the entity after the request.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/EntityInfo"
+                $ref: "#/components/schemas/EntityState"
+        "400":
+          description: The value does not fit the value kind of the entity.
+        "403":
+          description: The entity is not server-owned or its value kind is not settable from the app.
+        "503":
+          description: The server core did not handle the write within five seconds. It is queued in memory and runs once the core gets to it, unless the server restarts first; the answer only says it has not run yet.
 
   /entities/history:
     get:
@@ -451,32 +414,12 @@ paths:
     get:
       summary: Get the state of the fireplace
       description: |
-        The fireplace mode is a state the server keeps itself; no HomeKit switch stands behind it.
+        The fireplace mode is a server-owned switch entity (`server/fireplace`), no HomeKit switch stands behind it. It is switched with `PUT /entities/state`.
         `since` is when it went on, `endsAt` when the server switches it off (the fireplace's maximum duration, two hours, after `since`).
       operationId: getFireplace
       responses:
         "200":
           description: The state of the fireplace.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Fireplace"
-    put:
-      summary: Switch the fireplace on or off
-      description: |
-        Used by the Heizung tab and the push action "Kamin an?". Asking for the state it already has changes
-        nothing, so a second "on" does not restart that duration. The new state holds at once: the answer and
-        every later GET show it, and the rooms that follow the fireplace react right away.
-      operationId: setFireplace
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/FireplaceRequest"
-      responses:
-        "200":
-          description: The state of the fireplace after the request.
           content:
             application/json:
               schema:
@@ -495,7 +438,7 @@ components:
           description: Indicates if the automation is active.
         isRunning:
           type: boolean
-          description: Indicates if the automation is currently running.
+          description: Whether the newest recorded run of the automation has not ended yet. Always false for an automation that does not record runs (`recordsRuns` false).
         type:
           type: string
           description: Type name of the automation, e.g. MotionAtNight.
@@ -607,52 +550,6 @@ components:
         - closeByIsoTimeStamp
         - isOverdue
 
-    ActionLogItem:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier for the log item.
-        timestamp:
-          type: string
-          format: date-time
-          description: The ISO timestamp when the action was logged.
-        entityId:
-          $ref: "#/components/schemas/EntityId"
-        actionName:
-          type: string
-          description: The name of the action that was performed.
-        detailDescription:
-          type: string
-          description: A detailed description of the action.
-        hasCacheHit:
-          type: boolean
-          description: Indicates if the action was a cache hit.
-        runId:
-          type: string
-          format: uuid
-          description: The automation run that sent the action.
-        status:
-          type: string
-          enum: [executed, cacheHit, failed]
-          description: Whether the action was sent, skipped as a duplicate, or failed.
-        reason:
-          type: string
-          enum: [plan, window, fireplace, system]
-          description: Why the server wrote a radiator. Absent for other commands and for entries that predate it.
-        planTargetInC:
-          type: number
-          format: double
-          description: The plan target at the time of a plan write.
-      required:
-        - id
-        - timestamp
-        - entityId
-        - actionName
-        - detailDescription
-        - hasCacheHit
-
     EntityId:
       type: object
       properties:
@@ -673,26 +570,39 @@ components:
         - name
         - characteristicType
 
-    SetLightRequest:
+    SetEntityStateRequest:
       type: object
       properties:
-        placeId:
-          type: string
-          description: The place identifier (e.g. room name).
-        name:
-          type: string
-          description: The name of the light entity.
-        hexColor:
-          type: string
-          description: Hex color string (e.g. "#FF0000" or "FF0000").
-        brightness:
-          type: integer
-          minimum: 0
-          maximum: 100
-          description: Brightness level 0-100.
+        entityId:
+          $ref: "#/components/schemas/EntityId"
+        value:
+          $ref: "#/components/schemas/Value"
       required:
-        - placeId
-        - name
+        - entityId
+        - value
+
+    EntityState:
+      type: object
+      properties:
+        entityId:
+          $ref: "#/components/schemas/EntityId"
+        valueKind:
+          type: string
+        value:
+          $ref: "#/components/schemas/Value"
+        changed:
+          type: boolean
+          description: False when the entity already had this value.
+        origin:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - entityId
+        - valueKind
+        - value
+        - changed
 
     EntityHistory:
       type: object
@@ -707,84 +617,32 @@ components:
         - entityId
         - items
 
+    Value:
+      description: A generic value, a boolean, a number or a text; its shape follows the value kind (colour is the text "r g b" with components 0...1).
+      oneOf:
+        - type: boolean
+        - type: number
+        - type: string
+
     EntityHistoryItem:
       type: object
       properties:
+        valueKind:
+          type: string
+          description: The value kind of this point (the raw value of a characteristic type, e.g. `temperatureSensor`). A kind the app does not know is shown with its raw value.
+        value:
+          $ref: "#/components/schemas/Value"
         timestamp:
           type: string
           format: date-time
           description: The ISO timestamp of this historical data point.
-        motionDetected:
-          type: boolean
-          description: Motion sensor state (if applicable).
-        illuminanceInLux:
-          type: number
-          description: Illuminance in lux (if applicable).
-        isDeviceOn:
-          type: boolean
-          description: Device power state (if applicable).
-        brightness:
-          type: integer
-          description: Light brightness level 0-100 (if applicable).
-        colorTemperature:
-          type: number
-          format: float
-          description: Color temperature normalized to 0...1 warm...cold (if applicable).
-        colorRed:
-          type: number
-          format: float
-          description: RGB color red component 0...1 (if applicable).
-        colorGreen:
-          type: number
-          format: float
-          description: RGB color green component 0...1 (if applicable).
-        colorBlue:
-          type: number
-          format: float
-          description: RGB color blue component 0...1 (if applicable).
-        isContactOpen:
-          type: boolean
-          description: Contact sensor state (if applicable).
-        isDoorLocked:
-          type: boolean
-          description: Door lock state (if applicable).
-        stateOfCharge:
-          type: integer
-          description: Battery state of charge percentage (if applicable).
-        isHeaterActive:
-          type: boolean
-          description: Heater active state (if applicable).
-        temperatureInC:
-          type: number
-          description: Temperature in Celsius (if applicable).
-        targetTemperatureInC:
-          type: number
-          description: Thermostat target temperature in Celsius (characteristic type `targetTemperature`).
-        heatingMode:
+        origin:
           type: string
-          enum: ["off", "heat", "cool", "auto"]
-          description: Thermostat target mode, HomeKit TargetHeatingCoolingState (characteristic type `heatingMode`).
-        valvePositionPercent:
-          type: integer
-          description: Valve opening in percent, 0 to 100 (characteristic type `valvePosition`, Eve custom characteristic).
-        temperatureCalibrationInC:
-          type: number
-          description: Thermostat temperature offset in Celsius, in steps of 0.1 (characteristic type `temperatureCalibration`, Matter LocalTemperatureCalibration). The thermostat's reported temperature already includes it, so the raw sensor reading is `temperatureInC` minus this offset.
-        relativeHumidity:
-          type: number
-          description: Relative humidity percentage 0-100 (if applicable).
-        carbonDioxideSensorId:
-          type: integer
-          description: Carbon dioxide level in ppm (if applicable).
-        pmDensity:
-          type: number
-          description: Particulate matter density PM2.5/PM10 (if applicable).
-        airQuality:
-          type: integer
-          description: Air quality index (if applicable).
-        valveOpen:
-          type: boolean
-          description: Valve open state (if applicable).
+          description: Where the change came from, `homekit`, `server` or the name of a polling job. Absent for an item that is no single change, such as an hourly aggregate.
+        lastReport:
+          type: string
+          format: date-time
+          description: When the entity last reported, a replay included, next to `timestamp`, the time of the last change. Only on the newest item of a history. Stored per entity, written at most every five minutes, so it can lag by that much; a stored change counts as a report through its own timestamp. Absent until the entity has reported once after the column exists.
       required:
         - timestamp
 
@@ -803,17 +661,6 @@ components:
       required:
         - items
 
-    EntityInfo:
-      type: object
-      properties:
-        id:
-          type: string
-          description: Unique identifier composed of placeId, name, and characteristic type.
-        entityId:
-          $ref: "#/components/schemas/EntityId"
-      required:
-        - id
-        - entityId
     HeatingRoomDetail:
       type: object
       required: [placeId, name, range, istSource, radiators, samples]
@@ -881,12 +728,6 @@ components:
           type: string
           format: date-time
           description: When the server switches it off; missing while it is off. Clients show this value instead of computing it.
-    FireplaceRequest:
-      type: object
-      required: [isOn]
-      properties:
-        isOn:
-          type: boolean
     HeatingOverview:
       type: object
       required: [rooms, heatmap]

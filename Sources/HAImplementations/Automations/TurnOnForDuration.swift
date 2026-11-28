@@ -14,7 +14,6 @@ public struct TurnOnForDuration: Automatable {
     public let time: Time
     public let duration: Duration
     public let switches: [SwitchDevice]
-    public var triggerEntityIds = Set<EntityId>()
 
     public init(_ name: String, at time: Time, for duration: Duration, switches: [SwitchDevice]) {
         self.name = name

@@ -10,108 +10,34 @@ import HAModels
 import SwiftUI
 
 extension EntityHistoryItem {
-    /// Returns a SwiftUI Color from RGB values if available
+    /// Returns a SwiftUI Color from the colour value if available
     public var color: Color? {
-        guard let red = colorRed,
-              let green = colorGreen,
-              let blue = colorBlue else {
-            return nil
-        }
-        return Color(red: Double(red), green: Double(green), blue: Double(blue))
+        rgb.map { Color(red: Double($0.red), green: Double($0.green), blue: Double($0.blue)) }
     }
 
-    /// Returns the hue (color tone) in degrees (0-360°) from RGB values
-    /// Uses the existing RGB.hue helper from HAModels
+    /// The hue (color tone) in degrees (0-360°) of the colour value
     private var hue: Double? {
-        guard let red = colorRed,
-              let green = colorGreen,
-              let blue = colorBlue else {
+        rgb.map { Double($0.hue) }
+    }
+
+    /// The on/open/detected state of boolean values, `nil` for measurements.
+    var stateValue: Bool? {
+        guard case .bool(let bool) = value else { return nil }
+        return bool
+    }
+
+    /// The value as a number for charts, from the value and its descriptor: a number as is, a Bool as 1 or 0,
+    /// a colour as its hue, `nil` for a text that is no colour. A kind without a descriptor charts its raw number.
+    public var primaryValue: Double? {
+        switch value {
+        case .bool(let bool):
+            return bool ? 1.0 : 0.0
+        case .number(let number):
+            return number
+        case .text:
+            return descriptor?.constraint == .colorText ? hue : nil
+        case nil:
             return nil
         }
-        let rgb = RGB(red: red, green: green, blue: blue)
-        return Double(rgb.hue)
-    }
-
-    /// The on/open/detected state of boolean entities, `nil` for measurements.
-    var stateValue: Bool? {
-        isDeviceOn ?? motionDetected ?? isContactOpen ?? isDoorLocked ?? isHeaterActive ?? valveOpen
-    }
-
-    /// Returns the primary value for this history item based on available data
-    /// Used for chart visualization
-    /// Priority order: numeric sensors > percentage sensors > boolean sensors > color (hue)
-    public var primaryValue: Double? {
-        // Temperature (high priority - common sensor)
-        if let temperatureInC {
-            return temperatureInC
-        }
-        // Humidity (high priority - common sensor)
-        if let relativeHumidity {
-            return relativeHumidity
-        }
-        // CO2 (high priority - important air quality metric)
-        if let carbonDioxideSensorId {
-            return Double(carbonDioxideSensorId)
-        }
-        // Air quality index
-        if let airQuality {
-            return Double(airQuality)
-        }
-        // PM density (particulate matter)
-        if let pmDensity {
-            return pmDensity
-        }
-        // Illuminance
-        if let illuminanceInLux {
-            return illuminanceInLux
-        }
-        // Brightness percentage
-        if let brightness {
-            return Double(brightness)
-        }
-        // Battery state of charge
-        if let stateOfCharge {
-            return Double(stateOfCharge)
-        }
-        // Color temperature
-        if let colorTemperature {
-            return Double(colorTemperature)
-        }
-        if let targetTemperatureInC {
-            return targetTemperatureInC
-        }
-        if let valvePositionPercent {
-            return Double(valvePositionPercent)
-        }
-        if let temperatureCalibrationInC {
-            return temperatureCalibrationInC
-        }
-        if let heatingMode {
-            return Double(heatingMode.rawValue)
-        }
-        // Boolean sensors (lower priority)
-        if let isDeviceOn {
-            return isDeviceOn ? 1.0 : 0.0
-        }
-        if let motionDetected {
-            return motionDetected ? 1.0 : 0.0
-        }
-        if let isContactOpen {
-            return isContactOpen ? 1.0 : 0.0
-        }
-        if let isDoorLocked {
-            return isDoorLocked ? 1.0 : 0.0
-        }
-        if let isHeaterActive {
-            return isHeaterActive ? 1.0 : 0.0
-        }
-        if let valveOpen {
-            return valveOpen ? 1.0 : 0.0
-        }
-        // Color as hue (last priority)
-        if let hue {
-            return hue
-        }
-        return nil
     }
 }

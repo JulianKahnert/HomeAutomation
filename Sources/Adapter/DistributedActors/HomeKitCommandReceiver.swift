@@ -34,8 +34,12 @@ public distributed actor HomeKitCommandReceiver {
         return entities
     }
 
-    public distributed func findEntity(_ entity: EntityId) async throws {
-        try await adapter.findEntity(entity)
+    public distributed func homeKitInventory() async -> HomeKitInventory {
+        log.info("homeKitInventory() — received remote call")
+        let start = ContinuousClock.now
+        let inventory = await adapter.homeKitInventory()
+        log.info("homeKitInventory() — returning \(inventory.summary) in \(start.duration(to: .now))")
+        return inventory
     }
 
     public distributed func perform(_ action: HomeManagableAction) async throws {
@@ -59,5 +63,13 @@ public distributed actor HomeKitCommandReceiver {
             log.error("trigger(scene:) — failed '\(sceneName)' after \(duration): \(error)")
             throw error
         }
+    }
+
+    public distributed func listThermostats() async throws -> [Thermostat] {
+        try await adapter.listThermostats()
+    }
+
+    public distributed func readThermostat(_ thermostat: Thermostat) async throws -> [EntityStorageItem] {
+        try await adapter.readThermostat(thermostat)
     }
 }

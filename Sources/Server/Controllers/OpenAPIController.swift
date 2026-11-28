@@ -7,6 +7,7 @@
 
 import Dependencies
 import Fluent
+import HAApplicationLayer
 import HAImplementations
 import HAModels
 import OpenAPIRuntime
@@ -32,13 +33,13 @@ struct OpenAPIController: APIProtocol {
     // MARK: - /config/automations
 
     func getAutomations(_ input: Operations.GetAutomations.Input) async throws -> Operations.GetAutomations.Output {
-        let automationNames = await request.application.automationService.getActiveAutomationNames()
-        let lastRuns = try await request.application.automationRunRepository.latestRunPerAutomation()
-        let automations = await request.application.homeAutomationConfigService.automations
+        let lastRuns = try await request.application.journalReader.latestRunPerAutomation()
+        let automations = try await request.application.configReader.load().automations.map(\.automation)
             .map { tmp in
                 Components.Schemas.Automation(name: tmp.name,
                                               isActive: tmp.isActive,
-                                              isRunning: automationNames.contains(tmp.name),
+                                              // a run that is recorded and not finished; a restart marks the leftovers interrupted
+                                              isRunning: lastRuns[tmp.name]?.outcome == .running,
                                               _type: String(describing: type(of: tmp)),
                                               recordsRuns: tmp.recordsRuns,
                                               lastRun: lastRuns[tmp.name].map(Components.Schemas.AutomationRun.init),
@@ -48,7 +49,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getAutomationRuns(_ input: Operations.GetAutomationRuns.Input) async throws -> Operations.GetAutomationRuns.Output {
-        let runs = try await request.application.automationRunRepository.runs(for: input.path.name,
+        let runs = try await request.application.journalReader.runs(for: input.path.name,
                                                                               startDate: input.query.startDate,
                                                                               endDate: input.query.endDate,
                                                                               limit: Self.clampedLimit(input.query.limit))
@@ -56,7 +57,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getRecentRuns(_ input: Operations.GetRecentRuns.Input) async throws -> Operations.GetRecentRuns.Output {
-        let runs = try await request.application.automationRunRepository.latestRuns(since: input.query.since,
+        let runs = try await request.application.journalReader.latestRuns(since: input.query.since,
                                                                                     limit: Self.clampedLimit(input.query.limit))
         return .ok(.init(body: .json(runs.map(Components.Schemas.AutomationRun.init))))
     }
@@ -67,7 +68,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        try await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: true)
+        try await request.application.commandPort.setAutomationActive(name: name, to: true)
         return .ok
     }
 
@@ -77,7 +78,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        try await request.application.homeAutomationConfigService.setAutomationActive(with: name, to: false)
+        try await request.application.commandPort.setAutomationActive(name: name, to: false)
         return .ok
     }
 
@@ -87,7 +88,7 @@ struct OpenAPIController: APIProtocol {
             throw Abort(.notFound, reason: "Automation name not provided")
         }
 
-        await request.application.automationService.stopAutomation(with: name)
+        try await request.application.commandPort.stopAutomation(name: name)
         return .ok
     }
 
@@ -152,7 +153,7 @@ struct OpenAPIController: APIProtocol {
 
     // MARK: - /windowopenstates
     func getWindowStates(_ input: Operations.GetWindowStates.Input) async throws -> Operations.GetWindowStates.Output {
-        let contentState = await request.application.homeManager.getWindowContentState()
+        let contentState = try await request.application.storageReader.windowContentState()
         let windows = contentState.windows.map { window in
             Components.Schemas.WindowState(id: window.id,
                                            name: window.name,
@@ -169,95 +170,31 @@ struct OpenAPIController: APIProtocol {
                                            staleDateIsoTimeStamp: contentState.staleDate?.ISO8601Format()))))
     }
 
-    // MARK: - /actions
+    // MARK: - /entities/state
 
-    func getActions(_ input: Operations.GetActions.Input) async throws -> Operations.GetActions.Output {
-        var runId: UUID?
-        if let runIdString = input.query.runId {
-            guard let parsed = UUID(uuidString: runIdString) else {
-                throw Abort(.badRequest, reason: "Invalid runId: \(runIdString)")
-            }
-            runId = parsed
+    func setEntityState(_ input: Operations.SetEntityState.Input) async throws -> Operations.SetEntityState.Output {
+        guard case .json(let body) = input.body else { throw Abort(.badRequest) }
+        guard let type = CharacteristicsType(rawValue: body.entityId.characteristicType) else { return .badRequest }
+        let characteristicsName = body.entityId.characteristicsName.flatMap { $0.isEmpty ? nil : $0 }
+        let entityId = EntityId(placeId: body.entityId.placeId, name: body.entityId.name,
+                                characteristicsName: characteristicsName, characteristic: type)
+
+        // Only a server-owned entity of a kind the descriptor lets the app set; any other one stays unchanged.
+        guard entityId.isServerOwned, ValueDescriptor.descriptor(for: type).isSettableFromApp else { return .forbidden }
+        let value = Value(body.value)
+        let change: StateChange
+        do {
+            change = try await request.application.commandPort.setState(entityId, value: value)
+        } catch ReportError.valueDoesNotFit {
+            return .badRequest
         }
-
-        let actionItems = await request.application.homeManager.getActionLog(limit: input.query.limit, runId: runId)
-
-        let schemaItems = actionItems.map { item in
-            Components.Schemas.ActionLogItem(id: item.id.uuidString,
-                                             timestamp: item.timestamp,
-                                             entityId: .init(item.entityId),
-                                             actionName: item.actionName,
-                                             detailDescription: item.detailDescription,
-                                             hasCacheHit: item.hasCacheHit,
-                                             runId: item.runId?.uuidString,
-                                             status: item.status.flatMap { .init(rawValue: $0.rawValue) },
-                                             reason: item.reason.flatMap { .init(rawValue: $0.rawValue) },
-                                             planTargetInC: item.planTargetInC)
-        }
-
-        return .ok(.init(body: .json(schemaItems)))
-    }
-
-    func clearActions(_ input: Operations.ClearActions.Input) async throws -> Operations.ClearActions.Output {
-        await request.application.homeManager.clearActionLog()
-        return .ok
-    }
-
-    // MARK: - /lights/set
-
-    func setLightProperties(_ input: Operations.SetLightProperties.Input) async throws -> Operations.SetLightProperties.Output {
-        guard case let .json(body) = input.body else {
-            throw Abort(.badRequest, reason: "Invalid JSON body")
-        }
-
-        // Set RGB color if hex provided
-        if let hexColor = body.hexColor {
-            let hex = hexColor.hasPrefix("#") ? String(hexColor.dropFirst()) : hexColor
-            guard hex.count == 6,
-                  let hexInt = UInt32(hex, radix: 16) else {
-                throw Abort(.badRequest, reason: "Invalid hex color: \(hexColor)")
-            }
-
-            let red = Float((hexInt >> 16) & 0xFF) / 255.0
-            let green = Float((hexInt >> 8) & 0xFF) / 255.0
-            let blue = Float(hexInt & 0xFF) / 255.0
-            let rgb = RGB(red: red, green: green, blue: blue)
-
-            let colorId = EntityId(placeId: body.placeId, name: body.name, characteristicsName: nil, characteristic: .color)
-            await request.application.homeManager.perform(.setRGB(colorId, rgb: rgb))
-        }
-
-        // Set brightness if provided
-        if let brightness = body.brightness {
-            let normalizedBrightness = Float(brightness) / 100.0
-
-            let brightnessId = EntityId(placeId: body.placeId, name: body.name, characteristicsName: nil, characteristic: .brightness)
-            await request.application.homeManager.perform(.setBrightness(brightnessId, normalizedBrightness))
-        }
-
-        return .ok
-    }
-
-    // MARK: - /entities
-
-    func getEntitiesWithHistory(_ input: Operations.GetEntitiesWithHistory.Input) async throws -> Operations.GetEntitiesWithHistory.Output {
-        // Get all unique entity IDs that have history
-        let entityIds = try await request.application.entityStorageDbRepository.getAllEntityIds()
-
-        // Map EntityIds to EntityInfo
-        let entityInfos = entityIds.map { entityId in
-            Components.Schemas.EntityInfo(
-                id: "\(entityId.placeId)_\(entityId.name)_\(entityId.characteristicType.rawValue)",
-                entityId: Components.Schemas.EntityId(
-                    placeId: entityId.placeId,
-                    name: entityId.name,
-                    characteristicsName: entityId.characteristicsName ?? "",
-                    characteristicType: entityId.characteristicType.rawValue
-                )
-            )
-        }
-
-        return .ok(.init(body: .json(entityInfos)))
+        let item = change.item
+        return .ok(.init(body: .json(.init(entityId: .init(entityId),
+                                           valueKind: type.rawValue,
+                                           value: .init(change.value),
+                                           changed: change.changed,
+                                           origin: item.origin.rawValue,
+                                           timestamp: item.timestamp))))
     }
 
     // MARK: - /entities/history
@@ -281,7 +218,7 @@ struct OpenAPIController: APIProtocol {
         let cursor = input.query.cursor
         let limit = Self.clampedLimit(input.query.limit)
 
-        let historyItems = try await request.application.entityStorageDbRepository.getHistory(
+        let historyItems = try await request.application.storageReader.getHistory(
             for: entityId,
             startDate: startDate,
             endDate: endDate,
@@ -289,7 +226,14 @@ struct OpenAPIController: APIProtocol {
             limit: limit,
             includePrevious: input.query.includePrevious ?? false
         )
-        let schemaItems = historyItems.map(Components.Schemas.EntityHistoryItem.init)
+        var schemaItems = historyItems.map(Components.Schemas.EntityHistoryItem.init)
+
+        // The last report is stored with the entity and belongs to the newest change only.
+        if cursor == nil, !schemaItems.isEmpty, let current = try await request.application.storageReader.getCurrent(entityId),
+           let lastReport = current.lastReport,
+           abs(current.timestamp.timeIntervalSince(schemaItems[0].timestamp)) < 1 {
+            schemaItems[0].lastReport = lastReport
+        }
 
         // Calculate next cursor (timestamp of last item, or nil if no more data)
         let nextCursor = schemaItems.last?.timestamp
@@ -303,7 +247,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getRoomHistory(_ input: Operations.GetRoomHistory.Input) async throws -> Operations.GetRoomHistory.Output {
-        let histories = try await request.application.entityStorageDbRepository.getRoomHistory(placeId: input.query.placeId,
+        let histories = try await request.application.storageReader.getRoomHistory(placeId: input.query.placeId,
                                                                                                startDate: input.query.startDate,
                                                                                                endDate: input.query.endDate,
                                                                                                includePrevious: input.query.includePrevious ?? false)
@@ -315,7 +259,7 @@ struct OpenAPIController: APIProtocol {
     }
 
     func getHeatingOverview(_ input: Operations.GetHeatingOverview.Input) async throws -> Operations.GetHeatingOverview.Output {
-        let rooms = await heatingRooms().map(\.heatingSources)
+        let rooms = try await heatingRooms().map(\.heatingSources)
         let overview = try await HeatingOverviewBuilder(detail: heatingDetailBuilder()).overview(for: rooms)
         return .ok(.init(body: .json(.init(overview))))
     }
@@ -325,7 +269,7 @@ struct OpenAPIController: APIProtocol {
             return .badRequest(.init())
         }
         let placeId = input.path.placeId
-        guard let room = await heatingRooms().first(where: { $0.placeId == placeId }) else {
+        guard let room = try await heatingRooms().first(where: { $0.placeId == placeId }) else {
             return .notFound(.init())
         }
         let detail = try await heatingDetailBuilder().detail(for: room.heatingSources, range: range)
@@ -333,28 +277,23 @@ struct OpenAPIController: APIProtocol {
     }
 
     /// The heating automations of the deployed configuration.
-    private func heatingRooms() async -> [RoomHeating] {
-        await request.application.homeAutomationConfigService.automations.compactMap { $0 as? RoomHeating }
+    private func heatingRooms() async throws -> [RoomHeating] {
+        try await request.application.configReader.load().automations.compactMap { $0.automation as? RoomHeating }
     }
 
     /// Both heating endpoints cut the days by the local clock of the house, Europe/Berlin.
     private func heatingDetailBuilder() -> HeatingRoomDetailBuilder {
-        HeatingRoomDetailBuilder(storage: request.application.entityStorageDbRepository,
-                                 writes: request.application.heatingWriteRepository,
-                                 fireplace: request.application.fireplaceRepository,
-                                 calendar: HeatingOverviewBuilder.berlin)
+        let storage = request.application.storageReader
+        return HeatingRoomDetailBuilder(storage: storage,
+                                        journal: request.application.journalReader,
+                                        lastReport: { try? await storage.getCurrent($0)?.lastReport },
+                                        calendar: HeatingOverviewBuilder.berlin)
     }
 
     // MARK: - /heating/fireplace
 
     func getFireplace(_ input: Operations.GetFireplace.Input) async throws -> Operations.GetFireplace.Output {
-        let state = await Fireplace.state(with: request.application.homeManager)
-        return .ok(.init(body: .json(.init(state))))
-    }
-
-    func setFireplace(_ input: Operations.SetFireplace.Input) async throws -> Operations.SetFireplace.Output {
-        guard case .json(let body) = input.body else { throw Abort(.badRequest) }
-        let state = await Fireplace.set(isOn: body.isOn, with: request.application.homeManager)
+        let state = try await Fireplace.state(from: request.application.storageReader)
         return .ok(.init(body: .json(.init(state))))
     }
 }
@@ -390,29 +329,31 @@ extension Components.Schemas.AutomationRun {
 
 extension Components.Schemas.EntityHistoryItem {
     init(_ item: EntityStorageItem) {
-        self.init(timestamp: item.timestamp,
-                  motionDetected: item.motionDetected,
-                  illuminanceInLux: item.illuminance?.value,
-                  isDeviceOn: item.isDeviceOn,
-                  brightness: item.brightness,
-                  colorTemperature: item.colorTemperature,
-                  colorRed: item.color?.red,
-                  colorGreen: item.color?.green,
-                  colorBlue: item.color?.blue,
-                  isContactOpen: item.isContactOpen,
-                  isDoorLocked: item.isDoorLocked,
-                  stateOfCharge: item.stateOfCharge,
-                  isHeaterActive: item.isHeaterActive,
-                  temperatureInC: item.temperatureInC?.value,
-                  targetTemperatureInC: item.targetTemperatureInC,
-                  heatingMode: item.heatingMode.flatMap { .init(rawValue: $0.name) },
-                  valvePositionPercent: item.valvePositionPercent,
-                  temperatureCalibrationInC: item.temperatureCalibrationInC,
-                  relativeHumidity: item.relativeHumidity,
-                  carbonDioxideSensorId: item.carbonDioxideSensorId,
-                  pmDensity: item.pmDensity,
-                  airQuality: item.airQuality,
-                  valveOpen: item.valveOpen)
+        self.init(valueKind: item.kind?.rawValue,
+                  value: item.value.map { .init($0) },
+                  timestamp: item.timestamp,
+                  origin: item.origin.rawValue,
+                  lastReport: item.lastReport)
+    }
+}
+
+extension Components.Schemas.Value {
+    init(_ value: Value) {
+        switch value {
+        case .bool(let bool): self = .case1(bool)
+        case .number(let number): self = .case2(number)
+        case .text(let text): self = .case3(text)
+        }
+    }
+}
+
+extension Value {
+    init(_ payload: Components.Schemas.Value) {
+        switch payload {
+        case .case1(let bool): self = .bool(bool)
+        case .case2(let number): self = .number(number)
+        case .case3(let text): self = .text(text)
+        }
     }
 }
 

@@ -4,6 +4,8 @@
 //
 
 import Foundation
+import HAApplicationLayer
+import HAImplementations
 @testable import HAModels
 @testable import Server
 import Testing
@@ -13,63 +15,57 @@ struct StoragePolicyTests {
 
     // MARK: - rule table
 
+    private func rule(_ type: CharacteristicsType) -> ValueDescriptor.StorageRule {
+        ValueDescriptor.descriptor(for: type).storage
+    }
+
     @Test(arguments: [CharacteristicsType.temperatureSensor, .targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration, .heating, .valve,
-                      .relativeHumiditySensor, .contactSensor, .batterySensor, .lock, .motionSensor, .switcher,
-                      .brightness, .colorTemperature, .color, .airQualitySensor, .pmDensitySensor])
+                      .relativeHumiditySensor, .contactSensor, .lock, .motionSensor, .switcher,
+                      .brightness, .colorTemperature, .color, .airQualitySensor, .pmDensitySensor, .energyPrice])
     func keepsRawForeverWithoutRollupOrDeadBand(_ type: CharacteristicsType) {
-        let policy = StoragePolicy.policy(for: type)
-        #expect(policy.rawRetentionDays == nil)
-        #expect(policy.rollup == .none)
-        #expect(policy.deadBand == nil)
+        #expect(rule(type).rawRetentionDays == nil)
+        #expect(rule(type).hourlyRollup == false)
+        #expect(rule(type).deadBand == nil)
     }
 
     @Test(arguments: [CharacteristicsType.lightSensor, .carbonDioxideSensorId])
     func rollsUpLuxAndCO2HourlyAfter90Days(_ type: CharacteristicsType) {
-        let policy = StoragePolicy.policy(for: type)
-        #expect(policy.rawRetentionDays == 90)
-        #expect(policy.rollup == .hourly)
-        #expect(policy.kind == .analog)
+        #expect(rule(type).rawRetentionDays == 90)
+        #expect(rule(type).hourlyRollup)
     }
 
     @Test func co2HasDeadBandAndTreatsZeroAsError() throws {
-        let policy = StoragePolicy.policy(for: .carbonDioxideSensorId)
-        #expect(policy.deadBand == StoragePolicy.DeadBand(threshold: .absolute(25), maxInterval: .minutes(15)))
-        let range = try #require(policy.validRange)
+        let co2 = rule(.carbonDioxideSensorId)
+        #expect(co2.deadBand?.absoluteChange == 25)
+        #expect(co2.deadBand?.maxInterval == .minutes(15))
+        let range = try #require(co2.validRange)
         #expect(!range.contains(0))
         #expect(range.contains(420))
-        #expect(StoragePolicy.policy(for: .lightSensor).validRange?.contains(0) == true)
+        #expect(rule(.lightSensor).validRange?.contains(0) == true)
     }
 
-    @Test func heatingFieldsAreStates() {
-        for type in [CharacteristicsType.targetTemperature, .heatingMode, .valvePosition, .temperatureCalibration, .heating, .valve] {
-            #expect(StoragePolicy.policy(for: type).kind == .state)
-        }
-        #expect(StoragePolicy.policy(for: .airQualitySensor).kind == .enumeration)
+    @Test func batteryStoresOnlyChangesOfAPercentagePoint() throws {
+        let band = try #require(rule(.batterySensor).deadBand)
+        #expect(band.absoluteChange == 1)
+        let last = (value: 80.0, timestamp: now)
+        #expect(!band.shouldStore(80, at: now.addingTimeInterval(3 * 3600), lastStored: last))
+        #expect(!band.shouldStore(80.4, at: now.addingTimeInterval(3 * 3600), lastStored: last))
+        #expect(band.shouldStore(79, at: now.addingTimeInterval(3 * 3600), lastStored: last))
+        #expect(rule(.batterySensor).hourlyRollup == false)
+        #expect(rule(.batterySensor).rawRetentionDays == nil)
     }
 
     @Test(arguments: CharacteristicsType.allCases)
-    func rollupAndDeadBandAlwaysNameTheirValueColumn(_ type: CharacteristicsType) {
-        let policy = StoragePolicy.policy(for: type)
-        if policy.rollup != .none || policy.deadBand != nil {
-            #expect(policy.valueColumn != nil)
-            #expect(policy.kind == .analog)
+    func aRollupNeedsARetention(_ type: CharacteristicsType) {
+        if rule(type).hourlyRollup {
+            #expect(rule(type).rawRetentionDays != nil)
         }
-        if policy.rollup != .none {
-            #expect(policy.rawRetentionDays != nil)
-        }
-    }
-
-    @Test func unknownTypeIsKeptRawForever() {
-        #expect(StoragePolicy.policy(forRawType: "fineDustSensorV2") == StoragePolicy.unknown)
-        #expect(StoragePolicy.unknown.rawRetentionDays == nil)
-        #expect(StoragePolicy.unknown.rollup == .none)
-        #expect(StoragePolicy.policy(forRawType: "carbonDioxideSensorId") == StoragePolicy.policy(for: .carbonDioxideSensorId))
     }
 
     // MARK: - dead band
 
-    @Test func absoluteDeadBandStoresOnlyLargeChangesOrAfterMaxInterval() {
-        let band = StoragePolicy.DeadBand(threshold: .absolute(25), maxInterval: .minutes(15))
+    @Test func deadBandStoresOnlyLargeChangesOrAfterMaxInterval() throws {
+        let band = try #require(rule(.carbonDioxideSensorId).deadBand)
         let last = (value: 800.0, timestamp: now)
         #expect(band.shouldStore(800, at: now, lastStored: nil))
         #expect(!band.shouldStore(824, at: now.addingTimeInterval(60), lastStored: last))
@@ -79,14 +75,6 @@ struct StoragePolicyTests {
         #expect(!band.shouldStore(800, at: now.addingTimeInterval(14 * 60 + 59), lastStored: last))
         #expect(band.shouldStore(800, at: now.addingTimeInterval(15 * 60), lastStored: last))
         #expect(band.shouldStore(0, at: now.addingTimeInterval(1), lastStored: last))
-    }
-
-    @Test func relativeDeadBandScalesWithTheLastValue() {
-        let band = StoragePolicy.DeadBand(threshold: .relative(0.1), maxInterval: .hours(1))
-        #expect(!band.shouldStore(109, at: now, lastStored: (100, now)))
-        #expect(band.shouldStore(110, at: now, lastStored: (100, now)))
-        #expect(!band.shouldStore(1_090, at: now, lastStored: (1_000, now)))
-        #expect(band.shouldStore(90, at: now, lastStored: (100, now)))
     }
 
     // MARK: - cleanup and rollup selection
@@ -101,26 +89,54 @@ struct StoragePolicyTests {
         let targets = StoragePolicy.rollupCutoffs(now: now)
         #expect(Set(targets.map(\.type)) == [.lightSensor, .carbonDioxideSensorId])
         let co2 = try #require(targets.first { $0.type == .carbonDioxideSensorId })
-        #expect(co2.column == .carbonDioxideSensorId)
         #expect(co2.before.timeIntervalSince1970.truncatingRemainder(dividingBy: 3600) == 0)
         let exact = now.addingTimeInterval(-90 * 86_400)
         #expect(co2.before <= exact)
         #expect(exact.timeIntervalSince(co2.before) < 3600)
     }
 
-    @Test func cleanupJobDeletesOnlyRunsAndRollupJobCondensesLuxAndCO2() async {
+    @Test func upkeepStepsDeleteOldJournalEntriesAndCondenseLuxAndCO2() async throws {
         let store = RecordingRetentionStore()
         let runs = RecordingRunDeleter()
-        let job = DatabaseCleanupJob(entities: store,
-                                     automationRuns: runs,
-                                     noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender()))
+        let upkeep = DatabaseStorageUpkeep(entities: store,
+                                           journal: Journal(store: runs),
+                                           noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender()))
 
-        await job.performCleanup(now: now)
-        await EntityRollupJob(entities: store).rollUpOnce(now: now)
+        try await upkeep.perform(.cleanup, now: now)
+        try await upkeep.perform(.rollup, now: now)
+        try await upkeep.perform(.journal, now: now)
 
         #expect(await store.deletedTypes.isEmpty)
         #expect(Set(await store.rolledUpTypes) == [.lightSensor, .carbonDioxideSensorId])
         #expect(await runs.deletedBefore == [now.addingTimeInterval(-30 * 86_400)])
+    }
+
+    @Test func cleanupAutomationDeletesJournalEntriesOlderThan30DaysAndKeepsNewerOnes() async throws {
+        let store = InMemoryJournalStore()
+        let journal = Journal(store: store)
+        let now = Date()
+        let trigger = AutomationTrigger(kind: .serverStart, entityId: nil, summary: "Server start")
+        let oldRun = AutomationRun(automationName: "Old", startedAt: now.addingTimeInterval(-31 * 86_400), trigger: trigger, outcome: .completed)
+        let newRun = AutomationRun(automationName: "New", startedAt: now.addingTimeInterval(-29 * 86_400), trigger: trigger, outcome: .completed)
+        try await store.add(oldRun)
+        try await store.add(newRun)
+        try await store.addPush(JournalPush(timestamp: now.addingTimeInterval(-31 * 86_400), runId: oldRun.id, title: "Old", message: "", pushId: "old"))
+        try await store.addPush(JournalPush(timestamp: now.addingTimeInterval(-29 * 86_400), runId: newRun.id, title: "New", message: "", pushId: "new"))
+        let homeManager = await HomeManager(getAdapter: { nil },
+                                            storageRepo: MemoryStorage(),
+                                            notificationSender: SilentSender(),
+                                            location: Location(latitude: 0, longitude: 0),
+                                            journal: journal,
+                                            storageUpkeep: DatabaseStorageUpkeep(entities: RecordingRetentionStore(),
+                                                                                 journal: journal,
+                                                                                 noisyEntityWarner: NoisyEntityWarner(notificationSender: RecordingNotificationSender())))
+
+        try await AutomationRunContext.$event.withValue(.serverStarted) {
+            try await DatabaseCleanup().execute(using: homeManager)
+        }
+
+        #expect(try await store.latestRuns(since: .distantPast, limit: 10).map(\.automationName) == ["New"])
+        #expect(try await store.pushes(runId: nil).map(\.pushId) == ["new"])
     }
 
     // MARK: - noise guard
@@ -161,7 +177,7 @@ private actor RecordingRetentionStore: EntityRetentionStore {
         deletedTypes.append(type)
     }
 
-    func rollUpHourly(type: CharacteristicsType, column: StoragePolicy.ValueColumn, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
+    func rollUpHourly(type: CharacteristicsType, validRange: ClosedRange<Double>?, olderThan date: Date) async throws {
         rolledUpTypes.append(type)
     }
 
@@ -180,12 +196,11 @@ private actor RecordingNotificationSender: NotificationSender {
         messages.append(message)
     }
 
-    func clearNotification(id: String) async throws {}
     func startOrUpdateLiveActivity<ContentState: Encodable & Sendable>(contentState: ContentState, activityName: String, options: LiveActivityOptions) async {}
     func endAllLiveActivities(ofActivityType activityType: String) async {}
 }
 
-private actor RecordingRunDeleter: AutomationRunRepository {
+private actor RecordingRunDeleter: JournalStore {
     private(set) var deletedBefore: [Date] = []
 
     func add(_ run: AutomationRun) async throws {}
@@ -194,7 +209,14 @@ private actor RecordingRunDeleter: AutomationRunRepository {
     func latestRuns(since date: Date, limit: Int) async throws -> [AutomationRun] { [] }
     func latestRunPerAutomation() async throws -> [String: AutomationRun] { [:] }
     func markRunningAsInterrupted() async throws {}
-    func deleteRuns(olderThan date: Date) async throws {
+    func addCommand(_ command: ActionLogItem) async throws {}
+    func setCommandStatus(_ id: UUID, to status: ActionLogItem.Status) async throws {}
+    func commands(limit: Int?, runId: UUID?) async throws -> [ActionLogItem] { [] }
+    func heatingWrites(placeId: String, startDate: Date?, endDate: Date?) async throws -> [ActionLogItem] { [] }
+    func lastHeatingWrites() async throws -> [ActionLogItem] { [] }
+    func addPush(_ push: JournalPush) async throws {}
+    func pushes(runId: UUID?) async throws -> [JournalPush] { [] }
+    func deleteEntries(olderThan date: Date) async throws {
         deletedBefore.append(date)
     }
 }

@@ -16,7 +16,6 @@ public struct UpsertScene: Automatable {
     public var isActive = true
     public let name: String
     public let time: Time
-    public var triggerEntityIds = Set<EntityId>()
 
     public let sceneName: String
     public let mode: Mode

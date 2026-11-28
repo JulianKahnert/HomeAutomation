@@ -9,6 +9,7 @@ import HAModels
 
 public enum AnyAutomation: Codable, Sendable {
     case createScene(CreateScene)
+    case databaseCleanup(DatabaseCleanup)
     case energyLowPrice(EnergyLowPrice)
     case fireplaceReminder(FireplaceReminder)
     case fireplaceTimeout(FireplaceTimeout)
@@ -24,12 +25,14 @@ public enum AnyAutomation: Codable, Sendable {
     case turn(Turn)
     case turnOnForDuration(TurnOnForDuration)
     case windowOpen(WindowOpen)
+    case windowProjection(WindowProjection)
     case upsertScene(UpsertScene)
     case triggerScene(TriggerScene)
 
     public var automation: any Automatable {
         switch self {
         case .createScene(let createScene): return createScene
+        case .databaseCleanup(let databaseCleanup): return databaseCleanup
         case .energyLowPrice(let energyLowPrice): return energyLowPrice
         case .fireplaceReminder(let fireplaceReminder): return fireplaceReminder
         case .fireplaceTimeout(let fireplaceTimeout): return fireplaceTimeout
@@ -45,39 +48,17 @@ public enum AnyAutomation: Codable, Sendable {
         case .setLightProperties(let setLightProperties): return setLightProperties
         case .turn(let turn): return turn
         case .windowOpen(let windowOpen): return windowOpen
+        case .windowProjection(let windowProjection): return windowProjection
         case .upsertScene(let upsertScene): return upsertScene
         case .triggerScene(let triggerScene): return triggerScene
         }
     }
 
-    public var automationTypes: [Automatable.Type] {
-        var tmp: [Automatable.Type] = [
-            CreateScene.self,
-            EnergyLowPrice.self,
-            FireplaceReminder.self,
-            FireplaceTimeout.self,
-            HealthCheck.self,
-            MaintenanceAutomation.self,
-            MotionAtNight.self,
-            RestartSystem.self,
-            RoomHeating.self,
-            SetLightProperties.self,
-            Turn.self,
-            TurnOnForDuration.self,
-            WindowOpen.self,
-            UpsertScene.self,
-            TriggerScene.self
-        ]
-
-        #if canImport(WeatherKit)
-        tmp.append(GardenWatering.self)
-        #endif
-        return tmp
-    }
-
     public static func create(from automation: any Automatable) -> AnyAutomation {
         if let createScene = automation as? CreateScene {
             return .createScene(createScene)
+        } else if let databaseCleanup = automation as? DatabaseCleanup {
+            return .databaseCleanup(databaseCleanup)
         } else if let energyLowPrice = automation as? EnergyLowPrice {
             return .energyLowPrice(energyLowPrice)
         } else if let fireplaceReminder = automation as? FireplaceReminder {
@@ -102,6 +83,8 @@ public enum AnyAutomation: Codable, Sendable {
             return .turnOnForDuration(turnOnForDuration)
         } else if let windowOpen = automation as? WindowOpen {
             return .windowOpen(windowOpen)
+        } else if let windowProjection = automation as? WindowProjection {
+            return .windowProjection(windowProjection)
         } else if let upsertScene = automation as? UpsertScene {
             return .upsertScene(upsertScene)
         } else if let triggerScene = automation as? TriggerScene {

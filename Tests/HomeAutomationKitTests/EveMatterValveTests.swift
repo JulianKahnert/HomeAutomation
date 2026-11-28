@@ -8,7 +8,6 @@ import HAModels
 import Testing
 
 struct EveMatterValveTests {
-    private let bathroom = EntityId(placeId: "Bad OG", name: "Eve Thermo Bad OG", characteristicsName: "Heizung", characteristic: .valvePosition)
     private let livingRoom = EntityId(placeId: "Kaminzimmer", name: "Eve Thermo Kaminzimmer", characteristicsName: "Heizung", characteristic: .valvePosition)
 
     @Test("Raw values within 0...100 are the valve position in percent", arguments: [
@@ -35,14 +34,6 @@ struct EveMatterValveTests {
         #expect(EveMatterValve.calibrationInC(fromRawValue: rawValue) == nil)
     }
 
-    @Test("Valve position and calibration of the same Thermo are tracked separately")
-    func tracksCharacteristicsSeparately() {
-        let calibration = EntityId(placeId: "Bad OG", name: "Eve Thermo Bad OG", characteristicsName: "Heizung", characteristic: .temperatureCalibration)
-        var detector = MatterReadingChangeDetector()
-        let results = [(bathroom, 5), (calibration, 5), (bathroom, 5), (calibration, -5)].map { detector.recordIfChanged($1, for: $0) }
-        #expect(results == [true, true, false, true])
-    }
-
     @Test("Only an endpoint with the Thermostat cluster is a thermostat")
     func detectsThermostat() {
         // Eve Thermo: Descriptor, Identify, Thermostat, Eve vendor cluster
@@ -52,27 +43,4 @@ struct EveMatterValveTests {
         #expect(!EveMatterValve.isThermostat(serverClusterIDs: []))
     }
 
-    @Test("The first reading of an entity is a change, the same value again is not")
-    func detectsFirstReadingAndRepeats() {
-        var detector = MatterReadingChangeDetector()
-        let results = [71, 71, 45, 45].map { detector.recordIfChanged($0, for: bathroom) }
-        #expect(results == [true, false, true, false])
-    }
-
-    @Test("Entities are tracked separately")
-    func tracksEntitiesSeparately() {
-        var detector = MatterReadingChangeDetector()
-        let results = [livingRoom, bathroom, livingRoom].map { detector.recordIfChanged(0, for: $0) }
-        #expect(results == [true, true, false])
-    }
-
-    @Test("After a reset every entity's next reading is a change again")
-    func resetSendsAgain() {
-        var detector = MatterReadingChangeDetector()
-        let first = detector.recordIfChanged(71, for: bathroom)
-        detector.reset()
-        let afterReset = detector.recordIfChanged(71, for: bathroom)
-        #expect(first)
-        #expect(afterReset)
-    }
 }

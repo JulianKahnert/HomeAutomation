@@ -59,7 +59,7 @@ public struct MotionAtNight: Automatable {
    export AUTH_TOKEN="your-generated-token-here"
    ```
 
-3. **Configure Database**: Set `DATABASE_URL` environment variable (MySQL connection string)
+3. **Configure Database**: Set the `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USERNAME` and `DATABASE_PASSWORD` environment variables (and `DATABASE_TLS_VERIFY`, see `docs/setup-server.md`)
 
 4. **Build & Run FlowKit Adapter**:
    ```bash
@@ -101,7 +101,6 @@ Implement the `Automatable` protocol:
 ```swift
 public protocol Automatable {
     var name: String { get }
-    var triggerEntityIds: Set<EntityId> { get }  // Sensors/devices that trigger this
     func shouldTrigger(with event: HomeEvent, using hm: HomeManagable) async throws -> Bool
     func execute(using hm: HomeManagable) async throws
 }

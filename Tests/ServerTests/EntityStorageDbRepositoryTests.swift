@@ -6,341 +6,73 @@
 import Foundation
 @testable import HAModels
 @testable import Server
-import XCTest
+import Testing
 
-/// Tests for EntityStorageDbRepository mapping functions
-///
-/// These tests ensure complete field mapping between EntityStorageItem and EntityStorageDbItem.
-/// If a new field is added to either model but the mapping is not updated, these tests will FAIL.
-final class EntityStorageDbRepositoryTests: XCTestCase {
+/// The mapping between a state and its narrow rows: a directory entry and one change with a number and a text.
+@Suite("Narrow storage mapping")
+struct EntityStorageMappingTests {
+    static let samples: [(CharacteristicsType, Value)] = [
+        (.motionSensor, .bool(true)), (.lightSensor, .number(250.5)), (.switcher, .bool(false)),
+        (.brightness, .number(80)), (.colorTemperature, .number(3500)), (.color, .text("0.8 0.6 0.4")),
+        (.contactSensor, .bool(true)), (.lock, .bool(false)), (.batterySensor, .number(95)),
+        (.heating, .bool(true)), (.temperatureSensor, .number(21.5)), (.relativeHumiditySensor, .number(55)),
+        (.carbonDioxideSensorId, .number(450)), (.pmDensitySensor, .number(8.5)), (.airQualitySensor, .number(2)),
+        (.valve, .bool(false)), (.targetTemperature, .number(19.5)), (.heatingMode, .number(2)),
+        (.valvePosition, .number(42)), (.temperatureCalibration, .number(-0.5)),
+        (.energyPrice, .number(0.31)),
+        (.deadline, .text("running 1800000000.0"))
+    ]
 
-    // MARK: - Round-trip Tests
-
-    /// Tests that all fields survive a round-trip conversion: EntityStorageItem -> DbItem -> EntityStorageItem
-    ///
-    /// This test will FAIL if:
-    /// - A new field is added to EntityStorageItem but not mapped in EntityStorageDbRepository
-    /// - A field loses precision or data during conversion
-    func testCompleteFieldMappingRoundTrip_AllFields() throws {
-        // Create EntityStorageItem with ALL fields populated
-        let original = createFullyPopulatedEntityStorageItem()
-
-        // Convert to DB model and back
-        let dbItem = EntityStorageDbRepository.map(original)
-        let restored = EntityStorageDbRepository.mapDbItem(dbItem)
-
-        // Verify ALL fields match
-        assertEntityStorageItemsEqual(original, restored, message: "Round-trip conversion should preserve all fields")
+    @Test("every value kind is covered by a sample")
+    func samplesCoverAllKinds() {
+        #expect(Set(Self.samples.map(\.0)) == Set(CharacteristicsType.allCases))
     }
 
-    /// Tests air sensor device with temperature, humidity, CO2, PM density, and air quality
-    func testAirSensorMapping() throws {
-        let entityId = EntityId(
-            placeId: "bedroom",
-            name: "Luftsensor",
-            characteristicsName: nil,
-            characteristic: .temperatureSensor
-        )
+    @Test("every value kind is stored and read back unchanged", arguments: samples)
+    func roundTrip(type: CharacteristicsType, value: Value) throws {
+        let id = EntityId(placeId: "Kitchen", name: "Device", characteristicsName: "Name", characteristic: type)
+        let item = try #require(EntityStorageItem(entityId: id, timestamp: Date(timeIntervalSince1970: 1_735_333_200), value: value, origin: .server))
+        let stored = try #require(item.value)
+        let entity = EntityDbItem(placeId: id.placeId, serviceName: id.name, characteristicType: type.rawValue, characteristicsName: id.characteristicsName)
+        let change = EntityChangeDbItem(entityId: UUID(), timestamp: item.timestamp, value: stored, shape: ValueDescriptor.descriptor(for: type).shape, origin: item.origin.rawValue)
 
-        let original = EntityStorageItem(
-            entityId: entityId,
-            timestamp: Date(),
-            motionDetected: nil,
-            illuminance: nil,
-            isDeviceOn: nil,
-            brightness: nil,
-            colorTemperature: nil,
-            color: nil,
-            isContactOpen: nil,
-            isDoorLocked: nil,
-            stateOfCharge: nil,
-            isHeaterActive: nil,
-            temperatureInC: Measurement(value: 22.5, unit: .celsius),
-            relativeHumidity: 45.5,
-            carbonDioxideSensorId: 650,
-            pmDensity: 12.3,
-            airQuality: 1,
-            valveOpen: nil
-        )
+        let restored = try #require(EntityStorageItem(entity: entity, change: change))
 
-        let dbItem = EntityStorageDbRepository.map(original)
-        let restored = EntityStorageDbRepository.mapDbItem(dbItem)
-
-        // Verify air quality fields
-        XCTAssertNotNil(restored.temperatureInC)
-        XCTAssertEqual(restored.temperatureInC?.converted(to: .celsius).value ?? 0, 22.5, accuracy: 0.01)
-        XCTAssertEqual(restored.relativeHumidity, 45.5)
-        XCTAssertEqual(restored.carbonDioxideSensorId, 650)
-        XCTAssertEqual(restored.pmDensity, 12.3)
-        XCTAssertEqual(restored.airQuality, 1)
+        #expect(restored == item)
+        #expect(restored.origin == .server)
+        #expect(restored.value == value)
     }
 
-    /// Tests motion sensor with illuminance
-    func testMotionSensorMapping() throws {
-        let entityId = EntityId(
-            placeId: "hallway",
-            name: "Motion Sensor",
-            characteristicsName: nil,
-            characteristic: .motionSensor
-        )
-
-        let original = EntityStorageItem(
-            entityId: entityId,
-            timestamp: Date(),
-            motionDetected: true,
-            illuminance: Measurement(value: 150.0, unit: .lux),
-            isDeviceOn: nil,
-            brightness: nil,
-            colorTemperature: nil,
-            color: nil,
-            isContactOpen: nil,
-            isDoorLocked: nil,
-            stateOfCharge: nil,
-            isHeaterActive: nil,
-            temperatureInC: nil,
-            relativeHumidity: nil,
-            carbonDioxideSensorId: nil,
-            pmDensity: nil,
-            airQuality: nil,
-            valveOpen: nil
-        )
-
-        let dbItem = EntityStorageDbRepository.map(original)
-        let restored = EntityStorageDbRepository.mapDbItem(dbItem)
-
-        XCTAssertEqual(restored.motionDetected, true)
-        XCTAssertNotNil(restored.illuminance)
-        XCTAssertEqual(restored.illuminance?.converted(to: .lux).value ?? 0, 150.0, accuracy: 0.01)
+    @Test("a deadline is one row: the number for the end, the text for the case")
+    func deadlineColumns() {
+        let row = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .text("overdue 1800000000.0"), shape: .textWithNumber, origin: "server")
+        let none = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .text("none"), shape: .textWithNumber, origin: "server")
+        #expect(row.number == 1_800_000_000 && row.text == "overdue")
+        #expect(none.number == nil && none.text == "none")
     }
 
-    /// Tests light device with brightness, color temperature, and RGB color
-    func testLightDeviceMapping() throws {
-        let entityId = EntityId(
-            placeId: "living-room",
-            name: "Smart Light",
-            characteristicsName: nil,
-            characteristic: .switcher
-        )
-
-        let original = EntityStorageItem(
-            entityId: entityId,
-            timestamp: Date(),
-            motionDetected: nil,
-            illuminance: nil,
-            isDeviceOn: true,
-            brightness: 75,
-            colorTemperature: 4000.0,
-            color: RGB(red: 1.0, green: 0.5, blue: 0.2),
-            isContactOpen: nil,
-            isDoorLocked: nil,
-            stateOfCharge: nil,
-            isHeaterActive: nil,
-            temperatureInC: nil,
-            relativeHumidity: nil,
-            carbonDioxideSensorId: nil,
-            pmDensity: nil,
-            airQuality: nil,
-            valveOpen: nil
-        )
-
-        let dbItem = EntityStorageDbRepository.map(original)
-        let restored = EntityStorageDbRepository.mapDbItem(dbItem)
-
-        XCTAssertEqual(restored.isDeviceOn, true)
-        XCTAssertEqual(restored.brightness, 75)
-        XCTAssertEqual(restored.colorTemperature, 4000.0)
-        XCTAssertNotNil(restored.color)
-        XCTAssertEqual(Double(restored.color?.red ?? 0), 1.0, accuracy: 0.01)
-        XCTAssertEqual(Double(restored.color?.green ?? 0), 0.5, accuracy: 0.01)
-        XCTAssertEqual(Double(restored.color?.blue ?? 0), 0.2, accuracy: 0.01)
+    @Test("a bool is stored in the number column, a text in the text column")
+    func columns() {
+        let flag = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .bool(true), origin: "homekit")
+        let text = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .text("1 2 3"), origin: "homekit")
+        #expect(flag.number == 1 && flag.text == nil)
+        #expect(text.number == nil && text.text == "1 2 3")
     }
 
-    /// Tests heating device with valve state
-    func testHeatingDeviceMapping() throws {
-        let entityId = EntityId(
-            placeId: "bedroom",
-            name: "Radiator Valve",
-            characteristicsName: nil,
-            characteristic: .valve
-        )
+    @Test("a heating mode this server does not know is read as an item without value")
+    func unknownHeatingMode() throws {
+        let entity = EntityDbItem(placeId: "Kitchen", serviceName: "Thermo", characteristicType: CharacteristicsType.heatingMode.rawValue, characteristicsName: nil)
+        let change = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .number(9), origin: "homekit")
 
-        let original = EntityStorageItem(
-            entityId: entityId,
-            timestamp: Date(),
-            motionDetected: nil,
-            illuminance: nil,
-            isDeviceOn: nil,
-            brightness: nil,
-            colorTemperature: nil,
-            color: nil,
-            isContactOpen: nil,
-            isDoorLocked: nil,
-            stateOfCharge: nil,
-            isHeaterActive: true,
-            temperatureInC: nil,
-            relativeHumidity: nil,
-            carbonDioxideSensorId: nil,
-            pmDensity: nil,
-            airQuality: nil,
-            valveOpen: true
-        )
+        let item = try #require(EntityStorageItem(entity: entity, change: change))
 
-        let dbItem = EntityStorageDbRepository.map(original)
-        let restored = EntityStorageDbRepository.mapDbItem(dbItem)
-
-        XCTAssertEqual(restored.isHeaterActive, true)
-        XCTAssertEqual(restored.valveOpen, true)
+        #expect(item.heatingMode == nil)
     }
 
-    /// Tests that nil/null values are preserved correctly
-    func testNullValueMapping() throws {
-        let entityId = EntityId(
-            placeId: "test",
-            name: "Test Device",
-            characteristicsName: nil,
-            characteristic: .batterySensor
-        )
-
-        let original = EntityStorageItem(
-            entityId: entityId,
-            timestamp: Date(),
-            motionDetected: nil,
-            illuminance: nil,
-            isDeviceOn: nil,
-            brightness: nil,
-            colorTemperature: nil,
-            color: nil,
-            isContactOpen: nil,
-            isDoorLocked: nil,
-            stateOfCharge: 85,
-            isHeaterActive: nil,
-            temperatureInC: nil,
-            relativeHumidity: nil,
-            carbonDioxideSensorId: nil,
-            pmDensity: nil,
-            airQuality: nil,
-            valveOpen: nil
-        )
-
-        let dbItem = EntityStorageDbRepository.map(original)
-        let restored = EntityStorageDbRepository.mapDbItem(dbItem)
-
-        // Only stateOfCharge should be set
-        XCTAssertEqual(restored.stateOfCharge, 85)
-        XCTAssertNil(restored.motionDetected)
-        XCTAssertNil(restored.illuminance)
-        XCTAssertNil(restored.isDeviceOn)
-        XCTAssertNil(restored.brightness)
-        XCTAssertNil(restored.colorTemperature)
-        XCTAssertNil(restored.color)
-        XCTAssertNil(restored.temperatureInC)
-        XCTAssertNil(restored.relativeHumidity)
-        XCTAssertNil(restored.carbonDioxideSensorId)
-        XCTAssertNil(restored.pmDensity)
-        XCTAssertNil(restored.airQuality)
-        XCTAssertNil(restored.valveOpen)
-    }
-
-    // MARK: - Helper Methods
-
-    private func createFullyPopulatedEntityStorageItem() -> EntityStorageItem {
-        let entityId = EntityId(
-            placeId: "test-place",
-            name: "Test Device",
-            characteristicsName: "test-characteristic",
-            characteristic: .airQualitySensor
-        )
-
-        return EntityStorageItem(
-            entityId: entityId,
-            timestamp: Date(timeIntervalSince1970: 1735333200), // Fixed timestamp for reproducibility
-            motionDetected: true,
-            illuminance: Measurement(value: 250.5, unit: .lux),
-            isDeviceOn: true,
-            brightness: 80,
-            colorTemperature: 3500.0,
-            color: RGB(red: 0.8, green: 0.6, blue: 0.4),
-            isContactOpen: false,
-            isDoorLocked: true,
-            stateOfCharge: 95,
-            isHeaterActive: true,
-            temperatureInC: Measurement(value: 21.5, unit: .celsius),
-            relativeHumidity: 55.0,
-            carbonDioxideSensorId: 450,
-            pmDensity: 8.5,
-            airQuality: 2,
-            valveOpen: true,
-            targetTemperatureInC: 19.5,
-            heatingMode: .heat,
-            valvePositionPercent: 42,
-            temperatureCalibrationInC: -0.5
-        )
-    }
-
-    private func assertEntityStorageItemsEqual(
-        _ lhs: EntityStorageItem,
-        _ rhs: EntityStorageItem,
-        accuracy: Double = 0.001,
-        message: String,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        // Entity ID
-        XCTAssertEqual(lhs.entityId.placeId, rhs.entityId.placeId, message, file: file, line: line)
-        XCTAssertEqual(lhs.entityId.name, rhs.entityId.name, message, file: file, line: line)
-        XCTAssertEqual(lhs.entityId.characteristicsName, rhs.entityId.characteristicsName, message, file: file, line: line)
-        XCTAssertEqual(lhs.entityId.characteristicType, rhs.entityId.characteristicType, message, file: file, line: line)
-
-        // Timestamp
-        XCTAssertEqual(lhs.timestamp.timeIntervalSince1970, rhs.timestamp.timeIntervalSince1970, accuracy: 0.001, message, file: file, line: line)
-
-        // Motion & Illuminance
-        XCTAssertEqual(lhs.motionDetected, rhs.motionDetected, message, file: file, line: line)
-        if let lhsIlluminance = lhs.illuminance, let rhsIlluminance = rhs.illuminance {
-            XCTAssertEqual(lhsIlluminance.converted(to: .lux).value, rhsIlluminance.converted(to: .lux).value, accuracy: accuracy, message, file: file, line: line)
-        } else {
-            XCTAssertEqual(lhs.illuminance == nil, rhs.illuminance == nil, message, file: file, line: line)
-        }
-
-        // Device state
-        XCTAssertEqual(lhs.isDeviceOn, rhs.isDeviceOn, message, file: file, line: line)
-        XCTAssertEqual(lhs.brightness, rhs.brightness, message, file: file, line: line)
-        XCTAssertEqual(lhs.colorTemperature, rhs.colorTemperature, message, file: file, line: line)
-
-        // Color
-        if let lhsColor = lhs.color, let rhsColor = rhs.color {
-            XCTAssertEqual(lhsColor.red, rhsColor.red, accuracy: Float(accuracy), message, file: file, line: line)
-            XCTAssertEqual(lhsColor.green, rhsColor.green, accuracy: Float(accuracy), message, file: file, line: line)
-            XCTAssertEqual(lhsColor.blue, rhsColor.blue, accuracy: Float(accuracy), message, file: file, line: line)
-        } else {
-            XCTAssertEqual(lhs.color == nil, rhs.color == nil, message, file: file, line: line)
-        }
-
-        // Contact & Lock
-        XCTAssertEqual(lhs.isContactOpen, rhs.isContactOpen, message, file: file, line: line)
-        XCTAssertEqual(lhs.isDoorLocked, rhs.isDoorLocked, message, file: file, line: line)
-
-        // Battery
-        XCTAssertEqual(lhs.stateOfCharge, rhs.stateOfCharge, message, file: file, line: line)
-
-        // Heating
-        XCTAssertEqual(lhs.isHeaterActive, rhs.isHeaterActive, message, file: file, line: line)
-        XCTAssertEqual(lhs.valveOpen, rhs.valveOpen, message, file: file, line: line)
-        XCTAssertEqual(lhs.targetTemperatureInC, rhs.targetTemperatureInC, message, file: file, line: line)
-        XCTAssertEqual(lhs.heatingMode, rhs.heatingMode, message, file: file, line: line)
-        XCTAssertEqual(lhs.valvePositionPercent, rhs.valvePositionPercent, message, file: file, line: line)
-        XCTAssertEqual(lhs.temperatureCalibrationInC, rhs.temperatureCalibrationInC, message, file: file, line: line)
-
-        // Air Quality Sensors
-        if let lhsTemp = lhs.temperatureInC, let rhsTemp = rhs.temperatureInC {
-            XCTAssertEqual(lhsTemp.converted(to: .celsius).value, rhsTemp.converted(to: .celsius).value, accuracy: accuracy, message, file: file, line: line)
-        } else {
-            XCTAssertEqual(lhs.temperatureInC == nil, rhs.temperatureInC == nil, message, file: file, line: line)
-        }
-
-        XCTAssertEqual(lhs.relativeHumidity, rhs.relativeHumidity, message, file: file, line: line)
-        XCTAssertEqual(lhs.carbonDioxideSensorId, rhs.carbonDioxideSensorId, message, file: file, line: line)
-        XCTAssertEqual(lhs.pmDensity, rhs.pmDensity, message, file: file, line: line)
-        XCTAssertEqual(lhs.airQuality, rhs.airQuality, message, file: file, line: line)
+    @Test("an entity of an unknown characteristic type is skipped")
+    func unknownType() {
+        let entity = EntityDbItem(placeId: "Hall", serviceName: "Gone", characteristicType: "noLongerKnown", characteristicsName: nil)
+        let change = EntityChangeDbItem(entityId: UUID(), timestamp: Date(), value: .bool(true), origin: "homekit")
+        #expect(EntityStorageItem(entity: entity, change: change) == nil)
     }
 }

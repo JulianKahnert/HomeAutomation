@@ -27,7 +27,6 @@ struct AppFeature: Sendable {
         var selectedTab: Tab = .overview
         var overview = OverviewFeature.State()
         var automations = AutomationsFeature.State()
-        var rooms = RoomsFeature.State()
         var heating = HeatingFeature.State()
         var settings = SettingsFeature.State()
 
@@ -41,7 +40,6 @@ struct AppFeature: Sendable {
     enum Tab: Sendable, Equatable, CaseIterable {
         case overview
         case automations
-        case rooms
         case heating
         case settings
 
@@ -49,7 +47,6 @@ struct AppFeature: Sendable {
             switch self {
             case .overview: return "Overview"
             case .automations: return "Automations"
-            case .rooms: return "Rooms"
             case .heating: return "Heating"
             case .settings: return "Settings"
             }
@@ -59,7 +56,6 @@ struct AppFeature: Sendable {
             switch self {
             case .overview: return "house"
             case .automations: return "lamp.floor"
-            case .rooms: return "square.grid.2x2"
             case .heating: return "thermometer.high"
             case .settings: return "gear"
             }
@@ -69,21 +65,15 @@ struct AppFeature: Sendable {
     // MARK: - Action
 
     enum Action: Sendable, BindableAction {
-        case selectedTabChanged(Tab)
         case overview(OverviewFeature.Action)
         case automations(AutomationsFeature.Action)
-        case rooms(RoomsFeature.Action)
         case heating(HeatingFeature.Action)
         case settings(SettingsFeature.Action)
 
         // Live Activities & Push Notifications
         case startMonitoringLiveActivities
-        case stopMonitoringLiveActivities
         case registerPushToken(PushToken)
         case clearDeliveredNotifications
-
-        // Background tasks
-        case refreshWindowStates
 
         // Scene phase changes
         case scenePhaseChanged(old: ScenePhase, new: ScenePhase)
@@ -111,10 +101,6 @@ struct AppFeature: Sendable {
             AutomationsFeature()
         }
 
-        Scope(\.rooms, action: \.rooms) {
-            RoomsFeature()
-        }
-
         Scope(\.heating, action: \.heating) {
             HeatingFeature()
         }
@@ -125,10 +111,6 @@ struct AppFeature: Sendable {
 
         Reduce { state, action in
             switch action {
-            case let .selectedTabChanged(tab):
-                state.selectedTab = tab
-                return .none
-
             case let .overview(.delegate(.openAutomation(name))):
                 state.selectedTab = .automations
                 return .send(.automations(.openAutomation(name)))
@@ -137,9 +119,6 @@ struct AppFeature: Sendable {
                 return .none
 
             case .automations:
-                return .none
-
-            case .rooms:
                 return .none
 
             case .heating:
@@ -174,11 +153,6 @@ struct AppFeature: Sendable {
                 }
                 .cancellable(id: CancelID.liveActivityMonitoring, cancelInFlight: true)
 
-            case .stopMonitoringLiveActivities:
-                return .run { _ in
-                    await liveActivity.stopActivity()
-                }
-
             // MARK: - Push Notifications
 
             case let .registerPushToken(token):
@@ -195,13 +169,6 @@ struct AppFeature: Sendable {
             case .clearDeliveredNotifications:
                 return .run { _ in
                     await pushNotification.clearDeliveredNotifications()
-                }
-
-            // MARK: - Background Tasks
-
-            case .refreshWindowStates:
-                return .run { send in
-                    await send(.settings(.refreshWindowStates))
                 }
 
             // MARK: - Scene Phase Changes
@@ -224,9 +191,8 @@ struct AppFeature: Sendable {
                 return .merge(
                     .send(.overview(.refresh)),
                     .send(.automations(.refresh)),
-                    .send(.rooms(.refresh)),
                     .send(.heating(.refresh)),
-                    .send(.refreshWindowStates),
+                    .send(.settings(.refreshWindowStates)),
                     .send(.startMonitoringLiveActivities),
                     .send(.clearDeliveredNotifications)
                 )
@@ -263,14 +229,6 @@ struct AppView: View {
                 AutomationsView(
                     store: store.scope(\.automations, action: \.automations)
                 )
-            }
-
-            Tab(
-                AppFeature.Tab.rooms.title,
-                systemImage: AppFeature.Tab.rooms.systemImage,
-                value: AppFeature.Tab.rooms
-            ) {
-                RoomsView(store: store.scope(\.rooms, action: \.rooms))
             }
 
             Tab(

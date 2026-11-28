@@ -7,25 +7,23 @@
 
 import Foundation
 import HAModels
-import Logging
-import Shared
 
-struct ClockJob: Job, Log {
+/// The clock events (`time`, `sunrise`, `sunset`) on every full minute, from the scheduler's one minute grid.
+struct ClockJob: ScheduledJob {
+    let name = "ClockJob"
+    let cadence: Duration = .minutes(1)
     let location: Location
-    let homeEventsContinuation: AsyncStream<HomeEvent>.Continuation
+    let homeEventSink: HomeEventSink
 
-    func run() async {
-        log.debug("Starting ClockJob")
-        for await date in Timer.publish(every: .minutes(1)) {
-            // trigger stream event
-            homeEventsContinuation.yield(.time(date: date))
+    func run(plannedAt date: Date) async throws {
+        // trigger stream event
+        homeEventSink.yield(.time(date: date))
 
-            // trigger sunset/sunrise event
-            if Sun.sunriseElevation(for: date, latitude: location.latitude, longitude: location.longitude) == .horizon {
-                homeEventsContinuation.yield(.sunrise)
-            } else if Sun.sunsetElevation(for: date, latitude: location.latitude, longitude: location.longitude) == .horizon {
-                homeEventsContinuation.yield(.sunset)
-            }
+        // trigger sunset/sunrise event
+        if Sun.sunriseElevation(for: date, latitude: location.latitude, longitude: location.longitude) == .horizon {
+            homeEventSink.yield(.sunrise)
+        } else if Sun.sunsetElevation(for: date, latitude: location.latitude, longitude: location.longitude) == .horizon {
+            homeEventSink.yield(.sunset)
         }
     }
 }
